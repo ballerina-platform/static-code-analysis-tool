@@ -16,6 +16,9 @@ OPTIONS
         --target-dir=<path>
                 Target directory path.
 
+        --scan-report
+                Generates an HTML report containing the analysis results.
+
 EXAMPLES
         Run analysis against all Ballerina documents in the current package
                 $ bal scan
@@ -26,3 +29,6 @@ EXAMPLES
 
         Run analysis and save analysis results in specified directory.
                 $ bal scan --target-dir="results"
+
+        Run analysis and generate an analysis report.
+                $ bal scan --scan-report

@@ -19,6 +19,7 @@ package io.ballerina.scan;
 
 import io.ballerina.cli.BLauncherCmd;
 import io.ballerina.projects.util.ProjectConstants;
+import io.ballerina.scan.utilities.ScanToolConstants;
 import io.ballerina.scan.utilities.ScanUtils;
 import picocli.CommandLine;
 
@@ -50,6 +51,9 @@ public class ScanCommand implements BLauncherCmd {
 
     @CommandLine.Option(names = "--target-dir", description = "Target directory path")
     private String targetDir;
+
+    @CommandLine.Option(names = {"--scan-report"}, description = "Enable scan report generation")
+    private boolean scanReport;
 
     public ScanCommand() {
 
@@ -162,6 +166,20 @@ public class ScanCommand implements BLauncherCmd {
             outputStream.println();
             outputStream.println("View scan results at:");
             outputStream.println("\t" + reportPath + "\n");
+        }
+
+        if (scanReport) {
+            Path scanReportPath;
+            outputStream.println();
+            outputStream.println("Generating scan report...");
+            if (targetDir != null) {
+                scanReportPath = ScanUtils.generateScanReport(issues, userPath, targetDir);
+            } else {
+                scanReportPath = ScanUtils.generateScanReport(issues, userPath, null);
+            }
+            outputStream.println();
+            outputStream.println("View scan report at:");
+            outputStream.println("\t" + ScanToolConstants.FILE_PROTOCOL + scanReportPath + "\n");
         }
     }
 

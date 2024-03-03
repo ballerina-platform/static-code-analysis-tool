@@ -69,6 +69,9 @@ dependencies {
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "${junitVersion}"
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: "${junitVersion}"
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: "${junitVersion}"
+
+    // For including the HTML scan report JAR
+    implementation files("${projectDir}/src/main/resources/report.zip")
 }
 
 tasks.withType(JavaExec).configureEach {
