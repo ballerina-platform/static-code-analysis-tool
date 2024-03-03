@@ -192,6 +192,7 @@ def balToolTomlFile = new File("${projectDir}/tool-scan/BalTool.toml")
 def balerinaCentralDir = System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io/bala/ballerina"
 def ballerinaLocalDir = System.getProperty("user.home") + "/.ballerina/repositories/local/bala/ballerina"
 def balCentralCacheDir = project.file(System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io")
+def ballerinaToolConfigDir = System.getProperty("user.home") + "/.ballerina/.config"
 def ballerinaToolConfigToml = System.getProperty("user.home") + "/.ballerina/.config/bal-tools.toml"
 
 task updateTomlFiles {
@@ -221,6 +222,7 @@ task createBallerinaToolConfigFile {
     outputs.upToDateWhen { false }
     doLast {
         if (!file(ballerinaToolConfigToml).exists()) {
+            file(ballerinaToolConfigDir).mkdirs()
             file(ballerinaToolConfigToml).createNewFile()
         }
 
