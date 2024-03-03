@@ -66,6 +66,10 @@ Execute the commands below to build from the source.
     ```bash
     bal scan --target-dir="results"
     ```
+4. Run analysis and generate an analysis report.
+    ```bash
+    bal scan --scan-report
+    ```
 
 ## Contribute to Ballerina
 As an open-source project, Ballerina welcomes contributions from the community.
