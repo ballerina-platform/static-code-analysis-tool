@@ -221,7 +221,7 @@ task createBallerinaToolConfigFile {
     outputs.upToDateWhen { false }
     doLast {
         if (!file(ballerinaToolConfigToml).exists()) {
-            file(ballerinaToolConfigToml).mkdir()
+            file(ballerinaToolConfigToml).createNewFile()
         }
 
         // Retrieve existing content of toml file
