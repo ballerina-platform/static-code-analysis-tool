@@ -1,0 +1,28 @@
+NAME
+        ballerina-scan - Static code analyzer
+
+SYNOPSIS
+        bal scan [OPTIONS] [<package>|<source-file>]
+
+DESCRIPTION
+        Compiles and performs static code analysis and reports the analysis issues.
+        Analyze source code defined in each module of a package when compiling the current package.
+        It analyzes the given source file when compiling a single '.bal' file.
+
+        Note: Analyzing individual '.bal' files of a package is not allowed.
+
+
+OPTIONS
+        --target-dir=<path>
+                Target directory path.
+
+EXAMPLES
+        Run analysis against all Ballerina documents in the current package
+                $ bal scan
+
+        Run analysis against a standalone Ballerina file. The file path can be
+        relative or absolute.
+                $ bal scan main.bal
+
+        Run analysis and save analysis results in specified directory.
+                $ bal scan --target-dir="results"
