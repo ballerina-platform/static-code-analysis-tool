@@ -16,5 +16,30 @@
  *  under the License.
  */
 
-rootProject.name = 'static-code-analysis-tool'
-include 'ScanCommand'
+package io.ballerina.scan;
+
+/**
+ * Represents the kind of severity of a {@link Rule} instance.
+ * <p>
+ * There are three known kinds of severities at the moment: {@link #CODE_SMELL}, {@link #BUG}
+ * and {@link #VULNERABILITY}.
+ * </p>
+ *
+ * @since 0.1.0
+ */
+public enum Severity {
+    /**
+     * Label for marking rules related to code maintainability.
+     */
+    CODE_SMELL,
+
+    /**
+     * Label for marking rules related to coding mistakes that cause errors or unexpected behaviour at runtime.
+     */
+    BUG,
+
+    /**
+     * Label for marking rules related to code susceptible to exploits due to security weaknesses.
+     */
+    VULNERABILITY
+}

@@ -16,5 +16,22 @@
  *  under the License.
  */
 
-rootProject.name = 'static-code-analysis-tool'
-include 'ScanCommand'
+package io.ballerina.scan;
+
+/**
+ * Denotes whether an {@link Issue} is reported by the Ballerina platform ({@link #BUILT_IN}) or an
+ * external analysis plugin ({@link #EXTERNAL}).
+ *
+ * @since 0.1.0
+ */
+public enum Source {
+    /**
+     * Label for marking issues reported by Ballerina scan tool and Ballerina platform static code analyzer plugins.
+     */
+    BUILT_IN,
+
+    /**
+     * Label for marking issues reported by non Ballerina platform static code analyzer plugins.
+     */
+    EXTERNAL
+}

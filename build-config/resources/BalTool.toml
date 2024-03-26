@@ -1,0 +1,5 @@
+[tool]
+id = "scan"
+
+[[dependency]]
+path = "../build/libs/ScanCommand-@toml.version@.jar"

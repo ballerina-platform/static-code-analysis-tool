@@ -16,5 +16,13 @@
  *  under the License.
  */
 
-rootProject.name = 'static-code-analysis-tool'
-include 'ScanCommand'
+package io.ballerina.scan;
+
+/**
+ * This class contains the constant variables used within the Ballerina scan tool.
+ *
+ * @since 0.1.0
+ */
+class ScanToolConstants {
+    static final String SCAN_COMMAND = "scan";
+}
