@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
     id 'java'
     id 'application'
@@ -56,6 +58,12 @@ dependencies {
     implementation group: 'org.ballerinalang', name: 'ballerina-cli', version: "${ballerinaLangVersion}"
 
     checkstyle group: 'com.puppycrawl.tools', name: 'checkstyle', version: "${puppycrawlCheckstyleVersion}"
+
+    // Required for determining the platform a java process is running on
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: "${apacheCommonsLang3Version}"
+
+    // Required dependencies for running scan tool tests
+    testImplementation group: 'org.testng', name: 'testng', version: "${testngVersion}"
 }
 
 tasks.withType(JavaExec).configureEach {
@@ -128,4 +136,135 @@ spotbugsTest {
     if (excludeFile.exists()) {
         excludeFilter = excludeFile
     }
+}
+
+task validateSpotbugs() {
+    doLast {
+        if (spotbugsMain.reports.size() > 0 && spotbugsMain.reports[0].destination.exists() &&
+                spotbugsMain.reports[0].destination.text.readLines().size() > 0) {
+            spotbugsMain.reports[0].destination?.eachLine {
+                println 'Failure: ' + it
+            }
+        } else {
+            throw new GradleException("Spotbugs rule violations were found.");
+        }
+    }
+}
+
+spotbugsMain.finalizedBy validateSpotbugs
+
+tasks.test {
+    useTestNG() {
+        suites 'src/test/resources/testng.xml'
+    }
+}
+
+// Configurations to automatically build and deploy scan tool
+def packageName = "tool_scan"
+def tomlVersion = "${project.scanToolVersion}"
+def ballerinaTomlFilePlaceHolder = new File("${rootDir}/build-config/resources/Ballerina.toml")
+def balToolTomlFilePlaceHolder = new File("${rootDir}/build-config/resources/BalTool.toml")
+def ballerinaTomlFile = new File("${projectDir}/tool-scan/Ballerina.toml")
+def balToolTomlFile = new File("${projectDir}/tool-scan/BalTool.toml")
+def balerinaCentralDir = System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io/bala/ballerina"
+def ballerinaLocalDir = System.getProperty("user.home") + "/.ballerina/repositories/local/bala/ballerina"
+def balCentralCacheDir = project.file(System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io")
+def ballerinaToolConfigDir = System.getProperty("user.home") + "/.ballerina/.config"
+def ballerinaToolConfigToml = System.getProperty("user.home") + "/.ballerina/.config/bal-tools.toml"
+
+task updateTomlFiles {
+    // Update the Ballerina.toml and BalTool.toml files
+    doLast {
+        def newConfig = ballerinaTomlFilePlaceHolder.text.replace("@toml.distribution@", project.ballerinaLangVersion)
+        newConfig = newConfig.replace("@toml.version@", tomlVersion)
+        ballerinaTomlFile.text = newConfig
+
+        def newToolConfig = balToolTomlFilePlaceHolder.text.replace("@toml.version@", tomlVersion)
+        balToolTomlFile.text = newToolConfig
+    }
+}
+
+task createBallerinaToolConfigFile {
+    // Create the bal-tools.toml file in the .ballerina/.config directory
+    def configFileContent = """
+        [[tool]]
+        id = "scan"
+        org = "ballerina"
+        name = "tool_scan"
+        version = "${project.scanToolVersion}"
+        active = true
+    """.stripIndent()
+
+    outputs.upToDateWhen { false }
+    doLast {
+        if (!file(ballerinaToolConfigToml).exists()) {
+            file(ballerinaToolConfigDir).mkdirs()
+            file(ballerinaToolConfigToml).createNewFile()
+        }
+
+        // Retrieve existing content of toml file
+        def tomlFile = file(ballerinaToolConfigToml)
+        def tomlFileContent = tomlFile.text
+
+        // Regex to identify existing scan tool entry
+        def entryRegex = /\n\[\[tool]]\nid = "scan"\norg = "ballerina"\nname = "tool_scan"\nversion = ".+"\nactive = true/
+        def match = tomlFileContent.find(entryRegex)
+
+        if (match) {
+            if (tomlFileContent.contains(configFileContent)) {
+                println("bal scan tool already exists!")
+            } else {
+                tomlFileContent = tomlFileContent.replaceFirst(entryRegex, configFileContent)
+                tomlFile.text = tomlFileContent
+                println("Successfully updated bal-tools.toml with new version of scan tool")
+            }
+        } else {
+            // add scan tool
+            tomlFile << "\n" + configFileContent
+            println("Successfully created the bal-tools.toml file in the .ballerina/.config directory")
+        }
+    }
+}
+
+task buildScanTool {
+    doLast {
+        // Pack and push to local repo of distribution
+        exec {
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                commandLine 'cmd', '/c', 'cd tool-scan & bal pack & bal push --repository=local'
+            } else {
+                commandLine 'sh', '-c', 'cd tool-scan ; bal pack ; bal push --repository=local'
+            }
+        }
+        println("Successfully build and pushed the scan tool to the local repository")
+
+        // Remove the cache directories in the central repository
+        delete {
+            fileTree(balCentralCacheDir).matching {
+                include 'cache-*'
+            }
+        }
+        println("Successfully cleaned the .ballerina/cache* directories")
+
+        // Update the central repository
+        def balDestinationDir = "$balerinaCentralDir/$packageName"
+        def balSourceDir = "$ballerinaLocalDir/$packageName"
+        if (file(balDestinationDir).exists()) {
+            file(balDestinationDir).deleteDir()
+        }
+        copy {
+            from balSourceDir
+            into balDestinationDir
+        }
+        println("Successfully copied package from local/bala the central.ballerina.io/bala directory")
+    }
+}
+
+createBallerinaToolConfigFile.dependsOn updateTomlFiles
+buildScanTool.dependsOn createBallerinaToolConfigFile
+
+build {
+    dependsOn updateTomlFiles
+    dependsOn createBallerinaToolConfigFile
+    dependsOn buildScanTool
 }
