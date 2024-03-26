@@ -58,6 +58,9 @@ dependencies {
 
     checkstyle group: 'com.puppycrawl.tools', name: 'checkstyle', version: "${puppycrawlCheckstyleVersion}"
 
+    // Required for determining the platform a java process is running on
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.0'
+
     // Required dependencies for running scan tool tests
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.8.2'
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.8.2'
@@ -208,10 +211,13 @@ task createBallerinaToolConfigFile {
         def match = tomlFileContent.find(entryRegex)
 
         if (match) {
-            // Replace existing version with new version of tool
-            tomlFileContent = tomlFileContent.replaceFirst(entryRegex, configFileContent)
-            tomlFile.text = tomlFileContent
-            println("Successfully updated bal-tools.toml with new version of scan tool")
+            if(tomlFileContent.contains(configFileContent)){
+                println("bal scan tool already exists!")
+            }else{
+                tomlFileContent = tomlFileContent.replaceFirst(entryRegex, configFileContent)
+                tomlFile.text = tomlFileContent
+                println("Successfully updated bal-tools.toml with new version of scan tool")
+            }
         } else {
             // add scan tool
             tomlFile << "\n" + configFileContent
