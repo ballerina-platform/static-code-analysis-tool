@@ -5,12 +5,12 @@ SYNOPSIS
         bal scan [OPTIONS] [<package>|<source-file>]
 
 DESCRIPTION
-        Compiles and performs static code analysis, prints results to the console,  and reports results.
+        Compile and perform static code analysis, print results to the console, and report results.
 
-        Analyze the source code defined in each module when compiling a package or analyze the given source file
-        when compiling a single BAL file.
+        Analyzes the source code defined in each module when compiling a package or analyzes the given source file
+        when compiling a single Ballerina file.
 
-        Note: Analyzing individual BAL files of a package is not allowed.
+        Note: Analyzing individual Ballerina files of a package is not allowed.
 
 
 OPTIONS
@@ -18,16 +18,16 @@ OPTIONS
                 Target directory path for saving analysis reports. (only for ballerina build projects)
 
         --scan-report
-        	    Generates an HTML report containing the analysis results. (only for ballerina build projects)
+                Generate an HTML report containing the analysis results. (only for ballerina build projects)
 
         --list-rules
                 List all available rules.
 
-        --include-rules=<rule1, …>
-	            Run analysis for a specific set of rules.
+        --include-rules=<rule1, ...>
+                Run analysis for a specific set of rules.
 
-        --exclude-rules=<rule1, …>
-	            Exclude analysis for a specific set of rules.
+        --exclude-rules=<rule1, ...>
+                Exclude analysis for a specific set of rules.
 
         --platforms=<platformName1, ...>
                 Define platform(s) to report results. The user can define more than one platform.
