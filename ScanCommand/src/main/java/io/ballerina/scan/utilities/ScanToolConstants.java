@@ -18,19 +18,6 @@
 
 package io.ballerina.scan.utilities;
 
-import picocli.CommandLine;
-
-import java.util.Arrays;
-import java.util.List;
-
-/**
- * This class is used by picocli for splitting comma separated arguments provided in a string.
- *
- * @since 0.1.0
- */
-public class StringToListConverter implements CommandLine.ITypeConverter<List<String>> {
-    @Override
-    public List<String> convert(String value) {
-        return Arrays.asList(value.split("\\s*,\\s*"));
-    }
+public class ScanToolConstants {
+    public static final String SCAN_COMMAND = "scan";
 }

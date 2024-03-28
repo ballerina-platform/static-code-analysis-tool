@@ -31,7 +31,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-@CommandLine.Command(name = "scan", description = "Perform static code analysis for ballerina packages")
+import static io.ballerina.scan.utilities.ScanToolConstants.SCAN_COMMAND;
+
+@CommandLine.Command(name = SCAN_COMMAND, description = "Perform static code analysis for ballerina packages")
 public class ScanCmd implements BLauncherCmd {
     private final PrintStream outputStream;
 
@@ -41,13 +43,15 @@ public class ScanCmd implements BLauncherCmd {
     @CommandLine.Option(names = {"--help", "-h", "?"}, hidden = true)
     private boolean helpFlag;
 
-    @CommandLine.Option(names = {"--platform-triggered"}, hidden = true)
+    @CommandLine.Option(names = {"--platform-triggered"},
+            description = "Specify whether the scan command is triggered from an external analysis platform tool",
+            hidden = true)
     private boolean platformTriggered;
 
     @CommandLine.Option(names = "--target-dir", description = "Target directory path")
     private String targetDir;
 
-    @CommandLine.Option(names = {"--scan-report"}, description = "Enable scan report generation")
+    @CommandLine.Option(names = {"--scan-report"}, description = "Enable HTML scan report generation")
     private boolean scanReport;
 
     @CommandLine.Option(names = {"--list-rules"},
@@ -66,7 +70,7 @@ public class ScanCmd implements BLauncherCmd {
 
     @CommandLine.Option(names = {"--platforms"},
             converter = StringToListConverter.class,
-            description = "static code analysis output platform",
+            description = "Specify the comma separated list of static code analysis platforms to report issues",
             defaultValue = "local")
     private List<String> platforms = new ArrayList<>();
 
@@ -76,7 +80,7 @@ public class ScanCmd implements BLauncherCmd {
 
     @Override
     public String getName() {
-        return "scan";
+        return SCAN_COMMAND;
     }
 
     @Override
@@ -104,7 +108,7 @@ public class ScanCmd implements BLauncherCmd {
                     builder.append("\n").append(content);
                 }
             } catch (IOException e) {
-                builder.append("Helper text is not available.");
+                builder.append("Help text is not available.");
                 throw new RuntimeException(e);
             }
         }

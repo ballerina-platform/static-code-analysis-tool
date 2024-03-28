@@ -25,7 +25,7 @@ package io.ballerina.scan;
  */
 public interface Rule {
     /**
-     * Returns the generated fully qualified id of the rule.
+     * Retrieve the generated fully qualified identifier of the rule.
      *
      * @return fully qualified id of the rule
      */
