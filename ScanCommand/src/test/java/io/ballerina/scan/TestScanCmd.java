@@ -33,7 +33,7 @@ import java.util.List;
 
 public class TestScanCmd {
     @Test
-    void test_scan_command() {
+    void testScanCommand() {
         ProcessBuilder processBuilder = new ProcessBuilder();
 
         List<String> arguments = new ArrayList<>();
