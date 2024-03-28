@@ -14,4 +14,4 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//at least one .bal file needed in a Ballerina project.
+// at least one .bal file needed in a Ballerina project.
