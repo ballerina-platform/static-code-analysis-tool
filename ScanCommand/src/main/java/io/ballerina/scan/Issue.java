@@ -33,27 +33,26 @@ public interface Issue {
      *
      * @return Location of reported issue
      */
-    Location getLocation();
+    Location location();
 
     /**
      * Returns the fully qualified rule id of reported issue.
      *
      * @return fully qualified rule id of reported issue
      */
-    String getRuleID();
+    String ruleId();
 
     /**
      * Returns {@link IssueType} of reported issue.
      *
      * @return IssueType of issue
      */
-    IssueType getIssueType();
+    IssueType issueType();
 
     /**
      * Returns {@link Severity} of reported issue.
      *
      * @return Severity of issue
      */
-    Severity getIssueSeverity();
+    Severity issueSeverity();
 }
-

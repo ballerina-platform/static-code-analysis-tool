@@ -31,7 +31,6 @@ import java.util.List;
  * @since 0.1.0
  */
 public class StringToListConverter implements CommandLine.ITypeConverter<List<String>> {
-
     @Override
     public List<String> convert(String value) {
         return Arrays.asList(value.split("\\s*,\\s*"));

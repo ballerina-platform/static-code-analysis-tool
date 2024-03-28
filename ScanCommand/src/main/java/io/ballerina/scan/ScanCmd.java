@@ -35,10 +35,11 @@ import java.util.List;
 
 @CommandLine.Command(name = "scan", description = "Perform static code analysis for ballerina packages")
 public class ScanCmd implements BLauncherCmd {
-
     private final PrintStream outputStream;
+
     @CommandLine.Parameters(description = "Program arguments")
     private final List<String> argList = new ArrayList<>();
+
     @CommandLine.Option(names = {"--help", "-h", "?"}, hidden = true)
     private boolean helpFlag;
 
@@ -109,16 +110,13 @@ public class ScanCmd implements BLauncherCmd {
                 throw new RuntimeException(e);
             }
         }
-
         return builder;
     }
 
     @Override
     public void setParentCmdParser(CommandLine parentCmdParser) {
-
     }
 
-    // Scan Command Main Method
     @Override
     public void execute() {
         if (helpFlag) {

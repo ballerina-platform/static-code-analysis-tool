@@ -35,9 +35,7 @@ public class TestScanCmd {
     @Test
     void testScanCommand() {
         ProcessBuilder processBuilder = new ProcessBuilder();
-
         List<String> arguments = new ArrayList<>();
-
         if (SystemUtils.IS_OS_WINDOWS) {
             arguments.add("cmd");
             arguments.add("/c");
@@ -63,12 +61,12 @@ public class TestScanCmd {
             String line;
             while ((line = reader.readLine()) != null) {
                 output.append(line).append("\n");
+
                 // Check the first message
                 if (output.length() > 1) {
                     break;
                 }
             }
-
             reader.close();
             exitCode = scanProcess.waitFor();
         } catch (IOException | InterruptedException e) {
