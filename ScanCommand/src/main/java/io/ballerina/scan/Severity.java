@@ -16,5 +16,15 @@
  *  under the License.
  */
 
-rootProject.name = 'static-code-analysis-tool'
-include 'ScanCommand'
+package io.ballerina.scan;
+
+/**
+ * Represents Severity for reported issues and defined rules.
+ *
+ * @since 0.1.0
+ */
+public enum Severity {
+    CODE_SMELL,
+    BUG,
+    VULNERABILITY
+}

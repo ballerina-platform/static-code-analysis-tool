@@ -16,5 +16,14 @@
  *  under the License.
  */
 
-rootProject.name = 'static-code-analysis-tool'
-include 'ScanCommand'
+package io.ballerina.scan;
+
+/**
+ * Represents Type for reported issues.
+ *
+ * @since 0.1.0
+ */
+public enum IssueType {
+    CORE_ISSUE,
+    EXTERNAL_ISSUE
+}

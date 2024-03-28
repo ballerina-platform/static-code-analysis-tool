@@ -16,5 +16,8 @@
  *  under the License.
  */
 
-rootProject.name = 'static-code-analysis-tool'
-include 'ScanCommand'
+package io.ballerina.scan.utilities;
+
+public class ScanToolConstants {
+    public static final String SCAN_COMMAND = "scan";
+}
