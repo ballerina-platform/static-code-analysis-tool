@@ -60,7 +60,7 @@ public class ScanCmd implements BLauncherCmd {
     private boolean scanReport;
 
     @CommandLine.Option(names = "--list-rules",
-            description = "List the rules available in the Ballerina scan tool.")
+            description = "List the rules available in the Ballerina scan tool")
     private boolean listRules;
 
     @CommandLine.Option(names = "--include-rules",

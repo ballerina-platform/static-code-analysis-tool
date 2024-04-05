@@ -16,5 +16,18 @@
  *  under the License.
  */
 
+pluginManagement {
+    plugins {
+        id 'java'
+        id 'application'
+        id 'java-library'
+        id 'checkstyle'
+        id 'jacoco'
+        id 'com.github.spotbugs' version "${spotbugsPluginVersion}"
+        id 'de.undercouch.download' version "${downloadPluginVersion}"
+        id 'org.sonarqube' version "${sonarqubeGradlePluginVersion}"
+    }
+}
+
 rootProject.name = 'static-code-analysis-tool'
 include 'ScanCommand'

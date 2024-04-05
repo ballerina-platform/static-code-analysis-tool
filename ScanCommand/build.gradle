@@ -23,8 +23,10 @@ plugins {
     id 'application'
     id 'java-library'
     id 'checkstyle'
-    id "com.github.spotbugs" version "${spotbugsPluginVersion}"
-    id "de.undercouch.download" version "${downloadPluginVersion}"
+    id 'jacoco'
+    id 'com.github.spotbugs'
+    id 'de.undercouch.download'
+    id 'org.sonarqube'
 }
 
 group = "${group}"
@@ -57,10 +59,14 @@ dependencies {
     implementation group: 'org.ballerinalang', name: 'jballerina-tools', version: "${ballerinaLangVersion}"
     implementation group: 'org.ballerinalang', name: 'ballerina-cli', version: "${ballerinaLangVersion}"
 
-    checkstyle group: 'com.puppycrawl.tools', name: 'checkstyle', version: "${puppycrawlCheckstyleVersion}"
-
     // Required for determining the platform a java process is running on
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: "${apacheCommonsLang3Version}"
+
+    // Required dependencies for jacoco
+    implementation group: 'org.jacoco', name: 'org.jacoco.core', version: "${jacocoVersion}"
+    implementation group: 'org.jacoco', name: 'org.jacoco.report', version: "${jacocoVersion}"
+
+    checkstyle group: 'com.puppycrawl.tools', name: 'checkstyle', version: "${puppycrawlCheckstyleVersion}"
 
     // Required dependencies for running scan tool tests
     testImplementation group: 'org.testng', name: 'testng', version: "${testngVersion}"
@@ -152,12 +158,6 @@ task validateSpotbugs() {
 }
 
 spotbugsMain.finalizedBy validateSpotbugs
-
-tasks.test {
-    useTestNG() {
-        suites 'src/test/resources/testng.xml'
-    }
-}
 
 // Configurations to automatically build and deploy scan tool
 def packageName = "tool_scan"
@@ -267,4 +267,54 @@ build {
     dependsOn updateTomlFiles
     dependsOn createBallerinaToolConfigFile
     dependsOn buildScanTool
+}
+
+// Configuring tests
+tasks.test {
+    useTestNG() {
+        suites 'src/test/resources/testng.xml'
+    }
+}
+
+// Codecove configurations
+def execFile;
+def classFileArray = []
+task copyExecFilesAndJavaClassFiles {
+    execFile = new File("${buildDir}/jacoco/test.exec")
+    if (execFile.exists()) {
+        fileTree("${buildDir}/classes").matching {
+            exclude '**/test/*'
+            exclude '**/module-info.class'
+        }.each { file -> classFileArray.push(file) }
+    }
+}
+
+task createCodeCoverageReport(type: JacocoReport) {
+    executionData file(execFile)
+    additionalClassDirs files(classFileArray)
+
+    reports {
+        xml.required = true
+        html.required = true
+        xml.destination new File("${rootDir}/.jacoco/reports/jacoco/report.xml")
+        html.destination new File("${rootDir}/.jacoco/reports/jacoco/report.html")
+    }
+    onlyIf = {
+        true
+    }
+}
+
+createCodeCoverageReport.dependsOn(copyExecFilesAndJavaClassFiles)
+
+// SonarCloud Configurations
+sonar {
+    properties {
+        property "sonar.projectKey", "ballerina-platform_static-code-analysis-tool"
+        property "sonar.organization", "ballerina-platform"
+        property "sonar.host.url", "https://sonarcloud.io"
+
+        // Additional properties
+        // To Add test coverage
+        property "sonar.coverage.jacoco.xmlReportPaths", "${rootDir}/.jacoco/reports/jacoco/*.xml"
+    }
 }

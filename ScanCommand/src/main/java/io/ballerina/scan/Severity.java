@@ -20,10 +20,6 @@ package io.ballerina.scan;
 
 /**
  * Represents the kind of severity of a {@link Rule} instance.
- * <p>
- * There are three known kinds of severities at the moment: {@link #CODE_SMELL}, {@link #BUG}
- * and {@link #VULNERABILITY}.
- * </p>
  *
  * @since 0.1.0
  */
