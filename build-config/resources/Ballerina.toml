@@ -1,0 +1,8 @@
+[package]
+org = "ballerina"
+name = "tool_scan"
+version = "@toml.version@"
+distribution = "@toml.distribution@"
+authors = ["Ballerina"]
+keywords = ["scan"]
+license = ["Apache-2.0"]
