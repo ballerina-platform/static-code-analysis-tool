@@ -24,7 +24,11 @@ under the License.
     <!-- Ballerina Scan Command Test Cases. -->
     <test name="ballerina-scan-command-test-suite">
         <classes>
-            <class name="io.ballerina.scan.ScanCmdTest"/>
+            <class name="io.ballerina.scan.internal.ScanCmdTest"/>
+            <class name="io.ballerina.scan.internal.RuleImplTest"/>
+            <class name="io.ballerina.scan.internal.IssueImplTest"/>
+            <class name="io.ballerina.scan.internal.ReporterImplTest"/>
+            <class name="io.ballerina.scan.utils.ScanUtilsTest"/>
         </classes>
     </test>
 </suite>

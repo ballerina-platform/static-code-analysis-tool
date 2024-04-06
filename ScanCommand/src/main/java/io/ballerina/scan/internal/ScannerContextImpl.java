@@ -16,39 +16,27 @@
  *  under the License.
  */
 
-package io.ballerina.scan;
+package io.ballerina.scan.internal;
+
+import io.ballerina.scan.Rule;
+import io.ballerina.scan.ScannerContext;
+
+import java.util.List;
 
 /**
- * {@code Rule} represents a static code analysis rule.
+ * Represents the implementation of the {@link ScannerContext} interface.
  *
  * @since 0.1.0
- */
-public interface Rule {
-    /**
-     * Retrieve the fully qualified identifier of the rule.
-     *
-     * @return fully qualified identifier of the rule
-     */
-    String id();
+ * */
+class ScannerContextImpl implements ScannerContext {
+    private final ReporterImpl reporter;
 
-    /**
-     * Returns the numeric identifier of the rule.
-     *
-     * @return numeric identifier of the rule
-     */
-    int numericId();
+    ScannerContextImpl(List<Rule> rules) {
+        this.reporter = new ReporterImpl(rules);
+    }
 
-    /**
-     * Returns the description of the rule.
-     *
-     * @return description of the rule
-     */
-    String description();
-
-    /**
-     * Returns {@link RuleKind} of the rule.
-     *
-     * @return rule kind of the rule
-     */
-    RuleKind kind();
+    @Override
+    public ReporterImpl getReporter() {
+        return reporter;
+    }
 }

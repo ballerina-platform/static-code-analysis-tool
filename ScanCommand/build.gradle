@@ -18,6 +18,8 @@
 
 import org.apache.tools.ant.taskdefs.condition.Os
 
+import java.nio.file.Paths
+
 plugins {
     id 'java'
     id 'application'
@@ -270,12 +272,15 @@ build {
 
 // Configuring tests
 tasks.test {
+    systemProperty "ballerina.home", Paths.get(System.getenv("BALLERINA_HOME")).resolve("distributions")
+            .resolve("ballerina-${ballerinaLangVersion}").toString()
+
     useTestNG() {
         suites 'src/test/resources/testng.xml'
     }
 }
 
-// Codecove configurations
+// Codecov configurations
 def execFile;
 def classFileArray = []
 task copyExecFilesAndJavaClassFiles {

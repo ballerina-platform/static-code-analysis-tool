@@ -16,39 +16,26 @@
  *  under the License.
  */
 
-package io.ballerina.scan;
+package io.ballerina.scan.internal;
+
+import io.ballerina.compiler.syntax.tree.ModulePartNode;
+import io.ballerina.compiler.syntax.tree.NodeVisitor;
+import io.ballerina.compiler.syntax.tree.SyntaxTree;
+import io.ballerina.projects.Document;
 
 /**
- * {@code Rule} represents a static code analysis rule.
+ * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.
  *
  * @since 0.1.0
- */
-public interface Rule {
-    /**
-     * Retrieve the fully qualified identifier of the rule.
-     *
-     * @return fully qualified identifier of the rule
-     */
-    String id();
+ * */
+class StaticCodeAnalyzer extends NodeVisitor {
+    private final SyntaxTree syntaxTree;
 
-    /**
-     * Returns the numeric identifier of the rule.
-     *
-     * @return numeric identifier of the rule
-     */
-    int numericId();
+    StaticCodeAnalyzer(Document document, ScannerContextImpl scannerContext) {
+        this.syntaxTree = document.syntaxTree();
+    }
 
-    /**
-     * Returns the description of the rule.
-     *
-     * @return description of the rule
-     */
-    String description();
-
-    /**
-     * Returns {@link RuleKind} of the rule.
-     *
-     * @return rule kind of the rule
-     */
-    RuleKind kind();
+    void analyze() {
+        this.visit((ModulePartNode) syntaxTree.rootNode());
+    }
 }

@@ -19,36 +19,15 @@
 package io.ballerina.scan;
 
 /**
- * {@code Rule} represents a static code analysis rule.
+ * {@code ScannerContext} represents a context that exposes properties required by scanner plugins from the scan tool.
  *
  * @since 0.1.0
- */
-public interface Rule {
+ * */
+public interface ScannerContext {
     /**
-     * Retrieve the fully qualified identifier of the rule.
+     *  Returns the {@link Reporter} to be used to report identified issues.
      *
-     * @return fully qualified identifier of the rule
-     */
-    String id();
-
-    /**
-     * Returns the numeric identifier of the rule.
-     *
-     * @return numeric identifier of the rule
-     */
-    int numericId();
-
-    /**
-     * Returns the description of the rule.
-     *
-     * @return description of the rule
-     */
-    String description();
-
-    /**
-     * Returns {@link RuleKind} of the rule.
-     *
-     * @return rule kind of the rule
-     */
-    RuleKind kind();
+     * @return reporter that needs to be used to report issues identified.
+     * */
+    Reporter getReporter();
 }
