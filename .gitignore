@@ -12,3 +12,6 @@ build/
 
 # IntelliJ IDEA
 .idea/
+
+# Coverage reports
+.jacoco/
