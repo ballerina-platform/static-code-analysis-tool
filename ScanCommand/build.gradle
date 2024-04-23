@@ -26,7 +26,6 @@ plugins {
     id 'jacoco'
     id 'com.github.spotbugs'
     id 'de.undercouch.download'
-    id 'org.sonarqube'
 }
 
 group = "${group}"
@@ -305,16 +304,3 @@ task createCodeCoverageReport(type: JacocoReport) {
 }
 
 createCodeCoverageReport.dependsOn(copyExecFilesAndJavaClassFiles)
-
-// SonarCloud Configurations
-sonar {
-    properties {
-        property "sonar.projectKey", "ballerina-platform_static-code-analysis-tool"
-        property "sonar.organization", "ballerina-platform"
-        property "sonar.host.url", "https://sonarcloud.io"
-
-        // Additional properties
-        // To Add test coverage
-        property "sonar.coverage.jacoco.xmlReportPaths", "${rootDir}/.jacoco/reports/jacoco/*.xml"
-    }
-}

@@ -46,20 +46,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./.jacoco/reports/jacoco/report.xml
 
-      - name: Cache SonarCloud packages for faster analysis
-        uses: actions/cache@v3
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-
-      - name: Generate SonarCloud Report
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        if: "${{ env.SONAR_TOKEN != '' }}"
-        run: ./gradlew sonar --info
-
   windows_build:
     name: Build
     runs-on: windows-latest
