@@ -54,35 +54,19 @@ class ReporterImpl implements Reporter {
 
     @Override
     public void reportIssue(Document reportedDocument, Location location, int ruleId) {
-        String documentName = reportedDocument.name();
-        Module module = reportedDocument.module();
-        String moduleName = module.moduleName().toString();
-        Path issuesFilePath = module.project().documentPath(reportedDocument.documentId())
-                .orElse(Path.of(documentName));
-
         Rule rule = rules.get(ruleId);
         if (rule == null) {
             throw new RuleNotFoundException(ruleId);
         }
-
-        String fullyQualifiedRuleId = rule.id();
-        String[] parts = fullyQualifiedRuleId.split(":");
-        Source source;
-        if (parts[0].equals(BALLERINA_RULE_PREFIX + rule.numericId())) {
-            source = Source.BUILT_IN;
-        } else {
-            String reportedSource = parts[0];
-            String pluginOrg = reportedSource.split(PATH_SEPARATOR)[0];
-            source = pluginOrg.equals(BALLERINA_ORG) ? Source.BUILT_IN : Source.EXTERNAL;
-        }
-
-        IssueImpl issue = new IssueImpl(location, rule, source,
-                moduleName + System.lineSeparator() + documentName, issuesFilePath.toString());
-        issues.add(issue);
+        issues.add(createIssue(reportedDocument, location, rule));
     }
 
     @Override
     public void reportIssue(Document reportedDocument, Location location, Rule rule) {
+        issues.add(createIssue(reportedDocument, location, rule));
+    }
+
+    private Issue createIssue(Document reportedDocument, Location location, Rule rule) {
         String documentName = reportedDocument.name();
         Module module = reportedDocument.module();
         String moduleName = module.moduleName().toString();
@@ -100,10 +84,8 @@ class ReporterImpl implements Reporter {
             source = pluginOrg.equals(BALLERINA_ORG) ? Source.BUILT_IN : Source.EXTERNAL;
         }
 
-        IssueImpl issue = new IssueImpl(location, rule, source,
-                moduleName + System.lineSeparator() + documentName, issuesFilePath.toString());
-
-        issues.add(issue);
+        return new IssueImpl(location, rule, source, moduleName + System.lineSeparator() + documentName,
+                issuesFilePath.toString());
     }
 
     List<Issue> getIssues() {

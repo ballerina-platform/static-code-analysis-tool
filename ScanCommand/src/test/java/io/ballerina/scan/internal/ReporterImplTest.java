@@ -38,15 +38,19 @@ import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+/**
+ * Static code analysis issue reporter tests.
+ *
+ * @since 0.1.0
+ */
 public class ReporterImplTest {
     @Test(description = "test creating a reporter and retrieving issues reported with a numeric rule identifier")
     void testReporterWithNumericId() {
         Rule rule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
-        List<Rule> rules = new ArrayList<>();
-        rules.add(rule);
-        ReporterImpl reporter = new ReporterImpl(rules);
+        ReporterImpl reporter = new ReporterImpl(Collections.singletonList(rule));
         Path validBalProject = Paths.get("src", "test", "resources", "test-resources",
                 "valid-single-file-project", "main.bal");
         Project project = SingleFileProject.load(validBalProject);

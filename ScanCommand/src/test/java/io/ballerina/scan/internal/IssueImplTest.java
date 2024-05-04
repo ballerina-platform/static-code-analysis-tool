@@ -34,13 +34,14 @@ public class IssueImplTest {
     @Test(description = "test creating and retrieving values from a static code analysis issue")
     void testIssue() {
         Rule rule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
-        BLangDiagnosticLocation location = new BLangDiagnosticLocation("", 0, 0,
-                0, 0, 0, 0);
-        IssueImpl issue = new IssueImpl(location, rule, Source.BUILT_IN, "", "");
+        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 16, 23,
+                17, 1, 748, 4);
+        IssueImpl issue = new IssueImpl(location, rule, Source.BUILT_IN, "main.bal",
+                "valid_bal_project/main.bal");
         Assert.assertEquals(issue.location(), location);
         Assert.assertEquals(issue.rule(), rule);
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
-        Assert.assertEquals(issue.fileName(), "");
-        Assert.assertEquals(issue.filePath(), "");
+        Assert.assertEquals(issue.fileName(), "main.bal");
+        Assert.assertEquals(issue.filePath(), "valid_bal_project/main.bal");
     }
 }

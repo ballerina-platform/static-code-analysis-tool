@@ -28,6 +28,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/**
+ * Parent test class for providing common setup methods for tests.
+ *
+ * @since 0.1.0
+ */
 public abstract class BaseTest {
     protected final Path testResources = Paths.get("src", "test", "resources");
     private ByteArrayOutputStream console;

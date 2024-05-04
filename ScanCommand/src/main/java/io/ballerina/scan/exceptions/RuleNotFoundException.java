@@ -24,6 +24,12 @@ package io.ballerina.scan.exceptions;
  * @since 0.1.0
  * */
 public class RuleNotFoundException extends RuntimeException {
+
+    /**
+     * Returns a new instance of the RuleNotFoundException with the specified rule identifier.
+     *
+     * @param ruleId numeric identifier of the static code analysis rule
+     */
     public RuleNotFoundException(int ruleId) {
         super(String.format("Rule not found: Invalid rule numeric identifier '%d'.", ruleId));
     }
