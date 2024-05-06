@@ -51,11 +51,4 @@ public interface Rule {
      * @return rule kind of the rule
      */
     RuleKind kind();
-  
-    /**
-     * Returns {@link Severity} of the rule.
-     *
-     * @return severity of the rule
-     */
-    Severity severity();
 }
