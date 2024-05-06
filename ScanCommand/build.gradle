@@ -280,7 +280,7 @@ tasks.test {
     }
 }
 
-// Codecov configurations
+// Codecove configurations
 def execFile;
 def classFileArray = []
 task copyExecFilesAndJavaClassFiles {
