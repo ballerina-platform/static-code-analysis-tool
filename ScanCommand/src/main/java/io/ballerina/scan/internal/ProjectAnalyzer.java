@@ -23,11 +23,10 @@ import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
 import io.ballerina.projects.Project;
 import io.ballerina.scan.Issue;
+import io.ballerina.scan.Rule;
 
 import java.util.List;
 import java.util.function.Consumer;
-
-import static io.ballerina.scan.internal.InbuiltRules.INBUILT_RULES;
 
 /**
  * Represents the project analyzer used for analyzing projects.
@@ -35,8 +34,8 @@ import static io.ballerina.scan.internal.InbuiltRules.INBUILT_RULES;
  * @since 0.1.0
  * */
 class ProjectAnalyzer {
-    List<Issue> analyze(Project project) {
-        ScannerContextImpl scannerContext = new ScannerContextImpl(INBUILT_RULES);
+    List<Issue> analyze(Project project, List<Rule> inbuiltRules) {
+        ScannerContextImpl scannerContext = new ScannerContextImpl(inbuiltRules);
         project.currentPackage().moduleIds().forEach(moduleId -> {
             Module module = project.currentPackage().module(moduleId);
             module.documentIds().forEach(analyzeDocument(module, scannerContext));

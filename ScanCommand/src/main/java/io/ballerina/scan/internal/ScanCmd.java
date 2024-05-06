@@ -131,11 +131,12 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer();
+        InbuiltRules inbuiltRules = new InbuiltRules();
 
         outputStream.println();
         outputStream.println("Running Scans...");
 
-        List<Issue> issues = projectAnalyzer.analyze(project.get());
+        List<Issue> issues = projectAnalyzer.analyze(project.get(), inbuiltRules.getInbuiltRules());
 
         if (!platforms.isEmpty() || platformTriggered) {
             return;

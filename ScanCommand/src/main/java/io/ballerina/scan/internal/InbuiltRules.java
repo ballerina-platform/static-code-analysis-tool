@@ -29,8 +29,13 @@ import java.util.List;
  * @since 0.1.0
  * */
 public class InbuiltRules {
-    static final List<Rule> INBUILT_RULES = new ArrayList<>();
+    private final List<Rule> inbuiltRules;
 
-    private InbuiltRules() {
+    InbuiltRules() {
+        inbuiltRules = new ArrayList<>();
+    }
+
+    List<Rule> getInbuiltRules() {
+        return inbuiltRules;
     }
 }
