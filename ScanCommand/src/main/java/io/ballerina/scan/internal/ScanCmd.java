@@ -16,9 +16,16 @@
  *  under the License.
  */
 
-package io.ballerina.scan;
+package io.ballerina.scan.internal;
 
 import io.ballerina.cli.BLauncherCmd;
+import io.ballerina.projects.Project;
+import io.ballerina.projects.ProjectKind;
+import io.ballerina.projects.directory.BuildProject;
+import io.ballerina.projects.directory.SingleFileProject;
+import io.ballerina.projects.util.ProjectConstants;
+import io.ballerina.scan.Issue;
+import io.ballerina.scan.utils.ScanUtils;
 import picocli.CommandLine;
 
 import java.io.BufferedReader;
@@ -27,14 +34,17 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
-import static io.ballerina.scan.ScanToolConstants.SCAN_COMMAND;
+import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 
 /**
- * This class represents the "bal scan" command.
+ * Represents the "bal scan" command.
  *
  * @since 0.1.0
  * */
@@ -104,6 +114,7 @@ public class ScanCmd implements BLauncherCmd {
 
     @Override
     public void setParentCmdParser(CommandLine parentCmdParser) {
+        // As there are no sub-commands for the scan command, this method is left empty
     }
 
     @Override
@@ -114,8 +125,44 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
+        Optional<Project> project = getProject();
+        if (project.isEmpty()) {
+            return;
+        }
+
+        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer();
+        InbuiltRules inbuiltRules = new InbuiltRules();
+
         outputStream.println();
         outputStream.println("Running Scans...");
+
+        List<Issue> issues = projectAnalyzer.analyze(project.get(), inbuiltRules.getInbuiltRules());
+
+        if (!platforms.isEmpty() || platformTriggered) {
+            return;
+        }
+
+        ScanUtils.printToConsole(issues, outputStream);
+
+        if (project.get().kind().equals(ProjectKind.BUILD_PROJECT)) {
+            Path reportPath;
+            reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir);
+            outputStream.println();
+            outputStream.println("View scan results at:");
+            outputStream.println("\t" + reportPath + System.lineSeparator());
+        } else {
+            if (targetDir != null) {
+                outputStream.println();
+                outputStream.println("Generating reports is not supported with single bal files. " +
+                        "Ignoring the flag and continuing the scans...");
+            }
+
+            if (scanReport) {
+                outputStream.println();
+                outputStream.println("Generating scan reports is not supported with single bal files. " +
+                        "Ignoring the flag and continuing the scans...");
+            }
+        }
     }
 
     private StringBuilder helpMessage() {
@@ -129,20 +176,46 @@ public class ScanCmd implements BLauncherCmd {
                 String content = br.readLine();
                 builder.append(content);
                 while ((content = br.readLine()) != null) {
-                    builder.append("\n").append(content);
+                    builder.append(System.lineSeparator()).append(content);
                 }
             } catch (IOException ex) {
-                builder.append("Help text is not available.");
-                throw new RuntimeException(ex);
+                throw new IllegalStateException(ex);
             }
         }
         return builder;
     }
 
+    private Optional<Project> getProject() {
+        if (argList.isEmpty()) {
+            try {
+                return Optional.of(BuildProject.load(Paths.get(System.getProperty(ProjectConstants.USER_DIR))));
+            } catch (RuntimeException ex) {
+                outputStream.println(ex.getMessage());
+                return Optional.empty();
+            }
+        }
+
+        if (argList.size() != 1) {
+            outputStream.println("Invalid number of arguments, expected one argument received " + argList.size());
+            return Optional.empty();
+        }
+
+        Path path = Paths.get(argList.get(0));
+        try {
+            if (path.toFile().isDirectory()) {
+                return Optional.of(BuildProject.load(path));
+            }
+            return Optional.of(SingleFileProject.load(path));
+        } catch (RuntimeException ex) {
+            outputStream.println(ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
     private static class StringToListConverter implements CommandLine.ITypeConverter<List<String>> {
         @Override
         public List<String> convert(String value) {
-            return Arrays.asList(value.split("\\s*,\\s*"));
+            return Arrays.stream(value.split(",", -1)).map(String::trim).toList();
         }
     }
 }

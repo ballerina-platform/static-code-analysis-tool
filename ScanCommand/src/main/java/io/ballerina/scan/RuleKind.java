@@ -19,36 +19,23 @@
 package io.ballerina.scan;
 
 /**
- * {@code Rule} represents a static code analysis rule.
+ * Represents the kind of rule of a {@link Rule} instance.
  *
  * @since 0.1.0
  */
-public interface Rule {
+public enum RuleKind {
     /**
-     * Retrieve the fully qualified identifier of the rule.
-     *
-     * @return fully qualified identifier of the rule
+     * Label for marking rules related to code maintainability.
      */
-    String id();
+    CODE_SMELL,
 
     /**
-     * Returns the numeric identifier of the rule.
-     *
-     * @return numeric identifier of the rule
+     * Label for marking rules related to coding mistakes that cause errors or unexpected behaviour at runtime.
      */
-    int numericId();
+    BUG,
 
     /**
-     * Returns the description of the rule.
-     *
-     * @return description of the rule
+     * Label for marking rules related to code susceptible to exploits due to security weaknesses.
      */
-    String description();
-
-    /**
-     * Returns {@link RuleKind} of the rule.
-     *
-     * @return rule kind of the rule
-     */
-    RuleKind kind();
+    VULNERABILITY
 }

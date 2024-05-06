@@ -1,1 +1,1 @@
-io.ballerina.scan.ScanCmd
+io.ballerina.scan.internal.ScanCmd

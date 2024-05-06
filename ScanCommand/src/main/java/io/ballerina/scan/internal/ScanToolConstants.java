@@ -16,39 +16,20 @@
  *  under the License.
  */
 
-package io.ballerina.scan;
+package io.ballerina.scan.internal;
 
 /**
- * {@code Rule} represents a static code analysis rule.
+ * {@code ScanToolConstants} contains the constant variables used within the Ballerina scan tool.
  *
  * @since 0.1.0
  */
-public interface Rule {
-    /**
-     * Retrieve the fully qualified identifier of the rule.
-     *
-     * @return fully qualified identifier of the rule
-     */
-    String id();
+public class ScanToolConstants {
+    static final String SCAN_COMMAND = "scan";
+    public static final String RESULTS_JSON_FILE = "scan_results.json";
+    static final String BALLERINA_RULE_PREFIX = "B";
+    public static final String PATH_SEPARATOR = "/";
+    public static final String BALLERINA_ORG = "ballerina";
 
-    /**
-     * Returns the numeric identifier of the rule.
-     *
-     * @return numeric identifier of the rule
-     */
-    int numericId();
-
-    /**
-     * Returns the description of the rule.
-     *
-     * @return description of the rule
-     */
-    String description();
-
-    /**
-     * Returns {@link RuleKind} of the rule.
-     *
-     * @return rule kind of the rule
-     */
-    RuleKind kind();
+    private ScanToolConstants() {
+    }
 }

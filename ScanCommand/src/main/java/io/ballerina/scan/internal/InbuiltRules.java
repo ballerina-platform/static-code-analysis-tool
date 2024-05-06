@@ -16,26 +16,26 @@
  *  under the License.
  */
 
-package io.ballerina.scan;
+package io.ballerina.scan.internal;
+
+import io.ballerina.scan.Rule;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Represents the kind of severity of a {@link Rule} instance.
+ * {@code InbuiltRules} contains the core static code analysis rules.
  *
  * @since 0.1.0
- */
-public enum Severity {
-    /**
-     * Label for marking rules related to code maintainability.
-     */
-    CODE_SMELL,
+ * */
+public class InbuiltRules {
+    private final List<Rule> inbuiltRules;
 
-    /**
-     * Label for marking rules related to coding mistakes that cause errors or unexpected behaviour at runtime.
-     */
-    BUG,
+    InbuiltRules() {
+        inbuiltRules = new ArrayList<>();
+    }
 
-    /**
-     * Label for marking rules related to code susceptible to exploits due to security weaknesses.
-     */
-    VULNERABILITY
+    List<Rule> getInbuiltRules() {
+        return inbuiltRules;
+    }
 }

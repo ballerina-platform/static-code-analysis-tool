@@ -16,13 +16,21 @@
  *  under the License.
  */
 
-package io.ballerina.scan;
+package io.ballerina.scan.exceptions;
 
 /**
- * This class contains the constant variables used within the Ballerina scan tool.
+ * Represents the exception thrown for an unidentified static code analysis rule during reporting of an analysis issue.
  *
  * @since 0.1.0
- */
-class ScanToolConstants {
-    static final String SCAN_COMMAND = "scan";
+ * */
+public class RuleNotFoundException extends RuntimeException {
+
+    /**
+     * Returns a new instance of the RuleNotFoundException with the specified rule identifier.
+     *
+     * @param ruleId numeric identifier of the static code analysis rule
+     */
+    public RuleNotFoundException(int ruleId) {
+        super(String.format("Rule not found: Invalid rule numeric identifier '%d'.", ruleId));
+    }
 }
