@@ -24,18 +24,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@code InbuiltRules} contains the core static code analysis rules.
+ * {@code CoreRules} contains the core static code analysis rules.
  *
  * @since 0.1.0
  * */
-public class InbuiltRules {
-    private final List<Rule> inbuiltRules;
+public class CoreRules {
+    private final List<Rule> coreRules;
 
-    InbuiltRules() {
-        inbuiltRules = new ArrayList<>();
+    CoreRules() {
+        coreRules = new ArrayList<>();
     }
 
-    List<Rule> getInbuiltRules() {
-        return inbuiltRules;
+    List<Rule> getCoreRules() {
+        return coreRules;
     }
 }

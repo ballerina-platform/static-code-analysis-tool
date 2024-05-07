@@ -86,4 +86,37 @@ public class ScanUtilsTest extends BaseTest {
         String expected = "[]";
         Assert.assertEquals(result, expected);
     }
+
+    @Test(description = "test method for creating html analysis report from analysis results")
+    void testGenerateScanReport() throws IOException {
+        List<Issue> issues = new ArrayList<>();
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", validBalProject.toString());
+        Project project = ProjectLoader.loadProject(validBalProject);
+        System.setProperty("user.dir", userDir);
+        Path scanReportPath = ScanUtils.generateScanReport(issues, project, null);
+        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        Path validationScanReportPath = testResources.resolve("command-outputs")
+                .resolve("empty-issues-html-report.txt");
+        String expected = Files.readString(validationScanReportPath, StandardCharsets.UTF_8).replace("\r\n",
+                "\n");
+        Assert.assertEquals(result, expected);
+    }
+
+    @Test(description =
+            "test method for creating html analysis report from analysis results when directory is provided")
+    void testGenerateScanReportToProvidedDirectory() throws IOException {
+        List<Issue> issues = new ArrayList<>();
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", validBalProject.toString());
+        Project project = ProjectLoader.loadProject(validBalProject);
+        System.setProperty("user.dir", userDir);
+        Path scanReportPath = ScanUtils.generateScanReport(issues, project, RESULTS_DIRECTORY);
+        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        Path validationScanReportPath = testResources.resolve("command-outputs")
+                .resolve("empty-issues-html-report.txt");
+        String expected = Files.readString(validationScanReportPath, StandardCharsets.UTF_8).replace("\r\n",
+                "\n");
+        Assert.assertEquals(result, expected);
+    }
 }

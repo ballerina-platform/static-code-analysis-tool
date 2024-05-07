@@ -27,8 +27,11 @@ public class ScanToolConstants {
     static final String SCAN_COMMAND = "scan";
     public static final String RESULTS_JSON_FILE = "scan_results.json";
     static final String BALLERINA_RULE_PREFIX = "B";
-    public static final String PATH_SEPARATOR = "/";
-    public static final String BALLERINA_ORG = "ballerina";
+    static final String PATH_SEPARATOR = "/";
+    static final String BALLERINA_ORG = "ballerina";
+    static final String FILE_PROTOCOL = "file://";
+    public static final String RESULTS_HTML_FILE = "index.html";
+    public static final String REPORT_DATA_PLACEHOLDER = "__data__";
 
     private ScanToolConstants() {
     }

@@ -18,15 +18,27 @@
 
 package io.ballerina.scan.internal;
 
+import io.ballerina.projects.Project;
+import io.ballerina.projects.directory.ProjectLoader;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
+import io.ballerina.scan.Issue;
+import io.ballerina.scan.Rule;
+import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.Source;
+import io.ballerina.scan.utils.ScanUtils;
 import org.testng.Assert;
+import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
+import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
 import picocli.CommandLine;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Scan command tests.
@@ -34,6 +46,19 @@ import java.nio.file.Path;
  * @since 0.1.0
  */
 public class ScanCmdTest extends BaseTest {
+    private final Path validBalProject = testResources.resolve("test-resources")
+            .resolve("valid-bal-project");
+
+    private static final String RESULTS_DIRECTORY = "results";
+
+    @AfterTest
+    void cleanup() {
+        Path resultsDirectoryPath = validBalProject.resolve(RESULTS_DIRECTORY);
+        if (Files.exists(resultsDirectoryPath)) {
+            ProjectUtils.deleteDirectory(resultsDirectoryPath);
+        }
+    }
+
     @Test(description = "test scan command override methods")
     void testScanCommandOverrideMethods() throws IOException {
         ScanCmd scanCmd = new ScanCmd();
@@ -152,5 +177,56 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", userDir);
         String expected = "Invalid number of arguments, expected one argument received 2";
         Assert.assertEquals(scanLog, expected);
+    }
+
+    @Test(description = "test scan command with method for saving results to file when analysis issues are is present")
+    void testScanCommandSaveToDirectoryMethodWhenIssuePresent() throws IOException {
+        Rule coreRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
+        Rule externalRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG, "exampleOrg",
+                "exampleName");
+        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 16, 23,
+                17, 1, 748, 4);
+        List<Issue> issues = new ArrayList<>();
+        issues.add(new IssueImpl(location, coreRule, Source.BUILT_IN, "main.bal",
+                validBalProject.resolve("main.bal").toString()));
+        issues.add(new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
+                validBalProject.resolve("main.bal").toString()));
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", validBalProject.toString());
+        Project project = ProjectLoader.loadProject(validBalProject);
+        System.setProperty("user.dir", userDir);
+        Path resultsFile = ScanUtils.saveToDirectory(issues, project, null);
+        String result = Files.readString(resultsFile, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        Path validationResultsFilePath = testResources.resolve("command-outputs")
+                .resolve("issues-report.txt");
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8).replace("\r\n",
+                "\n");
+        Assert.assertEquals(result, expected);
+    }
+
+    @Test(description =
+            "test scan command with method for creating html analysis report when analysis issues are is present")
+    void testScanCommandGenerateScanReportMethodWhenIssuePresent() throws IOException {
+        Rule coreRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
+        Rule externalRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG, "exampleOrg",
+                "exampleName");
+        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 16, 23,
+                17, 1, 748, 4);
+        List<Issue> issues = new ArrayList<>();
+        issues.add(new IssueImpl(location, coreRule, Source.BUILT_IN, "main.bal",
+                validBalProject.resolve("main.bal").toString()));
+        issues.add(new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
+                validBalProject.resolve("main.bal").toString()));
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", validBalProject.toString());
+        Project project = ProjectLoader.loadProject(validBalProject);
+        System.setProperty("user.dir", userDir);
+        Path resultsFile = ScanUtils.generateScanReport(issues, project, null);
+        String result = Files.readString(resultsFile, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        Path validationResultsFilePath = testResources.resolve("command-outputs")
+                .resolve("issues-html-report.txt");
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8).replace("\r\n",
+                "\n");
+        Assert.assertEquals(result, expected);
     }
 }

@@ -131,12 +131,12 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer();
-        InbuiltRules inbuiltRules = new InbuiltRules();
+        CoreRules coreRules = new CoreRules();
 
         outputStream.println();
         outputStream.println("Running Scans...");
 
-        List<Issue> issues = projectAnalyzer.analyze(project.get(), inbuiltRules.getInbuiltRules());
+        List<Issue> issues = projectAnalyzer.analyze(project.get(), coreRules.getCoreRules());
 
         if (!platforms.isEmpty() || platformTriggered) {
             return;
@@ -150,6 +150,15 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println();
             outputStream.println("View scan results at:");
             outputStream.println("\t" + reportPath + System.lineSeparator());
+
+            if (scanReport) {
+                Path scanReportPath;
+                outputStream.println("Generating scan report...");
+                scanReportPath = ScanUtils.generateScanReport(issues, project.get(), targetDir);
+                outputStream.println();
+                outputStream.println("View scan report at:");
+                outputStream.println("\t" + ScanToolConstants.FILE_PROTOCOL + scanReportPath + System.lineSeparator());
+            }
         } else {
             if (targetDir != null) {
                 outputStream.println();

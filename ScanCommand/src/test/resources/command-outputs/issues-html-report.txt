@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="description" content="Ballerina Scan Report"/><link rel="icon" href="./favicon.ico"/><link rel="manifest" href="./manifest.json"/><title>Ballerina Static Code Analysis Report</title><script defer="defer" src="./static/js/main.c074c0b5.js"></script><link href="./static/css/main.8d242420.css" rel="stylesheet"></head><body><div id="root"></div><script id="scanData" type="text/json">{
+  "projectName": "valid_bal_project",
+  "scannedFiles": [
+    {
+      "fileName": "main.bal",
+      "filePath": "src\\test\\resources\\test-resources\\valid-bal-project\\main.bal",
+      "fileContent": "// Copyright (c) 2024, WSO2 LLC. (https://www.wso2.com).\r\n//\r\n// WSO2 Inc. licenses this file to you under the Apache License,\r\n// Version 2.0 (the \"License\"); you may not use this file except\r\n// in compliance with the License.\r\n// You may obtain a copy of the License at\r\n//\r\n//   http://www.apache.org/licenses/LICENSE-2.0\r\n//\r\n// Unless required by applicable law or agreed to in writing,\r\n// software distributed under the License is distributed on an\r\n// \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY\r\n// KIND, either express or implied.  See the License for the\r\n// specific language governing permissions and limitations\r\n// under the License.\r\n\r\npublic function main() {\r\n}\r\n",
+      "issues": [
+        {
+          "ruleID": "B101",
+          "issueSeverity": "BUG",
+          "issueType": "BUILT_IN",
+          "message": "rule 101",
+          "textRange": {
+            "startLine": 16,
+            "startLineOffset": 17,
+            "endLine": 23,
+            "endLineOffset": 1
+          }
+        },
+        {
+          "ruleID": "exampleOrg/exampleName:B101",
+          "issueSeverity": "BUG",
+          "issueType": "EXTERNAL",
+          "message": "rule 101",
+          "textRange": {
+            "startLine": 16,
+            "startLineOffset": 17,
+            "endLine": 23,
+            "endLineOffset": 1
+          }
+        }
+      ]
+    }
+  ]
+}</script></body></html>
