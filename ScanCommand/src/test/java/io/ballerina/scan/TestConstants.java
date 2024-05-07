@@ -16,22 +16,11 @@
  *  under the License.
  */
 
-package io.ballerina.scan.internal;
+package io.ballerina.scan;
 
-/**
- * {@code ScanToolConstants} contains the constant variables used within the Ballerina scan tool.
- *
- * @since 0.1.0
- */
-public class ScanToolConstants {
-    static final String SCAN_COMMAND = "scan";
-    static final String BALLERINA_RULE_PREFIX = "B";
-    static final String PACKAGE_ORG_NAME_SEPARATOR = "/";
-    static final String BALLERINA_ORG = "ballerina";
-    static final String BALLERINAI_ORG = "ballerinai";
-    static final String BALLERINAX_ORG = "ballerinax";
-    static final String FILE_PROTOCOL = "file://";
-
-    private ScanToolConstants() {
+public class TestConstants {
+    public static final String WINDOWS_LINE_SEPARATOR = "\r\n";
+    public static final String LINUX_LINE_SEPARATOR = "\n";
+    private TestConstants() {
     }
 }

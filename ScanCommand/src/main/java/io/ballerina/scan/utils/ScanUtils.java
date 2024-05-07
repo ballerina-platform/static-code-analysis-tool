@@ -26,7 +26,6 @@ import io.ballerina.projects.Project;
 import io.ballerina.projects.internal.model.Target;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.internal.IssueImpl;
-import io.ballerina.scan.internal.ScanToolConstants;
 import io.ballerina.tools.text.LineRange;
 
 import java.io.File;
@@ -47,7 +46,25 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import static io.ballerina.scan.internal.ScanToolConstants.RESULTS_JSON_FILE;
+import static io.ballerina.scan.utils.ScanUtilConstants.REPORT_DATA_PLACEHOLDER;
+import static io.ballerina.scan.utils.ScanUtilConstants.RESULTS_HTML_FILE;
+import static io.ballerina.scan.utils.ScanUtilConstants.RESULTS_JSON_FILE;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_FILE_CONTENT;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_FILE_NAME;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_FILE_PATH;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUES;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_MESSAGE;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_RULE_ID;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_SEVERITY;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TYPE;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_PROJECT_NAME;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_SCANNED_FILES;
+import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ZIP_FILE;
 
 /**
  * {@code ScanUtils} contains all the utility functions used by the scan tool.
@@ -140,109 +157,114 @@ public final class ScanUtils {
      */
     public static Path generateScanReport(List<Issue> issues, Project project, String directoryName) {
         JsonObject jsonScannedProject = new JsonObject();
-        jsonScannedProject.addProperty("projectName", project.currentPackage().packageName().toString());
+        jsonScannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, project.currentPackage().packageName().toString());
         Map<String, JsonObject> jsonScanReportPathAndFile = new HashMap<>();
         issues.forEach((issue) -> {
-            IssueImpl issueIml = (IssueImpl) issue;
-            String filePath = issueIml.filePath();
+            IssueImpl issueImpl = (IssueImpl) issue;
+            String filePath = issueImpl.filePath();
 
             JsonObject jsonScanReportFile;
             if (!jsonScanReportPathAndFile.containsKey(filePath)) {
                 jsonScanReportFile = new JsonObject();
-                jsonScanReportFile.addProperty("fileName", issueIml.fileName());
-                jsonScanReportFile.addProperty("filePath", filePath);
-                String fileContent = "";
+                jsonScanReportFile.addProperty(SCAN_REPORT_FILE_NAME, issueImpl.fileName());
+                jsonScanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
+                String fileContent;
                 try {
                     fileContent = Files.readString(Path.of(filePath));
                 } catch (IOException ex) {
-                    throw new RuntimeException(ex);
+                    throw new RuntimeException("Failed to read the file with exception: " + ex.getMessage());
                 }
-                jsonScanReportFile.addProperty("fileContent", fileContent);
-
-                JsonObject jsonScanReportIssueTextRange = new JsonObject();
-                LineRange lineRange = issueIml.location().lineRange();
-                jsonScanReportIssueTextRange.addProperty("startLine", lineRange.startLine().line());
-                jsonScanReportIssueTextRange.addProperty("startLineOffset", lineRange.startLine().offset());
-                jsonScanReportIssueTextRange.addProperty("endLine", lineRange.endLine().line());
-                jsonScanReportIssueTextRange.addProperty("endLineOffset", lineRange.endLine().offset());
-
-                JsonObject jsonScanReportIssue = new JsonObject();
-                jsonScanReportIssue.addProperty("ruleID", issueIml.rule().id());
-                jsonScanReportIssue.addProperty("issueSeverity", issueIml.rule().kind().toString());
-                jsonScanReportIssue.addProperty("issueType", issueIml.source().toString());
-                jsonScanReportIssue.addProperty("message", issueIml.rule().description());
-                jsonScanReportIssue.add("textRange", jsonScanReportIssueTextRange);
-
+                jsonScanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
                 JsonArray jsonIssues = new JsonArray();
-                jsonIssues.add(jsonScanReportIssue);
-                jsonScanReportFile.add("issues", jsonIssues);
+                JsonObject jsonIssue = getJsonIssue(issueImpl);
+                jsonIssues.add(jsonIssue);
+                jsonScanReportFile.add(SCAN_REPORT_ISSUES, jsonIssues);
             } else {
                 jsonScanReportFile = jsonScanReportPathAndFile.get(filePath);
-
-                JsonObject jsonScanReportIssueTextRange = new JsonObject();
-                LineRange lineRange = issueIml.location().lineRange();
-                jsonScanReportIssueTextRange.addProperty("startLine", lineRange.startLine().line());
-                jsonScanReportIssueTextRange.addProperty("startLineOffset", lineRange.startLine().offset());
-                jsonScanReportIssueTextRange.addProperty("endLine", lineRange.endLine().line());
-                jsonScanReportIssueTextRange.addProperty("endLineOffset", lineRange.endLine().offset());
-
-                JsonObject jsonScanReportIssue = new JsonObject();
-                jsonScanReportIssue.addProperty("ruleID", issueIml.rule().id());
-                jsonScanReportIssue.addProperty("issueSeverity", issueIml.rule().kind().toString());
-                jsonScanReportIssue.addProperty("issueType", issueIml.source().toString());
-                jsonScanReportIssue.addProperty("message", issueIml.rule().description());
-                jsonScanReportIssue.add("textRange", jsonScanReportIssueTextRange);
-
-                JsonArray jsonIssues = jsonScanReportFile.getAsJsonArray("issues");
-                jsonIssues.add(jsonScanReportIssue);
-
-                jsonScanReportFile.add("issues", jsonIssues);
+                JsonArray jsonIssues = jsonScanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES);
+                JsonObject jsonIssue = getJsonIssue(issueImpl);
+                jsonIssues.add(jsonIssue);
+                jsonScanReportFile.add(SCAN_REPORT_ISSUES, jsonIssues);
             }
             jsonScanReportPathAndFile.put(filePath, jsonScanReportFile);
         });
         JsonArray jsonScannedFiles = new JsonArray();
         jsonScanReportPathAndFile.values().forEach(jsonScannedFiles::add);
-        jsonScannedProject.add("scannedFiles", jsonScannedFiles);
+        jsonScannedProject.add(SCAN_REPORT_SCANNED_FILES, jsonScannedFiles);
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         String jsonOutput = gson.toJson(jsonScannedProject);
         Target target = getTargetPath(project, directoryName);
-        InputStream innerJarStream = ScanUtils.class.getResourceAsStream("/report.zip");
+        InputStream innerJarStream = ScanUtils.class.getClassLoader().getResourceAsStream(SCAN_REPORT_ZIP_FILE);
 
         File htmlFile;
         try {
-            unzipReportResources(innerJarStream, target.getReportPath().toFile());
-            String content = Files.readString(target.getReportPath().resolve(ScanToolConstants.RESULTS_HTML_FILE));
-            content = content.replace(ScanToolConstants.REPORT_DATA_PLACEHOLDER, jsonOutput);
-            htmlFile = new File(target.getReportPath().resolve(ScanToolConstants.RESULTS_HTML_FILE).toString());
+            Path htmlReportPath = target.getReportPath();
+            unzipReportResources(innerJarStream, htmlReportPath.toFile());
+            String content = Files.readString(htmlReportPath.resolve(RESULTS_HTML_FILE));
+            content = content.replace(REPORT_DATA_PLACEHOLDER, jsonOutput);
+            htmlFile = new File(htmlReportPath.resolve(RESULTS_HTML_FILE).toString());
             FileOutputStream fileOutputStream = new FileOutputStream(htmlFile);
 
             try (Writer writer = new OutputStreamWriter(fileOutputStream, StandardCharsets.UTF_8)) {
                 writer.write(new String(content.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
             }
         } catch (IOException ex) {
-            throw new RuntimeException(ex);
+            throw new RuntimeException("Failed to copy the file with exception: " + ex.getMessage());
         }
         return htmlFile.toPath();
     }
 
+    /**
+     * Returns the {@link JsonObject} representation of the static code analysis issue.
+     *
+     * @param issueImpl
+     * @return json object representation of the static code analysis issue
+     */
+    private static JsonObject getJsonIssue(IssueImpl issueImpl) {
+        JsonObject jsonScanReportIssue = new JsonObject();
+        jsonScanReportIssue.addProperty(SCAN_REPORT_ISSUE_RULE_ID, issueImpl.rule().id());
+        jsonScanReportIssue.addProperty(SCAN_REPORT_ISSUE_SEVERITY, issueImpl.rule().kind().toString());
+        jsonScanReportIssue.addProperty(SCAN_REPORT_ISSUE_TYPE, issueImpl.source().toString());
+        jsonScanReportIssue.addProperty(SCAN_REPORT_ISSUE_MESSAGE, issueImpl.rule().description());
+        JsonObject jsonScanReportIssueTextRange = new JsonObject();
+        LineRange lineRange = issueImpl.location().lineRange();
+        jsonScanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE, lineRange.startLine().line());
+        jsonScanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET,
+                lineRange.startLine().offset());
+        jsonScanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE, lineRange.endLine().line());
+        jsonScanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET,
+                lineRange.endLine().offset());
+        jsonScanReportIssue.add(SCAN_REPORT_ISSUE_TEXT_RANGE, jsonScanReportIssueTextRange);
+        return jsonScanReportIssue;
+    }
+
+    /**
+     * Extracts the HTML report template zip from a provided resource stream to the provided destination.
+     *
+     * @param source resource stream that contains the zip
+     * @param target destination to extract contents of the zip
+     */
     private static void unzipReportResources(InputStream source, File target) throws IOException {
         final ZipInputStream zipStream = new ZipInputStream(source);
         ZipEntry nextEntry;
         while ((nextEntry = zipStream.getNextEntry()) != null) {
-            if (!nextEntry.isDirectory()) {
-                final File nextFile = new File(target, nextEntry.getName());
-                final File parent = nextFile.getParentFile();
+            if (nextEntry.isDirectory()) {
+                continue;
+            }
 
-                if (parent != null) {
-                    Files.createDirectories(parent.toPath());
-                }
-                try (OutputStream targetStream = new FileOutputStream(nextFile)) {
-                    final int bufferSize = 4 * 1024;
-                    final byte[] buffer = new byte[bufferSize];
-                    int nextCount;
-                    while ((nextCount = zipStream.read(buffer)) >= 0) {
-                        targetStream.write(buffer, 0, nextCount);
-                    }
+            final File nextFile = new File(target, nextEntry.getName());
+            final File parent = nextFile.getParentFile();
+            if (parent != null) {
+                Files.createDirectories(parent.toPath());
+            }
+
+            try (OutputStream targetStream = new FileOutputStream(nextFile)) {
+                final int bufferSize = 4 * 1024;
+                final byte[] buffer = new byte[bufferSize];
+                int nextCount = zipStream.read(buffer);
+                while (nextCount >= 0) {
+                    targetStream.write(buffer, 0, nextCount);
+                    nextCount = zipStream.read(buffer);
                 }
             }
         }

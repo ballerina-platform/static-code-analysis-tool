@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.internal;
 
+import io.ballerina.cli.utils.OsUtils;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
@@ -39,6 +40,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+
+import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
+import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 
 /**
  * Scan command tests.
@@ -74,8 +78,10 @@ public class ScanCmdTest extends BaseTest {
         StringBuilder longDescription = new StringBuilder();
         scanCmd.printLongDesc(longDescription);
         Path helpTextPath = testResources.resolve("command-outputs").resolve("tool-help.txt");
-        expected = Files.readString(helpTextPath, StandardCharsets.UTF_8).replace("\r\n", "\n").trim();
-        Assert.assertEquals(longDescription.toString().replace("\r\n", "\n"), expected);
+        expected = Files.readString(helpTextPath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR).trim();
+        Assert.assertEquals(longDescription.toString()
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR), expected);
     }
 
     @Test(description = "test scan command with help flag")
@@ -86,7 +92,8 @@ public class ScanCmdTest extends BaseTest {
         scanCmd.execute();
         String scanLog = readOutput(true);
         Path helpTextPath = testResources.resolve("command-outputs").resolve("tool-help.txt");
-        String expected = Files.readString(helpTextPath, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        String expected = Files.readString(helpTextPath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertEquals(scanLog, expected);
     }
 
@@ -179,7 +186,7 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(scanLog, expected);
     }
 
-    @Test(description = "test scan command with method for saving results to file when analysis issues are is present")
+    @Test(description = "test scan command with method for saving results to file when analysis issues are present")
     void testScanCommandSaveToDirectoryMethodWhenIssuePresent() throws IOException {
         Rule coreRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
         Rule externalRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG, "exampleOrg",
@@ -196,16 +203,23 @@ public class ScanCmdTest extends BaseTest {
         Project project = ProjectLoader.loadProject(validBalProject);
         System.setProperty("user.dir", userDir);
         Path resultsFile = ScanUtils.saveToDirectory(issues, project, null);
-        String result = Files.readString(resultsFile, StandardCharsets.UTF_8).replace("\r\n", "\n");
-        Path validationResultsFilePath = testResources.resolve("command-outputs")
+        String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+                validationResultsFilePath = testResources.resolve("command-outputs")
                 .resolve("issues-report.txt");
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8).replace("\r\n",
-                "\n");
+        } else {
+                validationResultsFilePath = testResources.resolve("command-outputs")
+                .resolve("ubuntu").resolve("issues-report.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertEquals(result, expected);
     }
 
     @Test(description =
-            "test scan command with method for creating html analysis report when analysis issues are is present")
+            "test scan command with method for creating html analysis report when analysis issues are present")
     void testScanCommandGenerateScanReportMethodWhenIssuePresent() throws IOException {
         Rule coreRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
         Rule externalRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG, "exampleOrg",
@@ -222,11 +236,18 @@ public class ScanCmdTest extends BaseTest {
         Project project = ProjectLoader.loadProject(validBalProject);
         System.setProperty("user.dir", userDir);
         Path resultsFile = ScanUtils.generateScanReport(issues, project, null);
-        String result = Files.readString(resultsFile, StandardCharsets.UTF_8).replace("\r\n", "\n");
-        Path validationResultsFilePath = testResources.resolve("command-outputs")
+        String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+                validationResultsFilePath = testResources.resolve("command-outputs")
                 .resolve("issues-html-report.txt");
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8).replace("\r\n",
-                "\n");
+        } else {
+                validationResultsFilePath = testResources.resolve("command-outputs")
+                .resolve("ubuntu").resolve("issues-html-report.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertEquals(result, expected);
     }
 }

@@ -34,6 +34,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
+import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
+
 /**
  * Scan utilities tests.
  *
@@ -69,7 +72,8 @@ public class ScanUtilsTest extends BaseTest {
         Project project = ProjectLoader.loadProject(validBalProject);
         System.setProperty("user.dir", userDir);
         Path resultsFile = ScanUtils.saveToDirectory(issues, project, null);
-        String result = Files.readString(resultsFile, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         String expected = "[]";
         Assert.assertEquals(result, expected);
     }
@@ -82,7 +86,8 @@ public class ScanUtilsTest extends BaseTest {
         Project project = ProjectLoader.loadProject(validBalProject);
         System.setProperty("user.dir", userDir);
         Path resultsFile = ScanUtils.saveToDirectory(issues, project, RESULTS_DIRECTORY);
-        String result = Files.readString(resultsFile, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         String expected = "[]";
         Assert.assertEquals(result, expected);
     }
@@ -95,11 +100,12 @@ public class ScanUtilsTest extends BaseTest {
         Project project = ProjectLoader.loadProject(validBalProject);
         System.setProperty("user.dir", userDir);
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, null);
-        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Path validationScanReportPath = testResources.resolve("command-outputs")
                 .resolve("empty-issues-html-report.txt");
-        String expected = Files.readString(validationScanReportPath, StandardCharsets.UTF_8).replace("\r\n",
-                "\n");
+        String expected = Files.readString(validationScanReportPath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertEquals(result, expected);
     }
 
@@ -112,11 +118,12 @@ public class ScanUtilsTest extends BaseTest {
         Project project = ProjectLoader.loadProject(validBalProject);
         System.setProperty("user.dir", userDir);
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, RESULTS_DIRECTORY);
-        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Path validationScanReportPath = testResources.resolve("command-outputs")
                 .resolve("empty-issues-html-report.txt");
-        String expected = Files.readString(validationScanReportPath, StandardCharsets.UTF_8).replace("\r\n",
-                "\n");
+        String expected = Files.readString(validationScanReportPath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertEquals(result, expected);
     }
 }

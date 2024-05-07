@@ -33,9 +33,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static io.ballerina.projects.util.ProjectConstants.BALLERINA_ORG;
+import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAI_ORG;
+import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
+import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_RULE_PREFIX;
-import static io.ballerina.scan.internal.ScanToolConstants.PATH_SEPARATOR;
+import static io.ballerina.scan.internal.ScanToolConstants.PACKAGE_ORG_NAME_SEPARATOR;
 
 /**
  * Represents the implementation of the {@link Reporter} interface.
@@ -72,18 +74,22 @@ class ReporterImpl implements Reporter {
         String moduleName = module.moduleName().toString();
         Path issuesFilePath = module.project().documentPath(reportedDocument.documentId())
                 .orElse(Path.of(documentName));
-
         String fullyQualifiedRuleId = rule.id();
         String[] parts = fullyQualifiedRuleId.split(":");
+
         Source source;
         if (parts[0].equals(BALLERINA_RULE_PREFIX + rule.numericId())) {
             source = Source.BUILT_IN;
         } else {
             String reportedSource = parts[0];
-            String pluginOrg = reportedSource.split(PATH_SEPARATOR)[0];
-            source = pluginOrg.equals(BALLERINA_ORG) ? Source.BUILT_IN : Source.EXTERNAL;
+            String pluginOrg = reportedSource.split(PACKAGE_ORG_NAME_SEPARATOR)[0];
+            if (pluginOrg.equals(BALLERINA_ORG) || pluginOrg.equals(BALLERINAI_ORG)
+                    || pluginOrg.equals(BALLERINAX_ORG)) {
+                source = Source.BUILT_IN;
+            } else {
+                source = Source.EXTERNAL;
+            }
         }
-
         return new IssueImpl(location, rule, source, moduleName + System.lineSeparator() + documentName,
                 issuesFilePath.toString());
     }
