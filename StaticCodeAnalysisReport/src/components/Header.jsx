@@ -4,7 +4,6 @@ import {
 } from "@mui/material";
 import BallerinaLogo from "../resources/Ballerina-Logo";
 
-
 function Header({ projectName }) {
     return (
         <Box sx={{

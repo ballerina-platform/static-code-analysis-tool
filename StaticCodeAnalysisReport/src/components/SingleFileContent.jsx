@@ -1,7 +1,6 @@
 import { Box } from "@mui/material";
 import { useEffect, useState } from "react";
 
-
 const REACT_REPORT_OFFSET = 1;
 function SingleFileContent({ issues, fileContent }) {
     const [issueLines, setIssueLines] = useState([])

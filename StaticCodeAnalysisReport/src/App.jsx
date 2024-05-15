@@ -3,13 +3,11 @@ import { useState } from "react";
 import MainView from "./components/MainView";
 import SingleFileView from "./components/SingleFileView";
 
-
 function App() {
   const [fileView, setFileView] = useState({
     viewToggle: false,
     requestedFile: {},
   })
-
 
   // Get the static analysis data from the Populated DOM
   let scanData = null

@@ -11,7 +11,6 @@ import {
 } from '@mui/x-data-grid';
 import { useEffect, useState } from 'react';
 
-
 const issueSeverityCell = (cellValue) => {
     switch (cellValue) {
         case "CODE_SMELL":

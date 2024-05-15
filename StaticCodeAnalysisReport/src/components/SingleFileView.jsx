@@ -7,7 +7,6 @@ import {
 import SingleFileTable from "./SingleFileTable"
 import SingleFileContent from "./SingleFileContent"
 
-
 function SingleFileView({ toggleMainView, requestedFile }) {
     return (
         <Box sx={{ margin: "1rem 0" }}>
