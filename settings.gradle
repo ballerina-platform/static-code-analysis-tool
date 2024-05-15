@@ -30,3 +30,5 @@ pluginManagement {
 
 rootProject.name = 'static-code-analysis-tool'
 include 'ScanCommand'
+include 'StaticCodeAnalysisReport'
+
