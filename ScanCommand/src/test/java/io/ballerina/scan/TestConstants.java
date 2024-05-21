@@ -21,6 +21,7 @@ package io.ballerina.scan;
 public class TestConstants {
     public static final String WINDOWS_LINE_SEPARATOR = "\r\n";
     public static final String LINUX_LINE_SEPARATOR = "\n";
+
     private TestConstants() {
     }
 }

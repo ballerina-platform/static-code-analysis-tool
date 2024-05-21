@@ -81,8 +81,8 @@ class ReporterImpl implements Reporter {
         if (parts[0].equals(BALLERINA_RULE_PREFIX + rule.numericId())) {
             source = Source.BUILT_IN;
         } else {
-            String reportedSource = parts[0];
-            String pluginOrg = reportedSource.split(PACKAGE_ORG_NAME_SEPARATOR)[0];
+            String reportingSource = parts[0];
+            String pluginOrg = reportingSource.split(PACKAGE_ORG_NAME_SEPARATOR)[0];
             if (pluginOrg.equals(BALLERINA_ORG) || pluginOrg.equals(BALLERINAI_ORG)
                     || pluginOrg.equals(BALLERINAX_ORG)) {
                 source = Source.BUILT_IN;

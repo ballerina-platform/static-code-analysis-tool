@@ -46,25 +46,25 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import static io.ballerina.scan.utils.ScanUtilConstants.REPORT_DATA_PLACEHOLDER;
-import static io.ballerina.scan.utils.ScanUtilConstants.RESULTS_HTML_FILE;
-import static io.ballerina.scan.utils.ScanUtilConstants.RESULTS_JSON_FILE;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_FILE_CONTENT;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_FILE_NAME;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_FILE_PATH;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUES;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_MESSAGE;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_RULE_ID;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_SEVERITY;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ISSUE_TYPE;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_PROJECT_NAME;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_SCANNED_FILES;
-import static io.ballerina.scan.utils.ScanUtilConstants.SCAN_REPORT_ZIP_FILE;
+import static io.ballerina.scan.utils.Constants.REPORT_DATA_PLACEHOLDER;
+import static io.ballerina.scan.utils.Constants.RESULTS_HTML_FILE;
+import static io.ballerina.scan.utils.Constants.RESULTS_JSON_FILE;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_CONTENT;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_NAME;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_PATH;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUES;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_MESSAGE;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_RULE_ID;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_SEVERITY;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TYPE;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_NAME;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SCANNED_FILES;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ZIP_FILE;
 
 /**
  * {@code ScanUtils} contains all the utility functions used by the scan tool.
@@ -156,43 +156,47 @@ public final class ScanUtils {
      * @return path of the html analysis report where generated issues are saved
      */
     public static Path generateScanReport(List<Issue> issues, Project project, String directoryName) {
-        JsonObject jsonScannedProject = new JsonObject();
-        jsonScannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, project.currentPackage().packageName().toString());
-        Map<String, JsonObject> jsonScanReportPathAndFile = new HashMap<>();
-        issues.forEach((issue) -> {
+        JsonObject scannedProject = new JsonObject();
+        scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, project.currentPackage().packageName().toString());
+        Map<String, JsonObject> scanReportPathAndFile = new HashMap<>();
+
+        for (Issue issue : issues) {
             IssueImpl issueImpl = (IssueImpl) issue;
             String filePath = issueImpl.filePath();
 
-            JsonObject jsonScanReportFile;
-            if (!jsonScanReportPathAndFile.containsKey(filePath)) {
-                jsonScanReportFile = new JsonObject();
-                jsonScanReportFile.addProperty(SCAN_REPORT_FILE_NAME, issueImpl.fileName());
-                jsonScanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
-                String fileContent;
-                try {
-                    fileContent = Files.readString(Path.of(filePath));
-                } catch (IOException ex) {
-                    throw new RuntimeException("Failed to read the file with exception: " + ex.getMessage());
-                }
-                jsonScanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
-                JsonArray jsonIssues = new JsonArray();
-                JsonObject jsonIssue = getJsonIssue(issueImpl);
-                jsonIssues.add(jsonIssue);
-                jsonScanReportFile.add(SCAN_REPORT_ISSUES, jsonIssues);
-            } else {
-                jsonScanReportFile = jsonScanReportPathAndFile.get(filePath);
-                JsonArray jsonIssues = jsonScanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES);
-                JsonObject jsonIssue = getJsonIssue(issueImpl);
-                jsonIssues.add(jsonIssue);
-                jsonScanReportFile.add(SCAN_REPORT_ISSUES, jsonIssues);
+            if (scanReportPathAndFile.containsKey(filePath)) {
+                JsonObject scanReportFile = scanReportPathAndFile.get(filePath);
+                JsonArray issuesArray = scanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES);
+                JsonObject issueObject = getJsonIssue(issueImpl);
+                issuesArray.add(issueObject);
+                scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
+                scanReportPathAndFile.put(filePath, scanReportFile);
+                continue;
             }
-            jsonScanReportPathAndFile.put(filePath, jsonScanReportFile);
-        });
-        JsonArray jsonScannedFiles = new JsonArray();
-        jsonScanReportPathAndFile.values().forEach(jsonScannedFiles::add);
-        jsonScannedProject.add(SCAN_REPORT_SCANNED_FILES, jsonScannedFiles);
+
+            JsonObject scanReportFile = new JsonObject();
+            scanReportFile.addProperty(SCAN_REPORT_FILE_NAME, issueImpl.fileName());
+            scanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
+            String fileContent;
+            try {
+                fileContent = Files.readString(Path.of(filePath));
+            } catch (IOException ex) {
+                throw new RuntimeException("Failed to read the file with exception: " + ex.getMessage());
+            }
+            scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
+            JsonArray issuesArray = new JsonArray();
+            JsonObject issueObject = getJsonIssue(issueImpl);
+            issuesArray.add(issueObject);
+            scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
+
+            scanReportPathAndFile.put(filePath, scanReportFile);
+        }
+
+        JsonArray scannedFiles = new JsonArray();
+        scanReportPathAndFile.values().forEach(scannedFiles::add);
+        scannedProject.add(SCAN_REPORT_SCANNED_FILES, scannedFiles);
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        String jsonOutput = gson.toJson(jsonScannedProject);
+        String jsonOutput = gson.toJson(scannedProject);
         Target target = getTargetPath(project, directoryName);
         InputStream innerJarStream = ScanUtils.class.getClassLoader().getResourceAsStream(SCAN_REPORT_ZIP_FILE);
 
@@ -217,25 +221,27 @@ public final class ScanUtils {
     /**
      * Returns the {@link JsonObject} representation of the static code analysis issue.
      *
-     * @param issueImpl
+     * @param issueImpl the {@link IssueImpl} representing the issue, to be converted to a JSON object
      * @return json object representation of the static code analysis issue
      */
     private static JsonObject getJsonIssue(IssueImpl issueImpl) {
-        JsonObject jsonScanReportIssue = new JsonObject();
-        jsonScanReportIssue.addProperty(SCAN_REPORT_ISSUE_RULE_ID, issueImpl.rule().id());
-        jsonScanReportIssue.addProperty(SCAN_REPORT_ISSUE_SEVERITY, issueImpl.rule().kind().toString());
-        jsonScanReportIssue.addProperty(SCAN_REPORT_ISSUE_TYPE, issueImpl.source().toString());
-        jsonScanReportIssue.addProperty(SCAN_REPORT_ISSUE_MESSAGE, issueImpl.rule().description());
-        JsonObject jsonScanReportIssueTextRange = new JsonObject();
+        JsonObject scanReportIssue = new JsonObject();
+        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_RULE_ID, issueImpl.rule().id());
+        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_SEVERITY, issueImpl.rule().kind().toString());
+        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_TYPE, issueImpl.source().toString());
+        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_MESSAGE, issueImpl.rule().description());
+
+        JsonObject scanReportIssueTextRange = new JsonObject();
         LineRange lineRange = issueImpl.location().lineRange();
-        jsonScanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE, lineRange.startLine().line());
-        jsonScanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET,
-                lineRange.startLine().offset());
-        jsonScanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE, lineRange.endLine().line());
-        jsonScanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET,
-                lineRange.endLine().offset());
-        jsonScanReportIssue.add(SCAN_REPORT_ISSUE_TEXT_RANGE, jsonScanReportIssueTextRange);
-        return jsonScanReportIssue;
+        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE, lineRange.startLine().line());
+        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET, lineRange.startLine()
+                .offset());
+        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE, lineRange.endLine().line());
+        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET, lineRange.endLine()
+                .offset());
+
+        scanReportIssue.add(SCAN_REPORT_ISSUE_TEXT_RANGE, scanReportIssueTextRange);
+        return scanReportIssue;
     }
 
     /**

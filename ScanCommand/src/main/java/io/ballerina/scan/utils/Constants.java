@@ -18,7 +18,7 @@
 
 package io.ballerina.scan.utils;
 
-public class ScanUtilConstants {
+public class Constants {
     static final String RESULTS_JSON_FILE = "scan_results.json";
     static final String RESULTS_HTML_FILE = "index.html";
     static final String REPORT_DATA_PLACEHOLDER = "__data__";
@@ -39,6 +39,6 @@ public class ScanUtilConstants {
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE = "endLine";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET = "endLineOffset";
 
-    private ScanUtilConstants() {
+    private Constants() {
     }
 }

@@ -151,7 +151,6 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println("\t" + reportPath + System.lineSeparator());
 
             if (scanReport) {
-                outputStream.println("Generating scan report...");
                 Path scanReportPath = ScanUtils.generateScanReport(issues, project.get(), targetDir);
                 outputStream.println();
                 outputStream.println("View scan report at:");
