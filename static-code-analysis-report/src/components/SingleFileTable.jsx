@@ -106,7 +106,7 @@ function SingleFileTable({ issues }) {
                     id: issueID,
                     ruleID: issue.ruleID,
                     issueSeverity: issue.issueSeverity,
-                    lineRange: `(${issue.textRange.startLine + REACT_REPORT_OFFSET}:${issue.textRange.startLineOffset}, ${issue.textRange.endLine}:${issue.textRange.endLineOffset + REACT_REPORT_OFFSET})`,
+                    lineRange: `(${issue.textRange.startLine + REACT_REPORT_OFFSET}:${issue.textRange.startLineOffset}, ${issue.textRange.endLine + REACT_REPORT_OFFSET}:${issue.textRange.endLineOffset})`,
                     description: issue.message
                 }
 

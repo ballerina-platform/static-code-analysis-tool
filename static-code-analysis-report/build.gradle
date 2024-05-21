@@ -57,5 +57,5 @@ task createScanReportZip(type: Zip) {
     include '**/static/js/*.js.map'
     exclude '**/static/js/runtime-*.js'
     archiveFileName = 'report.zip'
-    destinationDirectory = file("${rootDir}/ScanCommand/src/main/resources/")
+    destinationDirectory = file("${rootDir}/scan-command/src/main/resources/")
 }
