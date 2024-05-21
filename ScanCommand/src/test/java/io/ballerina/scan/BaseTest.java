@@ -28,6 +28,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
+import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
+
 /**
  * Parent test class for providing common setup methods for tests.
  *
@@ -52,7 +55,7 @@ public abstract class BaseTest {
 
     protected String readOutput(boolean silent) throws IOException {
         String output = "";
-        output = console.toString(StandardCharsets.UTF_8).replace("\r\n", "\n");
+        output = console.toString(StandardCharsets.UTF_8).replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         console.close();
         console = new ByteArrayOutputStream();
         printStream = new PrintStream(console, true, StandardCharsets.UTF_8);

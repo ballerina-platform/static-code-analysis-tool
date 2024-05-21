@@ -71,6 +71,9 @@ dependencies {
 
     // Required dependencies for running scan tool tests
     testImplementation group: 'org.testng', name: 'testng', version: "${testngVersion}"
+
+    // For including the scan report zip
+    implementation files("${projectDir}/src/main/resources/report.zip")
 }
 
 tasks.withType(JavaExec).configureEach {

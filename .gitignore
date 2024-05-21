@@ -3,7 +3,6 @@
 
 # Package Files
 *.jar
-*.zip
 
 # Gradle
 .gradle

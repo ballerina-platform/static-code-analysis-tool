@@ -16,18 +16,12 @@
  *  under the License.
  */
 
-pluginManagement {
-    plugins {
-        id 'java'
-        id 'application'
-        id 'java-library'
-        id 'checkstyle'
-        id 'jacoco'
-        id 'com.github.spotbugs' version "${spotbugsPluginVersion}"
-        id 'de.undercouch.download' version "${downloadPluginVersion}"
+package io.ballerina.scan;
+
+public class TestConstants {
+    public static final String WINDOWS_LINE_SEPARATOR = "\r\n";
+    public static final String LINUX_LINE_SEPARATOR = "\n";
+
+    private TestConstants() {
     }
 }
-
-rootProject.name = 'static-code-analysis-tool'
-include 'ScanCommand'
-include 'StaticCodeAnalysisReport'
