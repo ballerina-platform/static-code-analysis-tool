@@ -46,6 +46,11 @@ class StaticCodeAnalyzer extends NodeVisitor {
         this.visit((ModulePartNode) syntaxTree.rootNode());
     }
 
+    /**
+     * Visits check expressions in a Ballerina document and perform static code analysis.
+     *
+     * @param checkExpressionNode node that represents a check expression
+     */
     @Override
     public void visit(CheckExpressionNode checkExpressionNode) {
         if (checkExpressionNode.checkKeyword().kind().equals(SyntaxKind.CHECKPANIC_KEYWORD)) {

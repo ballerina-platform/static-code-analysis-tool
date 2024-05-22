@@ -59,6 +59,7 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext);
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
+        Assert.assertEquals(issues.size(), 1);
         Issue issue = issues.get(0);
         Rule rule = issue.rule();
         Assert.assertEquals(rule.id(), "B1");
