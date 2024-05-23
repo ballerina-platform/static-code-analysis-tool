@@ -37,7 +37,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAI_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_RULE_PREFIX;
-import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH_DELIMITER;
+import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
 
 /**
  * Represents the implementation of the {@link Reporter} interface.
@@ -82,7 +82,7 @@ class ReporterImpl implements Reporter {
             source = Source.BUILT_IN;
         } else {
             String reportingSource = parts[0];
-            String pluginOrg = reportingSource.split(FORWARD_SLASH_DELIMITER)[0];
+            String pluginOrg = reportingSource.split(FORWARD_SLASH)[0];
             if (pluginOrg.equals(BALLERINA_ORG) || pluginOrg.equals(BALLERINAI_ORG)
                     || pluginOrg.equals(BALLERINAX_ORG)) {
                 source = Source.BUILT_IN;
@@ -90,7 +90,7 @@ class ReporterImpl implements Reporter {
                 source = Source.EXTERNAL;
             }
         }
-        return new IssueImpl(location, rule, source, moduleName + FORWARD_SLASH_DELIMITER + documentName,
+        return new IssueImpl(location, rule, source, moduleName + FORWARD_SLASH + documentName,
                 issuesFilePath.toString());
     }
 

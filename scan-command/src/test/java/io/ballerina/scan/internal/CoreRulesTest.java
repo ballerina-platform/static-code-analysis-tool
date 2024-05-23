@@ -23,26 +23,18 @@ import io.ballerina.scan.RuleKind;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Core static code analysis rules tests.
  *
  * @since 0.1.0
  */
 public class CoreRulesTest {
-    @Test(description = "test core rules")
-    void testCoreRules() {
-        CoreRules coreRules = new CoreRules();
-        Map<Integer, Rule> rules = new HashMap<>();
-        coreRules.getCoreRules().forEach(rule -> {
-            rules.put(rule.numericId(), rule);
-        });
-        Rule ruleCheckPanic = rules.get(1);
-        Assert.assertEquals(ruleCheckPanic.id(), "B1");
-        Assert.assertEquals(ruleCheckPanic.numericId(), 1);
-        Assert.assertEquals(ruleCheckPanic.description(), "Should avoid checkpanic");
-        Assert.assertEquals(ruleCheckPanic.kind(), RuleKind.CODE_SMELL);
+    @Test(description = "test checkpanic rule")
+    void testCheckpanicRule() {
+        Rule rule = CoreRules.RULE_CHECKPANIC.rule();
+        Assert.assertEquals(rule.id(), "B1");
+        Assert.assertEquals(rule.numericId(), 1);
+        Assert.assertEquals(rule.description(), "Avoid checkpanic");
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }

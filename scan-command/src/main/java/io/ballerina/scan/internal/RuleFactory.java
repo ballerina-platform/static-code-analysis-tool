@@ -22,7 +22,7 @@ import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_RULE_PREFIX;
-import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH_DELIMITER;
+import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
 
 /**
  * {@code RuleFactory} contains the logic to create a {@link Rule} with fully qualified identifier.
@@ -55,7 +55,7 @@ class RuleFactory {
      * @return an external static code analysis rule instance
      */
     static Rule createRule(int numericId, String description, RuleKind ruleKind, String org, String name) {
-        String reportedSource = org + FORWARD_SLASH_DELIMITER + name;
+        String reportedSource = org + FORWARD_SLASH + name;
         return new RuleImpl(reportedSource + ":" + BALLERINA_RULE_PREFIX + numericId, numericId, description,
                 ruleKind);
     }

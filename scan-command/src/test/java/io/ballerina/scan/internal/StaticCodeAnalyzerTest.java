@@ -26,12 +26,11 @@ import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.Source;
 import org.testng.Assert;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,31 +39,26 @@ import java.util.List;
  * @since 0.1.0
  */
 public class StaticCodeAnalyzerTest extends BaseTest {
-    private final Path coreRuleBalFiles = testResources.resolve("test-resources")
-            .resolve("core-rules");
-    private final List<Rule> rules = new ArrayList<>();
+    private final Path coreRuleBalFiles = testResources.resolve("test-resources").resolve("core-rules");
 
-    @BeforeTest
-    void setCoreRules() {
-        CoreRules coreRules = new CoreRules();
-        rules.addAll(coreRules.getCoreRules());
-    }
-
-    @Test(description = "test core analyzer checkpanic rule visitor")
-    void testCoreRuleCheckPanicVisitor() {
-        Project project = SingleFileProject.load(coreRuleBalFiles.resolve("rule_checkpanic.bal"));
+    @Test(description = "test checkpanic analyzer")
+    void testCheckpanicAnalyzer() {
+        String ballerinaFile = "rule_checkpanic.bal";
+        Project project = SingleFileProject.load(coreRuleBalFiles.resolve(ballerinaFile));
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
-        ScannerContextImpl scannerContext = new ScannerContextImpl(rules);
+        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRules.RULE_CHECKPANIC.rule()));
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext);
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
         Assert.assertEquals(issues.size(), 1);
         Issue issue = issues.get(0);
+        Assert.assertEquals(issue.source(), Source.BUILT_IN);
+        Assert.assertEquals(issue.location().lineRange().fileName(), ballerinaFile);
         Rule rule = issue.rule();
         Assert.assertEquals(rule.id(), "B1");
         Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), "Should avoid checkpanic");
+        Assert.assertEquals(rule.description(), "Avoid checkpanic");
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }

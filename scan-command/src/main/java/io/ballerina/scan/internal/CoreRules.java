@@ -21,23 +21,21 @@ package io.ballerina.scan.internal;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * {@code CoreRules} contains the core static code analysis rules.
  *
  * @since 0.1.0
  * */
-public class CoreRules {
-    private final List<Rule> coreRules;
+enum CoreRules {
+    RULE_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL));
 
-    CoreRules() {
-        coreRules = new ArrayList<>();
-        coreRules.add(RuleFactory.createRule(1, "Should avoid checkpanic", RuleKind.CODE_SMELL));
+    private final Rule rule;
+
+    CoreRules(Rule rule) {
+        this.rule = rule;
     }
 
-    List<Rule> getCoreRules() {
-        return coreRules;
+    public Rule rule() {
+        return rule;
     }
 }

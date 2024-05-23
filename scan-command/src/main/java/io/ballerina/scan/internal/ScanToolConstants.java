@@ -26,7 +26,7 @@ package io.ballerina.scan.internal;
 public class ScanToolConstants {
     static final String SCAN_COMMAND = "scan";
     static final String BALLERINA_RULE_PREFIX = "B";
-    static final String FORWARD_SLASH_DELIMITER = "/";
+    static final String FORWARD_SLASH = "/";
     static final String BALLERINA_ORG = "ballerina";
     static final String BALLERINAI_ORG = "ballerinai";
     static final String BALLERINAX_ORG = "ballerinax";

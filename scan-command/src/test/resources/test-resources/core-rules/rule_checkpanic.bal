@@ -14,11 +14,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-function getResult() returns json|error {
-    return {"result": "message"};
-}
+function getResult() returns int|error => 1;
 
 // Noncompliant
 public function main() {
-    json result = checkpanic getResult();
+    int result = checkpanic getResult();
 }
