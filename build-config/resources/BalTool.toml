@@ -2,4 +2,4 @@
 id = "scan"
 
 [[dependency]]
-path = "../build/libs/ScanCommand-@toml.version@.jar"
+path = "../build/libs/scan-command-@toml.version@.jar"

@@ -1,0 +1,60 @@
+[
+  {
+    "location": {
+      "lineRange": {
+        "fileName": "main.bal",
+        "startLine": {
+          "line": 16,
+          "offset": 17
+        },
+        "endLine": {
+          "line": 23,
+          "offset": 1
+        }
+      },
+      "textRange": {
+        "startOffset": 748,
+        "endOffset": 752,
+        "length": 4
+      }
+    },
+    "rule": {
+      "id": "ballerina:101",
+      "numericId": 101,
+      "description": "rule 101",
+      "ruleKind": "BUG"
+    },
+    "source": "BUILT_IN",
+    "fileName": "main.bal",
+    "filePath": "src/test/resources/test-resources/valid-bal-project/main.bal"
+  },
+  {
+    "location": {
+      "lineRange": {
+        "fileName": "main.bal",
+        "startLine": {
+          "line": 16,
+          "offset": 17
+        },
+        "endLine": {
+          "line": 23,
+          "offset": 1
+        }
+      },
+      "textRange": {
+        "startOffset": 748,
+        "endOffset": 752,
+        "length": 4
+      }
+    },
+    "rule": {
+      "id": "exampleOrg/exampleName:101",
+      "numericId": 101,
+      "description": "rule 101",
+      "ruleKind": "BUG"
+    },
+    "source": "EXTERNAL",
+    "fileName": "main.bal",
+    "filePath": "src/test/resources/test-resources/valid-bal-project/main.bal"
+  }
+]

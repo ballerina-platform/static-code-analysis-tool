@@ -16,18 +16,21 @@
  *  under the License.
  */
 
-pluginManagement {
-    plugins {
-        id 'java'
-        id 'application'
-        id 'java-library'
-        id 'checkstyle'
-        id 'jacoco'
-        id 'com.github.spotbugs' version "${spotbugsPluginVersion}"
-        id 'de.undercouch.download' version "${downloadPluginVersion}"
+package io.ballerina.scan.internal;
+
+/**
+ * {@code ScanToolConstants} contains the constant variables used within the Ballerina scan tool.
+ *
+ * @since 0.1.0
+ */
+public class ScanToolConstants {
+    static final String SCAN_COMMAND = "scan";
+    static final String BALLERINA_RULE_PREFIX = "ballerina:";
+    static final String FORWARD_SLASH = "/";
+    static final String BALLERINA_ORG = "ballerina";
+    static final String BALLERINAI_ORG = "ballerinai";
+    static final String BALLERINAX_ORG = "ballerinax";
+
+    private ScanToolConstants() {
     }
 }
-
-rootProject.name = 'static-code-analysis-tool'
-include 'scan-command'
-include 'static-code-analysis-report'

@@ -1,0 +1,5 @@
+[tool]
+id = "scan"
+
+[[dependency]]
+path = "../build/libs/scan-command-0.1.0.jar"
