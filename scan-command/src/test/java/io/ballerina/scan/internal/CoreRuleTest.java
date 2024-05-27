@@ -28,10 +28,15 @@ import org.testng.annotations.Test;
  *
  * @since 0.1.0
  */
-public class CoreRulesTest {
+public class CoreRuleTest {
+    @Test(description = "test all rules")
+    void testAllRules() {
+        Assert.assertEquals(CoreRule.rules().size(), 1);
+    }
+
     @Test(description = "test checkpanic rule")
     void testCheckpanicRule() {
-        Rule rule = CoreRules.RULE_CHECKPANIC.rule();
+        Rule rule = CoreRule.AVOID_CHECKPANIC.rule();
         Assert.assertEquals(rule.id(), "B1");
         Assert.assertEquals(rule.numericId(), 1);
         Assert.assertEquals(rule.description(), "Avoid checkpanic");

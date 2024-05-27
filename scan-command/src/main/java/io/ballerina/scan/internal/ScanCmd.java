@@ -132,10 +132,7 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer();
-        List<Rule> coreRules = new ArrayList<>();
-        for (CoreRules coreRule: CoreRules.values()) {
-             coreRules.add(coreRule.rule());
-        }
+        List<Rule> coreRules = CoreRule.rules();
 
         outputStream.println();
         outputStream.println("Running Scans...");

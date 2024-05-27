@@ -47,7 +47,7 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         Project project = SingleFileProject.load(coreRuleBalFiles.resolve(ballerinaFile));
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
-        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRules.RULE_CHECKPANIC.rule()));
+        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.AVOID_CHECKPANIC.rule()));
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext);
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();

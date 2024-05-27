@@ -55,7 +55,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
     public void visit(CheckExpressionNode checkExpressionNode) {
         if (checkExpressionNode.checkKeyword().kind().equals(SyntaxKind.CHECKPANIC_KEYWORD)) {
             scannerContext.getReporter().reportIssue(document, checkExpressionNode.location(),
-                    CoreRules.RULE_CHECKPANIC.rule());
+                    CoreRule.AVOID_CHECKPANIC.rule());
         }
     }
 }
