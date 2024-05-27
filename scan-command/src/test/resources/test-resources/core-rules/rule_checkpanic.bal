@@ -16,7 +16,7 @@
 
 function getResult() returns int|error => 1;
 
-// Noncompliant
 public function main() {
+    // Non-compliant
     int result = checkpanic getResult();
 }
