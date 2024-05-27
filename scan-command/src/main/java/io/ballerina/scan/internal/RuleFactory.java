@@ -56,7 +56,7 @@ class RuleFactory {
      */
     static Rule createRule(int numericId, String description, RuleKind ruleKind, String org, String name) {
         String reportedSource = org + FORWARD_SLASH + name;
-        return new RuleImpl(reportedSource + ":" + BALLERINA_RULE_PREFIX + numericId, numericId, description,
+        return new RuleImpl(reportedSource + ":" + numericId, numericId, description,
                 ruleKind);
     }
 

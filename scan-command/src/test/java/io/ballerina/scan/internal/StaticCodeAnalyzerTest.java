@@ -56,7 +56,7 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
         Assert.assertEquals(issue.location().lineRange().fileName(), ballerinaFile);
         Rule rule = issue.rule();
-        Assert.assertEquals(rule.id(), "B1");
+        Assert.assertEquals(rule.id(), "ballerina:1");
         Assert.assertEquals(rule.numericId(), 1);
         Assert.assertEquals(rule.description(), "Avoid checkpanic");
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);

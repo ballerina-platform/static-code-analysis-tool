@@ -32,7 +32,7 @@ public class RuleImplTest {
     @Test(description = "test creating and retrieving values from a core rule")
     void testCoreRule() {
         Rule rule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
-        Assert.assertEquals(rule.id(), "B101");
+        Assert.assertEquals(rule.id(), "ballerina:101");
         Assert.assertEquals(rule.numericId(), 101);
         Assert.assertEquals(rule.description(), "rule 101");
         Assert.assertEquals(rule.kind(), RuleKind.BUG);
@@ -42,7 +42,7 @@ public class RuleImplTest {
     void testExternalRule() {
         Rule rule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG,
                 "exampleOrg", "exampleName");
-        Assert.assertEquals(rule.id(), "exampleOrg/exampleName:B101");
+        Assert.assertEquals(rule.id(), "exampleOrg/exampleName:101");
         Assert.assertEquals(rule.numericId(), 101);
         Assert.assertEquals(rule.description(), "rule 101");
         Assert.assertEquals(rule.kind(), RuleKind.BUG);

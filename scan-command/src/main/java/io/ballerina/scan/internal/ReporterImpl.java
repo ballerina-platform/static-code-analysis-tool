@@ -78,7 +78,7 @@ class ReporterImpl implements Reporter {
         String[] parts = fullyQualifiedRuleId.split(":");
 
         Source source;
-        if (parts[0].equals(BALLERINA_RULE_PREFIX + rule.numericId())) {
+        if (parts[0].equals(BALLERINA_RULE_PREFIX) && parts[1].equals(String.valueOf(rule.numericId()))) {
             source = Source.BUILT_IN;
         } else {
             String reportingSource = parts[0];

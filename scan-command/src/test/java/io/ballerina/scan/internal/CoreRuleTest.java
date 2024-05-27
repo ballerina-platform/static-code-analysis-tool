@@ -37,7 +37,7 @@ public class CoreRuleTest {
     @Test(description = "test checkpanic rule")
     void testCheckpanicRule() {
         Rule rule = CoreRule.AVOID_CHECKPANIC.rule();
-        Assert.assertEquals(rule.id(), "B1");
+        Assert.assertEquals(rule.id(), "ballerina:1");
         Assert.assertEquals(rule.numericId(), 1);
         Assert.assertEquals(rule.description(), "Avoid checkpanic");
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);

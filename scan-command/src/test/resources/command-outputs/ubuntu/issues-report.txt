@@ -19,7 +19,7 @@
       }
     },
     "rule": {
-      "id": "B101",
+      "id": "ballerina:101",
       "numericId": 101,
       "description": "rule 101",
       "ruleKind": "BUG"
@@ -48,7 +48,7 @@
       }
     },
     "rule": {
-      "id": "exampleOrg/exampleName:B101",
+      "id": "exampleOrg/exampleName:101",
       "numericId": 101,
       "description": "rule 101",
       "ruleKind": "BUG"
