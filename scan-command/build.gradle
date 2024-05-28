@@ -59,9 +59,13 @@ dependencies {
     implementation group: 'org.ballerinalang', name: 'ballerina-tools-api', version: "${ballerinaLangVersion}"
     implementation group: 'org.ballerinalang', name: 'jballerina-tools', version: "${ballerinaLangVersion}"
     implementation group: 'org.ballerinalang', name: 'ballerina-cli', version: "${ballerinaLangVersion}"
+    implementation group: 'org.ballerinalang', name: 'toml-parser', version: "${ballerinaLangVersion}"
 
     // Required for determining the platform a java process is running on
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: "${apacheCommonsLang3Version}"
+
+    // For extracting remote JAR files and other file operations
+    implementation group: 'commons-io', name: 'commons-io', version: "${commonsIoVersion}"
 
     // Required dependencies for jacoco
     implementation group: 'org.jacoco', name: 'org.jacoco.core', version: "${jacocoVersion}"

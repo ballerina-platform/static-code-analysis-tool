@@ -38,6 +38,14 @@ public class Constants {
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET = "startLineOffset";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE = "endLine";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET = "endLineOffset";
+    static final String SCAN_TABLE = "scan";
+    static final String SCAN_FILE_FIELD = "configPath";
+    static final String SCAN_FILE = "Scan.toml";
+    static final String PLATFORM_TABLE = "platform";
+    static final String ANALYZER_TABLE = "analyzer";
+    static final String RULES_TABLE = "rule";
+    static final String JAR_PREDICATE = ".jar";
+    static final String CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN = "^\\d+\\.\\d+\\.\\d+$";
 
     private Constants() {
     }

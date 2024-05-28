@@ -26,6 +26,7 @@ import io.ballerina.projects.directory.SingleFileProject;
 import io.ballerina.projects.util.ProjectConstants;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
+import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanUtils;
 import picocli.CommandLine;
 
@@ -131,13 +132,16 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer();
+        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project.get(), outputStream);
+        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(scanTomlFile);
         List<Rule> coreRules = CoreRule.rules();
 
         outputStream.println();
         outputStream.println("Running Scans...");
 
         List<Issue> issues = projectAnalyzer.analyze(project.get(), coreRules);
+        List<Issue> externalIssues = projectAnalyzer.runExternalAnalyzers(project.get());
+        issues.addAll(externalIssues);
 
         if (!platforms.isEmpty() || platformTriggered) {
             return;
