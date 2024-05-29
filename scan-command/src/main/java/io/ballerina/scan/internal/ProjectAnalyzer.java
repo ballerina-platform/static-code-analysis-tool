@@ -18,7 +18,6 @@
 
 package io.ballerina.scan.internal;
 
-import io.ballerina.projects.BallerinaToml;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
@@ -34,7 +33,7 @@ import java.util.function.Consumer;
 
 import static io.ballerina.projects.util.ProjectConstants.IMPORT_PREFIX;
 import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
-import static io.ballerina.scan.internal.ScanToolConstants.USE_IMPORT_AS_SERVICE;
+import static io.ballerina.scan.internal.ScanToolConstants.USE_IMPORT_AS_UNDERSCORE;
 
 /**
  * Represents the project analyzer used for analyzing projects.
@@ -66,46 +65,56 @@ class ProjectAnalyzer {
         };
     }
 
+    private void buildStringWithNewLine(StringBuilder stringBuilder, String content) {
+        stringBuilder.append(content).append(System.lineSeparator());
+    }
+
+    private void extractAnalyzerImportsAndDependencies(ScanTomlFile.Analyzer analyzer, StringBuilder imports,
+                                                       StringBuilder dependencies) {
+        String org = analyzer.org();
+        String name = analyzer.name();
+        String version = analyzer.version();
+        String repository = analyzer.repository();
+        String reportingSource = org + FORWARD_SLASH + name;
+        buildStringWithNewLine(imports, IMPORT_PREFIX + reportingSource + USE_IMPORT_AS_UNDERSCORE);
+
+        if (version == null) {
+            return;
+        }
+        buildStringWithNewLine(dependencies, "");
+        buildStringWithNewLine(dependencies, "[[dependency]]");
+        buildStringWithNewLine(dependencies, "org = '" + org + "'");
+        buildStringWithNewLine(dependencies, "name = '" + name + "'");
+        buildStringWithNewLine(dependencies, "version = '" + version + "'");
+
+        if (repository == null) {
+            return;
+        }
+        buildStringWithNewLine(dependencies, "repository = '" + repository + "'");
+    }
+
     List<Issue> runExternalAnalyzers(Project project) {
         StringBuilder newImports = new StringBuilder();
         StringBuilder tomlDependencies = new StringBuilder();
-        int importCounter = 0;
 
         for (ScanTomlFile.Analyzer analyzer : scanTomlFile.getAnalyzers()) {
-            String reportingSource = analyzer.getOrg() + FORWARD_SLASH + analyzer.getName();
-            String analyzerImport = IMPORT_PREFIX + reportingSource + USE_IMPORT_AS_SERVICE;
-            newImports.append(analyzerImport).append("\n");
-
-            if (analyzer.getVersion() != null) {
-                tomlDependencies.append("\n");
-                tomlDependencies.append("[[dependency]]" + "\n");
-                tomlDependencies.append("org='").append(analyzer.getOrg()).append("'\n");
-                tomlDependencies.append("name='").append(analyzer.getName()).append("'\n");
-                tomlDependencies.append("version='").append(analyzer.getVersion()).append("'\n");
-
-                if (analyzer.getRepository() != null) {
-                    tomlDependencies.append("repository='").append(analyzer.getRepository()).append("'\n");
-                }
-            }
-            importCounter++;
+            extractAnalyzerImportsAndDependencies(analyzer, newImports, tomlDependencies);
         }
-
         Module defaultModule = project.currentPackage().getDefaultModule();
-        Document mainBAL = defaultModule.document(defaultModule.documentIds().iterator().next());
-        String documentContent = mainBAL.textDocument().toString();
-        mainBAL.modify().withContent(newImports + documentContent).apply();
+        Document balFile = defaultModule.document(defaultModule.documentIds().iterator().next());
+        String balFileContent = balFile.textDocument().toString();
+        balFile.modify().withContent(newImports + balFileContent).apply();
 
-        BallerinaToml ballerinaToml = project.currentPackage().ballerinaToml().orElse(null);
-        if (ballerinaToml != null) {
-            documentContent = ballerinaToml.tomlDocument().textDocument().toString();
-            ballerinaToml.modify().withContent(documentContent + tomlDependencies).apply();
-        }
+        project.currentPackage().ballerinaToml().ifPresent(ballerinaToml -> {
+            String tomlFileContent = ballerinaToml.tomlDocument().textDocument().toString();
+            ballerinaToml.modify().withContent(tomlFileContent + tomlDependencies).apply();
+        });
 
         List<ScannerContext> scannerContextList = new ArrayList<>();
 
         // TODO: Implement the logic to pass scanner contexts to compiler plugins and perform external static analysis.
 
-        List<Issue> externalIssues = new ArrayList<>();
+        List<Issue> externalIssues = new ArrayList<>(scannerContextList.size());
         for (ScannerContext scannerContext : scannerContextList) {
             ReporterImpl reporter = (ReporterImpl) scannerContext.getReporter();
             externalIssues.addAll(reporter.getIssues());

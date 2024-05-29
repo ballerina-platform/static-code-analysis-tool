@@ -30,7 +30,7 @@ public class ScanToolConstants {
     static final String BALLERINA_ORG = "ballerina";
     static final String BALLERINAI_ORG = "ballerinai";
     static final String BALLERINAX_ORG = "ballerinax";
-    static final String USE_IMPORT_AS_SERVICE = " as _;";
+    static final String USE_IMPORT_AS_UNDERSCORE = " as _;";
 
     private ScanToolConstants() {
     }

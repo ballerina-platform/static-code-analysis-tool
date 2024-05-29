@@ -41,6 +41,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
+import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
+import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
+
 public class ProjectAnalyzerTest extends BaseTest {
     private ProjectAnalyzer projectAnalyzer;
     private Project project;
@@ -91,26 +94,27 @@ public class ProjectAnalyzerTest extends BaseTest {
         Assert.assertEquals(issues.size(), 0);
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
-        String result = document.textDocument().toString();
+        String result = document.textDocument().toString().replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertTrue(result.contains("import exampleOrg/exampleName as _;"));
         Assert.assertTrue(result.contains("import ballerina/example_module_static_code_analyzer as _;"));
         Assert.assertTrue(result.contains("import ballerinax/example_module_static_code_analyzer as _;"));
         BallerinaToml ballerinaToml = project.currentPackage().ballerinaToml().orElse(null);
         if (ballerinaToml != null) {
-            result = ballerinaToml.tomlDocument().textDocument().toString();
+            result = ballerinaToml.tomlDocument().textDocument().toString()
+                    .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         }
         Assert.assertTrue(result.contains("""
                 [[dependency]]
-                org='ballerina'
-                name='example_module_static_code_analyzer'
-                version='0.1.0'
+                org = 'ballerina'
+                name = 'example_module_static_code_analyzer'
+                version = '0.1.0'
                 """));
         Assert.assertTrue(result.contains("""
                 [[dependency]]
-                org='ballerinax'
-                name='example_module_static_code_analyzer'
-                version='0.1.0'
-                repository='local'
+                org = 'ballerinax'
+                name = 'example_module_static_code_analyzer'
+                version = '0.1.0'
+                repository = 'local'
                 """));
     }
 }

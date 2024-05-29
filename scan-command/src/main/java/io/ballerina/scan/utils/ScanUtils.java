@@ -56,6 +56,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -63,9 +64,15 @@ import java.util.zip.ZipInputStream;
 import static io.ballerina.projects.util.ProjectConstants.LOCAL_REPOSITORY_NAME;
 import static io.ballerina.projects.util.ProjectConstants.REPORT_DIR_NAME;
 import static io.ballerina.projects.util.ProjectConstants.USER_DIR_PROPERTY;
+import static io.ballerina.scan.utils.Constants.ANALYZER_NAME;
+import static io.ballerina.scan.utils.Constants.ANALYZER_ORG;
+import static io.ballerina.scan.utils.Constants.ANALYZER_REPOSITORY;
 import static io.ballerina.scan.utils.Constants.ANALYZER_TABLE;
+import static io.ballerina.scan.utils.Constants.ANALYZER_VERSION;
 import static io.ballerina.scan.utils.Constants.CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN;
 import static io.ballerina.scan.utils.Constants.JAR_PREDICATE;
+import static io.ballerina.scan.utils.Constants.PLATFORM_NAME;
+import static io.ballerina.scan.utils.Constants.PLATFORM_PATH;
 import static io.ballerina.scan.utils.Constants.PLATFORM_TABLE;
 import static io.ballerina.scan.utils.Constants.REPORT_DATA_PLACEHOLDER;
 import static io.ballerina.scan.utils.Constants.RESULTS_HTML_FILE;
@@ -97,6 +104,9 @@ import static io.ballerina.scan.utils.Constants.SCAN_TABLE;
  * @since 0.1.0
  * */
 public final class ScanUtils {
+    private ScanUtils() {
+    }
+
     /**
      * Prints issues generated via static code analyzers to the console.
      *
@@ -309,50 +319,40 @@ public final class ScanUtils {
      * @return an in-memory representation of the Scan.toml file
      */
     public static ScanTomlFile loadScanTomlConfigurations(Project project, PrintStream outputStream) {
+        if (!project.kind().equals(ProjectKind.BUILD_PROJECT) || project.currentPackage().ballerinaToml().isEmpty()) {
+            return new ScanTomlFile();
+        }
+
+        BallerinaToml ballerinaToml = project.currentPackage().ballerinaToml().get();
+        TomlDocument ballerinaTomlDocument = ballerinaToml.tomlDocument();
+        Toml ballerinaTomlDocumentContent = ballerinaTomlDocument.toml();
+
         Path targetDir = project.targetDir();
-
-        if (project.kind().equals(ProjectKind.BUILD_PROJECT)) {
-            if (project.currentPackage().ballerinaToml().isPresent()) {
-                BallerinaToml ballerinaToml = project.currentPackage().ballerinaToml().get();
-                TomlDocument ballerinaTomlDocument = ballerinaToml.tomlDocument();
-                Toml ballerinaTomlDocumentContent = ballerinaTomlDocument.toml();
-                Toml scanTable = ballerinaTomlDocumentContent.getTable(SCAN_TABLE).orElse(null);
-
-                if (scanTable != null) {
-                    TomlValueNode configPath = scanTable.get(SCAN_FILE_FIELD).orElse(null);
-
-                    if (configPath != null) {
-                        String scanTomlPath = configPath.toNativeValue().toString();
-                        Optional<Path> path = convertConfigurationPath(scanTomlPath);
-                        Optional<Path> absPath = path.isEmpty() || path.get().isAbsolute() ? path
-                                : Optional.of(project.sourceRoot().resolve(scanTomlPath));
-
-                        if (isLocalFile(absPath)) {
-                            return loadScanFile(targetDir, absPath.get(), outputStream);
-                        } else {
-                            try {
-                                URL url = new URL(scanTomlPath);
-                                return loadRemoteScanFile(targetDir, url, outputStream);
-                            } catch (MalformedURLException ex) {
-                                throw new RuntimeException("Failed to retrieve remote configuration file " +
-                                        "with exception: " + ex.getMessage());
-                            }
-                        }
-                    }
-                    outputStream.println("configPath for Scan.toml is missing!");
-                    return new ScanTomlFile();
-                }
-                Path scanTomlFilePath = Path.of(System.getProperty(USER_DIR_PROPERTY)).resolve(SCAN_FILE);
-
-                if (Files.exists(scanTomlFilePath)) {
-                    outputStream.println("Loading scan tool configurations from " + scanTomlFilePath + "...");
-                    return loadScanFile(targetDir, scanTomlFilePath, outputStream);
-                }
-                return new ScanTomlFile();
+        if (ballerinaTomlDocumentContent.getTable(SCAN_TABLE).isEmpty()) {
+            Path scanTomlFilePath = Path.of(System.getProperty(USER_DIR_PROPERTY)).resolve(SCAN_FILE);
+            if (Files.exists(scanTomlFilePath)) {
+                outputStream.println("Loading scan tool configurations from " + scanTomlFilePath + "...");
+                return loadScanFile(targetDir, scanTomlFilePath, outputStream);
             }
             return new ScanTomlFile();
         }
-        return new ScanTomlFile();
+
+        Toml scanTable = ballerinaTomlDocumentContent.getTable(SCAN_TABLE).get();
+        if (scanTable.get(SCAN_FILE_FIELD).isEmpty()) {
+            outputStream.println("configPath for Scan.toml is missing!");
+            return new ScanTomlFile();
+        }
+
+        TomlValueNode configPath = scanTable.get(SCAN_FILE_FIELD).get();
+        String scanTomlPath = configPath.toNativeValue().toString();
+        Optional<Path> path = convertConfigurationPath(scanTomlPath);
+        Optional<Path> absPath = path.isEmpty() || path.get().isAbsolute() ? path
+                : Optional.of(project.sourceRoot().resolve(scanTomlPath));
+
+        if (absPath.isPresent() && isLocalFile(absPath.get())) {
+            return loadScanFile(targetDir, absPath.get(), outputStream);
+        }
+        return loadRemoteScanFile(targetDir, scanTomlPath, outputStream);
     }
 
     /**
@@ -375,20 +375,19 @@ public final class ScanUtils {
      * @param path the path of the file
      * @return true if the file is a local file, false otherwise
      */
-    private static boolean isLocalFile(Optional<Path> path) throws InvalidPathException {
-        return path.isPresent() && new File(path.get().toString()).exists();
+    private static boolean isLocalFile(Path path) throws InvalidPathException {
+        return new File(path.toString()).exists();
     }
 
     /**
      * Returns the {@link ScanTomlFile} representation a remote Scan.toml file from the provided URL.
      *
-     * @param targetDir              the target directory
-     * @param remoteScanTomlFilePath the remote Scan.toml file path
-     * @param outputStream           the print stream
+     * @param targetDir    the target directory
+     * @param scanTomlPath the remote Scan.toml file path
+     * @param outputStream the print stream
      * @return an in-memory representation of the remote Scan.toml file
      */
-    private static ScanTomlFile loadRemoteScanFile(Path targetDir, URL remoteScanTomlFilePath,
-                                                   PrintStream outputStream) {
+    private static ScanTomlFile loadRemoteScanFile(Path targetDir, String scanTomlPath, PrintStream outputStream) {
         Path cachePath = targetDir.resolve(REPORT_DIR_NAME).resolve(SCAN_FILE);
 
         if (Files.exists(cachePath)) {
@@ -396,13 +395,15 @@ public final class ScanUtils {
             return loadScanFile(targetDir, cachePath, outputStream);
         }
 
+        URL remoteScanTomlFilePath;
         try {
+            remoteScanTomlFilePath = new URL(scanTomlPath);
             FileUtils.copyURLToFile(remoteScanTomlFilePath, cachePath.toFile());
         } catch (IOException ex) {
             throw new RuntimeException("Failed to download remote configuration file with exception: "
                     + ex.getMessage());
         }
-        outputStream.println("Loading scan tool configurations from " + remoteScanTomlFilePath.toString());
+        outputStream.println("Loading scan tool configurations from " + remoteScanTomlFilePath);
         return loadScanFile(targetDir, cachePath, outputStream);
     }
 
@@ -416,54 +417,39 @@ public final class ScanUtils {
      */
     private static ScanTomlFile loadScanFile(Path targetDir, Path scanTomlFilePath, PrintStream outputStream) {
         Toml scanTomlDocumentContent;
-
         try {
             scanTomlDocumentContent = Toml.read(scanTomlFilePath);
         } catch (IOException ex) {
             throw new RuntimeException("Failed to read the configuration file with exception: " + ex.getMessage());
         }
         ScanTomlFile scanTomlFile = new ScanTomlFile();
-
-        List<Toml> platformTables = scanTomlDocumentContent.getTables(PLATFORM_TABLE);
-        platformTables.forEach(platformTable -> {
-            Map<String, Object> properties = platformTable.toMap();
-            String name = !(properties.get("name") instanceof String) ? null :
-                    properties.remove("name").toString();
-            String path = !(properties.get("path") instanceof String) ? null :
-                    properties.remove("path").toString();
-
-            if (name != null && !name.isEmpty() && path != null) {
-                if (!(new File(path).exists())) {
-                    try {
-                        URL url = new URL(path);
-                        path = loadRemoteJAR(targetDir, name, url, outputStream);
-                    } catch (MalformedURLException ex) {
-                        throw new RuntimeException("Failed to retrieve remote platform file with exception: "
-                                + ex.getMessage());
-                    }
-                }
-
-                if (Files.exists(Path.of(path))) {
-                    ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name, path, properties);
-                    scanTomlFile.setPlatform(platform);
-                }
-            }
+        scanTomlDocumentContent.getTables(ANALYZER_TABLE).forEach(loadAnalyzers(scanTomlFile));
+        scanTomlDocumentContent.getTables(PLATFORM_TABLE).forEach(loadPlatforms(scanTomlFile, targetDir, outputStream));
+        scanTomlDocumentContent.getTable(RULES_TABLE).ifPresent(ruleTable -> {
+            ruleTable.get("include").ifPresent(loadRules(scanTomlFile, true));
+            ruleTable.get("exclude").ifPresent(loadRules(scanTomlFile, false));
         });
+        return scanTomlFile;
+    }
 
-        List<Toml> staticCodeAnalyzerTables = scanTomlDocumentContent.getTables(ANALYZER_TABLE);
-        staticCodeAnalyzerTables.forEach(staticCodeAnalyzer -> {
-            Map<String, Object> properties = staticCodeAnalyzer.toMap();
-            String org = !(properties.get("org") instanceof String) ? null :
-                    properties.get("org").toString();
-            String name = !(properties.get("name") instanceof String) ? null :
-                    properties.get("name").toString();
-
+    /**
+     * Loads analyzers to the {@link ScanTomlFile} representation of the Scan.toml file.
+     *
+     * @param scanTomlFile the in-memory representation of the Scan.toml file
+     */
+    private static Consumer<Toml> loadAnalyzers(ScanTomlFile scanTomlFile) {
+        return analyzerTable -> {
+            Map<String, Object> properties = analyzerTable.toMap();
+            String org = !(properties.get(ANALYZER_ORG) instanceof String) ? null : properties
+                    .remove(ANALYZER_ORG).toString();
+            String name = !(properties.get(ANALYZER_NAME) instanceof String) ? null : properties
+                    .remove(ANALYZER_NAME).toString();
             Pattern versionPattern = Pattern.compile(CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN);
-            Object providedVersion = properties.get("version");
-            String version = (providedVersion instanceof String) &&
-                    versionPattern.matcher(providedVersion.toString()).matches() ? providedVersion.toString() : null;
-            String repository = !(properties.get("repository") instanceof String) ? null :
-                    properties.get("repository").toString();
+            Object providedVersion = properties.remove(ANALYZER_VERSION);
+            String version = (providedVersion instanceof String) && versionPattern.matcher(providedVersion.toString())
+                    .matches() ? providedVersion.toString() : null;
+            String repository = !(properties.get(ANALYZER_REPOSITORY) instanceof String) ? null : properties
+                    .remove(ANALYZER_REPOSITORY).toString();
 
             if (org != null && !org.isEmpty() && name != null && !name.isEmpty()) {
                 ScanTomlFile.Analyzer analyzer;
@@ -476,41 +462,63 @@ public final class ScanUtils {
                 }
                 scanTomlFile.setAnalyzer(analyzer);
             }
-        });
+        };
+    }
 
-        Toml rulesTable = scanTomlDocumentContent.getTable(RULES_TABLE).orElse(null);
-        if (rulesTable != null) {
-            TomlValueNode include = rulesTable.get("include").orElse(null);
-            TomlArrayValueNode includeArray;
-            if (include != null && include.kind().equals(TomlType.ARRAY)) {
-                includeArray = (TomlArrayValueNode) include;
-                List<String> rulesToInclude = includeArray.toNativeValue()
-                        .stream()
-                        .map(Object::toString)
-                        .toList();
-
-                rulesToInclude.forEach(ruleToInclude -> {
-                    ScanTomlFile.RuleToFilter ruleToFilter = new ScanTomlFile.RuleToFilter(ruleToInclude);
-                    scanTomlFile.setRuleToInclude(ruleToFilter);
-                });
+    /**
+     * Loads platforms to the {@link ScanTomlFile} representation of the Scan.toml file.
+     *
+     * @param scanTomlFile the in-memory representation of the Scan.toml file
+     * @param targetDir    the target directory
+     * @param outputStream the print stream
+     */
+    private static Consumer<Toml> loadPlatforms(ScanTomlFile scanTomlFile, Path targetDir, PrintStream outputStream) {
+        return platformTable -> {
+            Map<String, Object> properties = platformTable.toMap();
+            String name = !(properties.get(PLATFORM_NAME) instanceof String) ? null : properties.remove(PLATFORM_NAME)
+                    .toString();
+            String path = !(properties.get(PLATFORM_PATH) instanceof String) ? null : properties.remove(PLATFORM_PATH)
+                    .toString();
+            if (name != null && !name.isEmpty() && path != null) {
+                if (!(new File(path).exists())) {
+                    try {
+                        URL url = new URL(path);
+                        path = loadRemoteJAR(targetDir, name, url, outputStream);
+                    } catch (MalformedURLException ex) {
+                        throw new RuntimeException("Failed to retrieve remote platform file with exception: "
+                                + ex.getMessage());
+                    }
+                }
+                if (Files.exists(Path.of(path))) {
+                    ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name, path, properties);
+                    scanTomlFile.setPlatform(platform);
+                }
             }
+        };
+    }
 
-            TomlValueNode exclude = rulesTable.get("exclude").orElse(null);
-            TomlArrayValueNode excludeArray = null;
-            if (exclude != null && exclude.kind().equals(TomlType.ARRAY)) {
-                excludeArray = (TomlArrayValueNode) exclude;
-                List<String> rulesToExclude = excludeArray.toNativeValue()
-                        .stream()
-                        .map(Object::toString)
-                        .toList();
-
-                rulesToExclude.forEach(ruleToExclude -> {
-                    ScanTomlFile.RuleToFilter ruleToFilter = new ScanTomlFile.RuleToFilter(ruleToExclude);
-                    scanTomlFile.setRuleToExclude(ruleToFilter);
-                });
+    /**
+     * Loads rules to the {@link ScanTomlFile} representation of the Scan.toml file.
+     *
+     * @param scanTomlFile the in-memory representation of the Scan.toml file
+     * @param includeRules whether to include/exclude the rules
+     */
+    private static Consumer<TomlValueNode> loadRules(ScanTomlFile scanTomlFile, boolean includeRules) {
+        return rules -> {
+            if (!rules.kind().equals(TomlType.ARRAY)) {
+                return;
             }
-        }
-        return scanTomlFile;
+            TomlArrayValueNode rulesArray = (TomlArrayValueNode) rules;
+            List<String> rulesList = rulesArray.toNativeValue().stream().map(Object::toString).toList();
+            rulesList.forEach(fullyQualifiedRule -> {
+                ScanTomlFile.RuleToFilter rule = new ScanTomlFile.RuleToFilter(fullyQualifiedRule);
+                if (includeRules) {
+                    scanTomlFile.setRuleToInclude(rule);
+                } else {
+                    scanTomlFile.setRuleToExclude(rule);
+                }
+            });
+        };
     }
 
     /**
@@ -535,8 +543,5 @@ public final class ScanUtils {
         } catch (IOException ex) {
             throw new RuntimeException("Failed to download remote JAR file with exception: " + ex.getMessage());
         }
-    }
-
-    private ScanUtils() {
     }
 }

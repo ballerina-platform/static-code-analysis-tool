@@ -21,6 +21,7 @@ package io.ballerina.scan.utils;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
+import io.ballerina.projects.directory.SingleFileProject;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.Issue;
@@ -118,6 +119,26 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertEquals(result, expected);
     }
 
+    @Test(description =
+            "test method for loading configurations from a scan toml file in a Ballerina single file project")
+    void testloadScanTomlConfigurationsForSingleFileProject() {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("single-file-project-with-config-file").resolve("main.bal");
+        Project project = SingleFileProject.load(ballerinaProject);
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream);
+        System.setProperty("user.dir", userDir);
+        Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
+        Assert.assertEquals(analyzers.size(), 0);
+        Set<ScanTomlFile.RuleToFilter> rulesToInclude = scanTomlFile.getRulesToInclude();
+        Assert.assertEquals(rulesToInclude.size(), 0);
+        Set<ScanTomlFile.RuleToFilter> rulesToExclude = scanTomlFile.getRulesToExclude();
+        Assert.assertEquals(rulesToExclude.size(), 0);
+        Set<ScanTomlFile.Platform> platforms = scanTomlFile.getPlatforms();
+        Assert.assertEquals(platforms.size(), 0);
+    }
+
     @Test(description = "test method for loading configurations from a scan toml file")
     void testloadScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")
@@ -131,33 +152,33 @@ public class ScanUtilsTest extends BaseTest {
         List<ScanTomlFile.Analyzer> analyzerList = new ArrayList<>(analyzers);
         Assert.assertEquals(analyzerList.size(), 4);
         ScanTomlFile.Analyzer analyzer = analyzerList.get(0);
-        Assert.assertEquals(analyzer.getOrg(), "exampleOrg");
-        Assert.assertEquals(analyzer.getName(), "exampleName");
+        Assert.assertEquals(analyzer.org(), "exampleOrg");
+        Assert.assertEquals(analyzer.name(), "exampleName");
         analyzer = analyzerList.get(1);
-        Assert.assertEquals(analyzer.getOrg(), "ballerina");
-        Assert.assertEquals(analyzer.getName(), "example_module_static_code_analyzer");
-        Assert.assertEquals(analyzer.getVersion(), "0.1.0");
+        Assert.assertEquals(analyzer.org(), "ballerina");
+        Assert.assertEquals(analyzer.name(), "example_module_static_code_analyzer");
+        Assert.assertEquals(analyzer.version(), "0.1.0");
         analyzer = analyzerList.get(2);
-        Assert.assertEquals(analyzer.getOrg(), "ballerinax");
-        Assert.assertEquals(analyzer.getName(), "example_module_static_code_analyzer");
-        Assert.assertEquals(analyzer.getVersion(), "0.1.0");
-        Assert.assertEquals(analyzer.getRepository(), LOCAL_REPOSITORY_NAME);
+        Assert.assertEquals(analyzer.org(), "ballerinax");
+        Assert.assertEquals(analyzer.name(), "example_module_static_code_analyzer");
+        Assert.assertEquals(analyzer.version(), "0.1.0");
+        Assert.assertEquals(analyzer.repository(), LOCAL_REPOSITORY_NAME);
         Set<ScanTomlFile.RuleToFilter> rulesToInclude = scanTomlFile.getRulesToInclude();
         List<ScanTomlFile.RuleToFilter> ruleToIncludeList = new ArrayList<>(rulesToInclude);
         Assert.assertEquals(ruleToIncludeList.size(), 4);
         ScanTomlFile.RuleToFilter ruleToInclude = ruleToIncludeList.get(0);
-        Assert.assertEquals(ruleToInclude.getId(), "ballerina:1");
+        Assert.assertEquals(ruleToInclude.id(), "ballerina:1");
         ruleToInclude = ruleToIncludeList.get(1);
-        Assert.assertEquals(ruleToInclude.getId(), "exampleOrg/exampleName:1");
+        Assert.assertEquals(ruleToInclude.id(), "exampleOrg/exampleName:1");
         ruleToInclude = ruleToIncludeList.get(2);
-        Assert.assertEquals(ruleToInclude.getId(), "ballerina/example_module_static_code_analyzer:1");
+        Assert.assertEquals(ruleToInclude.id(), "ballerina/example_module_static_code_analyzer:1");
         ruleToInclude = ruleToIncludeList.get(3);
-        Assert.assertEquals(ruleToInclude.getId(), "ballerinax/example_module_static_code_analyzer:1");
+        Assert.assertEquals(ruleToInclude.id(), "ballerinax/example_module_static_code_analyzer:1");
         Set<ScanTomlFile.RuleToFilter> rulesToExclude = scanTomlFile.getRulesToExclude();
         List<ScanTomlFile.RuleToFilter> ruleToExcludeList = new ArrayList<>(rulesToExclude);
         Assert.assertEquals(ruleToExcludeList.size(), 1);
         ScanTomlFile.RuleToFilter ruleToExclude = ruleToExcludeList.get(0);
-        Assert.assertEquals(ruleToExclude.getId(), "ballerina:1");
+        Assert.assertEquals(ruleToExclude.id(), "ballerina:1");
         Set<ScanTomlFile.Platform> platforms = scanTomlFile.getPlatforms();
         Assert.assertEquals(platforms.size(), 0);
     }
@@ -175,33 +196,33 @@ public class ScanUtilsTest extends BaseTest {
         List<ScanTomlFile.Analyzer> analyzerList = new ArrayList<>(analyzers);
         Assert.assertEquals(analyzerList.size(), 4);
         ScanTomlFile.Analyzer analyzer = analyzerList.get(0);
-        Assert.assertEquals(analyzer.getOrg(), "exampleOrg");
-        Assert.assertEquals(analyzer.getName(), "exampleName");
+        Assert.assertEquals(analyzer.org(), "exampleOrg");
+        Assert.assertEquals(analyzer.name(), "exampleName");
         analyzer = analyzerList.get(1);
-        Assert.assertEquals(analyzer.getOrg(), "ballerina");
-        Assert.assertEquals(analyzer.getName(), "example_module_static_code_analyzer");
-        Assert.assertEquals(analyzer.getVersion(), "0.1.0");
+        Assert.assertEquals(analyzer.org(), "ballerina");
+        Assert.assertEquals(analyzer.name(), "example_module_static_code_analyzer");
+        Assert.assertEquals(analyzer.version(), "0.1.0");
         analyzer = analyzerList.get(2);
-        Assert.assertEquals(analyzer.getOrg(), "ballerinax");
-        Assert.assertEquals(analyzer.getName(), "example_module_static_code_analyzer");
-        Assert.assertEquals(analyzer.getVersion(), "0.1.0");
-        Assert.assertEquals(analyzer.getRepository(), LOCAL_REPOSITORY_NAME);
+        Assert.assertEquals(analyzer.org(), "ballerinax");
+        Assert.assertEquals(analyzer.name(), "example_module_static_code_analyzer");
+        Assert.assertEquals(analyzer.version(), "0.1.0");
+        Assert.assertEquals(analyzer.repository(), LOCAL_REPOSITORY_NAME);
         Set<ScanTomlFile.RuleToFilter> rulesToInclude = scanTomlFile.getRulesToInclude();
         List<ScanTomlFile.RuleToFilter> ruleToIncludeList = new ArrayList<>(rulesToInclude);
         Assert.assertEquals(ruleToIncludeList.size(), 4);
         ScanTomlFile.RuleToFilter ruleToInclude = ruleToIncludeList.get(0);
-        Assert.assertEquals(ruleToInclude.getId(), "ballerina:1");
+        Assert.assertEquals(ruleToInclude.id(), "ballerina:1");
         ruleToInclude = ruleToIncludeList.get(1);
-        Assert.assertEquals(ruleToInclude.getId(), "exampleOrg/exampleName:1");
+        Assert.assertEquals(ruleToInclude.id(), "exampleOrg/exampleName:1");
         ruleToInclude = ruleToIncludeList.get(2);
-        Assert.assertEquals(ruleToInclude.getId(), "ballerina/example_module_static_code_analyzer:1");
+        Assert.assertEquals(ruleToInclude.id(), "ballerina/example_module_static_code_analyzer:1");
         ruleToInclude = ruleToIncludeList.get(3);
-        Assert.assertEquals(ruleToInclude.getId(), "ballerinax/example_module_static_code_analyzer:1");
+        Assert.assertEquals(ruleToInclude.id(), "ballerinax/example_module_static_code_analyzer:1");
         Set<ScanTomlFile.RuleToFilter> rulesToExclude = scanTomlFile.getRulesToExclude();
         List<ScanTomlFile.RuleToFilter> ruleToExcludeList = new ArrayList<>(rulesToExclude);
         Assert.assertEquals(ruleToExcludeList.size(), 1);
         ScanTomlFile.RuleToFilter ruleToExclude = ruleToExcludeList.get(0);
-        Assert.assertEquals(ruleToExclude.getId(), "ballerina:1");
+        Assert.assertEquals(ruleToExclude.id(), "ballerina:1");
         Set<ScanTomlFile.Platform> platforms = scanTomlFile.getPlatforms();
         Assert.assertEquals(platforms.size(), 0);
     }

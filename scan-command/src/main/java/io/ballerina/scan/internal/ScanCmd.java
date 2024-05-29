@@ -140,8 +140,7 @@ public class ScanCmd implements BLauncherCmd {
         outputStream.println("Running Scans...");
 
         List<Issue> issues = projectAnalyzer.analyze(project.get(), coreRules);
-        List<Issue> externalIssues = projectAnalyzer.runExternalAnalyzers(project.get());
-        issues.addAll(externalIssues);
+        issues.addAll(projectAnalyzer.runExternalAnalyzers(project.get()));
 
         if (!platforms.isEmpty() || platformTriggered) {
             return;

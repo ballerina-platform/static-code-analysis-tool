@@ -44,20 +44,6 @@ repository = 40
 
 [[analyzer]]
 
-[rule]
-include = "ballerina:1"
-exclude = "ballerina:1"
-
-[rule]
-include = []
-exclude = []
-
-[rule]
-include = 1
-exclude = 1
-
-[rule]
-
 [[platform]]
 name = ""
 path = "https://example.com/example-platform-analyzer-1.0.jar"

@@ -68,69 +68,15 @@ public class ScanTomlFile {
         return Collections.unmodifiableSet(rulesToExclude);
     }
 
-    public static class Platform {
-        private String name;
-        private String path;
-        private Map<String, Object> arguments;
-
-        Platform(String name, String path, Map<String, Object> arguments) {
+    public record Platform(String name, String path, Map<String, Object> arguments) {
+        public Platform(String name, String path, Map<String, Object> arguments) {
             this.name = name;
             this.path = path;
-            this.arguments = arguments;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public String getPath() {
-            return path;
-        }
-
-        public Map<String, Object> getArguments() {
-            return Collections.unmodifiableMap(arguments);
+            this.arguments = Collections.unmodifiableMap(arguments);
         }
     }
 
-    public static class Analyzer {
-        private String org;
-        private String name;
-        private String version;
-        private String repository;
+    public record Analyzer(String org, String name, String version, String repository) { }
 
-        Analyzer(String org, String name, String version, String repository) {
-            this.org = org;
-            this.name = name;
-            this.version = version;
-            this.repository = repository;
-        }
-
-        public String getOrg() {
-            return org;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public String getVersion() {
-            return version;
-        }
-
-        public String getRepository() {
-            return repository;
-        }
-    }
-
-    public static class RuleToFilter {
-        private String id;
-
-        RuleToFilter(String id) {
-            this.id = id;
-        }
-
-        public String getId() {
-            return id;
-        }
-    }
+    public record RuleToFilter(String id) { }
 }
