@@ -18,6 +18,11 @@
 
 package io.ballerina.scan.utils;
 
+/**
+ * {@code Constants} contains the constants used by the scan tool utilities.
+ *
+ * @since 0.1.0
+ */
 public class Constants {
     static final String RESULTS_JSON_FILE = "scan_results.json";
     static final String RESULTS_HTML_FILE = "index.html";

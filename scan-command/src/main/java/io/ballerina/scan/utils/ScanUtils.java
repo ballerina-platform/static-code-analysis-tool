@@ -62,7 +62,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static io.ballerina.projects.util.ProjectConstants.LOCAL_REPOSITORY_NAME;
-import static io.ballerina.projects.util.ProjectConstants.REPORT_DIR_NAME;
 import static io.ballerina.projects.util.ProjectConstants.USER_DIR_PROPERTY;
 import static io.ballerina.scan.utils.Constants.ANALYZER_NAME;
 import static io.ballerina.scan.utils.Constants.ANALYZER_ORG;
@@ -349,7 +348,7 @@ public final class ScanUtils {
         Optional<Path> absPath = path.isEmpty() || path.get().isAbsolute() ? path
                 : Optional.of(project.sourceRoot().resolve(scanTomlPath));
 
-        if (absPath.isPresent() && isLocalFile(absPath.get())) {
+        if (absPath.isPresent() && absPath.get().toFile().isFile()) {
             return loadScanFile(targetDir, absPath.get(), outputStream);
         }
         return loadRemoteScanFile(targetDir, scanTomlPath, outputStream);
@@ -370,16 +369,6 @@ public final class ScanUtils {
     }
 
     /**
-     * Checks if the provided file is a local file.
-     *
-     * @param path the path of the file
-     * @return true if the file is a local file, false otherwise
-     */
-    private static boolean isLocalFile(Path path) throws InvalidPathException {
-        return new File(path.toString()).exists();
-    }
-
-    /**
      * Returns the {@link ScanTomlFile} representation a remote Scan.toml file from the provided URL.
      *
      * @param targetDir    the target directory
@@ -388,7 +377,7 @@ public final class ScanUtils {
      * @return an in-memory representation of the remote Scan.toml file
      */
     private static ScanTomlFile loadRemoteScanFile(Path targetDir, String scanTomlPath, PrintStream outputStream) {
-        Path cachePath = targetDir.resolve(REPORT_DIR_NAME).resolve(SCAN_FILE);
+        Path cachePath = targetDir.resolve(SCAN_FILE);
 
         if (Files.exists(cachePath)) {
             outputStream.println("Loading scan tool configurations from cache...");
@@ -440,28 +429,25 @@ public final class ScanUtils {
     private static Consumer<Toml> loadAnalyzers(ScanTomlFile scanTomlFile) {
         return analyzerTable -> {
             Map<String, Object> properties = analyzerTable.toMap();
-            String org = !(properties.get(ANALYZER_ORG) instanceof String) ? null : properties
-                    .remove(ANALYZER_ORG).toString();
-            String name = !(properties.get(ANALYZER_NAME) instanceof String) ? null : properties
-                    .remove(ANALYZER_NAME).toString();
+            Object analyzerOrg = properties.remove(ANALYZER_ORG);
+            String org = (analyzerOrg instanceof String) ? analyzerOrg.toString() : null;
+            Object analyzerName = properties.remove(ANALYZER_NAME);
+            String name = (analyzerName instanceof String) ? analyzerName.toString() : null;
             Pattern versionPattern = Pattern.compile(CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN);
-            Object providedVersion = properties.remove(ANALYZER_VERSION);
-            String version = (providedVersion instanceof String) && versionPattern.matcher(providedVersion.toString())
-                    .matches() ? providedVersion.toString() : null;
-            String repository = !(properties.get(ANALYZER_REPOSITORY) instanceof String) ? null : properties
-                    .remove(ANALYZER_REPOSITORY).toString();
+            Object analyzerVersion = properties.remove(ANALYZER_VERSION);
+            String version = (analyzerVersion instanceof String) && versionPattern.matcher(analyzerVersion.toString())
+                    .matches() ? analyzerVersion.toString() : null;
+            Object analyzerRepository = properties.remove(ANALYZER_REPOSITORY);
+            String repository = (analyzerRepository instanceof String) ? analyzerRepository.toString() : null;
 
-            if (org != null && !org.isEmpty() && name != null && !name.isEmpty()) {
-                ScanTomlFile.Analyzer analyzer;
-
-                if (repository != null && repository.equals(LOCAL_REPOSITORY_NAME) && version != null &&
-                        !version.isEmpty()) {
-                    analyzer = new ScanTomlFile.Analyzer(org, name, version, repository);
-                } else {
-                    analyzer = new ScanTomlFile.Analyzer(org, name, version, null);
-                }
-                scanTomlFile.setAnalyzer(analyzer);
+            if (org == null || org.isEmpty() || name == null || name.isEmpty()) {
+                return;
             }
+            boolean isLocalRepository = repository != null && repository.equals(LOCAL_REPOSITORY_NAME) &&
+                    version != null && !version.isEmpty();
+            String repo = isLocalRepository ? repository : null;
+            ScanTomlFile.Analyzer analyzer = new ScanTomlFile.Analyzer(org, name, version, repo);
+            scanTomlFile.setAnalyzer(analyzer);
         };
     }
 
@@ -479,20 +465,24 @@ public final class ScanUtils {
                     .toString();
             String path = !(properties.get(PLATFORM_PATH) instanceof String) ? null : properties.remove(PLATFORM_PATH)
                     .toString();
-            if (name != null && !name.isEmpty() && path != null) {
-                if (!(new File(path).exists())) {
-                    try {
-                        URL url = new URL(path);
-                        path = loadRemoteJAR(targetDir, name, url, outputStream);
-                    } catch (MalformedURLException ex) {
-                        throw new RuntimeException("Failed to retrieve remote platform file with exception: "
-                                + ex.getMessage());
-                    }
+
+            if (name == null || name.isEmpty() || path == null) {
+                return;
+            }
+
+            // Download remote JAR if the path is a URL and set the path to the downloaded JAR
+            if (!(new File(path).exists())) {
+                try {
+                    URL url = new URL(path);
+                    path = loadRemoteJAR(targetDir, name, url, outputStream);
+                } catch (MalformedURLException ex) {
+                    throw new RuntimeException("Failed to retrieve remote platform file with exception: "
+                            + ex.getMessage());
                 }
-                if (Files.exists(Path.of(path))) {
-                    ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name, path, properties);
-                    scanTomlFile.setPlatform(platform);
-                }
+            }
+            if (Files.exists(Path.of(path))) {
+                ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name, path, properties);
+                scanTomlFile.setPlatform(platform);
             }
         };
     }

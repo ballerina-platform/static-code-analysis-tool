@@ -65,34 +65,6 @@ class ProjectAnalyzer {
         };
     }
 
-    private void buildStringWithNewLine(StringBuilder stringBuilder, String content) {
-        stringBuilder.append(content).append(System.lineSeparator());
-    }
-
-    private void extractAnalyzerImportsAndDependencies(ScanTomlFile.Analyzer analyzer, StringBuilder imports,
-                                                       StringBuilder dependencies) {
-        String org = analyzer.org();
-        String name = analyzer.name();
-        String version = analyzer.version();
-        String repository = analyzer.repository();
-        String reportingSource = org + FORWARD_SLASH + name;
-        buildStringWithNewLine(imports, IMPORT_PREFIX + reportingSource + USE_IMPORT_AS_UNDERSCORE);
-
-        if (version == null) {
-            return;
-        }
-        buildStringWithNewLine(dependencies, "");
-        buildStringWithNewLine(dependencies, "[[dependency]]");
-        buildStringWithNewLine(dependencies, "org = '" + org + "'");
-        buildStringWithNewLine(dependencies, "name = '" + name + "'");
-        buildStringWithNewLine(dependencies, "version = '" + version + "'");
-
-        if (repository == null) {
-            return;
-        }
-        buildStringWithNewLine(dependencies, "repository = '" + repository + "'");
-    }
-
     List<Issue> runExternalAnalyzers(Project project) {
         StringBuilder newImports = new StringBuilder();
         StringBuilder tomlDependencies = new StringBuilder();
@@ -120,5 +92,32 @@ class ProjectAnalyzer {
             externalIssues.addAll(reporter.getIssues());
         }
         return externalIssues;
+    }
+
+    private void extractAnalyzerImportsAndDependencies(ScanTomlFile.Analyzer analyzer, StringBuilder imports,
+                                                       StringBuilder dependencies) {
+        String org = analyzer.org();
+        String name = analyzer.name();
+        String version = analyzer.version();
+        String repository = analyzer.repository();
+        buildStringWithNewLine(imports, IMPORT_PREFIX + org + FORWARD_SLASH + name + USE_IMPORT_AS_UNDERSCORE);
+
+        if (version == null) {
+            return;
+        }
+        buildStringWithNewLine(dependencies, "");
+        buildStringWithNewLine(dependencies, "[[dependency]]");
+        buildStringWithNewLine(dependencies, "org = '" + org + "'");
+        buildStringWithNewLine(dependencies, "name = '" + name + "'");
+        buildStringWithNewLine(dependencies, "version = '" + version + "'");
+
+        if (repository == null) {
+            return;
+        }
+        buildStringWithNewLine(dependencies, "repository = '" + repository + "'");
+    }
+
+    private void buildStringWithNewLine(StringBuilder stringBuilder, String content) {
+        stringBuilder.append(content).append(System.lineSeparator());
     }
 }
