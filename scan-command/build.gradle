@@ -21,17 +21,16 @@ import org.apache.tools.ant.taskdefs.condition.Os
 import java.nio.file.Paths
 
 plugins {
-    id 'java'
-    id 'application'
     id 'java-library'
     id 'checkstyle'
     id 'jacoco'
+    id 'maven-publish'
     id 'com.github.spotbugs'
     id 'de.undercouch.download'
 }
 
 group = "${group}"
-version = "${scanToolVersion}"
+version = "${version}"
 
 repositories {
     mavenLocal()
@@ -81,7 +80,7 @@ tasks.withType(JavaExec).configureEach {
 }
 
 // Setting up checkstyles
-task downloadCheckstyleRuleFiles(type: Download) {
+tasks.register('downloadCheckstyleRuleFiles', Download) {
     src([
             'https://raw.githubusercontent.com/wso2/code-quality-tools/v1.4/checkstyle/jdk-17/checkstyle.xml',
             'https://raw.githubusercontent.com/wso2/code-quality-tools/v1.4/checkstyle/jdk-17/suppressions.xml'
@@ -148,7 +147,7 @@ spotbugsTest {
     }
 }
 
-task validateSpotbugs() {
+tasks.register('validateSpotbugs') {
     doLast {
         if (spotbugsMain.reports.size() > 0 && spotbugsMain.reports[0].destination.exists() &&
                 spotbugsMain.reports[0].destination.text.readLines().size() > 0) {
@@ -164,22 +163,23 @@ task validateSpotbugs() {
 spotbugsMain.finalizedBy validateSpotbugs
 
 // Configurations to automatically build and deploy scan tool
+def packageOrg = "ballerina"
 def packageName = "tool_scan"
-def tomlVersion = "${project.scanToolVersion}"
+def tomlVersion = "${version}"
 def ballerinaTomlFilePlaceHolder = new File("${rootDir}/build-config/resources/Ballerina.toml")
 def balToolTomlFilePlaceHolder = new File("${rootDir}/build-config/resources/BalTool.toml")
 def ballerinaTomlFile = new File("${projectDir}/tool-scan/Ballerina.toml")
 def balToolTomlFile = new File("${projectDir}/tool-scan/BalTool.toml")
-def balerinaCentralDir = System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io/bala/ballerina"
-def ballerinaLocalDir = System.getProperty("user.home") + "/.ballerina/repositories/local/bala/ballerina"
+def balerinaCentralDir = System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io/bala/${packageOrg}"
+def ballerinaLocalDir = System.getProperty("user.home") + "/.ballerina/repositories/local/bala/${packageOrg}"
 def balCentralCacheDir = project.file(System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io")
 def ballerinaToolConfigDir = System.getProperty("user.home") + "/.ballerina/.config"
 def ballerinaToolConfigToml = System.getProperty("user.home") + "/.ballerina/.config/bal-tools.toml"
 
-task updateTomlFiles {
+tasks.register('updateTomlFiles') {
     // Update the Ballerina.toml and BalTool.toml files
     doLast {
-        def newConfig = ballerinaTomlFilePlaceHolder.text.replace("@toml.distribution@", project.ballerinaLangVersion)
+        def newConfig = ballerinaTomlFilePlaceHolder.text.replace("@toml.distribution@", ballerinaLangVersion)
         newConfig = newConfig.replace("@toml.version@", tomlVersion)
         ballerinaTomlFile.text = newConfig
 
@@ -188,14 +188,14 @@ task updateTomlFiles {
     }
 }
 
-task createBallerinaToolConfigFile {
+tasks.register('createBallerinaToolConfigFile') {
     // Create the bal-tools.toml file in the .ballerina/.config directory
     def configFileContent = """
         [[tool]]
         id = "scan"
-        org = "ballerina"
-        name = "tool_scan"
-        version = "${project.scanToolVersion}"
+        org = "${packageOrg}"
+        name = "${packageName}"
+        version = "${version}"
         active = true
     """.stripIndent()
 
@@ -211,7 +211,7 @@ task createBallerinaToolConfigFile {
         def tomlFileContent = tomlFile.text
 
         // Regex to identify existing scan tool entry
-        def entryRegex = /\n\[\[tool]]\nid = "scan"\norg = "ballerina"\nname = "tool_scan"\nversion = ".+"\nactive = true/
+        def entryRegex = /\n\[\[tool]]\nid = "scan"\norg = "${packageOrg}"\nname = "${packageName}"\nversion = ".+"\nactive = true/
         def match = tomlFileContent.find(entryRegex)
 
         if (match) {
@@ -230,7 +230,7 @@ task createBallerinaToolConfigFile {
     }
 }
 
-task buildScanTool {
+tasks.register('buildScanTool') {
     doLast {
         // Pack and push to local repo of distribution
         exec {
@@ -284,10 +284,9 @@ tasks.test {
 }
 
 // Codecove configurations
-def execFile;
+def execFile = new File("${buildDir}/jacoco/test.exec");
 def classFileArray = []
-task copyExecFilesAndJavaClassFiles {
-    execFile = new File("${buildDir}/jacoco/test.exec")
+tasks.register('copyExecFilesAndJavaClassFiles') {
     if (execFile.exists()) {
         fileTree("${buildDir}/classes").matching {
             exclude '**/test/*'
@@ -296,7 +295,7 @@ task copyExecFilesAndJavaClassFiles {
     }
 }
 
-task createCodeCoverageReport(type: JacocoReport) {
+tasks.register('createCodeCoverageReport', JacocoReport) {
     executionData file(execFile)
     additionalClassDirs files(classFileArray)
 
@@ -312,3 +311,42 @@ task createCodeCoverageReport(type: JacocoReport) {
 }
 
 createCodeCoverageReport.dependsOn(copyExecFilesAndJavaClassFiles)
+
+// Publish scan tool to central
+tasks.register('publishScanPackage') {
+    doLast {
+        exec {
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                commandLine 'cmd', '/c', 'cd tool-scan & bal pack & bal push'
+            } else {
+                commandLine 'sh', '-c', 'cd tool-scan ; bal pack ; bal push'
+            }
+        }
+        println("Successfully published the scan tool package to central.")
+    }
+}
+
+// Publish scan tool package to GitHub packages
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            groupId group
+            artifactId project.name
+            version version
+        }
+    }
+
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/ballerina-platform/static-code-analysis-tool")
+            credentials {
+                username = System.getenv("publishUser")
+                password = System.getenv("publishPAT")
+            }
+        }
+    }
+}
+
+publish.dependsOn(publishScanPackage)

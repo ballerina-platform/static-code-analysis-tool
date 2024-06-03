@@ -7,7 +7,7 @@ on:
 
 jobs:
   ubuntu_build:
-    name: Build
+    name: Build on Ubuntu with tests
     runs-on: ubuntu-latest
     concurrency:
       group: ${{ github.head_ref }}-ubuntu
@@ -47,7 +47,7 @@ jobs:
           files: ./.jacoco/reports/jacoco/report.xml
 
   windows_build:
-    name: Build
+    name: Build on Windows with tests
     runs-on: windows-latest
     concurrency:
       group: ${{ github.head_ref }}-windows

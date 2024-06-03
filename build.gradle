@@ -1,0 +1,20 @@
+plugins {
+    id "net.researchgate.release"
+}
+
+// Release scan tool to GitHub
+def moduleVersion = project.version.replace("-SNAPSHOT", "")
+release {
+    failOnSnapshotDependencies = true
+    versionPropertyFile = 'gradle.properties'
+    tagTemplate = 'v${version}'
+
+    git {
+        requireBranch = "release-${moduleVersion}"
+        pushToRemote = 'origin'
+    }
+}
+
+tasks.register('build') {
+    dependsOn 'scan-command:build'
+}
