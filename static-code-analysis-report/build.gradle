@@ -17,18 +17,18 @@
 
 import org.apache.tools.ant.taskdefs.condition.Os
 
-task updateVersionScanReport(type: Exec) {
+tasks.register('updateVersionScanReport', Exec) {
     doFirst {
-        println "update version to " + scanToolVersion
+        println "update version to " + version
         if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-            commandLine 'cmd', '/c', 'npm', 'run', 'update-version', '--', scanToolVersion
+            commandLine 'cmd', '/c', 'npm', 'run', 'update-version', '--', version
         } else {
-            commandLine 'npm', 'run', 'update-version', '--', scanToolVersion
+            commandLine 'npm', 'run', 'update-version', '--', version
         }
     }
 }
 
-task npmInstallScanReport(type: Exec) {
+tasks.register('npmInstallScanReport', Exec) {
     dependsOn updateVersionScanReport
     if (Os.isFamily(Os.FAMILY_WINDOWS)) {
         commandLine 'cmd', '/c', 'npm', 'install'
@@ -37,7 +37,7 @@ task npmInstallScanReport(type: Exec) {
     }
 }
 
-task npmBuildScanReport(type: Exec) {
+tasks.register('npmBuildScanReport', Exec) {
     dependsOn npmInstallScanReport
     if (Os.isFamily(Os.FAMILY_WINDOWS)) {
         commandLine 'cmd', '/c', 'npm', 'run', 'build'
@@ -46,7 +46,7 @@ task npmBuildScanReport(type: Exec) {
     }
 }
 
-task createScanReportZip(type: Zip) {
+tasks.register('createScanReportZip', Zip) {
     dependsOn npmBuildScanReport
     from "build"
     include 'index.html'
