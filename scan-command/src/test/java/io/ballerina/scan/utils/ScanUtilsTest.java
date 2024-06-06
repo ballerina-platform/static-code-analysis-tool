@@ -120,7 +120,7 @@ public class ScanUtilsTest extends BaseTest {
     }
 
     @Test(description =
-            "test method for loading configurations from a scan toml file in a Ballerina single file project")
+            "test method for loading configurations from a Scan.toml file in a Ballerina single file project")
     void testloadScanTomlConfigurationsForSingleFileProject() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("single-file-project-with-config-file").resolve("main.bal");
@@ -139,7 +139,7 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertEquals(platforms.size(), 0);
     }
 
-    @Test(description = "test method for loading configurations from a scan toml file")
+    @Test(description = "test method for loading configurations from a Scan.toml file")
     void testloadScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
@@ -183,7 +183,30 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertEquals(platforms.size(), 0);
     }
 
-    @Test(description = "test method for loading configurations from an external scan toml file")
+    @Test(description =
+            "test method for loading configurations from a Scan.toml file with invalid Ballerina.toml configuration")
+    void testloadScanTomlConfigurationsWithInvalidBallerinaTomlConfiguration() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-invalid-file-configuration");
+        Project project = BuildProject.load(ballerinaProject);
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream);
+        System.setProperty("user.dir", userDir);
+        String result = readOutput(true).trim();
+        String expected = "configPath for Scan.toml is missing!";
+        Assert.assertEquals(result, expected);
+        Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
+        Assert.assertEquals(analyzers.size(), 0);
+        Set<ScanTomlFile.RuleToFilter> rulesToInclude = scanTomlFile.getRulesToInclude();
+        Assert.assertEquals(rulesToInclude.size(), 0);
+        Set<ScanTomlFile.RuleToFilter> rulesToExclude = scanTomlFile.getRulesToExclude();
+        Assert.assertEquals(rulesToExclude.size(), 0);
+        Set<ScanTomlFile.Platform> platforms = scanTomlFile.getPlatforms();
+        Assert.assertEquals(platforms.size(), 0);
+    }
+
+    @Test(description = "test method for loading configurations from an external configuration file")
     void testloadExternalScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-external-config-file");
@@ -225,5 +248,23 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertEquals(ruleToExclude.id(), "ballerina:1");
         Set<ScanTomlFile.Platform> platforms = scanTomlFile.getPlatforms();
         Assert.assertEquals(platforms.size(), 0);
+    }
+
+    @Test(description = "test method for loading configurations from an invalid external configuration file")
+    void testloadInvalidExternalScanTomlConfigurations() {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-invalid-external-config-file");
+        Project project = BuildProject.load(ballerinaProject);
+        System.setProperty("user.dir", ballerinaProject.toString());
+        String result = "";
+        String expected = "Failed to download remote configuration file with exception: no protocol: ./Config.toml";
+        ScanTomlFile scanTomlFile = null;
+        try {
+            scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream);
+        } catch (RuntimeException ex) {
+            result = ex.getMessage();
+        }
+        Assert.assertNull(scanTomlFile);
+        Assert.assertEquals(result, expected);
     }
 }
