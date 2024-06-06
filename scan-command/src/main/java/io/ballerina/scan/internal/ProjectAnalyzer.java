@@ -19,8 +19,10 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.projects.Document;
+import io.ballerina.projects.DocumentConfig;
 import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
+import io.ballerina.projects.ModuleId;
 import io.ballerina.projects.Project;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
@@ -29,10 +31,12 @@ import io.ballerina.scan.utils.ScanTomlFile;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import static io.ballerina.projects.util.ProjectConstants.IMPORT_PREFIX;
 import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
+import static io.ballerina.scan.internal.ScanToolConstants.IMPORT_GENERATOR_FILE;
 import static io.ballerina.scan.internal.ScanToolConstants.USE_IMPORT_AS_UNDERSCORE;
 
 /**
@@ -73,9 +77,18 @@ class ProjectAnalyzer {
             extractAnalyzerImportsAndDependencies(analyzer, newImports, tomlDependencies);
         }
         Module defaultModule = project.currentPackage().getDefaultModule();
-        Document balFile = defaultModule.document(defaultModule.documentIds().iterator().next());
-        String balFileContent = balFile.textDocument().toString();
-        balFile.modify().withContent(newImports + balFileContent).apply();
+        List<String> defaultModuleFiles = defaultModule.documentIds()
+                .stream()
+                .map(documentId -> defaultModule.document(documentId).name())
+                .toList();
+        String documentName;
+        do {
+            documentName = String.format("%s-%s.bal", IMPORT_GENERATOR_FILE, UUID.randomUUID());
+        } while (defaultModuleFiles.contains(documentName));
+        ModuleId defaultModuleId = defaultModule.moduleId();
+        DocumentId documentId = DocumentId.create(documentName, defaultModuleId);
+        DocumentConfig documentConfig = DocumentConfig.from(documentId, newImports.toString(), documentName);
+        defaultModule.modify().addDocument(documentConfig).apply();
 
         project.currentPackage().ballerinaToml().ifPresent(ballerinaToml -> {
             String tomlFileContent = ballerinaToml.tomlDocument().textDocument().toString();

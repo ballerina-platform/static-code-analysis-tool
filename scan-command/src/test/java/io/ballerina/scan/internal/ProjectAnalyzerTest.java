@@ -20,6 +20,7 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.projects.BallerinaToml;
 import io.ballerina.projects.Document;
+import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
@@ -37,7 +38,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -88,12 +88,19 @@ public class ProjectAnalyzerTest extends BaseTest {
     }
 
     @Test(description = "Test analyzing project with external analyzers")
-    void testAnalyzingProjectWithExternalAnalyzers() throws IOException {
+    void testAnalyzingProjectWithExternalAnalyzers() {
         // TODO: Implement mock external analyzer issue assertions.
         List<Issue> issues = projectAnalyzer.runExternalAnalyzers(project);
         Assert.assertEquals(issues.size(), 0);
         Module defaultModule = project.currentPackage().getDefaultModule();
-        Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
+        Document document = null;
+        for (DocumentId documentId : defaultModule.documentIds()) {
+            document = defaultModule.document(documentId);
+            if (!document.name().equals("main.bal")) {
+                break;
+            }
+        }
+        Assert.assertNotNull(document);
         String result = document.textDocument().toString().replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertTrue(result.contains("import exampleOrg/exampleName as _;"));
         Assert.assertTrue(result.contains("import ballerina/example_module_static_code_analyzer as _;"));

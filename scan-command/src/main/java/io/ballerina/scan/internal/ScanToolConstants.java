@@ -31,6 +31,7 @@ public class ScanToolConstants {
     static final String BALLERINAI_ORG = "ballerinai";
     static final String BALLERINAX_ORG = "ballerinax";
     static final String USE_IMPORT_AS_UNDERSCORE = " as _;";
+    static final String IMPORT_GENERATOR_FILE = "scanFile";
 
     private ScanToolConstants() {
     }

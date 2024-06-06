@@ -24,6 +24,7 @@ import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.SingleFileProject;
 import io.ballerina.projects.util.ProjectConstants;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.utils.ScanTomlFile;
@@ -129,6 +130,11 @@ public class ScanCmd implements BLauncherCmd {
 
         Optional<Project> project = getProject();
         if (project.isEmpty()) {
+            return;
+        }
+
+        if (ProjectUtils.isProjectEmpty(project.get())) {
+            outputStream.println("ballerina: package is empty. Please add at least one .bal file.");
             return;
         }
 
