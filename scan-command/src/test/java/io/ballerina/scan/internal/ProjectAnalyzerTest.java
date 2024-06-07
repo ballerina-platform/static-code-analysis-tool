@@ -40,6 +40,7 @@ import org.testng.annotations.Test;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
@@ -58,9 +59,12 @@ public class ProjectAnalyzerTest extends BaseTest {
     }
 
     @BeforeMethod
-    void initializeMethod() {
-        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream);
-        projectAnalyzer = new ProjectAnalyzer(scanTomlFile);
+    void initializeMethod() throws RuntimeException {
+        Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream);
+        if (scanTomlFile.isEmpty()) {
+            throw new RuntimeException("Failed to load scan toml file!");
+        }
+        projectAnalyzer = new ProjectAnalyzer(scanTomlFile.get());
     }
 
     @AfterTest

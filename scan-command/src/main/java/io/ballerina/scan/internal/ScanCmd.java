@@ -141,8 +141,12 @@ public class ScanCmd implements BLauncherCmd {
         outputStream.println();
         outputStream.println("Running Scans...");
 
-        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project.get(), outputStream);
-        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(scanTomlFile);
+        Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project.get(), outputStream);
+        if (scanTomlFile.isEmpty()) {
+           return;
+        }
+
+        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(scanTomlFile.get());
         List<Rule> coreRules = CoreRule.rules();
         List<Issue> issues = projectAnalyzer.analyze(project.get(), coreRules);
         issues.addAll(projectAnalyzer.runExternalAnalyzers(project.get()));
