@@ -1,0 +1,6 @@
+[package]
+org = "ballerina"
+name = "bal_project_with_invalid_file_configuration"
+version = "0.1.0"
+
+[scan]

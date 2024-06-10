@@ -14,9 +14,5 @@
 // specific language governing permissions and limitations
 // under the License.
 
-function getResult() returns int|error => 1;
-
 public function main() {
-    // Non-compliant
-    int result = checkpanic getResult();
 }

@@ -78,13 +78,13 @@ class ReporterImpl implements Reporter {
         String[] parts = fullyQualifiedRuleId.split(":");
 
         Source source;
-        if (parts[0].equals(BALLERINA_RULE_PREFIX) && parts[1].equals(String.valueOf(rule.numericId()))) {
+        if (BALLERINA_RULE_PREFIX.equals(parts[0]) && String.valueOf(rule.numericId()).equals(parts[1])) {
             source = Source.BUILT_IN;
         } else {
             String reportingSource = parts[0];
             String pluginOrg = reportingSource.split(FORWARD_SLASH)[0];
-            if (pluginOrg.equals(BALLERINA_ORG) || pluginOrg.equals(BALLERINAI_ORG)
-                    || pluginOrg.equals(BALLERINAX_ORG)) {
+            if (BALLERINA_ORG.equals(pluginOrg) || BALLERINAI_ORG.equals(pluginOrg)
+                    || BALLERINAX_ORG.equals(pluginOrg)) {
                 source = Source.BUILT_IN;
             } else {
                 source = Source.EXTERNAL;

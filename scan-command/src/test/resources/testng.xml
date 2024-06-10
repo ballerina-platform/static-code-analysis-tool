@@ -30,6 +30,7 @@ under the License.
             <class name="io.ballerina.scan.internal.ReporterImplTest"/>
             <class name="io.ballerina.scan.internal.CoreRuleTest"/>
             <class name="io.ballerina.scan.internal.StaticCodeAnalyzerTest"/>
+            <class name="io.ballerina.scan.internal.ProjectAnalyzerTest"/>
             <class name="io.ballerina.scan.utils.ScanUtilsTest"/>
         </classes>
     </test>

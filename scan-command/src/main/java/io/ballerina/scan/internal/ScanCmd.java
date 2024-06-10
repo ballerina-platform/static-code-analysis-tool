@@ -24,8 +24,10 @@ import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.SingleFileProject;
 import io.ballerina.projects.util.ProjectConstants;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
+import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanUtils;
 import picocli.CommandLine;
 
@@ -131,13 +133,23 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer();
-        List<Rule> coreRules = CoreRule.rules();
+        if (ProjectUtils.isProjectEmpty(project.get())) {
+            outputStream.println("ballerina: package is empty. Please add at least one .bal file.");
+            return;
+        }
 
         outputStream.println();
         outputStream.println("Running Scans...");
 
+        Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project.get(), outputStream);
+        if (scanTomlFile.isEmpty()) {
+           return;
+        }
+
+        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(scanTomlFile.get());
+        List<Rule> coreRules = CoreRule.rules();
         List<Issue> issues = projectAnalyzer.analyze(project.get(), coreRules);
+        issues.addAll(projectAnalyzer.runExternalAnalyzers(project.get()));
 
         if (!platforms.isEmpty() || platformTriggered) {
             return;

@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "bal_project_with_invalid_platform_config_file"
+version = "0.1.0"

@@ -1,0 +1,7 @@
+[package]
+org = "ballerina"
+name = "bal_project_with_external_config_file"
+version = "0.1.0"
+
+[scan]
+configPath = "../Configurations.toml"
