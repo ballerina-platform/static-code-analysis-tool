@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.internal;
 
+import io.ballerina.cli.utils.OsUtils;
 import io.ballerina.projects.BallerinaToml;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
@@ -38,8 +39,12 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
@@ -93,9 +98,45 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with external analyzers")
     void testAnalyzingProjectWithExternalAnalyzers() {
-        // TODO: Implement mock external analyzer issue assertions.
-        List<Issue> issues = projectAnalyzer.runExternalAnalyzers(project);
-        Assert.assertEquals(issues.size(), 0);
+        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(project);
+        List<Issue> issues = projectAnalyzer.runExternalAnalyzers(project, externalAnalyzers);
+        Assert.assertEquals(issues.size(), 3);
+        Issue issue = issues.get(0);
+        LineRange location = issue.location().lineRange();
+        Assert.assertEquals(location.fileName(), "main.bal");
+        Assert.assertEquals(location.startLine().line(), 16);
+        Assert.assertEquals(location.startLine().offset(), 0);
+        Assert.assertEquals(location.endLine().line(), 21);
+        Assert.assertEquals(location.endLine().offset(), 1);
+        Rule rule = issue.rule();
+        Assert.assertEquals(rule.id(), "ballerina/example_module_static_code_analyzer:1");
+        Assert.assertEquals(rule.numericId(), 1);
+        Assert.assertEquals(rule.description(), "rule 1");
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        issue = issues.get(1);
+        location = issue.location().lineRange();
+        Assert.assertEquals(location.fileName(), "main.bal");
+        Assert.assertEquals(location.startLine().line(), 16);
+        Assert.assertEquals(location.startLine().offset(), 0);
+        Assert.assertEquals(location.endLine().line(), 21);
+        Assert.assertEquals(location.endLine().offset(), 1);
+        rule = issue.rule();
+        Assert.assertEquals(rule.id(), "exampleOrg/example_module_static_code_analyzer:1");
+        Assert.assertEquals(rule.numericId(), 1);
+        Assert.assertEquals(rule.description(), "rule 1");
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        issue = issues.get(2);
+        location = issue.location().lineRange();
+        Assert.assertEquals(location.fileName(), "main.bal");
+        Assert.assertEquals(location.startLine().line(), 16);
+        Assert.assertEquals(location.startLine().offset(), 0);
+        Assert.assertEquals(location.endLine().line(), 21);
+        Assert.assertEquals(location.endLine().offset(), 1);
+        rule = issue.rule();
+        Assert.assertEquals(rule.id(), "ballerinax/example_module_static_code_analyzer:1");
+        Assert.assertEquals(rule.numericId(), 1);
+        Assert.assertEquals(rule.description(), "rule 1");
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = null;
         for (DocumentId documentId : defaultModule.documentIds()) {
@@ -106,7 +147,7 @@ public class ProjectAnalyzerTest extends BaseTest {
         }
         Assert.assertNotNull(document);
         String result = document.textDocument().toString().replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Assert.assertTrue(result.contains("import exampleOrg/exampleName as _;"));
+        Assert.assertTrue(result.contains("import exampleOrg/example_module_static_code_analyzer as _;"));
         Assert.assertTrue(result.contains("import ballerina/example_module_static_code_analyzer as _;"));
         Assert.assertTrue(result.contains("import ballerinax/example_module_static_code_analyzer as _;"));
         BallerinaToml ballerinaToml = project.currentPackage().ballerinaToml().orElse(null);
@@ -127,5 +168,25 @@ public class ProjectAnalyzerTest extends BaseTest {
                 version = '0.1.0'
                 repository = 'local'
                 """));
+    }
+
+    @Test(description = "test method for printing static code analysis rules to the console")
+    void testPrintRulesToConsole() throws IOException {
+        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(project);
+        List<Rule> rules = CoreRule.rules();
+        externalAnalyzers.values().forEach(rules::addAll);
+        ScanUtils.printRulesToConsole(rules, printStream);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("print-rules-to-console.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("print-rules-to-console.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String result = readOutput(true).trim();
+        Assert.assertEquals(result, expected);
     }
 }

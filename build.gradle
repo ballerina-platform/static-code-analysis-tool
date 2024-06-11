@@ -20,6 +20,38 @@ plugins {
     id "net.researchgate.release"
 }
 
+subprojects {
+    apply plugin: 'java-library'
+}
+
+project(':scan-command') {
+    dependencies {
+        tasks.test{
+            dependsOn ':test-compiler-plugins:exampleOrg-plugin:build'
+            dependsOn ':test-compiler-plugins:ballerina-plugin:build'
+            dependsOn ':test-compiler-plugins:ballerinax-plugin:build'
+        }
+    }
+}
+
+project(':test-compiler-plugins:exampleOrg-plugin') {
+    dependencies {
+        implementation project(':scan-command')
+    }
+}
+
+project(':test-compiler-plugins:ballerina-plugin') {
+    dependencies {
+        implementation project(':scan-command')
+    }
+}
+
+project(':test-compiler-plugins:ballerinax-plugin') {
+    dependencies {
+        implementation project(':scan-command')
+    }
+}
+
 // Release scan tool to GitHub
 def moduleVersion = project.version.replace("-SNAPSHOT", "")
 release {

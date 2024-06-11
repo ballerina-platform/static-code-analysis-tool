@@ -42,6 +42,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
@@ -148,15 +149,20 @@ public class ScanCmd implements BLauncherCmd {
 
         ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(scanTomlFile.get());
         List<Rule> coreRules = CoreRule.rules();
-        List<Issue> issues = projectAnalyzer.analyze(project.get(), coreRules);
-        issues.addAll(projectAnalyzer.runExternalAnalyzers(project.get()));
+        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(project.get());
+        if (listRules) {
+            externalAnalyzers.values().forEach(coreRules::addAll);
+            ScanUtils.printRulesToConsole(coreRules, outputStream);
+            return;
+        }
 
+        List<Issue> issues = projectAnalyzer.analyze(project.get(), coreRules);
+        issues.addAll(projectAnalyzer.runExternalAnalyzers(project.get(), externalAnalyzers));
         if (!platforms.isEmpty() || platformTriggered) {
             return;
         }
 
         ScanUtils.printToConsole(issues, outputStream);
-
         if (project.get().kind().equals(ProjectKind.BUILD_PROJECT)) {
             Path reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir);
             outputStream.println();

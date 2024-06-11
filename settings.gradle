@@ -31,3 +31,6 @@ pluginManagement {
 rootProject.name = 'static-code-analysis-tool'
 include 'scan-command'
 include 'static-code-analysis-report'
+include 'test-compiler-plugins:exampleOrg-plugin'
+include 'test-compiler-plugins:ballerina-plugin'
+include 'test-compiler-plugins:ballerinax-plugin'

@@ -148,7 +148,7 @@ public class ScanUtilsTest extends BaseTest {
         List<ScanTomlFile.Analyzer> analyzerList = new ArrayList<>(analyzers);
         Assert.assertEquals(analyzerList.size(), 4);
         ScanTomlFile.Analyzer analyzer = analyzerList.get(0);
-        assertAnalyzer(analyzer, "exampleOrg", "exampleName", null, null);
+        assertAnalyzer(analyzer, "exampleOrg", "example_module_static_code_analyzer", null, null);
         analyzer = analyzerList.get(1);
         assertAnalyzer(analyzer, "ballerina", "example_module_static_code_analyzer", "0.1.0", null);
         analyzer = analyzerList.get(2);
@@ -159,7 +159,7 @@ public class ScanUtilsTest extends BaseTest {
         ScanTomlFile.RuleToFilter ruleToInclude = ruleToIncludeList.get(0);
         Assert.assertEquals(ruleToInclude.id(), "ballerina:1");
         ruleToInclude = ruleToIncludeList.get(1);
-        Assert.assertEquals(ruleToInclude.id(), "exampleOrg/exampleName:1");
+        Assert.assertEquals(ruleToInclude.id(), "exampleOrg/example_module_static_code_analyzer:1");
         ruleToInclude = ruleToIncludeList.get(2);
         Assert.assertEquals(ruleToInclude.id(), "ballerina/example_module_static_code_analyzer:1");
         ruleToInclude = ruleToIncludeList.get(3);
@@ -230,7 +230,7 @@ public class ScanUtilsTest extends BaseTest {
         List<ScanTomlFile.Analyzer> analyzerList = new ArrayList<>(analyzers);
         Assert.assertEquals(analyzerList.size(), 4);
         ScanTomlFile.Analyzer analyzer = analyzerList.get(0);
-        assertAnalyzer(analyzer, "exampleOrg", "exampleName", null, null);
+        assertAnalyzer(analyzer, "exampleOrg", "example_module_static_code_analyzer", null, null);
         analyzer = analyzerList.get(1);
         assertAnalyzer(analyzer, "ballerina", "example_module_static_code_analyzer", "0.1.0", null);
         analyzer = analyzerList.get(2);
@@ -241,7 +241,7 @@ public class ScanUtilsTest extends BaseTest {
         ScanTomlFile.RuleToFilter ruleToInclude = ruleToIncludeList.get(0);
         Assert.assertEquals(ruleToInclude.id(), "ballerina:1");
         ruleToInclude = ruleToIncludeList.get(1);
-        Assert.assertEquals(ruleToInclude.id(), "exampleOrg/exampleName:1");
+        Assert.assertEquals(ruleToInclude.id(), "exampleOrg/example_module_static_code_analyzer:1");
         ruleToInclude = ruleToIncludeList.get(2);
         Assert.assertEquals(ruleToInclude.id(), "ballerina/example_module_static_code_analyzer:1");
         ruleToInclude = ruleToIncludeList.get(3);

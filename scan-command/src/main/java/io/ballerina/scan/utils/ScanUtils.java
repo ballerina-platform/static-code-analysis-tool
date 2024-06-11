@@ -28,6 +28,7 @@ import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.TomlDocument;
 import io.ballerina.projects.internal.model.Target;
 import io.ballerina.scan.Issue;
+import io.ballerina.scan.Rule;
 import io.ballerina.scan.internal.IssueImpl;
 import io.ballerina.toml.api.Toml;
 import io.ballerina.toml.semantic.TomlType;
@@ -548,6 +549,40 @@ public final class ScanUtils {
         } catch (IOException ex) {
             outputStream.println("Failed to download remote JAR file: " + ex.getMessage());
             return Optional.empty();
+        }
+    }
+
+    /**
+     * Prints the {@link List<Rule>} of static analysis rules to the console.
+     *
+     * @param rules        the list of static analysis rules
+     * @param outputStream the print stream
+     */
+    public static void printRulesToConsole(List<Rule> rules, PrintStream outputStream) {
+        String ruleIDColumn = "RuleID";
+        String ruleSeverityColumn = "Rule Severity";
+        String ruleDescriptionColumn = "Rule Description";
+
+        int maxRuleIDLength = ruleIDColumn.length();
+        int maxSeverityLength = ruleSeverityColumn.length();
+        int maxDescriptionLength = ruleDescriptionColumn.length();
+
+        for (Rule rule : rules) {
+            maxRuleIDLength = Math.max(maxRuleIDLength, rule.id().length());
+            maxSeverityLength = Math.max(maxSeverityLength, rule.kind().toString().length());
+            maxDescriptionLength = Math.max(maxDescriptionLength, rule.description().length());
+        }
+
+        String format = "\t%-" + maxRuleIDLength + "s | %-" + maxSeverityLength + "s | %-" + maxDescriptionLength
+                + "s%n";
+
+        outputStream.printf(format, ruleIDColumn, ruleSeverityColumn, ruleDescriptionColumn);
+        outputStream.printf("\t" + "-".repeat(maxRuleIDLength + 1) + "--" +
+                "-".repeat(maxSeverityLength + 1) + "--" + "-".repeat(maxDescriptionLength + 1) + "%n");
+
+        for (Rule rule : rules) {
+            String formattedLine = String.format(format, rule.id(), rule.kind().toString(), rule.description());
+            outputStream.println(formattedLine.replaceAll("\\s+$", ""));
         }
     }
 }
