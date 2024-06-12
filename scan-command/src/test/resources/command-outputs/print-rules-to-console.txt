@@ -5,9 +5,9 @@ Loading scan tool configurations from src\test\resources\test-resources\bal-proj
 	ballerina/example_module_static_code_analyzer:1  | CODE_SMELL    | rule 1
 	ballerina/example_module_static_code_analyzer:2  | BUG           | rule 2
 	ballerina/example_module_static_code_analyzer:3  | VULNERABILITY | rule 3
-	exampleOrg/example_module_static_code_analyzer:1 | CODE_SMELL    | rule 1
-	exampleOrg/example_module_static_code_analyzer:2 | BUG           | rule 2
-	exampleOrg/example_module_static_code_analyzer:3 | VULNERABILITY | rule 3
 	ballerinax/example_module_static_code_analyzer:1 | CODE_SMELL    | rule 1
 	ballerinax/example_module_static_code_analyzer:2 | BUG           | rule 2
 	ballerinax/example_module_static_code_analyzer:3 | VULNERABILITY | rule 3
+	exampleOrg/example_module_static_code_analyzer:1 | CODE_SMELL    | rule 1
+	exampleOrg/example_module_static_code_analyzer:2 | BUG           | rule 2
+	exampleOrg/example_module_static_code_analyzer:3 | VULNERABILITY | rule 3
