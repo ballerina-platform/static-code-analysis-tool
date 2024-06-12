@@ -26,8 +26,12 @@ import io.ballerina.projects.plugins.SyntaxNodeAnalysisContext;
 import io.ballerina.scan.Reporter;
 import io.ballerina.scan.ScannerContext;
 
+/**
+ * Represents a syntax node analysis task for a ballerinax module.
+ *
+ * @since 0.1.0
+ * */
 public class CustomAnalysisTask implements AnalysisTask<SyntaxNodeAnalysisContext> {
-
     private final Reporter reporter;
 
     public CustomAnalysisTask(ScannerContext scannerContext) {

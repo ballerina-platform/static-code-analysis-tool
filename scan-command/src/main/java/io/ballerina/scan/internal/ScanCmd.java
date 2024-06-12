@@ -147,17 +147,21 @@ public class ScanCmd implements BLauncherCmd {
            return;
         }
 
-        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(scanTomlFile.get());
+        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(project.get(), scanTomlFile.get());
         List<Rule> coreRules = CoreRule.rules();
-        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(project.get());
+        Optional<Map<String, List<Rule>>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(outputStream);
+        if (externalAnalyzers.isEmpty()) {
+            return;
+        }
+
         if (listRules) {
-            externalAnalyzers.values().forEach(coreRules::addAll);
+            externalAnalyzers.get().values().forEach(coreRules::addAll);
             ScanUtils.printRulesToConsole(coreRules, outputStream);
             return;
         }
 
-        List<Issue> issues = projectAnalyzer.analyze(project.get(), coreRules);
-        issues.addAll(projectAnalyzer.runExternalAnalyzers(project.get(), externalAnalyzers));
+        List<Issue> issues = projectAnalyzer.analyze(coreRules);
+        issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers.get()));
         if (!platforms.isEmpty() || platformTriggered) {
             return;
         }

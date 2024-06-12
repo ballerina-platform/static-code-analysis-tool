@@ -78,6 +78,9 @@ import static io.ballerina.scan.utils.Constants.REPORT_DATA_PLACEHOLDER;
 import static io.ballerina.scan.utils.Constants.RESULTS_HTML_FILE;
 import static io.ballerina.scan.utils.Constants.RESULTS_JSON_FILE;
 import static io.ballerina.scan.utils.Constants.RULES_TABLE;
+import static io.ballerina.scan.utils.Constants.RULE_DESCRIPTION_COLUMN;
+import static io.ballerina.scan.utils.Constants.RULE_ID_COLUMN;
+import static io.ballerina.scan.utils.Constants.RULE_SEVERITY_COLUMN;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE_FIELD;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_CONTENT;
@@ -559,13 +562,9 @@ public final class ScanUtils {
      * @param outputStream the print stream
      */
     public static void printRulesToConsole(List<Rule> rules, PrintStream outputStream) {
-        String ruleIDColumn = "RuleID";
-        String ruleSeverityColumn = "Rule Severity";
-        String ruleDescriptionColumn = "Rule Description";
-
-        int maxRuleIDLength = ruleIDColumn.length();
-        int maxSeverityLength = ruleSeverityColumn.length();
-        int maxDescriptionLength = ruleDescriptionColumn.length();
+        int maxRuleIDLength = RULE_ID_COLUMN.length();
+        int maxSeverityLength = RULE_SEVERITY_COLUMN.length();
+        int maxDescriptionLength = RULE_DESCRIPTION_COLUMN.length();
 
         for (Rule rule : rules) {
             maxRuleIDLength = Math.max(maxRuleIDLength, rule.id().length());
@@ -576,13 +575,13 @@ public final class ScanUtils {
         String format = "\t%-" + maxRuleIDLength + "s | %-" + maxSeverityLength + "s | %-" + maxDescriptionLength
                 + "s%n";
 
-        outputStream.printf(format, ruleIDColumn, ruleSeverityColumn, ruleDescriptionColumn);
+        outputStream.printf(format, RULE_ID_COLUMN, RULE_SEVERITY_COLUMN, RULE_DESCRIPTION_COLUMN);
         outputStream.printf("\t" + "-".repeat(maxRuleIDLength + 1) + "--" +
                 "-".repeat(maxSeverityLength + 1) + "--" + "-".repeat(maxDescriptionLength + 1) + "%n");
 
         for (Rule rule : rules) {
             String formattedLine = String.format(format, rule.id(), rule.kind().toString(), rule.description());
-            outputStream.println(formattedLine.replaceAll("\\s+$", ""));
+            outputStream.println(formattedLine.stripTrailing());
         }
     }
 }

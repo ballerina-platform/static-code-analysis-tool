@@ -69,7 +69,7 @@ public class ProjectAnalyzerTest extends BaseTest {
         if (scanTomlFile.isEmpty()) {
             throw new RuntimeException("Failed to load scan toml file!");
         }
-        projectAnalyzer = new ProjectAnalyzer(scanTomlFile.get());
+        projectAnalyzer = new ProjectAnalyzer(project, scanTomlFile.get());
     }
 
     @AfterTest
@@ -79,7 +79,7 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with core analyzer")
     void testAnalyzingProjectWithCoreAnalyzer() {
-        List<Issue> issues = projectAnalyzer.analyze(project, List.of(CoreRule.AVOID_CHECKPANIC.rule()));
+        List<Issue> issues = projectAnalyzer.analyze(List.of(CoreRule.AVOID_CHECKPANIC.rule()));
         Assert.assertEquals(issues.size(), 1);
         Issue issue = issues.get(0);
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
@@ -98,8 +98,10 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with external analyzers")
     void testAnalyzingProjectWithExternalAnalyzers() {
-        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(project);
-        List<Issue> issues = projectAnalyzer.runExternalAnalyzers(project, externalAnalyzers);
+        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(printStream)
+                .orElse(null);
+        Assert.assertNotNull(externalAnalyzers);
+        List<Issue> issues = projectAnalyzer.runExternalAnalyzers(externalAnalyzers);
         Assert.assertEquals(issues.size(), 3);
         Issue issue = issues.get(0);
         LineRange location = issue.location().lineRange();
@@ -172,7 +174,9 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "test method for printing static code analysis rules to the console")
     void testPrintRulesToConsole() throws IOException {
-        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(project);
+        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(printStream)
+                .orElse(null);
+        Assert.assertNotNull(externalAnalyzers);
         List<Rule> rules = CoreRule.rules();
         externalAnalyzers.values().forEach(rules::addAll);
         ScanUtils.printRulesToConsole(rules, printStream);

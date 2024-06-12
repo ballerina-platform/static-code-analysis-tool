@@ -23,8 +23,12 @@ import io.ballerina.projects.plugins.CodeAnalysisContext;
 import io.ballerina.projects.plugins.CodeAnalyzer;
 import io.ballerina.scan.ScannerContext;
 
+/**
+ * Represents a code analyzer for a ballerinax module.
+ *
+ * @since 0.1.0
+ * */
 public class CustomCodeAnalyzer extends CodeAnalyzer {
-
     private final ScannerContext scannerContext;
 
     public CustomCodeAnalyzer(ScannerContext scannerContext) {

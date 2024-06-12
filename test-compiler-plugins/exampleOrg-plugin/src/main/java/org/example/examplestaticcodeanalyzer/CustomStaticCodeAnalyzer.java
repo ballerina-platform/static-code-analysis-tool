@@ -22,8 +22,12 @@ import io.ballerina.projects.plugins.CompilerPlugin;
 import io.ballerina.projects.plugins.CompilerPluginContext;
 import io.ballerina.scan.ScannerContext;
 
+/**
+ * Represents a compiler plugin for a custom module.
+ *
+ * @since 0.1.0
+ * */
 public class CustomStaticCodeAnalyzer extends CompilerPlugin {
-
     @Override
     public void init(CompilerPluginContext compilerPluginContext) {
         Object context = compilerPluginContext.userData().get("ScannerContext");
