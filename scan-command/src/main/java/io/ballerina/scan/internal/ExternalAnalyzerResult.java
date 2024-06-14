@@ -16,21 +16,19 @@
  *  under the License.
  */
 
-package io.ballerina.scan.exceptions;
+package io.ballerina.scan.internal;
+
+import io.ballerina.scan.Rule;
+
+import java.util.List;
+import java.util.Map;
 
 /**
- * Represents the exception thrown for an unidentified static code analysis rule during reporting of an analysis issue.
+ * {@code ExternalAnalyzerResult} contains the results of loading the external analyzer plugins.
+ *
+ * @param externalAnalyzers      the map of loaded external analyzers
+ * @param hasAnalyzerPluginIssue indicates whether there was an issue with loading the external analyzers
  *
  * @since 0.1.0
- * */
-public class RuleNotFoundException extends RuntimeException {
-
-    /**
-     * Returns a new instance of the RuleNotFoundException with the specified rule identifier.
-     *
-     * @param ruleId numeric identifier of the static code analysis rule
-     */
-    public RuleNotFoundException(int ruleId) {
-        super(String.format("Rule not found: Invalid rule numeric identifier '%d'.", ruleId));
-    }
-}
+ */
+record ExternalAnalyzerResult(Map<String, List<Rule>> externalAnalyzers, boolean hasAnalyzerPluginIssue) { }

@@ -40,6 +40,8 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.ScannerContext;
+import io.ballerina.scan.utils.DiagnosticCode;
+import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 
 import java.io.BufferedReader;
@@ -57,7 +59,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -116,7 +117,7 @@ class ProjectAnalyzer {
         };
     }
 
-    Optional<Map<String, List<Rule>>> getExternalAnalyzers(PrintStream outputStream) {
+    ExternalAnalyzerResult getExternalAnalyzers(PrintStream outputStream) {
         StringBuilder newImports = new StringBuilder();
         StringBuilder tomlDependencies = new StringBuilder();
         Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
@@ -159,7 +160,7 @@ class ProjectAnalyzer {
                         }
             }).toList();
 
-            URLClassLoader ucl = URLClassLoader.newInstance(jarUrls.toArray(new URL[0]),
+            URLClassLoader ucl = URLClassLoader.newInstance(jarUrls.toArray(URL[]::new),
                     this.getClass().getClassLoader());
             InputStream resourceAsStream = ucl.getResourceAsStream(RULES_FILE);
             if (resourceAsStream == null) {
@@ -174,48 +175,43 @@ class ProjectAnalyzer {
                 throw new RuntimeException(ex);
             }
 
-            String fqn = pluginDesc.plugin().getClassName();
             List<Rule> externalRules = new ArrayList<>();
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             JsonElement element = gson.fromJson(output, JsonElement.class);
             if (!element.isJsonArray()) {
-                outputStream.println("Invalid JSON format for " + RULES_FILE + " in plugin '" + pluginName + "'.");
-                outputStream.println("Expected an array, but found:");
-                outputStream.println(gson.toJson(element));
-                return Optional.empty();
+                outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT, RULES_FILE, pluginName,
+                        gson.toJson(element)));
+                return new ExternalAnalyzerResult(externalAnalyzers, true);
             }
 
             JsonArray ruleArray = element.getAsJsonArray();
             for (JsonElement rule : ruleArray) {
                 JsonObject ruleObject = rule.getAsJsonObject();
                 if (!isValidRule(ruleObject)) {
-                    outputStream.println("Invalid JSON format for rule object in plugin '" + pluginName + "'.");
-                    outputStream.println("Rule object should contain numeric id, ruleKind and description, but found:");
-                    outputStream.println(gson.toJson(ruleObject));
-                    return Optional.empty();
+                    outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE, pluginName,
+                            gson.toJson(ruleObject)));
+                    return new ExternalAnalyzerResult(externalAnalyzers, true);
                 }
 
                 String kind = ruleObject.get(RULE_KIND).getAsString();
-                RuleKind ruleKind = switch (kind) {
-                    case BUG -> RuleKind.BUG;
-                    case VULNERABILITY -> RuleKind.VULNERABILITY;
-                    case CODE_SMELL -> RuleKind.CODE_SMELL;
-                    default -> null;
+                RuleKind ruleKind;
+                switch (kind) {
+                    case BUG -> ruleKind = RuleKind.BUG;
+                    case VULNERABILITY -> ruleKind = RuleKind.VULNERABILITY;
+                    case CODE_SMELL -> ruleKind = RuleKind.CODE_SMELL;
+                    default -> {
+                        outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_KIND,
+                                pluginName, Arrays.toString(RuleKind.values()), kind));
+                        return new ExternalAnalyzerResult(externalAnalyzers, true);
+                    }
                 };
-                if (ruleKind == null) {
-                    outputStream.println("Invalid RuleKind for rule object in plugin '" + pluginName + "'.");
-                    outputStream.println("RuleKind should be one of " + Arrays.toString(RuleKind.values()) +
-                            ", but found: " + kind);
-                    return Optional.empty();
-                }
-                int numericId = ruleObject.get(RULE_ID).getAsInt();
-                String description = ruleObject.get(RULE_DESCRIPTION).getAsString();
-                Rule inMemoryRule = RuleFactory.createRule(numericId, description, ruleKind, org, name);
+                Rule inMemoryRule = RuleFactory.createRule(ruleObject.get(RULE_ID).getAsInt(),
+                        ruleObject.get(RULE_DESCRIPTION).getAsString(), ruleKind, org, name);
                 externalRules.add(inMemoryRule);
             }
-            externalAnalyzers.put(fqn, externalRules);
+            externalAnalyzers.put(pluginDesc.plugin().getClassName(), externalRules);
         }
-        return Optional.of(externalAnalyzers);
+        return new ExternalAnalyzerResult(externalAnalyzers, false);
     }
 
     private String extractAnalyzerImportsAndDependencies(ScanTomlFile.Analyzer analyzer, StringBuilder imports,
@@ -262,7 +258,8 @@ class ProjectAnalyzer {
             // Save the scanner context to plugin cache for the compiler plugin to use during package compilation
             Map<String, Object> pluginProperties = new HashMap<>();
             pluginProperties.put("ScannerContext", scannerContext);
-            project.projectEnvironmentContext().getService(CompilerPluginCache.class)
+            project.projectEnvironmentContext()
+                    .getService(CompilerPluginCache.class)
                     .putData(externalAnalyzer.getKey(), pluginProperties);
         }
 

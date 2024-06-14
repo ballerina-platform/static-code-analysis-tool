@@ -220,7 +220,7 @@ public final class ScanUtils {
             try {
                 fileContent = Files.readString(Path.of(filePath));
             } catch (IOException ex) {
-                throw new RuntimeException("Failed to read the file with exception: " + ex.getMessage());
+                throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_FILE, ex.getMessage()));
             }
             scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
             JsonArray issuesArray = new JsonArray();
@@ -252,7 +252,7 @@ public final class ScanUtils {
                 writer.write(new String(content.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
             }
         } catch (IOException ex) {
-            throw new RuntimeException("Failed to copy the file with exception: " + ex.getMessage());
+            throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_COPY_FILE, ex.getMessage()));
         }
         return htmlFile.toPath();
     }
@@ -343,7 +343,7 @@ public final class ScanUtils {
 
         Toml scanTable = ballerinaTomlDocumentContent.getTable(SCAN_TABLE).get();
         if (scanTable.get(SCAN_FILE_FIELD).isEmpty()) {
-            outputStream.println("Failed to load scan tool configurations: " + SCAN_FILE_FIELD + " is missing");
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.MISSING_CONFIG_FIELD, SCAN_FILE_FIELD));
             return Optional.empty();
         }
 
@@ -395,7 +395,7 @@ public final class ScanUtils {
             remoteScanTomlFilePath = new URL(scanTomlPath);
             FileUtils.copyURLToFile(remoteScanTomlFilePath, cachePath.toFile());
         } catch (IOException ex) {
-            outputStream.println("Failed to load configuration file with exception: " + ex.getMessage());
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_CONFIG_FILE, ex.getMessage()));
             return Optional.empty();
         }
         outputStream.println("Loading scan tool configurations from " + remoteScanTomlFilePath);
@@ -416,7 +416,7 @@ public final class ScanUtils {
         try {
             scanTomlDocumentContent = Toml.read(scanTomlFilePath);
         } catch (IOException ex) {
-            outputStream.println("Failed to read the configuration file with exception: " + ex.getMessage());
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.READING_CONFIG_FILE, ex.getMessage()));
             return Optional.empty();
         }
         ScanTomlFile scanTomlFile = new ScanTomlFile();
@@ -492,7 +492,8 @@ public final class ScanUtils {
                     URL url = new URL(path.get());
                     path = loadRemoteJAR(targetDir, name.get(), url, outputStream);
                 } catch (MalformedURLException ex) {
-                    outputStream.println("Failed to retrieve remote platform file with exception: " + ex.getMessage());
+                    outputStream.println(DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_PLATFORM_FILE,
+                            ex.getMessage()));
                     return false;
                 }
             }
@@ -551,7 +552,7 @@ public final class ScanUtils {
             outputStream.println("Downloading remote JAR: " + remoteJarFile);
             return Optional.of(cachedJarPath.toAbsolutePath().toString());
         } catch (IOException ex) {
-            outputStream.println("Failed to download remote JAR file: " + ex.getMessage());
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.DOWNLOADING_REMOTE_JAR_FILE, ex.getMessage()));
             return Optional.empty();
         }
     }

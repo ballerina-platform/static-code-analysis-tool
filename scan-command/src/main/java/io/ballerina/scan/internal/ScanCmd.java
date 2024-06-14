@@ -27,6 +27,8 @@ import io.ballerina.projects.util.ProjectConstants;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
+import io.ballerina.scan.utils.DiagnosticCode;
+import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanUtils;
 import picocli.CommandLine;
@@ -42,7 +44,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
@@ -135,7 +136,7 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         if (ProjectUtils.isProjectEmpty(project.get())) {
-            outputStream.println("ballerina: package is empty. Please add at least one .bal file.");
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.EMPTY_PACKAGE));
             return;
         }
 
@@ -149,19 +150,19 @@ public class ScanCmd implements BLauncherCmd {
 
         ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(project.get(), scanTomlFile.get());
         List<Rule> coreRules = CoreRule.rules();
-        Optional<Map<String, List<Rule>>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(outputStream);
-        if (externalAnalyzers.isEmpty()) {
+        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(outputStream);
+        if (externalAnalyzerResult.hasAnalyzerPluginIssue()) {
             return;
         }
 
         if (listRules) {
-            externalAnalyzers.get().values().forEach(coreRules::addAll);
+            externalAnalyzerResult.externalAnalyzers().values().forEach(coreRules::addAll);
             ScanUtils.printRulesToConsole(coreRules, outputStream);
             return;
         }
 
         List<Issue> issues = projectAnalyzer.analyze(coreRules);
-        issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers.get()));
+        issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzerResult.externalAnalyzers()));
         if (!platforms.isEmpty() || platformTriggered) {
             return;
         }
@@ -182,14 +183,12 @@ public class ScanCmd implements BLauncherCmd {
         } else {
             if (targetDir != null) {
                 outputStream.println();
-                outputStream.println("Generating reports is not supported with single bal files. " +
-                        "Ignoring the flag and continuing the scans...");
+                outputStream.println(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
             }
 
             if (scanReport) {
                 outputStream.println();
-                outputStream.println("Generating scan reports is not supported with single bal files. " +
-                        "Ignoring the flag and continuing the scans...");
+                outputStream.println(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
             }
         }
     }
@@ -225,7 +224,7 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         if (argList.size() != 1) {
-            outputStream.println("Invalid number of arguments, expected one argument received " + argList.size());
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, argList.size()));
             return Optional.empty();
         }
 

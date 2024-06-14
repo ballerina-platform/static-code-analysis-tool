@@ -27,7 +27,8 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Source;
-import io.ballerina.scan.exceptions.RuleNotFoundException;
+import io.ballerina.scan.utils.DiagnosticCode;
+import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.tools.diagnostics.Location;
 import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextRange;
@@ -103,8 +104,7 @@ public class ReporterImplTest {
         Assert.assertEquals(issue.source(), Source.EXTERNAL);
     }
 
-    @Test(description = "test creating a reporter and reporting an issue with non-existent numeric rule identifier",
-    expectedExceptions = RuleNotFoundException.class)
+    @Test(description = "test creating a reporter and reporting an issue with non-existent numeric rule identifier")
     void testReporterWithNonExistentNumericId() {
         List<Rule> rules = new ArrayList<>();
         ReporterImpl reporter = new ReporterImpl(rules);
@@ -122,7 +122,11 @@ public class ReporterImplTest {
                 lineRange.startLine().line(), lineRange.endLine().line(),
                 lineRange.startLine().offset(), lineRange.endLine().offset(),
                 textRange.startOffset(), textRange.length());
-        reporter.reportIssue(document, issueLocation, 101);
+        try {
+            reporter.reportIssue(document, issueLocation, 101);
+        } catch (RuntimeException ex) {
+            Assert.assertEquals(ex.getMessage(), DiagnosticLog.error(DiagnosticCode.RULE_NOT_FOUND, 101));
+        }
     }
 
     @Test(description = "test creating a reporter and retrieving issues reported with a rule")

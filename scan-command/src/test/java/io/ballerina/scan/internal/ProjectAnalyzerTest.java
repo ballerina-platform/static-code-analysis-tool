@@ -44,7 +44,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
@@ -98,47 +97,20 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with external analyzers")
     void testAnalyzingProjectWithExternalAnalyzers() {
-        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(printStream)
-                .orElse(null);
-        Assert.assertNotNull(externalAnalyzers);
-        List<Issue> issues = projectAnalyzer.runExternalAnalyzers(externalAnalyzers);
+        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
+        Assert.assertFalse(externalAnalyzerResult.hasAnalyzerPluginIssue());
+        List<Issue> issues = projectAnalyzer.runExternalAnalyzers(externalAnalyzerResult.externalAnalyzers());
         Assert.assertEquals(issues.size(), 3);
-        Issue issue = issues.get(0);
-        LineRange location = issue.location().lineRange();
-        Assert.assertEquals(location.fileName(), "main.bal");
-        Assert.assertEquals(location.startLine().line(), 16);
-        Assert.assertEquals(location.startLine().offset(), 0);
-        Assert.assertEquals(location.endLine().line(), 21);
-        Assert.assertEquals(location.endLine().offset(), 1);
-        Rule rule = issue.rule();
-        Assert.assertEquals(rule.id(), "ballerina/example_module_static_code_analyzer:1");
-        Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), "rule 1");
-        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
-        issue = issues.get(1);
-        location = issue.location().lineRange();
-        Assert.assertEquals(location.fileName(), "main.bal");
-        Assert.assertEquals(location.startLine().line(), 16);
-        Assert.assertEquals(location.startLine().offset(), 0);
-        Assert.assertEquals(location.endLine().line(), 21);
-        Assert.assertEquals(location.endLine().offset(), 1);
-        rule = issue.rule();
-        Assert.assertEquals(rule.id(), "exampleOrg/example_module_static_code_analyzer:1");
-        Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), "rule 1");
-        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
-        issue = issues.get(2);
-        location = issue.location().lineRange();
-        Assert.assertEquals(location.fileName(), "main.bal");
-        Assert.assertEquals(location.startLine().line(), 16);
-        Assert.assertEquals(location.startLine().offset(), 0);
-        Assert.assertEquals(location.endLine().line(), 21);
-        Assert.assertEquals(location.endLine().offset(), 1);
-        rule = issue.rule();
-        Assert.assertEquals(rule.id(), "ballerinax/example_module_static_code_analyzer:1");
-        Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), "rule 1");
-        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+
+        assertIssue(issues.get(0), "main.bal", 16, 0, 21, 1, Source.BUILT_IN,
+                "ballerina/example_module_static_code_analyzer:1", 1, "rule 1",
+                RuleKind.CODE_SMELL);
+        assertIssue(issues.get(1), "main.bal", 16, 0, 21, 1, Source.EXTERNAL,
+                "exampleOrg/example_module_static_code_analyzer:1", 1, "rule 1",
+                RuleKind.CODE_SMELL);
+        assertIssue(issues.get(2), "main.bal", 16, 0, 21, 1, Source.BUILT_IN,
+                "ballerinax/example_module_static_code_analyzer:1", 1, "rule 1",
+                RuleKind.CODE_SMELL);
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = null;
         for (DocumentId documentId : defaultModule.documentIds()) {
@@ -172,13 +144,29 @@ public class ProjectAnalyzerTest extends BaseTest {
                 """));
     }
 
+    private void assertIssue(Issue issue, String fileName, int startLine, int startOffset, int endLine,
+                             int endOffset, Source source, String id, int numericId, String description,
+                             RuleKind kind) {
+        Assert.assertEquals(issue.source(), source);
+        LineRange location = issue.location().lineRange();
+        Assert.assertEquals(location.fileName(), fileName);
+        Assert.assertEquals(location.startLine().line(), startLine);
+        Assert.assertEquals(location.startLine().offset(), startOffset);
+        Assert.assertEquals(location.endLine().line(), endLine);
+        Assert.assertEquals(location.endLine().offset(), endOffset);
+        Rule rule = issue.rule();
+        Assert.assertEquals(rule.id(), id);
+        Assert.assertEquals(rule.numericId(), numericId);
+        Assert.assertEquals(rule.description(), description);
+        Assert.assertEquals(rule.kind(), kind);
+    }
+
     @Test(description = "test method for printing static code analysis rules to the console")
     void testPrintRulesToConsole() throws IOException {
-        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers(printStream)
-                .orElse(null);
-        Assert.assertNotNull(externalAnalyzers);
+        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
+        Assert.assertFalse(externalAnalyzerResult.hasAnalyzerPluginIssue());
         List<Rule> rules = CoreRule.rules();
-        externalAnalyzers.values().forEach(rules::addAll);
+        externalAnalyzerResult.externalAnalyzers().values().forEach(rules::addAll);
         ScanUtils.printRulesToConsole(rules, printStream);
         Path validationResultsFilePath;
         if (OsUtils.isWindows()) {

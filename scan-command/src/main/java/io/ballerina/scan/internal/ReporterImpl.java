@@ -24,7 +24,8 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Reporter;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.Source;
-import io.ballerina.scan.exceptions.RuleNotFoundException;
+import io.ballerina.scan.utils.DiagnosticCode;
+import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.tools.diagnostics.Location;
 
 import java.nio.file.Path;
@@ -58,7 +59,7 @@ class ReporterImpl implements Reporter {
     public void reportIssue(Document reportedDocument, Location location, int ruleId) {
         Rule rule = rules.get(ruleId);
         if (rule == null) {
-            throw new RuleNotFoundException(ruleId);
+            throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.RULE_NOT_FOUND, ruleId));
         }
         issues.add(createIssue(reportedDocument, location, rule));
     }
