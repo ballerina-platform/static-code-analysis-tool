@@ -60,6 +60,7 @@ public class Constants {
     static final String RULE_ID_COLUMN = "RuleID";
     static final String RULE_SEVERITY_COLUMN = "Rule Severity";
     static final String RULE_DESCRIPTION_COLUMN = "Rule Description";
+    static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerina/", "ballerinax/", "wso2/"};
 
     private Constants() {
     }

@@ -21,15 +21,21 @@ package io.ballerina.scan.utils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
+/**
+ * Diagnostic log tests.
+ *
+ * @since 0.1.0
+ */
 public class DiagnosticLogTest {
-    @Test
+    @Test(description = "Test error diagnostic message")
     public void testErrorDiagnostic() {
         String expected = "Invalid number of arguments, expected one argument received 0";
         String result = DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, 0);
         Assert.assertEquals(result, expected);
     }
 
-    @Test
+    @Test(description = "Test warning diagnostic message")
     public void testWarningDiagnostic() {
         String expected = "Generating reports is not supported with single bal files. " +
                 "Ignoring the flag and continuing the scans...";

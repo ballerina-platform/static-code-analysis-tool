@@ -53,6 +53,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.AbstractMap;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -81,6 +82,7 @@ import static io.ballerina.scan.utils.Constants.RESULTS_JSON_FILE;
 import static io.ballerina.scan.utils.Constants.RULES_TABLE;
 import static io.ballerina.scan.utils.Constants.RULE_DESCRIPTION_COLUMN;
 import static io.ballerina.scan.utils.Constants.RULE_ID_COLUMN;
+import static io.ballerina.scan.utils.Constants.RULE_PRIORITY_LIST;
 import static io.ballerina.scan.utils.Constants.RULE_SEVERITY_COLUMN;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE_FIELD;
@@ -589,58 +591,53 @@ public final class ScanUtils {
     }
 
     /**
-     * <p> Sorts the rules based on a specified order. </p>
-     * <p> The rules are sorted based on the following order. </p>
-     * <ul>
-     *  <li> -1 if the first element should come before the second element </li>
-     *  <li>  1 if the second element should come before the first element </li>
-     * </ul>
-     * <p> The sorting priority is provided as follows. </p>
+     * <p>
+     *     Sorts a list of rules based on their priorities. The priorities are determined by the rule's id and a
+     *     predefined list of priorities. It achieves this with the following steps:
+     * </p>
      * <ol>
-     *  <li> `ballerina` rules first </li>
-     *  <li> `ballerina/moduleName` rules next </li>
-     *  <li> `ballerinax/moduleName` rules next </li>
-     *  <li> `wso2/moduleName` rules next </li>
-     *  <li> All remaining rules sorted alphabetically </li>
+     *     <li>Get the priority of each rule by comparing the rule's id with the predefined list of priorities.</li>
+     *     <li>Sort the rules based on their priorities.</li>
+     *     <li>If both rules have the same priority, the one with an exact match in the priority list comes first </li>
+     *     <li>Otherwise, they are sorted based on the fully qualified rule id.</li>
      * </ol>
      *
      * @param rules The list of rules to be sorted.
      */
-    private static void sortRules(List<Rule> rules) {
+    public static void sortRules(List<Rule> rules) {
+        List<String> priorities = List.of(RULE_PRIORITY_LIST);
         Comparator<Rule> ruleComparator = (r1, r2) -> {
-            String id1 = r1.id().split(":")[0];
-            String id2 = r2.id().split(":")[0];
-
-            if (id1.equals("ballerina") && !id2.equals("ballerina")) {
-                return -1;
+            AbstractMap.SimpleEntry<Integer, Boolean> priority1 = getPriority(r1.id().split(":")[0], priorities);
+            AbstractMap.SimpleEntry<Integer, Boolean> priority2 = getPriority(r2.id().split(":")[0], priorities);
+            int comparison = Integer.compare(priority1.getKey(), priority2.getKey());
+            if (comparison != 0) {
+                return comparison;
             }
-            if (!id1.equals("ballerina") && id2.equals("ballerina")) {
-                return 1;
+            comparison = Boolean.compare(priority2.getValue(), priority1.getValue());
+            if (comparison != 0) {
+                return comparison;
             }
-
-            if (id1.startsWith("ballerina/") && !id2.startsWith("ballerina/")) {
-                return -1;
-            }
-            if (!id1.startsWith("ballerina/") && id2.startsWith("ballerina/")) {
-                return 1;
-            }
-
-            if (id1.startsWith("ballerinax/") && !id2.startsWith("ballerinax/")) {
-                return -1;
-            }
-            if (!id1.startsWith("ballerinax/") && id2.startsWith("ballerinax/")) {
-                return 1;
-            }
-
-            if (id1.startsWith("wso2/") && !id2.startsWith("wso2/")) {
-                return -1;
-            }
-            if (!id1.startsWith("wso2/") && id2.startsWith("wso2/")) {
-                return 1;
-            }
-
             return r1.id().compareTo(r2.id());
         };
         rules.sort(ruleComparator);
+    }
+
+    /**
+     * Returns the priority of the rule as a {@link AbstractMap.SimpleEntry<Integer, Boolean>} pair.
+     *
+     * @param ruleId     the rule id
+     * @param priorities the list of priorities
+     * @return the priority of the rule as a pair of the priority index and whether the rule is a direct match.
+     */
+    private static AbstractMap.SimpleEntry<Integer, Boolean> getPriority(String ruleId, List<String> priorities) {
+        for (int i = 0; i < priorities.size(); i++) {
+            if (ruleId.equals(priorities.get(i))) {
+                return new AbstractMap.SimpleEntry<>(i, true);
+            }
+            if (ruleId.startsWith(priorities.get(i))) {
+                return new AbstractMap.SimpleEntry<>(i, false);
+            }
+        }
+        return new AbstractMap.SimpleEntry<>(priorities.size(), false);
     }
 }

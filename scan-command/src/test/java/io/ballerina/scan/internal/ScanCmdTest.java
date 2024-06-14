@@ -20,6 +20,7 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.cli.utils.OsUtils;
 import io.ballerina.projects.Project;
+import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
@@ -27,6 +28,7 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Source;
+import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
@@ -43,6 +45,8 @@ import java.util.List;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
+import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
+import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 
 /**
  * Scan command tests.
@@ -249,5 +253,69 @@ public class ScanCmdTest extends BaseTest {
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "test method for printing static code analysis rules to the console")
+    void testPrintRulesToConsole() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-config-file");
+        Project project = BuildProject.load(ballerinaProject);
+        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
+        Assert.assertNotNull(scanTomlFile);
+        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(project, scanTomlFile);
+        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
+        Assert.assertFalse(externalAnalyzerResult.hasAnalyzerPluginIssue());
+        List<Rule> rules = CoreRule.rules();
+        externalAnalyzerResult.externalAnalyzers().values().forEach(rules::addAll);
+        ScanUtils.printRulesToConsole(rules, printStream);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("print-rules-to-console.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("print-rules-to-console.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String result = readOutput(true).trim();
+        Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "test method for sorting static code analysis rules in specified order")
+    void testSorRules() throws IOException {
+        List<Rule> rules = new ArrayList<>(List.of(
+                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINA_ORG, "exampleModule"),
+                RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINAX_ORG, "exampleModule"),
+                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "wso2", "exampleModule"),
+                RuleFactory.createRule(3, "rule 3", RuleKind.BUG),
+                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "exampleOrg", "exampleModule"),
+                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY),
+                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINAX_ORG, "exampleModule"),
+                RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINA_ORG, "exampleModule"),
+                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINAX_ORG, "exampleModule"),
+                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "wso2", "exampleModule"),
+                RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "exampleOrg", "exampleModule"),
+                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "exampleOrg", "exampleModule"),
+                RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "wso2", "exampleModule"),
+                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINA_ORG, "exampleModule"),
+                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL)
+        ));
+        ScanUtils.sortRules(rules);
+        Assert.assertEquals(rules.get(0).id(), "ballerina:1");
+        Assert.assertEquals(rules.get(1).id(), "ballerina:2");
+        Assert.assertEquals(rules.get(2).id(), "ballerina:3");
+        Assert.assertEquals(rules.get(3).id(), "ballerina/exampleModule:1");
+        Assert.assertEquals(rules.get(4).id(), "ballerina/exampleModule:2");
+        Assert.assertEquals(rules.get(5).id(), "ballerina/exampleModule:3");
+        Assert.assertEquals(rules.get(6).id(), "ballerinax/exampleModule:1");
+        Assert.assertEquals(rules.get(7).id(), "ballerinax/exampleModule:2");
+        Assert.assertEquals(rules.get(8).id(), "ballerinax/exampleModule:3");
+        Assert.assertEquals(rules.get(9).id(), "wso2/exampleModule:1");
+        Assert.assertEquals(rules.get(10).id(), "wso2/exampleModule:2");
+        Assert.assertEquals(rules.get(11).id(), "wso2/exampleModule:3");
+        Assert.assertEquals(rules.get(12).id(), "exampleOrg/exampleModule:1");
+        Assert.assertEquals(rules.get(13).id(), "exampleOrg/exampleModule:2");
+        Assert.assertEquals(rules.get(14).id(), "exampleOrg/exampleModule:3");
     }
 }

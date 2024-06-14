@@ -18,7 +18,6 @@
 
 package io.ballerina.scan.internal;
 
-import io.ballerina.cli.utils.OsUtils;
 import io.ballerina.projects.BallerinaToml;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
@@ -39,9 +38,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +45,11 @@ import java.util.Optional;
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 
+/**
+ * Project analyzer tests.
+ *
+ * @since 0.1.0
+ */
 public class ProjectAnalyzerTest extends BaseTest {
     private ProjectAnalyzer projectAnalyzer;
     private Project project;
@@ -159,26 +160,5 @@ public class ProjectAnalyzerTest extends BaseTest {
         Assert.assertEquals(rule.numericId(), numericId);
         Assert.assertEquals(rule.description(), description);
         Assert.assertEquals(rule.kind(), kind);
-    }
-
-    @Test(description = "test method for printing static code analysis rules to the console")
-    void testPrintRulesToConsole() throws IOException {
-        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
-        Assert.assertFalse(externalAnalyzerResult.hasAnalyzerPluginIssue());
-        List<Rule> rules = CoreRule.rules();
-        externalAnalyzerResult.externalAnalyzers().values().forEach(rules::addAll);
-        ScanUtils.printRulesToConsole(rules, printStream);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("print-rules-to-console.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("print-rules-to-console.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String result = readOutput(true).trim();
-        Assert.assertEquals(result, expected);
     }
 }
