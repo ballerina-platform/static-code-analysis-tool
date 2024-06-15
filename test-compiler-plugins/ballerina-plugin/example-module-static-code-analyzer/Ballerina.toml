@@ -2,4 +2,4 @@
 org = "ballerina"
 name = "example_module_static_code_analyzer"
 version = "0.1.0"
-distribution = "2201.9.0"
+distribution = "2201.9.1"
