@@ -7,4 +7,6 @@ module io.ballerina.scan{
     requires info.picocli;
     requires com.google.gson;
     requires org.apache.commons.io;
+
+    exports io.ballerina.scan;
 }
