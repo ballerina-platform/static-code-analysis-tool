@@ -9,8 +9,9 @@
   - [`ScannerContext` interface](#scannercontext-interface)
   - [`Reporter` interface](#reporter-interface)
 - [Steps to create a Static Code Analyzer Compiler Plugin](#steps-to-create-a-static-code-analyzer-compiler-plugin)
-  - [Step 1: Defining the static code analysis rules](#step-1-defining-the-static-code-analysis-rules)
-  - [Step 2: Implementing the compiler plugin classes to perform static code analysis](#step-2-implementing-the-compiler-plugin-classes-to-perform-static-code-analysis)
+  - [Step 1: Add the static code analysis tool dependencies to the project](#step-1-add-the-static-code-analysis-tool-dependencies-to-the-project)
+  - [Step 2: Defining the static code analysis rules](#step-2-defining-the-static-code-analysis-rules)
+  - [Step 3: Implementing the compiler plugin classes to perform static code analysis](#step-3-implementing-the-compiler-plugin-classes-to-perform-static-code-analysis)
 - [References](#references)
 
 # What is a static code analyzer compiler plugin?
@@ -141,7 +142,6 @@ package io.ballerina.scan;
 
 public interface Reporter {
    void reportIssue(Document reportedDocument, Location location, int ruleId);
-
    void reportIssue(Document reportedDocument, Location location, Rule rule);
 }
 ```
@@ -190,12 +190,65 @@ It consists of the following types:
 
 # Steps to create a Static Code Analyzer Compiler Plugin
 
-There are two steps to follow to create a static code analyzer compiler plugin:
+There are three steps to follow to create a static code analyzer compiler plugin:
 
+- Add the static code analysis tool dependencies to the project.
 - Defining the static code analysis rules.
 - Implementing the compiler plugin classes to perform static code analysis.
 
-## Step 1: Defining the static code analysis rules
+## Step 1: Add the static code analysis tool dependencies to the project
+- Clone the static code analysis tool repository:
+
+```bash
+git clone https://github.com/ballerina-platform/static-code-analysis-tool.git
+```
+
+- Build the static code analysis tool:
+
+```bash
+cd static-code-analysis-tool
+./gradlew clean build
+```
+
+- Publish the static code analysis tool to the local Maven repository:
+
+```bash
+./gradlew publishToMavenLocal
+```
+
+- Add the following dependencies to the `build.gradle` file of the new project:
+
+```groovy
+repositories {
+    mavenLocal()
+}
+
+dependencies {
+    implementation group: 'io.ballerina.scan', name: 'scan-command', version: '0.1.0'
+}
+```
+
+> Note: Once the static code analysis tool is published to the GitHub package registry, only adding the following dependencies to the `build.gradle` file is sufficient:
+
+```groovy
+repositories {
+    maven {
+        maven {
+            url = 'https://maven.pkg.github.com/ballerina-platform/*'
+            credentials {
+            username System.getenv("packageUser")
+            password System.getenv("packagePAT")
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation group: 'io.ballerina.scan', name: 'scan-command', version: '0.1.0'
+}
+```
+
+## Step 2: Defining the static code analysis rules
 
 Create a `rules.json` file in the resources directory with static analysis rules defined in the following format:
 
@@ -228,7 +281,7 @@ Each static code analysis rule consists of three parts:
   - VULNERABILITY
 - `description` - Description of the rule.
 
-## Step 2: Implementing the compiler plugin classes to perform static code analysis
+## Step 3: Implementing the compiler plugin classes to perform static code analysis
 
 - Create a plugin class that extends the `CompilerPlugin` class, and passes the `ScannerContext` retrieved from the `CompilerPluginContext`:
 
