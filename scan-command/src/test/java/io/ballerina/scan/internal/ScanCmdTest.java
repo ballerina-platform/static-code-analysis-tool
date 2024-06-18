@@ -103,28 +103,36 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with Ballerina project")
     void testScanCommandProject() throws IOException {
-        String userDir = System.getProperty("user.dir");
-        Path validBalProject = testResources.resolve("test-resources").resolve("valid-bal-project");
-        System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
+        System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
-        String scanLog = readOutput(true);
         System.setProperty("user.dir", userDir);
+        String scanLog = readOutput(true);
         String expected = "Running Scans...";
+        Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
+    }
+
+    @Test(description = "test scan command with an empty Ballerina project")
+    void testScanCommandEmptyProject() throws IOException {
+        Path emptyBalProject = testResources.resolve("test-resources").resolve("empty-bal-project");
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        System.setProperty("user.dir", emptyBalProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String scanLog = readOutput(true);
+        String expected = "ballerina: Package is empty. Please add at least one .bal file.";
         Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
     }
 
     @Test(description = "test scan command with Ballerina project with single file as argument")
     void testScanCommandProjectWithArgument() throws IOException {
-        String userDir = System.getProperty("user.dir");
-        Path validBalProject = testResources.resolve("test-resources").resolve("valid-bal-project");
-        System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {validBalProject.resolve("main.bal").toString()};
         new CommandLine(scanCmd).parseArgs(args);
+        System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
-        String scanLog = readOutput(true);
         System.setProperty("user.dir", userDir);
+        String scanLog = readOutput(true);
         String expected = "The source file '" + validBalProject.resolve("main.bal") +
                 "' belongs to a Ballerina package.";
         Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
@@ -132,30 +140,24 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with single file project with single file as argument")
     void testScanCommandSingleFileProject() throws IOException {
-        String userDir = System.getProperty("user.dir");
         Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
-        System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {validBalProject.resolve("main.bal").toString()};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         String scanLog = readOutput(true);
-        System.setProperty("user.dir", userDir);
         String expected = "Running Scans...";
         Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
     }
 
     @Test(description = "test scan command with single file project with project directory as argument")
     void testScanCommandSingleFileProjectWithDirectoryAsArgument() throws IOException {
-        String userDir = System.getProperty("user.dir");
         Path parentDirectory = testResources.resolve("test-resources").toAbsolutePath();
-        System.setProperty("user.dir", parentDirectory.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {parentDirectory.resolve("valid-single-file-project").toString()};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         String scanLog = readOutput(true).trim();
-        System.setProperty("user.dir", userDir);
         String expected = "Invalid Ballerina package directory: " +
                 parentDirectory.resolve("valid-single-file-project") + ", cannot find 'Ballerina.toml' file.";
         Assert.assertEquals(scanLog, expected);
@@ -163,13 +165,12 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with single file project without arguments")
     void testScanCommandSingleFileProjectWithoutArgument() throws IOException {
-        String userDir = System.getProperty("user.dir");
         Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
-        System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
+        System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
-        String scanLog = readOutput(true).trim();
         System.setProperty("user.dir", userDir);
+        String scanLog = readOutput(true).trim();
         String expected = "Invalid Ballerina package directory: " + validBalProject +
                 ", cannot find 'Ballerina.toml' file.";
         Assert.assertEquals(scanLog, expected);
@@ -177,15 +178,14 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with single file project with too many arguments")
     void testScanCommandSingleFileProjectWithTooManyArguments() throws IOException {
-        String userDir = System.getProperty("user.dir");
         Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
-        System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"main.bal", "argument2"};
         new CommandLine(scanCmd).parseArgs(args);
+        System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
-        String scanLog = readOutput(true).trim();
         System.setProperty("user.dir", userDir);
+        String scanLog = readOutput(true).trim();
         String expected = "Invalid number of arguments, expected one argument received 2";
         Assert.assertEquals(scanLog, expected);
     }
@@ -202,10 +202,7 @@ public class ScanCmdTest extends BaseTest {
                 validBalProject.resolve("main.bal").toString()));
         issues.add(new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
                 validBalProject.resolve("main.bal").toString()));
-        String userDir = System.getProperty("user.dir");
-        System.setProperty("user.dir", validBalProject.toString());
         Project project = ProjectLoader.loadProject(validBalProject);
-        System.setProperty("user.dir", userDir);
         Path resultsFile = ScanUtils.saveToDirectory(issues, project, null);
         String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -235,10 +232,7 @@ public class ScanCmdTest extends BaseTest {
                 validBalProject.resolve("main.bal").toString()));
         issues.add(new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
                 validBalProject.resolve("main.bal").toString()));
-        String userDir = System.getProperty("user.dir");
-        System.setProperty("user.dir", validBalProject.toString());
         Project project = ProjectLoader.loadProject(validBalProject);
-        System.setProperty("user.dir", userDir);
         Path resultsFile = ScanUtils.generateScanReport(issues, project, null);
         String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -260,7 +254,9 @@ public class ScanCmdTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
         Project project = BuildProject.load(ballerinaProject);
+        System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
+        System.setProperty("user.dir", userDir);
         Assert.assertNotNull(scanTomlFile);
         ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(project, scanTomlFile);
         ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
@@ -282,8 +278,32 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(result, expected);
     }
 
+    @Test(description = "test scan command with list rules flag")
+    void testScanCommandWithListRulesFlag() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--list-rules"};
+        new CommandLine(scanCmd).parseArgs(args);
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-config-file");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String result = readOutput(true);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("list-rules-output.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("list-rules-output.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(result, expected);
+    }
+
     @Test(description = "test method for sorting static code analysis rules in specified order")
-    void testSorRules() throws IOException {
+    void testSorRules() {
         List<Rule> rules = new ArrayList<>(List.of(
                 RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINA_ORG, "exampleModule"),
                 RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINAX_ORG, "exampleModule"),

@@ -33,12 +33,9 @@ import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.text.LineRange;
 import org.testng.Assert;
-import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,34 +48,24 @@ import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
  * @since 0.1.0
  */
 public class ProjectAnalyzerTest extends BaseTest {
-    private ProjectAnalyzer projectAnalyzer;
-    private Project project;
-    private final String userDir = System.getProperty("user.dir");
-
-    @BeforeTest
-    void initialize() {
-        Path ballerinaProject = testResources.resolve("test-resources")
-                .resolve("bal-project-with-config-file");
-        System.setProperty("user.dir", ballerinaProject.toString());
-        project = BuildProject.load(ballerinaProject);
-    }
+    private final Project project = BuildProject.load(testResources.resolve("test-resources")
+            .resolve("bal-project-with-config-file"));
+    private ProjectAnalyzer projectAnalyzer = null;
 
     @BeforeMethod
     void initializeMethod() throws RuntimeException {
+        System.setProperty("user.dir", project.sourceRoot().toString());
         Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream);
+        System.setProperty("user.dir", userDir);
         if (scanTomlFile.isEmpty()) {
             throw new RuntimeException("Failed to load scan toml file!");
         }
         projectAnalyzer = new ProjectAnalyzer(project, scanTomlFile.get());
     }
 
-    @AfterTest
-    void cleanup() {
-        System.setProperty("user.dir", userDir);
-    }
-
     @Test(description = "Test analyzing project with core analyzer")
     void testAnalyzingProjectWithCoreAnalyzer() {
+        Assert.assertNotNull(projectAnalyzer);
         List<Issue> issues = projectAnalyzer.analyze(List.of(CoreRule.AVOID_CHECKPANIC.rule()));
         Assert.assertEquals(issues.size(), 1);
         Issue issue = issues.get(0);
@@ -98,6 +85,7 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with external analyzers")
     void testAnalyzingProjectWithExternalAnalyzers() {
+        Assert.assertNotNull(projectAnalyzer);
         ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
         Assert.assertFalse(externalAnalyzerResult.hasAnalyzerPluginIssue());
         List<Issue> issues = projectAnalyzer.runExternalAnalyzers(externalAnalyzerResult.externalAnalyzers());

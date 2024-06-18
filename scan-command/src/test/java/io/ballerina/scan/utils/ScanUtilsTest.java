@@ -127,7 +127,6 @@ public class ScanUtilsTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("single-file-project-with-config-file").resolve("main.bal");
         Project project = SingleFileProject.load(ballerinaProject);
-        String userDir = System.getProperty("user.dir");
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -139,7 +138,6 @@ public class ScanUtilsTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
         Project project = BuildProject.load(ballerinaProject);
-        String userDir = System.getProperty("user.dir");
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -190,7 +188,6 @@ public class ScanUtilsTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-platform-config-file");
         Project project = BuildProject.load(ballerinaProject);
-        String userDir = System.getProperty("user.dir");
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -207,7 +204,6 @@ public class ScanUtilsTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-file-configuration");
         Project project = BuildProject.load(ballerinaProject);
-        String userDir = System.getProperty("user.dir");
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -221,7 +217,6 @@ public class ScanUtilsTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-external-config-file");
         Project project = BuildProject.load(ballerinaProject);
-        String userDir = System.getProperty("user.dir");
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -262,7 +257,6 @@ public class ScanUtilsTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-config-file");
         Project project = BuildProject.load(ballerinaProject);
-        String userDir = System.getProperty("user.dir");
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -278,7 +272,6 @@ public class ScanUtilsTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-remote-config-file");
         Project project = BuildProject.load(ballerinaProject);
-        String userDir = System.getProperty("user.dir");
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);

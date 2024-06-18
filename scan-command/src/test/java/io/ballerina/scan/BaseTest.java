@@ -40,6 +40,7 @@ public abstract class BaseTest {
     protected final Path testResources = Paths.get("src", "test", "resources");
     private ByteArrayOutputStream console;
     protected PrintStream printStream;
+    protected final String userDir = System.getProperty("user.dir");
 
     @BeforeMethod
     protected void setup() {
