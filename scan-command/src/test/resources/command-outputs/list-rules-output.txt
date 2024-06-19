@@ -1,5 +1,5 @@
 
-Running Scans...
+Running Scans
 Loading scan tool configurations from src\test\resources\test-resources\bal-project-with-config-file\Scan.toml
 	RuleID                                           | Rule Severity | Rule Description
 	------------------------------------------------------------------------------------

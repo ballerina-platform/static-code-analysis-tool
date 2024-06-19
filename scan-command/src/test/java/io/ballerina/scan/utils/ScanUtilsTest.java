@@ -41,7 +41,6 @@ import java.util.Set;
 import static io.ballerina.projects.util.ProjectConstants.LOCAL_REPOSITORY_NAME;
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
-import static io.ballerina.scan.utils.Constants.SCAN_FILE_FIELD;
 
 /**
  * Scan utilities tests.
@@ -199,16 +198,15 @@ public class ScanUtilsTest extends BaseTest {
     @Test(description =
             "test method for loading configurations from a Scan.toml file with invalid Ballerina.toml configuration")
     void testloadScanTomlConfigurationsWithInvalidBallerinaTomlConfiguration() throws IOException {
-        String result = "";
-        String expected = "Failed to load scan tool configurations: " + SCAN_FILE_FIELD + " is missing";
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-file-configuration");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
-        result = readOutput(true).trim();
         Assert.assertNull(scanTomlFile);
+        String result = readOutput(true).trim();
+        String expected = DiagnosticLog.error(DiagnosticCode.MISSING_CONFIG_FIELD);
         Assert.assertEquals(result, expected);
     }
 
@@ -252,30 +250,29 @@ public class ScanUtilsTest extends BaseTest {
 
     @Test(description = "test method for loading configurations from an invalid external configuration file")
     void testloadInvalidExternalScanTomlConfigurations() throws IOException {
-        String result = "";
-        String expected = "Failed to load configuration file with exception: no protocol: ./Config.toml";
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-config-file");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
-        result = readOutput(true).trim();
+        String result = readOutput(true).trim();
+        String expected = DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_CONFIG_FILE, "no protocol: ./Config.toml");
         Assert.assertNull(scanTomlFile);
         Assert.assertEquals(result, expected);
     }
 
     @Test(description = "test method for loading configurations from an invalid remote configuration file")
     void testloadInvalidRemoteScanTomlConfigurations() throws IOException {
-        String result = "";
-        String expected = "Failed to load configuration file with exception: no protocol: www.example.com/Config.toml";
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-remote-config-file");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
-        result = readOutput(true).trim();
+        String result = readOutput(true).trim();
+        String expected = DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_CONFIG_FILE,
+                "no protocol: www.example.com/Config.toml");
         Assert.assertNull(scanTomlFile);
         Assert.assertEquals(result, expected);
     }

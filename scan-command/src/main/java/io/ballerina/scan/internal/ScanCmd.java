@@ -141,7 +141,7 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         outputStream.println();
-        outputStream.println("Running Scans...");
+        outputStream.println("Running Scans");
 
         Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project.get(), outputStream);
         if (scanTomlFile.isEmpty()) {

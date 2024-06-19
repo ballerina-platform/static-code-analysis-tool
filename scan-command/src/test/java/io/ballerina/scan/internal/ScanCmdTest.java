@@ -108,7 +108,7 @@ public class ScanCmdTest extends BaseTest {
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String scanLog = readOutput(true);
-        String expected = "Running Scans...";
+        String expected = "Running Scans";
         Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
     }
 
@@ -120,7 +120,7 @@ public class ScanCmdTest extends BaseTest {
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String scanLog = readOutput(true);
-        String expected = "ballerina: Package is empty. Please add at least one .bal file.";
+        String expected = "Package is empty. Please add at least one .bal file";
         Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
     }
 
@@ -146,7 +146,7 @@ public class ScanCmdTest extends BaseTest {
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         String scanLog = readOutput(true);
-        String expected = "Running Scans...";
+        String expected = "Running Scans";
         Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
     }
 

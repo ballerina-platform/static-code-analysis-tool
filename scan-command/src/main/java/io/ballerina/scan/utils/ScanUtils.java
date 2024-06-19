@@ -345,7 +345,7 @@ public final class ScanUtils {
 
         Toml scanTable = ballerinaTomlDocumentContent.getTable(SCAN_TABLE).get();
         if (scanTable.get(SCAN_FILE_FIELD).isEmpty()) {
-            outputStream.println(DiagnosticLog.error(DiagnosticCode.MISSING_CONFIG_FIELD, SCAN_FILE_FIELD));
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.MISSING_CONFIG_FIELD));
             return Optional.empty();
         }
 

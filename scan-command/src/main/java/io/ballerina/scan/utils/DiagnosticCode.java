@@ -32,7 +32,7 @@ public enum DiagnosticCode {
     LOADING_REMOTE_PLATFORM_FILE("STATIC_ANALYSIS_ERROR_006", "loading.remote.platform.file"),
     DOWNLOADING_REMOTE_JAR_FILE("STATIC_ANALYSIS_ERROR_007", "downloading.remote.jar.file"),
     INVALID_JSON_FORMAT("STATIC_ANALYSIS_ERROR_008", "invalid.json.format"),
-    INVALID_JSON_FORMAT_RULE("STATIC_ANALYSIS_ERROR_009", "invalid.json.format.ruleS"),
+    INVALID_JSON_FORMAT_RULE("STATIC_ANALYSIS_ERROR_009", "invalid.json.format.rule"),
     INVALID_JSON_FORMAT_RULE_KIND("STATIC_ANALYSIS_ERROR_010", "invalid.json.format.rule.kind"),
     FAILED_TO_READ_FILE("STATIC_ANALYSIS_ERROR_011", "failed.to.read.file"),
     FAILED_TO_COPY_FILE("STATIC_ANALYSIS_ERROR_012", "failed.to.copy.file"),

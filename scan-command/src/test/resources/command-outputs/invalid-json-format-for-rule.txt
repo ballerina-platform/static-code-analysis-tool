@@ -1,0 +1,1 @@
+Invalid JSON format for rule object in plugin 'exampleOrg/exampleName'. Rule object should contain 'numeric id', 'ruleKind', and 'description' but found: {'id':'1', 'severity':'BUG', 'description':'rule 1'}
