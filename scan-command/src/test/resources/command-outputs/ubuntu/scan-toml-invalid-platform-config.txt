@@ -1,2 +1,2 @@
 Loading scan tool configurations from src/test/resources/test-resources/bal-project-with-invalid-platform-config-file/Scan.toml
-failed to download remote jar file: https://example.com/example-platform-analyzer-1.0.jar
+failed to retrieve remote platform file: no protocol: www.example.com/example-platform-analyzer-1.0.jar

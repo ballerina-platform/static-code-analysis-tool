@@ -28,6 +28,8 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Source;
+import io.ballerina.scan.utils.DiagnosticCode;
+import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanUtils;
 import org.testng.Assert;
@@ -117,7 +119,7 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", emptyBalProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = "package is empty. please add at least one .bal file";
+        String expected = DiagnosticLog.error(DiagnosticCode.EMPTY_PACKAGE);
         Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
     }
 
@@ -126,9 +128,7 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {validBalProject.resolve("main.bal").toString()};
         new CommandLine(scanCmd).parseArgs(args);
-        System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
-        System.setProperty("user.dir", userDir);
         String expected = "The source file '" + validBalProject.resolve("main.bal") +
                 "' belongs to a Ballerina package.";
         Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
@@ -178,7 +178,7 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = "invalid number of arguments, expected one argument received 2";
+        String expected = DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, 2);
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -290,6 +290,36 @@ public class ScanCmdTest extends BaseTest {
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertEquals(readOutput(true), expected);
+    }
+
+    @Test(description = "test scan command with target directory flag on single file project")
+    void testScanCommandWithTargetDirFlagOnSingleFileProject() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        Path singleFileProject = testResources.resolve("test-resources")
+                .resolve("valid-single-file-project").resolve("main.bal");
+        String[] args = {singleFileProject.toString(), "--target-dir=results"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        Path validationResultsFilePath = testResources.resolve("command-outputs")
+                .resolve("single-file-report-generation.txt");
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(readOutput(true).trim(), expected);
+    }
+
+    @Test(description = "test scan command with scan report flag on single file project")
+    void testScanCommandWithScanReportFlagOnSingleFileProject() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        Path singleFileProject = testResources.resolve("test-resources")
+                .resolve("valid-single-file-project").resolve("main.bal");
+        String[] args = {singleFileProject.toString(), "--scan-report"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        Path validationResultsFilePath = testResources.resolve("command-outputs")
+                .resolve("single-file-scan-report-generation.txt");
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test method for sorting static code analysis rules in specified order",

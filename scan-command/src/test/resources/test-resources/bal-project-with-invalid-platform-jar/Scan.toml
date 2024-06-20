@@ -1,6 +1,6 @@
 [[platform]]
 name = "examplePlatform"
-path = "www.example.com/example-platform-analyzer-1.0.jar"
+path = "https://example.com/example-platform-analyzer-1.0.jar"
 
 [[analyzer]]
 org = "exampleOrg"

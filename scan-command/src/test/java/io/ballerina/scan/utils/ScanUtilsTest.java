@@ -170,18 +170,31 @@ public class ScanUtilsTest extends BaseTest {
     }
 
     @Test(description =
-            "test method for loading configurations from a Scan.toml file with invalid platform configuration")
-    void testloadInvalidPlatformScanTomlConfigurations() throws IOException {
+            "test method for loading configurations from a Scan.toml file with invalid platform JAR")
+    void testloadInvalidPlatformJAR() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-invalid-platform-jar");
+        Project project = BuildProject.load(ballerinaProject);
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
+        System.setProperty("user.dir", userDir);
+        Assert.assertNull(scanTomlFile);
         Path invalidPlatformTxtPath;
         if (OsUtils.isWindows()) {
             invalidPlatformTxtPath = testResources.resolve("command-outputs")
-                    .resolve("scan-toml-invalid-platform.txt");
+                    .resolve("scan-toml-invalid-platform-jar.txt");
         } else {
             invalidPlatformTxtPath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("scan-toml-invalid-platform.txt");
+                    .resolve("ubuntu").resolve("scan-toml-invalid-platform-jar.txt");
         }
         String expected = Files.readString(invalidPlatformTxtPath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(readOutput(true).trim(), expected);
+    }
+
+    @Test(description =
+            "test method for loading configurations from a Scan.toml file with invalid platform configuration")
+    void testloadInvalidPlatformScanTomlConfigurations() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-platform-config-file");
         Project project = BuildProject.load(ballerinaProject);
@@ -189,6 +202,16 @@ public class ScanUtilsTest extends BaseTest {
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
         Assert.assertNull(scanTomlFile);
+        Path invalidPlatformTxtPath;
+        if (OsUtils.isWindows()) {
+            invalidPlatformTxtPath = testResources.resolve("command-outputs")
+                    .resolve("scan-toml-invalid-platform-config.txt");
+        } else {
+            invalidPlatformTxtPath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("scan-toml-invalid-platform-config.txt");
+        }
+        String expected = Files.readString(invalidPlatformTxtPath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 

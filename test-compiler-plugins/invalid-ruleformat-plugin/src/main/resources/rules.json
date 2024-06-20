@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "severity": "CODE_SMELL",
+    "description": "rule 1"
+  },
+  {
+    "id": 2,
+    "severity": "BUG",
+    "description": "rule 2"
+  },
+  {
+    "id": 3,
+    "severity": "VULNERABILITY",
+    "description": "rule 3"
+  }
+]

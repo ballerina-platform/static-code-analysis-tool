@@ -19,7 +19,6 @@
 package io.ballerina.scan.internal;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -176,7 +175,7 @@ class ProjectAnalyzer {
             }
 
             List<Rule> externalRules = new ArrayList<>();
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            Gson gson = new Gson();
             JsonElement element = gson.fromJson(output, JsonElement.class);
             if (!element.isJsonArray()) {
                 outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT, RULES_FILE, pluginName,
