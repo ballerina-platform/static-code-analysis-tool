@@ -45,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
@@ -251,10 +252,10 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertNotNull(scanTomlFile);
         System.setProperty("user.dir", userDir);
         ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(project, scanTomlFile);
-        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
-        Assert.assertFalse(externalAnalyzerResult.hasAnalyzerPluginIssue());
+        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
+        Assert.assertFalse(externalAnalyzers.isEmpty());
         List<Rule> rules = CoreRule.rules();
-        externalAnalyzerResult.externalAnalyzers().values().forEach(rules::addAll);
+        externalAnalyzers.values().forEach(rules::addAll);
         ScanUtils.printRulesToConsole(rules, printStream);
         Path validationResultsFilePath;
         if (OsUtils.isWindows()) {

@@ -18,7 +18,6 @@
 
 package io.ballerina.scan.internal;
 
-import io.ballerina.cli.utils.OsUtils;
 import io.ballerina.projects.BallerinaToml;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
@@ -42,6 +41,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
@@ -89,9 +89,9 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with external analyzers")
     void testAnalyzingProjectWithExternalAnalyzers() {
-        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
-        Assert.assertFalse(externalAnalyzerResult.hasAnalyzerPluginIssue());
-        List<Issue> issues = projectAnalyzer.runExternalAnalyzers(externalAnalyzerResult.externalAnalyzers());
+        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
+        Assert.assertFalse(externalAnalyzers.isEmpty());
+        List<Issue> issues = projectAnalyzer.runExternalAnalyzers(externalAnalyzers);
         Assert.assertEquals(issues.size(), 3);
 
         assertIssue(issues.get(0), "main.bal", 16, 0, 21, 1, Source.BUILT_IN,
@@ -158,27 +158,24 @@ public class ProjectAnalyzerTest extends BaseTest {
         Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-analyzer-rules"));
         System.setProperty("user.dir", invalidProject.sourceRoot().toString());
-        // Flush the previous console output
-        readOutput(true);
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
                 .orElse(null);
         Assert.assertNotNull(scanTomlFile);
         System.setProperty("user.dir", userDir);
         projectAnalyzer = new ProjectAnalyzer(invalidProject, scanTomlFile);
-        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
-        Assert.assertTrue(externalAnalyzerResult.hasAnalyzerPluginIssue());
-        Path invalidExternalAnalyzerRulesPath;
-        if (OsUtils.isWindows()) {
-            invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                    .resolve("invalid-json-format-for-rules.txt");
-        } else {
-            invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("invalid-json-format-for-rules.txt");
+        Map<String, List<Rule>> externalAnalyzers = null;
+        String result = null;
+        try {
+            externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
+        } catch (RuntimeException ex) {
+            result = ex.getMessage();
         }
+        Assert.assertNull(externalAnalyzers);
+        Path invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
+                .resolve("invalid-json-format-for-rules.txt");
         String expected = Files.readString(invalidExternalAnalyzerRulesPath, StandardCharsets.UTF_8)
-                .replace("__path__", invalidProject.sourceRoot().toString())
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Assert.assertEquals(readOutput(true), expected);
+        Assert.assertEquals(result, expected);
     }
 
     @Test(description = "Test analyzing project with invalid external analyzer rule format")
@@ -186,27 +183,24 @@ public class ProjectAnalyzerTest extends BaseTest {
         Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-analyzer-rule-format"));
         System.setProperty("user.dir", invalidProject.sourceRoot().toString());
-        // Flush the previous console output
-        readOutput(true);
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
                 .orElse(null);
         Assert.assertNotNull(scanTomlFile);
         System.setProperty("user.dir", userDir);
         projectAnalyzer = new ProjectAnalyzer(invalidProject, scanTomlFile);
-        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
-        Assert.assertTrue(externalAnalyzerResult.hasAnalyzerPluginIssue());
-        Path invalidExternalAnalyzerRulesPath;
-        if (OsUtils.isWindows()) {
-            invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                    .resolve("invalid-json-rule-format.txt");
-        } else {
-            invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("invalid-json-rule-format.txt");
+        Map<String, List<Rule>> externalAnalyzers = null;
+        String result = null;
+        try {
+            externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
+        } catch (RuntimeException ex) {
+            result = ex.getMessage();
         }
+        Assert.assertNull(externalAnalyzers);
+        Path invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
+                .resolve("invalid-json-rule-format.txt");
         String expected = Files.readString(invalidExternalAnalyzerRulesPath, StandardCharsets.UTF_8)
-                .replace("__path__", invalidProject.sourceRoot().toString())
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Assert.assertEquals(readOutput(true), expected);
+        Assert.assertEquals(result, expected);
     }
 
     @Test(description = "Test analyzing project with invalid external analyzer rule kind")
@@ -214,26 +208,23 @@ public class ProjectAnalyzerTest extends BaseTest {
         Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-analyzer-rule-kind"));
         System.setProperty("user.dir", invalidProject.sourceRoot().toString());
-        // Flush the previous console output
-        readOutput(true);
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
                 .orElse(null);
         Assert.assertNotNull(scanTomlFile);
         System.setProperty("user.dir", userDir);
         projectAnalyzer = new ProjectAnalyzer(invalidProject, scanTomlFile);
-        ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
-        Assert.assertTrue(externalAnalyzerResult.hasAnalyzerPluginIssue());
-        Path invalidExternalAnalyzerRulesPath;
-        if (OsUtils.isWindows()) {
-            invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                    .resolve("invalid-json-rule-kind.txt");
-        } else {
-            invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("invalid-json-rule-kind.txt");
+        Map<String, List<Rule>> externalAnalyzers = null;
+        String result = null;
+        try {
+            externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
+        } catch (RuntimeException ex) {
+            result = ex.getMessage();
         }
+        Assert.assertNull(externalAnalyzers);
+        Path invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
+                .resolve("invalid-json-rule-kind.txt");
         String expected = Files.readString(invalidExternalAnalyzerRulesPath, StandardCharsets.UTF_8)
-                .replace("__path__", invalidProject.sourceRoot().toString())
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Assert.assertEquals(readOutput(true), expected);
+        Assert.assertEquals(result, expected);
     }
 }

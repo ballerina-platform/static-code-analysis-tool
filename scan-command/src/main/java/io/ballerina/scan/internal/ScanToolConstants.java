@@ -40,6 +40,8 @@ public class ScanToolConstants {
     static final String RULE_ID = "id";
     static final String RULE_DESCRIPTION = "description";
 
+    static final String SCANNER_CONTEXT = "ScannerContext";
+
     private ScanToolConstants() {
     }
 }

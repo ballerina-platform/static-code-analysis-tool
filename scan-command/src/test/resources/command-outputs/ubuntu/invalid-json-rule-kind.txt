@@ -1,2 +1,0 @@
-Loading scan tool configurations from __path__/Scan.toml
-invalid ruleKind for rule object in plugin 'invalid/invalid_module_rulekind_static_code_analyzer'. ruleKind should be one of [CODE_SMELL, BUG, VULNERABILITY] but found: 'SECURITY_HOTSPOT'

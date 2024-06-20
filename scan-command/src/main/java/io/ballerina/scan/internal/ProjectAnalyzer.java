@@ -47,7 +47,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.PrintStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -72,6 +71,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.RULES_FILE;
 import static io.ballerina.scan.internal.ScanToolConstants.RULE_DESCRIPTION;
 import static io.ballerina.scan.internal.ScanToolConstants.RULE_ID;
 import static io.ballerina.scan.internal.ScanToolConstants.RULE_KIND;
+import static io.ballerina.scan.internal.ScanToolConstants.SCANNER_CONTEXT;
 import static io.ballerina.scan.internal.ScanToolConstants.USE_IMPORT_AS_UNDERSCORE;
 import static io.ballerina.scan.internal.ScanToolConstants.VULNERABILITY;
 
@@ -83,7 +83,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.VULNERABILITY;
 class ProjectAnalyzer {
     private final Project project;
     private final ScanTomlFile scanTomlFile;
-    private String generatedDocumentName;
+    private String pluginImportsDocumentName;
 
     ProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
         this.project = project;
@@ -94,8 +94,8 @@ class ProjectAnalyzer {
                 .map(documentId -> defaultModule.document(documentId).name())
                 .toList();
         do {
-            generatedDocumentName = String.format("%s-%s.bal", IMPORT_GENERATOR_FILE, UUID.randomUUID());
-        } while (defaultModuleFiles.contains(generatedDocumentName));
+            pluginImportsDocumentName = String.format("%s-%s.bal", IMPORT_GENERATOR_FILE, UUID.randomUUID());
+        } while (defaultModuleFiles.contains(pluginImportsDocumentName));
     }
 
     List<Issue> analyze(List<Rule> inbuiltRules) {
@@ -116,7 +116,7 @@ class ProjectAnalyzer {
         };
     }
 
-    ExternalAnalyzerResult getExternalAnalyzers(PrintStream outputStream) {
+    Map<String, List<Rule>> getExternalAnalyzers() {
         StringBuilder newImports = new StringBuilder();
         StringBuilder tomlDependencies = new StringBuilder();
         Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
@@ -127,8 +127,9 @@ class ProjectAnalyzer {
 
         Module defaultModule = project.currentPackage().getDefaultModule();
         ModuleId defaultModuleId = defaultModule.moduleId();
-        DocumentId documentId = DocumentId.create(generatedDocumentName, defaultModuleId);
-        DocumentConfig documentConfig = DocumentConfig.from(documentId, newImports.toString(), generatedDocumentName);
+        DocumentId documentId = DocumentId.create(pluginImportsDocumentName, defaultModuleId);
+        DocumentConfig documentConfig = DocumentConfig.from(documentId, newImports.toString(),
+                pluginImportsDocumentName);
         defaultModule.modify().addDocument(documentConfig).apply();
         project.currentPackage().ballerinaToml().ifPresent(ballerinaToml -> {
             String tomlFileContent = ballerinaToml.tomlDocument().textDocument().toString();
@@ -178,18 +179,16 @@ class ProjectAnalyzer {
             Gson gson = new Gson();
             JsonElement element = gson.fromJson(output, JsonElement.class);
             if (!element.isJsonArray()) {
-                outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT, RULES_FILE, pluginName,
-                        gson.toJson(element)));
-                return new ExternalAnalyzerResult(externalAnalyzers, true);
+                throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT, RULES_FILE,
+                        pluginName, gson.toJson(element)));
             }
 
             JsonArray ruleArray = element.getAsJsonArray();
             for (JsonElement rule : ruleArray) {
                 JsonObject ruleObject = rule.getAsJsonObject();
                 if (!isValidRule(ruleObject)) {
-                    outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE, pluginName,
-                            gson.toJson(ruleObject)));
-                    return new ExternalAnalyzerResult(externalAnalyzers, true);
+                    throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE,
+                            pluginName, gson.toJson(ruleObject)));
                 }
 
                 String kind = ruleObject.get(RULE_KIND).getAsString();
@@ -199,9 +198,8 @@ class ProjectAnalyzer {
                     case VULNERABILITY -> ruleKind = RuleKind.VULNERABILITY;
                     case CODE_SMELL -> ruleKind = RuleKind.CODE_SMELL;
                     default -> {
-                        outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_KIND,
+                        throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_KIND,
                                 pluginName, Arrays.toString(RuleKind.values()), kind));
-                        return new ExternalAnalyzerResult(externalAnalyzers, true);
                     }
                 };
                 Rule inMemoryRule = RuleFactory.createRule(ruleObject.get(RULE_ID).getAsInt(),
@@ -210,7 +208,7 @@ class ProjectAnalyzer {
             }
             externalAnalyzers.put(pluginDesc.plugin().getClassName(), externalRules);
         }
-        return new ExternalAnalyzerResult(externalAnalyzers, false);
+        return externalAnalyzers;
     }
 
     private String extractAnalyzerImportsAndDependencies(ScanTomlFile.Analyzer analyzer, StringBuilder imports,
@@ -256,7 +254,7 @@ class ProjectAnalyzer {
 
             // Save the scanner context to plugin cache for the compiler plugin to use during package compilation
             Map<String, Object> pluginProperties = new HashMap<>();
-            pluginProperties.put("ScannerContext", scannerContext);
+            pluginProperties.put(SCANNER_CONTEXT, scannerContext);
             project.projectEnvironmentContext()
                     .getService(CompilerPluginCache.class)
                     .putData(externalAnalyzer.getKey(), pluginProperties);
@@ -267,10 +265,9 @@ class ProjectAnalyzer {
         for (ScannerContext scannerContext : scannerContextList) {
             ReporterImpl reporter = (ReporterImpl) scannerContext.getReporter();
             for (Issue issue : reporter.getIssues()) {
-                if (issue.location().lineRange().fileName().equals(generatedDocumentName)) {
-                    continue;
+                if (!issue.location().lineRange().fileName().equals(pluginImportsDocumentName)) {
+                    externalIssues.add(issue);
                 }
-                externalIssues.add(issue);
             }
         }
         return externalIssues;
