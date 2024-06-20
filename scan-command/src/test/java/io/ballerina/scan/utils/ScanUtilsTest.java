@@ -64,9 +64,8 @@ public class ScanUtilsTest extends BaseTest {
     void testPrintToConsole() throws IOException {
         List<Issue> issues = new ArrayList<>();
         ScanUtils.printToConsole(issues, printStream);
-        String printLog = readOutput(true).trim();
         String expected = "[]";
-        Assert.assertEquals(printLog, expected);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test method for saving results to file when no directory is provided")
@@ -173,7 +172,6 @@ public class ScanUtilsTest extends BaseTest {
     @Test(description =
             "test method for loading configurations from a Scan.toml file with invalid platform configuration")
     void testloadInvalidPlatformScanTomlConfigurations() throws IOException {
-        String result = "";
         Path invalidPlatformTxtPath;
         if (OsUtils.isWindows()) {
             invalidPlatformTxtPath = testResources.resolve("command-outputs")
@@ -190,9 +188,8 @@ public class ScanUtilsTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
-        result = readOutput(true).trim();
         Assert.assertNull(scanTomlFile);
-        Assert.assertEquals(result, expected);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description =
@@ -205,9 +202,8 @@ public class ScanUtilsTest extends BaseTest {
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
         Assert.assertNull(scanTomlFile);
-        String result = readOutput(true).trim();
         String expected = DiagnosticLog.error(DiagnosticCode.MISSING_CONFIG_FIELD);
-        Assert.assertEquals(result, expected);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test method for loading configurations from an external configuration file")
@@ -256,10 +252,9 @@ public class ScanUtilsTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
-        String result = readOutput(true).trim();
         String expected = DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_CONFIG_FILE, "no protocol: ./Config.toml");
         Assert.assertNull(scanTomlFile);
-        Assert.assertEquals(result, expected);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test method for loading configurations from an invalid remote configuration file")
@@ -270,11 +265,10 @@ public class ScanUtilsTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
-        String result = readOutput(true).trim();
         String expected = DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_CONFIG_FILE,
                 "no protocol: www.example.com/Config.toml");
         Assert.assertNull(scanTomlFile);
-        Assert.assertEquals(result, expected);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     private void assertAnalyzer(ScanTomlFile.Analyzer analyzer, String org, String name, String version,

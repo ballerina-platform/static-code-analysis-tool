@@ -32,6 +32,7 @@ import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
 import picocli.CommandLine;
@@ -70,9 +71,8 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command override methods")
     void testScanCommandOverrideMethods() throws IOException {
         ScanCmd scanCmd = new ScanCmd();
-        String result = scanCmd.getName();
         String expected = "scan";
-        Assert.assertEquals(result, expected);
+        Assert.assertEquals(scanCmd.getName(), expected);
 
         StringBuilder usageResult = new StringBuilder();
         scanCmd.printUsage(usageResult);
@@ -94,11 +94,10 @@ public class ScanCmdTest extends BaseTest {
         String[] args = {"--help"};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String scanLog = readOutput(true);
         Path helpTextPath = testResources.resolve("command-outputs").resolve("tool-help.txt");
         String expected = Files.readString(helpTextPath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Assert.assertEquals(scanLog, expected);
+        Assert.assertEquals(readOutput(true), expected);
     }
 
     @Test(description = "test scan command with Ballerina project")
@@ -107,9 +106,8 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String scanLog = readOutput(true);
         String expected = "Running Scans";
-        Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
     }
 
     @Test(description = "test scan command with an empty Ballerina project")
@@ -119,9 +117,8 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", emptyBalProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String scanLog = readOutput(true);
-        String expected = "Package is empty. Please add at least one .bal file";
-        Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
+        String expected = "package is empty. please add at least one .bal file";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
     }
 
     @Test(description = "test scan command with Ballerina project with single file as argument")
@@ -132,10 +129,9 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String scanLog = readOutput(true);
         String expected = "The source file '" + validBalProject.resolve("main.bal") +
                 "' belongs to a Ballerina package.";
-        Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
     }
 
     @Test(description = "test scan command with single file project with single file as argument")
@@ -145,9 +141,8 @@ public class ScanCmdTest extends BaseTest {
         String[] args = {validBalProject.resolve("main.bal").toString()};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String scanLog = readOutput(true);
         String expected = "Running Scans";
-        Assert.assertEquals(scanLog.trim().split("\n")[0], expected);
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
     }
 
     @Test(description = "test scan command with single file project with project directory as argument")
@@ -157,10 +152,9 @@ public class ScanCmdTest extends BaseTest {
         String[] args = {parentDirectory.resolve("valid-single-file-project").toString()};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String scanLog = readOutput(true).trim();
         String expected = "Invalid Ballerina package directory: " +
                 parentDirectory.resolve("valid-single-file-project") + ", cannot find 'Ballerina.toml' file.";
-        Assert.assertEquals(scanLog, expected);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test scan command with single file project without arguments")
@@ -170,10 +164,9 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String scanLog = readOutput(true).trim();
         String expected = "Invalid Ballerina package directory: " + validBalProject +
                 ", cannot find 'Ballerina.toml' file.";
-        Assert.assertEquals(scanLog, expected);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test scan command with single file project with too many arguments")
@@ -185,9 +178,8 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String scanLog = readOutput(true).trim();
-        String expected = "Invalid number of arguments, expected one argument received 2";
-        Assert.assertEquals(scanLog, expected);
+        String expected = "invalid number of arguments, expected one argument received 2";
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test scan command with method for saving results to file when analysis issues are present")
@@ -256,8 +248,8 @@ public class ScanCmdTest extends BaseTest {
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
-        System.setProperty("user.dir", userDir);
         Assert.assertNotNull(scanTomlFile);
+        System.setProperty("user.dir", userDir);
         ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(project, scanTomlFile);
         ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
         Assert.assertFalse(externalAnalyzerResult.hasAnalyzerPluginIssue());
@@ -274,8 +266,7 @@ public class ScanCmdTest extends BaseTest {
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String result = readOutput(true).trim();
-        Assert.assertEquals(result, expected);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test scan command with list rules flag")
@@ -288,7 +279,6 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String result = readOutput(true);
         Path validationResultsFilePath;
         if (OsUtils.isWindows()) {
             validationResultsFilePath = testResources.resolve("command-outputs")
@@ -299,43 +289,58 @@ public class ScanCmdTest extends BaseTest {
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Assert.assertEquals(result, expected);
+        Assert.assertEquals(readOutput(true), expected);
     }
 
-    @Test(description = "test method for sorting static code analysis rules in specified order")
-    void testSorRules() {
-        List<Rule> rules = new ArrayList<>(List.of(
-                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINA_ORG, "exampleModule"),
-                RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINAX_ORG, "exampleModule"),
-                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "wso2", "exampleModule"),
-                RuleFactory.createRule(3, "rule 3", RuleKind.BUG),
-                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "exampleOrg", "exampleModule"),
-                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY),
-                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINAX_ORG, "exampleModule"),
-                RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINA_ORG, "exampleModule"),
-                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINAX_ORG, "exampleModule"),
-                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "wso2", "exampleModule"),
-                RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "exampleOrg", "exampleModule"),
-                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "exampleOrg", "exampleModule"),
-                RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "wso2", "exampleModule"),
-                RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINA_ORG, "exampleModule"),
-                RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL)
-        ));
+    @Test(description = "test method for sorting static code analysis rules in specified order",
+            dataProvider = "RulesProvider")
+    void testSortRules(List<Rule> rules, String[] expectedOrder) {
         ScanUtils.sortRules(rules);
-        Assert.assertEquals(rules.get(0).id(), "ballerina:1");
-        Assert.assertEquals(rules.get(1).id(), "ballerina:2");
-        Assert.assertEquals(rules.get(2).id(), "ballerina:3");
-        Assert.assertEquals(rules.get(3).id(), "ballerina/exampleModule:1");
-        Assert.assertEquals(rules.get(4).id(), "ballerina/exampleModule:2");
-        Assert.assertEquals(rules.get(5).id(), "ballerina/exampleModule:3");
-        Assert.assertEquals(rules.get(6).id(), "ballerinax/exampleModule:1");
-        Assert.assertEquals(rules.get(7).id(), "ballerinax/exampleModule:2");
-        Assert.assertEquals(rules.get(8).id(), "ballerinax/exampleModule:3");
-        Assert.assertEquals(rules.get(9).id(), "wso2/exampleModule:1");
-        Assert.assertEquals(rules.get(10).id(), "wso2/exampleModule:2");
-        Assert.assertEquals(rules.get(11).id(), "wso2/exampleModule:3");
-        Assert.assertEquals(rules.get(12).id(), "exampleOrg/exampleModule:1");
-        Assert.assertEquals(rules.get(13).id(), "exampleOrg/exampleModule:2");
-        Assert.assertEquals(rules.get(14).id(), "exampleOrg/exampleModule:3");
+        for (int rule = 0; rule < rules.size(); rule++) {
+            Assert.assertEquals(rules.get(rule).id(), expectedOrder[rule]);
+        }
+    }
+
+    @DataProvider(name = "RulesProvider")
+    Object[][] rulesProvider() {
+        return new Object[][] {
+                {
+                    new ArrayList<>(List.of(
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINA_ORG, "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINAX_ORG, "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "wso2", "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "exampleOrg", "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINAX_ORG, "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINA_ORG, "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINAX_ORG,
+                                    "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "wso2", "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "exampleOrg", "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "exampleOrg", "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "wso2", "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINA_ORG, "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL)
+                        )),
+                        new String[] {
+                                "ballerina:1",
+                                "ballerina:2",
+                                "ballerina:3",
+                                "ballerina/exampleModule:1",
+                                "ballerina/exampleModule:2",
+                                "ballerina/exampleModule:3",
+                                "ballerinax/exampleModule:1",
+                                "ballerinax/exampleModule:2",
+                                "ballerinax/exampleModule:3",
+                                "wso2/exampleModule:1",
+                                "wso2/exampleModule:2",
+                                "wso2/exampleModule:3",
+                                "exampleOrg/exampleModule:1",
+                                "exampleOrg/exampleModule:2",
+                                "exampleOrg/exampleModule:3"
+                        }
+                }
+        };
     }
 }

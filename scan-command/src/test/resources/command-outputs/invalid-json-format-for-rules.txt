@@ -1,1 +1,1 @@
-Invalid JSON format for 'rules.json' in plugin 'exampleOrg/exampleName'. Expected an array, but found: {}
+invalid json format for 'rules.json' in plugin 'exampleOrg/exampleName'. expected an array, but found: {}

@@ -65,7 +65,6 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with core analyzer")
     void testAnalyzingProjectWithCoreAnalyzer() {
-        Assert.assertNotNull(projectAnalyzer);
         List<Issue> issues = projectAnalyzer.analyze(List.of(CoreRule.AVOID_CHECKPANIC.rule()));
         Assert.assertEquals(issues.size(), 1);
         Issue issue = issues.get(0);
@@ -85,7 +84,6 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with external analyzers")
     void testAnalyzingProjectWithExternalAnalyzers() {
-        Assert.assertNotNull(projectAnalyzer);
         ExternalAnalyzerResult externalAnalyzerResult = projectAnalyzer.getExternalAnalyzers(printStream);
         Assert.assertFalse(externalAnalyzerResult.hasAnalyzerPluginIssue());
         List<Issue> issues = projectAnalyzer.runExternalAnalyzers(externalAnalyzerResult.externalAnalyzers());
