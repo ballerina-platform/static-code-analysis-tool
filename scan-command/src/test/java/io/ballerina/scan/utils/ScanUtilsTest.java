@@ -280,6 +280,44 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
+    @Test(description = "test method for loading configurations from a remote configuration file")
+    void testloadRemoteScanTomlConfigurations() {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-remote-config-file");
+        Project project = BuildProject.load(ballerinaProject);
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
+        System.setProperty("user.dir", userDir);
+        Assert.assertNotNull(scanTomlFile);
+        Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
+        List<ScanTomlFile.Analyzer> analyzerList = new ArrayList<>(analyzers);
+        Assert.assertEquals(analyzerList.size(), 4);
+        ScanTomlFile.Analyzer analyzer = analyzerList.get(0);
+        assertAnalyzer(analyzer, "exampleOrg", "example_module_static_code_analyzer", null, null);
+        analyzer = analyzerList.get(1);
+        assertAnalyzer(analyzer, "ballerina", "example_module_static_code_analyzer", "0.1.0", null);
+        analyzer = analyzerList.get(2);
+        assertAnalyzer(analyzer, "ballerinax", "example_module_static_code_analyzer", "0.1.0", LOCAL_REPOSITORY_NAME);
+        Set<ScanTomlFile.RuleToFilter> rulesToInclude = scanTomlFile.getRulesToInclude();
+        List<ScanTomlFile.RuleToFilter> ruleToIncludeList = new ArrayList<>(rulesToInclude);
+        Assert.assertEquals(ruleToIncludeList.size(), 4);
+        ScanTomlFile.RuleToFilter ruleToInclude = ruleToIncludeList.get(0);
+        Assert.assertEquals(ruleToInclude.id(), "ballerina:1");
+        ruleToInclude = ruleToIncludeList.get(1);
+        Assert.assertEquals(ruleToInclude.id(), "exampleOrg/example_module_static_code_analyzer:1");
+        ruleToInclude = ruleToIncludeList.get(2);
+        Assert.assertEquals(ruleToInclude.id(), "ballerina/example_module_static_code_analyzer:1");
+        ruleToInclude = ruleToIncludeList.get(3);
+        Assert.assertEquals(ruleToInclude.id(), "ballerinax/example_module_static_code_analyzer:1");
+        Set<ScanTomlFile.RuleToFilter> rulesToExclude = scanTomlFile.getRulesToExclude();
+        List<ScanTomlFile.RuleToFilter> ruleToExcludeList = new ArrayList<>(rulesToExclude);
+        Assert.assertEquals(ruleToExcludeList.size(), 1);
+        ScanTomlFile.RuleToFilter ruleToExclude = ruleToExcludeList.get(0);
+        Assert.assertEquals(ruleToExclude.id(), "ballerina:1");
+        Set<ScanTomlFile.Platform> platforms = scanTomlFile.getPlatforms();
+        Assert.assertEquals(platforms.size(), 0);
+    }
+
     @Test(description = "test method for loading configurations from an invalid remote configuration file")
     void testloadInvalidRemoteScanTomlConfigurations() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
