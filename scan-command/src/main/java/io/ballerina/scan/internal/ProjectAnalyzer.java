@@ -42,6 +42,7 @@ import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
+import io.ballerina.scan.utils.ScanToolException;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -179,7 +180,7 @@ class ProjectAnalyzer {
             Gson gson = new Gson();
             JsonElement element = gson.fromJson(output, JsonElement.class);
             if (!element.isJsonArray()) {
-                throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT, RULES_FILE,
+                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT, RULES_FILE,
                         pluginName, gson.toJson(element)));
             }
 
@@ -187,7 +188,7 @@ class ProjectAnalyzer {
             for (JsonElement rule : ruleArray) {
                 JsonObject ruleObject = rule.getAsJsonObject();
                 if (!isValidRule(ruleObject)) {
-                    throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE,
+                    throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE,
                             pluginName, gson.toJson(ruleObject)));
                 }
 
@@ -198,7 +199,7 @@ class ProjectAnalyzer {
                     case VULNERABILITY -> ruleKind = RuleKind.VULNERABILITY;
                     case CODE_SMELL -> ruleKind = RuleKind.CODE_SMELL;
                     default -> {
-                        throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_KIND,
+                        throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_KIND,
                                 pluginName, Arrays.toString(RuleKind.values()), kind));
                     }
                 };

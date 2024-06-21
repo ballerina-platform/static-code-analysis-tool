@@ -16,19 +16,20 @@
  *  under the License.
  */
 
-package io.ballerina.scan.internal;
-
-import io.ballerina.scan.Rule;
-
-import java.util.List;
-import java.util.Map;
+package io.ballerina.scan.utils;
 
 /**
- * {@code ExternalAnalyzerResult} contains the results of loading the external analyzer plugins.
- *
- * @param externalAnalyzers      the map of loaded external analyzers
- * @param hasAnalyzerPluginIssue indicates whether there was an issue with loading the external analyzers
+ * {@code ScanToolException} represents a scan tool related runtime exception.
  *
  * @since 0.1.0
- */
-record ExternalAnalyzerResult(Map<String, List<Rule>> externalAnalyzers, boolean hasAnalyzerPluginIssue) { }
+ * */
+public class ScanToolException extends RuntimeException {
+    /**
+     * Returns a new instance of the ScanToolException with the specified diagnostic message.
+     *
+     * @param exception diagnostic message
+     */
+    public ScanToolException(String exception) {
+        super(exception);
+    }
+}
