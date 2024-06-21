@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "bal_project_with_missing_external_analyzer_rules_file"
+version = "0.1.0"

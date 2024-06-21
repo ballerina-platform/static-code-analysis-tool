@@ -222,7 +222,8 @@ public final class ScanUtils {
             try {
                 fileContent = Files.readString(Path.of(filePath));
             } catch (IOException ex) {
-                throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_FILE, ex.getMessage()));
+                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_BALLERINA_FILE,
+                        ex.getMessage()));
             }
             scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
             JsonArray issuesArray = new JsonArray();
@@ -254,7 +255,8 @@ public final class ScanUtils {
                 writer.write(new String(content.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
             }
         } catch (IOException ex) {
-            throw new RuntimeException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_COPY_FILE, ex.getMessage()));
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_COPY_SCAN_REPORT,
+                    ex.getMessage()));
         }
         return htmlFile.toPath();
     }
@@ -544,9 +546,10 @@ public final class ScanUtils {
      */
     private static Optional<String> loadRemoteJAR(Path targetDir, String fileName, URL remoteJarFile,
                                                   PrintStream outputStream) {
-        Path cachedJarPath = targetDir.resolve(fileName + JAR_PREDICATE);
+        String platformJarFileName = fileName + JAR_PREDICATE;
+        Path cachedJarPath = targetDir.resolve(platformJarFileName);
         if (Files.exists(cachedJarPath)) {
-            outputStream.println("Loading " + fileName + JAR_PREDICATE + " from cache");
+            outputStream.println("Loading " + platformJarFileName + " from cache");
             return Optional.of(cachedJarPath.toAbsolutePath().toString());
         }
         try {
@@ -554,7 +557,7 @@ public final class ScanUtils {
             outputStream.println("Downloading remote JAR: " + remoteJarFile);
             return Optional.of(cachedJarPath.toAbsolutePath().toString());
         } catch (IOException ex) {
-            outputStream.println(DiagnosticLog.error(DiagnosticCode.DOWNLOADING_REMOTE_JAR_FILE, ex.getMessage()));
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.DOWNLOADING_REMOTE_JAR_FILE, platformJarFileName));
             return Optional.empty();
         }
     }

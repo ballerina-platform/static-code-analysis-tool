@@ -1,1 +1,1 @@
-# ballerina/example_module_static_code_analyzer
+# invalid/invalid_module_rules_static_code_analyzer

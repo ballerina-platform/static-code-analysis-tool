@@ -84,6 +84,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.VULNERABILITY;
 class ProjectAnalyzer {
     private final Project project;
     private final ScanTomlFile scanTomlFile;
+    private final Gson gson = new Gson();
     private String pluginImportsDocumentName;
 
     ProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
@@ -151,62 +152,9 @@ class ProjectAnalyzer {
             if (pkgManifest.compilerPluginDescriptor().isEmpty() || !analyzerDescriptors.contains(pluginName)) {
                 continue;
             }
-
             CompilerPluginDescriptor pluginDesc = pkgManifest.compilerPluginDescriptor().get();
-            List<URL> jarUrls = pluginDesc.dependencies().stream().map(dependency -> {
-                        try {
-                            return Path.of(dependency.getPath()).toUri().toURL();
-                        } catch (MalformedURLException ex) {
-                            throw new RuntimeException(ex);
-                        }
-            }).toList();
-
-            URLClassLoader ucl = URLClassLoader.newInstance(jarUrls.toArray(URL[]::new),
-                    this.getClass().getClassLoader());
-            InputStream resourceAsStream = ucl.getResourceAsStream(RULES_FILE);
-            if (resourceAsStream == null) {
-                continue;
-            }
-
-            String output;
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(resourceAsStream,
-                    StandardCharsets.UTF_8))) {
-                output = reader.lines().collect(Collectors.joining());
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
-            }
-
-            List<Rule> externalRules = new ArrayList<>();
-            Gson gson = new Gson();
-            JsonElement element = gson.fromJson(output, JsonElement.class);
-            if (!element.isJsonArray()) {
-                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT, RULES_FILE,
-                        pluginName, gson.toJson(element)));
-            }
-
-            JsonArray ruleArray = element.getAsJsonArray();
-            for (JsonElement rule : ruleArray) {
-                JsonObject ruleObject = rule.getAsJsonObject();
-                if (!isValidRule(ruleObject)) {
-                    throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE,
-                            pluginName, gson.toJson(ruleObject)));
-                }
-
-                String kind = ruleObject.get(RULE_KIND).getAsString();
-                RuleKind ruleKind;
-                switch (kind) {
-                    case BUG -> ruleKind = RuleKind.BUG;
-                    case VULNERABILITY -> ruleKind = RuleKind.VULNERABILITY;
-                    case CODE_SMELL -> ruleKind = RuleKind.CODE_SMELL;
-                    default -> {
-                        throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_KIND,
-                                pluginName, Arrays.toString(RuleKind.values()), kind));
-                    }
-                };
-                Rule inMemoryRule = RuleFactory.createRule(ruleObject.get(RULE_ID).getAsInt(),
-                        ruleObject.get(RULE_DESCRIPTION).getAsString(), ruleKind, org, name);
-                externalRules.add(inMemoryRule);
-            }
+            String ruleFileContent = loadRuleFileContent(pluginName, pluginDesc);
+            List<Rule> externalRules = loadExternalRules(org, name, pluginName, ruleFileContent);
             externalAnalyzers.put(pluginDesc.plugin().getClassName(), externalRules);
         }
         return externalAnalyzers;
@@ -239,12 +187,95 @@ class ProjectAnalyzer {
         stringBuilder.append(content).append(System.lineSeparator());
     }
 
+    private String loadRuleFileContent(String pluginName, CompilerPluginDescriptor pluginDesc) {
+        InputStream resource = loadResource(pluginDesc);
+        if (resource == null) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.MISSING_RULES_FILE, pluginName, RULES_FILE));
+        }
+
+        String resourceContent;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource,
+                StandardCharsets.UTF_8))) {
+            resourceContent = reader.lines().collect(Collectors.joining());
+        } catch (IOException ex) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.READING_RULES_FILE, RULES_FILE, pluginName,
+                    ex.getMessage()));
+        }
+        return resourceContent;
+    }
+
+    private InputStream loadResource(CompilerPluginDescriptor pluginDesc) {
+        List<URL> jarUrls = pluginDesc.dependencies().stream().map(dependency -> {
+            try {
+                return Path.of(dependency.getPath()).toUri().toURL();
+            } catch (MalformedURLException ex) {
+                throw new ScanToolException(
+                        DiagnosticLog.error(DiagnosticCode.FAILED_TO_LOAD_COMPILER_PLUGIN,
+                                ex.getMessage()));
+            }
+        }).toList();
+
+        URLClassLoader ucl = URLClassLoader.newInstance(jarUrls.toArray(URL[]::new),
+                this.getClass().getClassLoader());
+        return ucl.getResourceAsStream(RULES_FILE);
+    }
+
+    private List<Rule> loadExternalRules(String org, String name, String pluginName, String ruleFileContent) {
+        List<Rule> rules = new ArrayList<>();
+        JsonArray ruleArray = getRuleJsonArray(pluginName, ruleFileContent);
+        for (JsonElement rule : ruleArray) {
+            JsonObject ruleObject = getRuleObject(pluginName, rule);
+            RuleKind ruleKind = getRuleKind(pluginName, ruleObject.get(RULE_KIND).getAsString());
+            Rule inMemoryRule = RuleFactory.createRule(ruleObject.get(RULE_ID).getAsInt(),
+                    ruleObject.get(RULE_DESCRIPTION).getAsString(), ruleKind, org, name);
+            rules.add(inMemoryRule);
+        }
+        return rules;
+    }
+
+    private JsonArray getRuleJsonArray(String pluginName, String ruleFileContent) {
+        Gson gson = new Gson();
+        JsonElement element = gson.fromJson(ruleFileContent, JsonElement.class);
+        if (!element.isJsonArray()) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT, RULES_FILE,
+                    pluginName, gson.toJson(element)));
+        }
+        return element.getAsJsonArray();
+    }
+
+    private JsonObject getRuleObject(String pluginName, JsonElement rule) {
+        JsonObject ruleObject = rule.getAsJsonObject();
+        if (!isValidRule(ruleObject)) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE,
+                    pluginName, gson.toJson(ruleObject)));
+        }
+        return ruleObject;
+    }
+
     private boolean isValidRule(JsonObject ruleObject) {
         return ruleObject.has(RULE_ID) &&
                 ruleObject.get(RULE_ID).isJsonPrimitive() &&
                 ruleObject.get(RULE_ID).getAsJsonPrimitive().isNumber() &&
                 ruleObject.has(RULE_KIND) &&
                 ruleObject.has(RULE_DESCRIPTION);
+    }
+
+    private RuleKind getRuleKind(String pluginName, String kind) {
+        switch (kind) {
+            case BUG -> {
+                return RuleKind.BUG;
+            }
+            case VULNERABILITY -> {
+                return RuleKind.VULNERABILITY;
+            }
+            case CODE_SMELL -> {
+                return RuleKind.CODE_SMELL;
+            }
+            default -> {
+                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_KIND,
+                        pluginName, Arrays.toString(RuleKind.values()), kind));
+            }
+        }
     }
 
     List<Issue> runExternalAnalyzers(Map<String, List<Rule>> externalAnalyzers) {
