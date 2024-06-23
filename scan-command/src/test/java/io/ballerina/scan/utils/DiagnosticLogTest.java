@@ -39,7 +39,7 @@ public class DiagnosticLogTest extends BaseTest {
 
     @Test(description = "Test warning diagnostic message")
     public void testWarningDiagnostic() {
-        String expected = "generating reports is not supported with single bal files. " +
+        String expected = "generating reports is not supported with single bal files, " +
                 "ignoring the flag and continuing the scans";
         String result = DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED);
         Assert.assertEquals(result, expected);
