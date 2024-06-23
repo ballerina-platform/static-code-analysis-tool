@@ -24,7 +24,7 @@ jobs:
           java-version: '17.0.7'
 
       - name: Set Up Ballerina
-        uses: ballerina-platform/setup-ballerina@v1.1.0
+        uses: ballerina-platform/setup-ballerina@v1.1.1
         with:
           version: latest
 
@@ -64,9 +64,9 @@ jobs:
           java-version: '17.0.7'
 
       - name: Set Up Ballerina
-        uses: ballerina-platform/setup-ballerina@v1.1.0
+        uses: ballerina-platform/setup-ballerina@v1.1.1
         with:
-          version: '2201.9.0'
+          version: '2201.9.1'
 
       - name: Build with Gradle
         env:

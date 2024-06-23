@@ -1,0 +1,1 @@
+invalid json format for 'rules.json' in plugin 'invalid/invalid_module_rules_static_code_analyzer'. expected an array, but found: {"id":1,"ruleKind":"CODE_SMELL","description":"rule 1"}

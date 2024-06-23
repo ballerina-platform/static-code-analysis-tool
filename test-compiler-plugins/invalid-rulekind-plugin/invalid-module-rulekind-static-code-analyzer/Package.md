@@ -1,0 +1,1 @@
+# invalid/invalid_module_rulekind_static_code_analyzer

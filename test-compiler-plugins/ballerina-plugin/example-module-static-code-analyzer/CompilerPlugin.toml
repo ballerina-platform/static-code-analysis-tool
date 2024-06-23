@@ -1,0 +1,5 @@
+[plugin] # Have to check if below path is needed
+class = "io.ballerina.examplestaticcodeanalyzer.CustomStaticCodeAnalyzer"
+
+[[dependency]]
+path = "../build/libs/ballerina-plugin-0.1.0.jar"

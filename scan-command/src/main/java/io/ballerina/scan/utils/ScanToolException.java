@@ -16,21 +16,20 @@
  *  under the License.
  */
 
-package io.ballerina.scan.exceptions;
+package io.ballerina.scan.utils;
 
 /**
- * Represents the exception thrown for an unidentified static code analysis rule during reporting of an analysis issue.
+ * {@code ScanToolException} represents a scan tool related runtime exception.
  *
  * @since 0.1.0
  * */
-public class RuleNotFoundException extends RuntimeException {
-
+public class ScanToolException extends RuntimeException {
     /**
-     * Returns a new instance of the RuleNotFoundException with the specified rule identifier.
+     * Returns a new instance of the ScanToolException with the specified diagnostic message.
      *
-     * @param ruleId numeric identifier of the static code analysis rule
+     * @param exception diagnostic message
      */
-    public RuleNotFoundException(int ruleId) {
-        super(String.format("Rule not found: Invalid rule numeric identifier '%d'.", ruleId));
+    public ScanToolException(String exception) {
+        super(exception);
     }
 }

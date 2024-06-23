@@ -1,7 +1,7 @@
 # custom compiler plugins
 [[analyzer]]
 org = "exampleOrg"
-name = "exampleName"
+name = "example_module_static_code_analyzer"
 
 [[analyzer]]
 org = "ballerina"
@@ -18,7 +18,7 @@ repository = "local"
 [rule]
 include = [
     "ballerina:1",
-    "exampleOrg/exampleName:1",
+    "exampleOrg/example_module_static_code_analyzer:1",
     "ballerina/example_module_static_code_analyzer:1",
     "ballerinax/example_module_static_code_analyzer:1",
 ]

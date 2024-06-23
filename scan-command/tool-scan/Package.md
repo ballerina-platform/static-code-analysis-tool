@@ -84,25 +84,25 @@ bal scan --list-rules
 - Run analysis for a specific rule.
 
 ```bash
-bal scan --include-rules="ballerina/io:B107"
+bal scan --include-rules="ballerina:101"
 ```
 
 - Run analysis for a specific set of rules.
 
 ```bash
-bal scan --include-rules="B101, ballerina/io:B107"
+bal scan --include-rules="ballerina:101, ballerina/io:101"
 ```
 
 - Exclude analysis for a specific rule.
 
 ```bash
-bal scan --exclude-rules="ballerina/io:B107"
+bal scan --exclude-rules="ballerina/io:101"
 ```
 
 - Exclude analysis for a specific set of rules.
 
 ```bash
-bal scan --exclude-rules="B101, ballerina/io:B107"
+bal scan --exclude-rules="ballerina:101, ballerina/io:101"
 ```
 
 - Run analysis and report to sonarqube

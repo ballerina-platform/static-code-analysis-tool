@@ -1,15 +1,15 @@
 [[platform]]
 name = "examplePlatform"
-path = "https://example.com/example-platform-analyzer-1.0.jar"
+path = "www.example.com/example-platform-analyzer-1.0.jar"
 
 [[analyzer]]
 org = "exampleOrg"
-name = "exampleName"
+name = "example_module_static_code_analyzer"
 
 [rule]
 include = [
     "ballerina:1",
-    "exampleOrg/exampleName:1",
+    "exampleOrg/example_module_static_code_analyzer:1",
     "ballerina/example_module_static_code_analyzer:1",
     "ballerinax/example_module_static_code_analyzer:1",
 ]

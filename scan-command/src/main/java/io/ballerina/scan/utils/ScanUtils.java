@@ -28,6 +28,7 @@ import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.TomlDocument;
 import io.ballerina.projects.internal.model.Target;
 import io.ballerina.scan.Issue;
+import io.ballerina.scan.Rule;
 import io.ballerina.scan.internal.IssueImpl;
 import io.ballerina.toml.api.Toml;
 import io.ballerina.toml.semantic.TomlType;
@@ -52,6 +53,8 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.AbstractMap;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +80,10 @@ import static io.ballerina.scan.utils.Constants.REPORT_DATA_PLACEHOLDER;
 import static io.ballerina.scan.utils.Constants.RESULTS_HTML_FILE;
 import static io.ballerina.scan.utils.Constants.RESULTS_JSON_FILE;
 import static io.ballerina.scan.utils.Constants.RULES_TABLE;
+import static io.ballerina.scan.utils.Constants.RULE_DESCRIPTION_COLUMN;
+import static io.ballerina.scan.utils.Constants.RULE_ID_COLUMN;
+import static io.ballerina.scan.utils.Constants.RULE_PRIORITY_LIST;
+import static io.ballerina.scan.utils.Constants.RULE_SEVERITY_COLUMN;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE_FIELD;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_CONTENT;
@@ -215,7 +222,8 @@ public final class ScanUtils {
             try {
                 fileContent = Files.readString(Path.of(filePath));
             } catch (IOException ex) {
-                throw new RuntimeException("Failed to read the file with exception: " + ex.getMessage());
+                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_BALLERINA_FILE,
+                        ex.getMessage()));
             }
             scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
             JsonArray issuesArray = new JsonArray();
@@ -247,7 +255,8 @@ public final class ScanUtils {
                 writer.write(new String(content.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
             }
         } catch (IOException ex) {
-            throw new RuntimeException("Failed to copy the file with exception: " + ex.getMessage());
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_COPY_SCAN_REPORT,
+                    ex.getMessage()));
         }
         return htmlFile.toPath();
     }
@@ -338,7 +347,7 @@ public final class ScanUtils {
 
         Toml scanTable = ballerinaTomlDocumentContent.getTable(SCAN_TABLE).get();
         if (scanTable.get(SCAN_FILE_FIELD).isEmpty()) {
-            outputStream.println("Failed to load scan tool configurations: " + SCAN_FILE_FIELD + " is missing");
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.MISSING_CONFIG_FIELD));
             return Optional.empty();
         }
 
@@ -390,7 +399,7 @@ public final class ScanUtils {
             remoteScanTomlFilePath = new URL(scanTomlPath);
             FileUtils.copyURLToFile(remoteScanTomlFilePath, cachePath.toFile());
         } catch (IOException ex) {
-            outputStream.println("Failed to load configuration file with exception: " + ex.getMessage());
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_CONFIG_FILE, ex.getMessage()));
             return Optional.empty();
         }
         outputStream.println("Loading scan tool configurations from " + remoteScanTomlFilePath);
@@ -411,7 +420,7 @@ public final class ScanUtils {
         try {
             scanTomlDocumentContent = Toml.read(scanTomlFilePath);
         } catch (IOException ex) {
-            outputStream.println("Failed to read the configuration file with exception: " + ex.getMessage());
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.READING_CONFIG_FILE, ex.getMessage()));
             return Optional.empty();
         }
         ScanTomlFile scanTomlFile = new ScanTomlFile();
@@ -487,7 +496,8 @@ public final class ScanUtils {
                     URL url = new URL(path.get());
                     path = loadRemoteJAR(targetDir, name.get(), url, outputStream);
                 } catch (MalformedURLException ex) {
-                    outputStream.println("Failed to retrieve remote platform file with exception: " + ex.getMessage());
+                    outputStream.println(DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_PLATFORM_FILE,
+                            ex.getMessage()));
                     return false;
                 }
             }
@@ -536,9 +546,10 @@ public final class ScanUtils {
      */
     private static Optional<String> loadRemoteJAR(Path targetDir, String fileName, URL remoteJarFile,
                                                   PrintStream outputStream) {
-        Path cachedJarPath = targetDir.resolve(fileName + JAR_PREDICATE);
+        String platformJarFileName = fileName + JAR_PREDICATE;
+        Path cachedJarPath = targetDir.resolve(platformJarFileName);
         if (Files.exists(cachedJarPath)) {
-            outputStream.println("Loading " + fileName + JAR_PREDICATE + " from cache");
+            outputStream.println("Loading " + platformJarFileName + " from cache");
             return Optional.of(cachedJarPath.toAbsolutePath().toString());
         }
         try {
@@ -546,8 +557,90 @@ public final class ScanUtils {
             outputStream.println("Downloading remote JAR: " + remoteJarFile);
             return Optional.of(cachedJarPath.toAbsolutePath().toString());
         } catch (IOException ex) {
-            outputStream.println("Failed to download remote JAR file: " + ex.getMessage());
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.DOWNLOADING_REMOTE_JAR_FILE, platformJarFileName));
             return Optional.empty();
         }
+    }
+
+    /**
+     * Prints the {@link List<Rule>} of static analysis rules to the console.
+     *
+     * @param rules        the list of static analysis rules
+     * @param outputStream the print stream
+     */
+    public static void printRulesToConsole(List<Rule> rules, PrintStream outputStream) {
+        int maxRuleIDLength = RULE_ID_COLUMN.length();
+        int maxSeverityLength = RULE_SEVERITY_COLUMN.length();
+        int maxDescriptionLength = RULE_DESCRIPTION_COLUMN.length();
+
+        for (Rule rule : rules) {
+            maxRuleIDLength = Math.max(maxRuleIDLength, rule.id().length());
+            maxSeverityLength = Math.max(maxSeverityLength, rule.kind().toString().length());
+            maxDescriptionLength = Math.max(maxDescriptionLength, rule.description().length());
+        }
+
+        String format = "\t%-" + maxRuleIDLength + "s | %-" + maxSeverityLength + "s | %-" + maxDescriptionLength
+                + "s%n";
+
+        outputStream.printf(format, RULE_ID_COLUMN, RULE_SEVERITY_COLUMN, RULE_DESCRIPTION_COLUMN);
+        outputStream.printf("\t" + "-".repeat(maxRuleIDLength + 1) + "--" +
+                "-".repeat(maxSeverityLength + 1) + "--" + "-".repeat(maxDescriptionLength + 1) + "%n");
+
+        sortRules(rules);
+        for (Rule rule : rules) {
+            String formattedLine = String.format(format, rule.id(), rule.kind().toString(), rule.description());
+            outputStream.println(formattedLine.stripTrailing());
+        }
+    }
+
+    /**
+     * <p>
+     *     Sorts a list of rules based on their priorities. The priorities are determined by the rule's id and a
+     *     predefined list of priorities. It achieves this with the following steps:
+     * </p>
+     * <ol>
+     *     <li>Get the priority of each rule by comparing the rule's id with the predefined list of priorities.</li>
+     *     <li>Sort the rules based on their priorities.</li>
+     *     <li>If both rules have the same priority, the one with an exact match in the priority list comes first </li>
+     *     <li>Otherwise, they are sorted based on the fully qualified rule id.</li>
+     * </ol>
+     *
+     * @param rules The list of rules to be sorted.
+     */
+    public static void sortRules(List<Rule> rules) {
+        List<String> priorities = List.of(RULE_PRIORITY_LIST);
+        Comparator<Rule> ruleComparator = (r1, r2) -> {
+            AbstractMap.SimpleEntry<Integer, Boolean> priority1 = getPriority(r1.id().split(":")[0], priorities);
+            AbstractMap.SimpleEntry<Integer, Boolean> priority2 = getPriority(r2.id().split(":")[0], priorities);
+            int comparison = Integer.compare(priority1.getKey(), priority2.getKey());
+            if (comparison != 0) {
+                return comparison;
+            }
+            comparison = Boolean.compare(priority2.getValue(), priority1.getValue());
+            if (comparison != 0) {
+                return comparison;
+            }
+            return r1.id().compareTo(r2.id());
+        };
+        rules.sort(ruleComparator);
+    }
+
+    /**
+     * Returns the priority of the rule as a {@link AbstractMap.SimpleEntry<Integer, Boolean>} pair.
+     *
+     * @param ruleId     the rule id
+     * @param priorities the list of priorities
+     * @return the priority of the rule as a pair of the priority index and whether the rule is a direct match.
+     */
+    private static AbstractMap.SimpleEntry<Integer, Boolean> getPriority(String ruleId, List<String> priorities) {
+        for (int i = 0; i < priorities.size(); i++) {
+            if (ruleId.equals(priorities.get(i))) {
+                return new AbstractMap.SimpleEntry<>(i, true);
+            }
+            if (ruleId.startsWith(priorities.get(i))) {
+                return new AbstractMap.SimpleEntry<>(i, false);
+            }
+        }
+        return new AbstractMap.SimpleEntry<>(priorities.size(), false);
     }
 }
