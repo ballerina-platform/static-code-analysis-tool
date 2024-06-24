@@ -178,21 +178,14 @@ public class ScanCmd implements BLauncherCmd {
         List<String> externalJarFilePaths = new ArrayList<>();
         Map<String, PlatformPluginContext> platformContexts = new HashMap<>();
         scanTomlFile.get().getPlatforms().forEach(platform -> {
-            if (platformTriggered && platforms.size() == 1 && platforms.contains(platform.name())) {
-                externalJarFilePaths.add(platform.path());
-                Map<String, String> platformArgs = platform.arguments().entrySet().stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, value -> value.getValue().toString()));
-                platformContexts.put(platform.name(), new PlatformPluginContextIml(
-                        (HashMap<String, String>) platformArgs, platformTriggered));
-            } else {
-                platforms.add(platform.name());
-                externalJarFilePaths.add(platform.path());
-                Map<String, String> platformArgs = platform.arguments()
-                        .entrySet()
-                        .stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, value -> value.getValue().toString()));
-                platformContexts.put(platform.name(), new PlatformPluginContextIml(
-                        (HashMap<String, String>) platformArgs, platformTriggered));
+            String platformName = platform.name();
+            externalJarFilePaths.add(platform.path());
+            Map<String, String> platformArgs = platform.arguments().entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, value -> value.getValue().toString()));
+            platformContexts.put(platformName, new PlatformPluginContextImpl(
+                    (HashMap<String, String>) platformArgs, platformTriggered));
+            if (!platformTriggered || platforms.size() != 1 || !platforms.contains(platformName)) {
+                  platforms.add(platformName);
             }
         });
 

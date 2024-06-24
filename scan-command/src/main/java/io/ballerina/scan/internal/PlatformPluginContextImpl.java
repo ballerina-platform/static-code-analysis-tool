@@ -28,11 +28,11 @@ import java.util.Map;
  *
  * @since 0.1.0
  */
-public class PlatformPluginContextIml implements PlatformPluginContext {
+public class PlatformPluginContextImpl implements PlatformPluginContext {
     private final HashMap<String, String> platformArgs;
     private final boolean initiatedByPlatform;
 
-    PlatformPluginContextIml(HashMap<String, String> platformArgs, boolean initiatedByPlatform) {
+    PlatformPluginContextImpl(HashMap<String, String> platformArgs, boolean initiatedByPlatform) {
         this.platformArgs = platformArgs;
         this.initiatedByPlatform = initiatedByPlatform;
     }
