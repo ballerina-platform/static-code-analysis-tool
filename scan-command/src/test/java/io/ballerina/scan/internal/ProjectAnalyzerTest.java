@@ -154,31 +154,6 @@ public class ProjectAnalyzerTest extends BaseTest {
         Assert.assertEquals(rule.kind(), kind);
     }
 
-    @Test(description = "Test analyzing project with external analyzer missing rules.json file")
-    void testAnalyzingProjectWithMissingExternalAnalyzerRulesFile() throws IOException {
-        Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
-                .resolve("bal-project-with-missing-external-analyzer-rules-file"));
-        System.setProperty("user.dir", invalidProject.sourceRoot().toString());
-        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
-                .orElse(null);
-        Assert.assertNotNull(scanTomlFile);
-        System.setProperty("user.dir", userDir);
-        projectAnalyzer = new ProjectAnalyzer(invalidProject, scanTomlFile);
-        Map<String, List<Rule>> externalAnalyzers = null;
-        String result = null;
-        try {
-            externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
-        } catch (ScanToolException ex) {
-            result = ex.getMessage();
-        }
-        Assert.assertNull(externalAnalyzers);
-        Path invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                .resolve("missing-external-analyzer-rules-file.txt");
-        String expected = Files.readString(invalidExternalAnalyzerRulesPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Assert.assertEquals(result, expected);
-    }
-
     @Test(description = "Test analyzing project with invalid external analyzer rules.json configurations")
     void testAnalyzingProjectWithInvalidExternalAnalyzerRules() throws IOException {
         Project invalidProject = BuildProject.load(testResources.resolve("test-resources")

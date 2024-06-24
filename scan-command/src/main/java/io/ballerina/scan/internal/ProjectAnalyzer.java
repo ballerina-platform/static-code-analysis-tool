@@ -58,6 +58,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -122,9 +123,8 @@ class ProjectAnalyzer {
         StringBuilder newImports = new StringBuilder();
         StringBuilder tomlDependencies = new StringBuilder();
         Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
-        List<String> analyzerDescriptors = new ArrayList<>(analyzers.size());
         for (ScanTomlFile.Analyzer analyzer : analyzers) {
-            analyzerDescriptors.add(extractAnalyzerImportsAndDependencies(analyzer, newImports, tomlDependencies));
+            extractAnalyzerImportsAndDependencies(analyzer, newImports, tomlDependencies);
         }
 
         Module defaultModule = project.currentPackage().getDefaultModule();
@@ -149,18 +149,21 @@ class ProjectAnalyzer {
             String org = pkgManifest.org().value();
             String name = pkgManifest.name().value();
             String pluginName = org + FORWARD_SLASH + name;
-            if (pkgManifest.compilerPluginDescriptor().isEmpty() || !analyzerDescriptors.contains(pluginName)) {
+            if (pkgManifest.compilerPluginDescriptor().isEmpty()) {
                 continue;
             }
             CompilerPluginDescriptor pluginDesc = pkgManifest.compilerPluginDescriptor().get();
-            String ruleFileContent = loadRuleFileContent(pluginName, pluginDesc);
-            List<Rule> externalRules = loadExternalRules(org, name, pluginName, ruleFileContent);
+            Optional<String> ruleFileContent = loadRuleFileContent(pluginName, pluginDesc);
+            if (ruleFileContent.isEmpty()) {
+                continue;
+            }
+            List<Rule> externalRules = loadExternalRules(org, name, pluginName, ruleFileContent.get());
             externalAnalyzers.put(pluginDesc.plugin().getClassName(), externalRules);
         }
         return externalAnalyzers;
     }
 
-    private String extractAnalyzerImportsAndDependencies(ScanTomlFile.Analyzer analyzer, StringBuilder imports,
+    private void extractAnalyzerImportsAndDependencies(ScanTomlFile.Analyzer analyzer, StringBuilder imports,
                                                        StringBuilder dependencies) {
         String org = analyzer.org();
         String name = analyzer.name();
@@ -180,17 +183,16 @@ class ProjectAnalyzer {
         if (repository != null) {
             buildStringWithNewLine(dependencies, "repository = '" + repository + "'");
         }
-        return analyzerDescriptor;
     }
 
     private void buildStringWithNewLine(StringBuilder stringBuilder, String content) {
         stringBuilder.append(content).append(System.lineSeparator());
     }
 
-    private String loadRuleFileContent(String pluginName, CompilerPluginDescriptor pluginDesc) {
+    private Optional<String> loadRuleFileContent(String pluginName, CompilerPluginDescriptor pluginDesc) {
         InputStream resource = loadResource(pluginDesc);
         if (resource == null) {
-            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.MISSING_RULES_FILE, pluginName, RULES_FILE));
+            return Optional.empty();
         }
 
         String resourceContent;
@@ -201,7 +203,7 @@ class ProjectAnalyzer {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.READING_RULES_FILE, RULES_FILE, pluginName,
                     ex.getMessage()));
         }
-        return resourceContent;
+        return Optional.of(resourceContent);
     }
 
     private InputStream loadResource(CompilerPluginDescriptor pluginDesc) {

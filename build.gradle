@@ -30,7 +30,6 @@ project(':scan-command') {
             dependsOn ':test-compiler-plugins:exampleOrg-plugin:build'
             dependsOn ':test-compiler-plugins:ballerina-plugin:build'
             dependsOn ':test-compiler-plugins:ballerinax-plugin:build'
-            dependsOn ':test-compiler-plugins:invalid-rulefilemissing-plugin:build'
             dependsOn ':test-compiler-plugins:invalid-rules-plugin:build'
             dependsOn ':test-compiler-plugins:invalid-ruleformat-plugin:build'
             dependsOn ':test-compiler-plugins:invalid-rulekind-plugin:build'
@@ -51,12 +50,6 @@ project(':test-compiler-plugins:ballerina-plugin') {
 }
 
 project(':test-compiler-plugins:ballerinax-plugin') {
-    dependencies {
-        implementation project(':scan-command')
-    }
-}
-
-project(':test-compiler-plugins:invalid-rulefilemissing-plugin') {
     dependencies {
         implementation project(':scan-command')
     }

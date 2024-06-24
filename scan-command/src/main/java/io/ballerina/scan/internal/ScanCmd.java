@@ -207,17 +207,21 @@ public class ScanCmd implements BLauncherCmd {
             }
         });
 
+        includeRules.addAll(scanTomlFile.get().getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id)
+                .toList());
+        excludeRules.addAll(scanTomlFile.get().getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id)
+                .toList());
+        if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
+            return;
+        }
+
         List<Issue> issues = projectAnalyzer.analyze(coreRules);
         issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
 
-        includeRules.addAll(scanTomlFile.get().getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id)
-                .toList());
         if (!includeRules.isEmpty()) {
             issues.removeIf(issue -> !includeRules.contains(issue.rule().id()));
         }
-
-        excludeRules.addAll(scanTomlFile.get().getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id)
-                .toList());
         if (!excludeRules.isEmpty()) {
             issues.removeIf(issue -> excludeRules.contains(issue.rule().id()));
         }
