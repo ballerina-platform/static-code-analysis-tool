@@ -20,30 +20,21 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.scan.PlatformPluginContext;
 
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
+
 
 /**
  * Represents the implementation of the {@link PlatformPluginContext} interface.
  *
+ * @param platformArgs in-memory representation of platform specific arguments defined in the Scan.toml
+ * @param initiatedByPlatform true if the plugin is initiated by the platform, false otherwise
+ *
  * @since 0.1.0
  */
-public class PlatformPluginContextImpl implements PlatformPluginContext {
-    private final HashMap<String, String> platformArgs;
-    private final boolean initiatedByPlatform;
-
-    PlatformPluginContextImpl(HashMap<String, String> platformArgs, boolean initiatedByPlatform) {
-        this.platformArgs = platformArgs;
-        this.initiatedByPlatform = initiatedByPlatform;
-    }
-
-    @Override
-    public Map<String, String> platformArgs() {
-        return new HashMap<>(platformArgs);
-    }
-
-    @Override
-    public boolean initiatedByPlatform() {
-        return initiatedByPlatform;
+public record PlatformPluginContextImpl(Map<String, String> platformArgs, boolean initiatedByPlatform) implements
+        PlatformPluginContext {
+    public PlatformPluginContextImpl {
+        platformArgs = Collections.unmodifiableMap(platformArgs);
     }
 }

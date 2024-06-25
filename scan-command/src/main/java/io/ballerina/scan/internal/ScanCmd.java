@@ -55,7 +55,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
-import java.util.stream.Collectors;
 
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 
@@ -180,10 +179,9 @@ public class ScanCmd implements BLauncherCmd {
         scanTomlFile.get().getPlatforms().forEach(platform -> {
             String platformName = platform.name();
             externalJarFilePaths.add(platform.path());
-            Map<String, String> platformArgs = platform.arguments().entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, value -> value.getValue().toString()));
-            platformContexts.put(platformName, new PlatformPluginContextImpl(
-                    (HashMap<String, String>) platformArgs, platformTriggered));
+            Map<String, String> platformArgs = new HashMap<>();
+            platform.arguments().forEach((key, value) -> platformArgs.put(key, value.toString()));
+            platformContexts.put(platformName, new PlatformPluginContextImpl(platformArgs, platformTriggered));
             if (!platformTriggered || platforms.size() != 1 || !platforms.contains(platformName)) {
                   platforms.add(platformName);
             }
@@ -200,10 +198,8 @@ public class ScanCmd implements BLauncherCmd {
             }
         });
 
-        includeRules.addAll(scanTomlFile.get().getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id)
-                .toList());
-        excludeRules.addAll(scanTomlFile.get().getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id)
-                .toList());
+        scanTomlFile.get().getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id).forEach(includeRules::add);
+        scanTomlFile.get().getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id).forEach(excludeRules::add);
         if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
             outputStream.println(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
             return;
@@ -308,7 +304,7 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     private URLClassLoader loadPlatformPlugins(List<String> jarPaths) {
-        List<URL> jarUrls = new ArrayList<>();
+        List<URL> jarUrls = new ArrayList<>(jarPaths.size());
         jarPaths.forEach(jarPath -> {
             try {
                 URL jarUrl = Path.of(jarPath).toUri().toURL();
@@ -317,7 +313,7 @@ public class ScanCmd implements BLauncherCmd {
                 throw new ScanToolException(ex.getMessage());
             }
         });
-        return new URLClassLoader(jarUrls.toArray(new URL[0]), this.getClass().getClassLoader());
+        return new URLClassLoader(jarUrls.toArray(URL[]::new), this.getClass().getClassLoader());
     }
 
     private static class StringToListConverter implements CommandLine.ITypeConverter<List<String>> {

@@ -523,13 +523,12 @@ public final class ScanUtils {
                 return;
             }
             TomlArrayValueNode rulesArray = (TomlArrayValueNode) rules;
-            List<String> rulesList = rulesArray.toNativeValue().stream().map(Object::toString).toList();
-            rulesList.forEach(fullyQualifiedRule -> {
-                ScanTomlFile.RuleToFilter rule = new ScanTomlFile.RuleToFilter(fullyQualifiedRule);
+            rulesArray.toNativeValue().stream().map(Object::toString).forEach(rule -> {
+                ScanTomlFile.RuleToFilter ruleToFilter = new ScanTomlFile.RuleToFilter(rule);
                 if (includeRules) {
-                    scanTomlFile.setRuleToInclude(rule);
+                    scanTomlFile.setRuleToInclude(ruleToFilter);
                 } else {
-                    scanTomlFile.setRuleToExclude(rule);
+                    scanTomlFile.setRuleToExclude(ruleToFilter);
                 }
             });
         };

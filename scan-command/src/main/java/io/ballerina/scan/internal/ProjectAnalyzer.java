@@ -28,7 +28,6 @@ import io.ballerina.projects.DocumentConfig;
 import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
 import io.ballerina.projects.ModuleId;
-import io.ballerina.projects.Package;
 import io.ballerina.projects.PackageDependencyScope;
 import io.ballerina.projects.PackageManifest;
 import io.ballerina.projects.PackageResolution;
@@ -141,25 +140,24 @@ class ProjectAnalyzer {
         PackageResolution packageResolution = project.currentPackage().getResolution();
         ResolvedPackageDependency rootPkgNode = new ResolvedPackageDependency(project.currentPackage(),
                 PackageDependencyScope.DEFAULT);
-        List<Package> directDependencies = packageResolution.dependencyGraph().getDirectDependencies(rootPkgNode)
-                .stream().map(ResolvedPackageDependency::packageInstance).toList();
         Map<String, List<Rule>> externalAnalyzers = new HashMap<>();
-        for (Package pkgDependency : directDependencies) {
-            PackageManifest pkgManifest = pkgDependency.manifest();
-            String org = pkgManifest.org().value();
-            String name = pkgManifest.name().value();
-            String pluginName = org + FORWARD_SLASH + name;
-            if (pkgManifest.compilerPluginDescriptor().isEmpty()) {
-                continue;
-            }
-            CompilerPluginDescriptor pluginDesc = pkgManifest.compilerPluginDescriptor().get();
-            Optional<String> ruleFileContent = loadRuleFileContent(pluginName, pluginDesc);
-            if (ruleFileContent.isEmpty()) {
-                continue;
-            }
-            List<Rule> externalRules = loadExternalRules(org, name, pluginName, ruleFileContent.get());
-            externalAnalyzers.put(pluginDesc.plugin().getClassName(), externalRules);
-        }
+        packageResolution.dependencyGraph().getDirectDependencies(rootPkgNode).stream()
+                .map(ResolvedPackageDependency::packageInstance).forEach(pkgDependency -> {
+                    PackageManifest pkgManifest = pkgDependency.manifest();
+                    String org = pkgManifest.org().value();
+                    String name = pkgManifest.name().value();
+                    String pluginName = org + FORWARD_SLASH + name;
+                    if (pkgManifest.compilerPluginDescriptor().isEmpty()) {
+                        return;
+                    }
+                    CompilerPluginDescriptor pluginDesc = pkgManifest.compilerPluginDescriptor().get();
+                    Optional<String> ruleFileContent = loadRuleFileContent(pluginName, pluginDesc);
+                    if (ruleFileContent.isEmpty()) {
+                        return;
+                    }
+                    List<Rule> externalRules = loadExternalRules(org, name, pluginName, ruleFileContent.get());
+                    externalAnalyzers.put(pluginDesc.plugin().getClassName(), externalRules);
+                });
         return externalAnalyzers;
     }
 
