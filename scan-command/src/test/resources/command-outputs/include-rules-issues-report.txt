@@ -1,0 +1,31 @@
+[
+  {
+    "location": {
+      "lineRange": {
+        "fileName": "main.bal",
+        "startLine": {
+          "line": 20,
+          "offset": 17
+        },
+        "endLine": {
+          "line": 20,
+          "offset": 39
+        }
+      },
+      "textRange": {
+        "startOffset": 777,
+        "endOffset": 799,
+        "length": 22
+      }
+    },
+    "rule": {
+      "id": "ballerina:1",
+      "numericId": 1,
+      "description": "Avoid checkpanic",
+      "ruleKind": "CODE_SMELL"
+    },
+    "source": "BUILT_IN",
+    "fileName": "bal_project_with_analyzer_configurations/main.bal",
+    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-analyzer-configurations\\main.bal"
+  }
+]

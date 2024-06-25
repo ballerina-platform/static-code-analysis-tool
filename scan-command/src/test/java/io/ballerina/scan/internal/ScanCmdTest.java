@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -66,8 +67,12 @@ public class ScanCmdTest extends BaseTest {
     @AfterTest
     void cleanup() {
         Path resultsDirectoryPath = validBalProject.resolve(RESULTS_DIRECTORY);
-        if (Files.exists(resultsDirectoryPath)) {
-            ProjectUtils.deleteDirectory(resultsDirectoryPath);
+        removeFile(resultsDirectoryPath);
+    }
+
+    private void removeFile(Path filePath) {
+        if (Files.exists(filePath)) {
+            ProjectUtils.deleteDirectory(filePath);
         }
     }
 
@@ -337,21 +342,32 @@ public class ScanCmdTest extends BaseTest {
         return new Object[][] {
                 {
                     new ArrayList<>(List.of(
-                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINA_ORG, "exampleModule"),
-                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINAX_ORG, "exampleModule"),
-                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "wso2", "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL,
+                                    BALLERINA_ORG, "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG,
+                                    BALLERINAX_ORG, "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY,
+                                    "wso2", "exampleModule"),
                             RuleFactory.createRule(3, "rule 3", RuleKind.BUG),
-                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "exampleOrg", "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL,
+                                    "exampleOrg", "exampleModule"),
                             RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY),
-                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINAX_ORG, "exampleModule"),
-                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINA_ORG, "exampleModule"),
-                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINAX_ORG,
-                                    "exampleModule"),
-                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "wso2", "exampleModule"),
-                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "exampleOrg", "exampleModule"),
-                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "exampleOrg", "exampleModule"),
-                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "wso2", "exampleModule"),
-                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINA_ORG, "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL,
+                                    BALLERINAX_ORG, "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG,
+                                    BALLERINA_ORG, "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY,
+                                    BALLERINAX_ORG, "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL,
+                                    "wso2", "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG,
+                                    "exampleOrg", "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY,
+                                    "exampleOrg", "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG,
+                                    "wso2", "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY,
+                                    BALLERINA_ORG, "exampleModule"),
                             RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL)
                         )),
                         new String[] {
@@ -373,5 +389,244 @@ public class ScanCmdTest extends BaseTest {
                         }
                 }
         };
+    }
+
+    @Test(description = "test scan command with include rules flag")
+    void testScanCommandWithIncludeRulesFlag() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--include-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-analyzer-configurations");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
+                        .resolve("scan_results.json"), StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("include-rules-issues-report.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("include-rules-issues-report.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "test scan command with exclude rules flag")
+    void testScanCommandWithExcludeRulesFlag() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--exclude-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-analyzer-configurations");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
+                        .resolve("scan_results.json"), StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("exclude-rules-issues-report.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("exclude-rules-issues-report.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "test scan command with include and exclude rules flag")
+    void testScanCommandWithIncludeAndExcludeRulesFlags() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-analyzer-configurations");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("include-exclude-rules.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("include-exclude-rules.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(readOutput(true).trim(), expected);
+    }
+
+    @Test(description = "test scan command with include rules Scan.toml configurations")
+    void testScanCommandWithIncludeRulesScanTomlConfigurations() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-include-rule-configurations");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
+                        .resolve("scan_results.json"), StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("toml-include-rules-issues-report.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("toml-include-rules-issues-report.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "test scan command with exclude rules Scan.toml configurations")
+    void testScanCommandWithExcludeRulesScanTomlConfigurations() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--exclude-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-exclude-rule-configurations");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
+                        .resolve("scan_results.json"), StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("toml-exclude-rules-issues-report.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("toml-exclude-rules-issues-report.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "test scan command with include and exclude rules Scan.toml configurations")
+    void testScanCommandWithIncludeAndExcludeRulesScanTomlConfigurations() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-include-exclude-rule-configurations");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("toml-include-exclude-rules.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("toml-include-exclude-rules.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(readOutput(true).trim(), expected);
+    }
+
+    @Test(description = "test scan command with platform plugin configurations")
+    void testScanCommandWithPlatformPluginConfigurations() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-platform-configurations");
+        Path rootProject = Path.of(System.getProperty("user.dir")).getParent();
+        Assert.assertNotNull(rootProject);
+        Path platformPluginPath = rootProject
+                .resolve("test-static-code-analysis-platform-plugins")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin")
+                .resolve("build")
+                .resolve("libs")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
+        Assert.assertNotNull(platformPluginPath);
+        String tomlConfigurations = Files.readString(testResources.resolve("test-resources")
+                .resolve("platform-plugin-configurations.txt"));
+        tomlConfigurations = tomlConfigurations.replace("__platform_name__", "examplePlatform");
+        tomlConfigurations = tomlConfigurations.replace("__platform_plugin_path__",
+                platformPluginPath.toString().replace("\\", "\\\\"));
+        Files.writeString(ballerinaProject.resolve("Scan.toml"), tomlConfigurations,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+
+        System.setProperty("user.dir", ballerinaProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+
+        Path result = ballerinaProject.resolve("analysis-issues.json");
+        String platformIssuesOutput = Files.readString(result, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        removeFile(result);
+        result = ballerinaProject.resolve("platform-arguments.json");
+        String platformArgumentsOutput = Files.readString(result, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        removeFile(result);
+
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("platform-plugin-issue-output.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("platform-plugin-issue-output.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(platformIssuesOutput, expected);
+
+        validationResultsFilePath = testResources.resolve("command-outputs")
+                .resolve("platform-plugin-arguments-output.txt");
+        expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(platformArgumentsOutput, expected);
+    }
+
+    @Test(description = "test scan command with invalid platform plugin configurations")
+    void testScanCommandWithInvalidPlatformPluginConfigurations() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-invalid-platform-configurations");
+        Path rootProject = Path.of(System.getProperty("user.dir")).getParent();
+        Assert.assertNotNull(rootProject);
+        Path platformPluginPath = rootProject
+                .resolve("test-static-code-analysis-platform-plugins")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin")
+                .resolve("build")
+                .resolve("libs")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
+        String tomlConfigurations = Files.readString(testResources.resolve("test-resources")
+                .resolve("platform-plugin-configurations.txt"));
+        tomlConfigurations = tomlConfigurations.replace("__platform_name__", "invalidExamplePlatform");
+        tomlConfigurations = tomlConfigurations.replace("__platform_plugin_path__",
+                platformPluginPath.toString().replace("\\", "\\\\"));
+        Files.writeString(ballerinaProject.resolve("Scan.toml"), tomlConfigurations,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+
+        System.setProperty("user.dir", ballerinaProject.toString());
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        Path validationResultsFilePath;
+        if (OsUtils.isWindows()) {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("invalid-platform-plugin-configurations.txt");
+        } else {
+            validationResultsFilePath = testResources.resolve("command-outputs")
+                    .resolve("ubuntu").resolve("invalid-platform-plugin-configurations.txt");
+        }
+        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 }

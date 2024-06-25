@@ -1,0 +1,89 @@
+[
+  {
+    "location": {
+      "lineRange": {
+        "fileName": "main.bal",
+        "startLine": {
+          "line": 16,
+          "offset": 0
+        },
+        "endLine": {
+          "line": 21,
+          "offset": 1
+        }
+      },
+      "textRange": {
+        "startOffset": 664,
+        "endOffset": 803,
+        "length": 139
+      }
+    },
+    "rule": {
+      "id": "ballerina/example_module_static_code_analyzer:1",
+      "numericId": 1,
+      "description": "rule 1",
+      "ruleKind": "CODE_SMELL"
+    },
+    "source": "BUILT_IN",
+    "fileName": "bal_project_with_analyzer_configurations/main.bal",
+    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-analyzer-configurations\\main.bal"
+  },
+  {
+    "location": {
+      "lineRange": {
+        "fileName": "main.bal",
+        "startLine": {
+          "line": 16,
+          "offset": 0
+        },
+        "endLine": {
+          "line": 21,
+          "offset": 1
+        }
+      },
+      "textRange": {
+        "startOffset": 664,
+        "endOffset": 803,
+        "length": 139
+      }
+    },
+    "rule": {
+      "id": "exampleOrg/example_module_static_code_analyzer:1",
+      "numericId": 1,
+      "description": "rule 1",
+      "ruleKind": "CODE_SMELL"
+    },
+    "source": "EXTERNAL",
+    "fileName": "bal_project_with_analyzer_configurations/main.bal",
+    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-analyzer-configurations\\main.bal"
+  },
+  {
+    "location": {
+      "lineRange": {
+        "fileName": "main.bal",
+        "startLine": {
+          "line": 16,
+          "offset": 0
+        },
+        "endLine": {
+          "line": 21,
+          "offset": 1
+        }
+      },
+      "textRange": {
+        "startOffset": 664,
+        "endOffset": 803,
+        "length": 139
+      }
+    },
+    "rule": {
+      "id": "ballerinax/example_module_static_code_analyzer:1",
+      "numericId": 1,
+      "description": "rule 1",
+      "ruleKind": "CODE_SMELL"
+    },
+    "source": "BUILT_IN",
+    "fileName": "bal_project_with_analyzer_configurations/main.bal",
+    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-analyzer-configurations\\main.bal"
+  }
+]

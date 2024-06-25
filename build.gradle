@@ -33,6 +33,7 @@ project(':scan-command') {
             dependsOn ':test-compiler-plugins:invalid-rules-plugin:build'
             dependsOn ':test-compiler-plugins:invalid-ruleformat-plugin:build'
             dependsOn ':test-compiler-plugins:invalid-rulekind-plugin:build'
+            dependsOn ':test-static-code-analysis-platform-plugins:exampleOrg-static-code-analysis-platform-plugin:build'
         }
     }
 }
@@ -68,6 +69,12 @@ project(':test-compiler-plugins:invalid-ruleformat-plugin') {
 }
 
 project(':test-compiler-plugins:invalid-rulekind-plugin') {
+    dependencies {
+        implementation project(':scan-command')
+    }
+}
+
+project(':test-static-code-analysis-platform-plugins:exampleOrg-static-code-analysis-platform-plugin') {
     dependencies {
         implementation project(':scan-command')
     }
