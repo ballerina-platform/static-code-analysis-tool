@@ -1,7 +1,7 @@
 
 Running Scans
 Loading scan tool configurations from src/test/resources/test-resources/bal-project-with-config-file/Scan.toml
-	RuleID                                           | Rule Severity | Rule Description
+	RuleID                                           | Rule Kind     | Rule Description
 	------------------------------------------------------------------------------------
 	ballerina:1                                      | CODE_SMELL    | Avoid checkpanic
 	ballerina/example_module_static_code_analyzer:1  | CODE_SMELL    | rule 1

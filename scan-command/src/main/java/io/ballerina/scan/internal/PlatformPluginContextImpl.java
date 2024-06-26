@@ -23,7 +23,6 @@ import io.ballerina.scan.PlatformPluginContext;
 import java.util.Collections;
 import java.util.Map;
 
-
 /**
  * Represents the implementation of the {@link PlatformPluginContext} interface.
  *

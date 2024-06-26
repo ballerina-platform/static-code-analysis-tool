@@ -20,7 +20,7 @@ package io.ballerina.scan;
 import java.util.List;
 
 /**
- * {@code StaticCodeAnalysisPlatformPlugin} Represents an interface to extend reporting analysis issues to platforms.
+ * {@code StaticCodeAnalysisPlatformPlugin} Represents the interface to extend to report issues for a specific platform.
  *
  * @since 0.1.0
  */
@@ -34,16 +34,16 @@ public interface StaticCodeAnalysisPlatformPlugin {
     String platform();
 
     /**
-     * Initializes the platform plugin with arguments defined in the Scan.toml file before an analysis.
+     * Initializes the platform plugin with a {@link PlatformPluginContext}.
      *
-     * @param platformArgs in-memory representation of the arguments defined in the Scan.toml file.
+     * @param platformPluginContext context passed from the scan tool to the platform plugins.
      */
-    void init(PlatformPluginContext platformArgs);
+    void init(PlatformPluginContext platformPluginContext);
 
     /**
-     * Reports the analysis issues to the platform.
+     * Reports the issues to the platform.
      *
-     * @param issues list of analysis issues passed from the scan tool.
+     * @param issues list of issues passed from the scan tool.
      */
     void onScan(List<Issue> issues);
 }

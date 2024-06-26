@@ -58,7 +58,7 @@ public class Constants {
     static final String JAR_PREDICATE = ".jar";
     static final String CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN = "^\\d+\\.\\d+\\.\\d+$";
     static final String RULE_ID_COLUMN = "RuleID";
-    static final String RULE_SEVERITY_COLUMN = "Rule Severity";
+    static final String RULE_KIND_COLUMN = "Rule Kind";
     static final String RULE_DESCRIPTION_COLUMN = "Rule Description";
     static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerina/", "ballerinax/", "wso2/"};
 

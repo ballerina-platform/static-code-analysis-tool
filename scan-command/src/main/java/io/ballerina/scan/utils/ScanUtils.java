@@ -83,7 +83,7 @@ import static io.ballerina.scan.utils.Constants.RULES_TABLE;
 import static io.ballerina.scan.utils.Constants.RULE_DESCRIPTION_COLUMN;
 import static io.ballerina.scan.utils.Constants.RULE_ID_COLUMN;
 import static io.ballerina.scan.utils.Constants.RULE_PRIORITY_LIST;
-import static io.ballerina.scan.utils.Constants.RULE_SEVERITY_COLUMN;
+import static io.ballerina.scan.utils.Constants.RULE_KIND_COLUMN;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE_FIELD;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_CONTENT;
@@ -569,7 +569,7 @@ public final class ScanUtils {
      */
     public static void printRulesToConsole(List<Rule> rules, PrintStream outputStream) {
         int maxRuleIDLength = RULE_ID_COLUMN.length();
-        int maxSeverityLength = RULE_SEVERITY_COLUMN.length();
+        int maxSeverityLength = RULE_KIND_COLUMN.length();
         int maxDescriptionLength = RULE_DESCRIPTION_COLUMN.length();
 
         for (Rule rule : rules) {
@@ -581,7 +581,7 @@ public final class ScanUtils {
         String format = "\t%-" + maxRuleIDLength + "s | %-" + maxSeverityLength + "s | %-" + maxDescriptionLength
                 + "s%n";
 
-        outputStream.printf(format, RULE_ID_COLUMN, RULE_SEVERITY_COLUMN, RULE_DESCRIPTION_COLUMN);
+        outputStream.printf(format, RULE_ID_COLUMN, RULE_KIND_COLUMN, RULE_DESCRIPTION_COLUMN);
         outputStream.printf("\t" + "-".repeat(maxRuleIDLength + 1) + "--" +
                 "-".repeat(maxSeverityLength + 1) + "--" + "-".repeat(maxDescriptionLength + 1) + "%n");
 
