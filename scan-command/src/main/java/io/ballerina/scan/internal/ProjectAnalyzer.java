@@ -137,7 +137,8 @@ class ProjectAnalyzer {
             ballerinaToml.modify().withContent(tomlFileContent + tomlDependencies).apply();
         });
 
-        PackageResolution packageResolution = project.currentPackage().getResolution();
+        PackageResolution packageResolution = project.currentPackage().getResolution(project.currentPackage()
+                .compilationOptions());
         ResolvedPackageDependency rootPkgNode = new ResolvedPackageDependency(project.currentPackage(),
                 PackageDependencyScope.DEFAULT);
         Map<String, List<Rule>> externalAnalyzers = new HashMap<>();
