@@ -1,0 +1,4 @@
+[[platform]]
+name = "__platform_name__"
+path = "__platform_plugin_path__"
+key = "value"

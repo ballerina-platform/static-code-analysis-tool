@@ -1,5 +1,5 @@
 {
   "id": 1,
-  "ruleKind": "CODE_SMELL",
+  "kind": "CODE_SMELL",
   "description": "rule 1"
 }

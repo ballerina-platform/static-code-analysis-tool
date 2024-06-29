@@ -1,0 +1,6 @@
+Loading scan tool configurations from src/test/resources/test-resources/bal-project-with-invalid-platform-configurations/Scan.toml
+
+Running Scans
+
+The specified platform 'invalidExamplePlatform' is not available.
+Please ensure that the required platform plugin path is specified in 'Scan.toml'.

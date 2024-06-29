@@ -1,4 +1,5 @@
 module io.ballerina.scan{
+    uses io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
     requires io.ballerina.cli;
     requires io.ballerina.lang;
     requires io.ballerina.parser;

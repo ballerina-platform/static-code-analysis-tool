@@ -1,0 +1,20 @@
+# custom compiler plugins
+[[analyzer]]
+org = "exampleOrg"
+name = "example_module_static_code_analyzer"
+
+[[analyzer]]
+org = "ballerina"
+name = "example_module_static_code_analyzer"
+version = "0.1.0"
+
+[[analyzer]]
+org = "ballerinax"
+name = "example_module_static_code_analyzer"
+version = "0.1.0"
+repository = "local"
+
+[rule]
+exclude =[
+    "ballerina:1"
+]

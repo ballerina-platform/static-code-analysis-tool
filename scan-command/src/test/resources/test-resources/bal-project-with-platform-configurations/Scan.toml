@@ -1,0 +1,4 @@
+[[platform]]
+name = "examplePlatform"
+path = "C:\\Users\\Tharana Wanigaratne\\Desktop\\static-code-analysis-tool\\test-static-code-analysis-platform-plugins\\exampleOrg-static-code-analysis-platform-plugin\\build\\libs\\exampleOrg-static-code-analysis-platform-plugin.jar"
+key = "value"

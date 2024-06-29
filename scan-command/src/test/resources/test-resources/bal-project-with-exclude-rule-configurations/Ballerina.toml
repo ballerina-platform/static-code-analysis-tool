@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "bal_project_with_exclude_rule_configurations"
+version = "0.1.0"

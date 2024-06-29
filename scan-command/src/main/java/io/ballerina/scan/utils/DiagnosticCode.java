@@ -32,7 +32,6 @@ public enum DiagnosticCode {
     LOADING_REMOTE_PLATFORM_FILE("STATIC_ANALYSIS_ERROR_006", "loading.remote.platform.file"),
     DOWNLOADING_REMOTE_JAR_FILE("STATIC_ANALYSIS_ERROR_007", "downloading.remote.jar.file"),
     FAILED_TO_LOAD_COMPILER_PLUGIN("STATIC_ANALYSIS_ERROR_008", "loading.compiler.plugin"),
-    MISSING_RULES_FILE("STATIC_ANALYSIS_ERROR_009", "missing.rules.file"),
     READING_RULES_FILE("STATIC_ANALYSIS_ERROR_010", "reading.rules.file"),
     INVALID_JSON_FORMAT("STATIC_ANALYSIS_ERROR_011", "invalid.json.format"),
     INVALID_JSON_FORMAT_RULE("STATIC_ANALYSIS_ERROR_012", "invalid.json.format.rule"),
@@ -40,6 +39,8 @@ public enum DiagnosticCode {
     FAILED_TO_READ_BALLERINA_FILE("STATIC_ANALYSIS_ERROR_014", "failed.to.read.ballerina.file"),
     FAILED_TO_COPY_SCAN_REPORT("STATIC_ANALYSIS_ERROR_015", "failed.to.copy.scan.report"),
     RULE_NOT_FOUND("STATIC_ANALYSIS_ERROR_016", "rule.not.found"),
+    ATTEMPT_TO_INCLUDE_AND_EXCLUDE("STATIC_ANALYSIS_ERROR_017",
+            "attempt.to.include.and.exclude"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported");
 

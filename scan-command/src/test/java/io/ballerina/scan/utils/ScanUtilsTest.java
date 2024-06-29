@@ -185,7 +185,7 @@ public class ScanUtilsTest extends BaseTest {
                     .resolve("scan-toml-invalid-platform-jar.txt");
         } else {
             invalidPlatformTxtPath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("scan-toml-invalid-platform-jar.txt");
+                    .resolve("unix").resolve("scan-toml-invalid-platform-jar.txt");
         }
         String expected = Files.readString(invalidPlatformTxtPath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -208,7 +208,7 @@ public class ScanUtilsTest extends BaseTest {
                     .resolve("scan-toml-invalid-platform-config.txt");
         } else {
             invalidPlatformTxtPath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("scan-toml-invalid-platform-config.txt");
+                    .resolve("unix").resolve("scan-toml-invalid-platform-config.txt");
         }
         String expected = Files.readString(invalidPlatformTxtPath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
