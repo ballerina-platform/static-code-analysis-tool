@@ -1,1 +1,1 @@
-invalid json format for rule object in plugin 'invalid/invalid_module_ruleformat_static_code_analyzer'. rule object should contain 'numeric id', 'ruleKind', and 'description' but found: {"id":1,"severity":"CODE_SMELL","description":"rule 1"}
+invalid json format for rule object in plugin 'invalid/invalid_module_ruleformat_static_code_analyzer'. rule object should contain 'numeric id', 'kind', and 'description' but found: {"id":1,"severity":"CODE_SMELL","description":"rule 1"}

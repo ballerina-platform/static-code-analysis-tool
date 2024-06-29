@@ -1,1 +1,1 @@
-invalid ruleKind for rule object in plugin 'exampleOrg/exampleName'. ruleKind should be one of [CODE_SMELL, BUG, VULNERABILITY] but found: 'SECURITY_HOTSPOT'
+invalid kind for rule object in plugin 'exampleOrg/exampleName'. kind should be one of [CODE_SMELL, BUG, VULNERABILITY] but found: 'SECURITY_HOTSPOT'

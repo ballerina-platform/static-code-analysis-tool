@@ -150,9 +150,6 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        outputStream.println();
-        outputStream.println("Running Scans");
-
         Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project.get(), outputStream);
         if (scanTomlFile.isEmpty()) {
            return;
@@ -204,6 +201,9 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
             return;
         }
+
+        outputStream.println();
+        outputStream.println("Running Scans");
 
         List<Issue> issues = projectAnalyzer.analyze(coreRules);
         issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));

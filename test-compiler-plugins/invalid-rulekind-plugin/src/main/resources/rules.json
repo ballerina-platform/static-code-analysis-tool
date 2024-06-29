@@ -1,17 +1,17 @@
 [
   {
     "id": 1,
-    "ruleKind": "CODE_SMELL",
+    "kind": "CODE_SMELL",
     "description": "rule 1"
   },
   {
     "id": 2,
-    "ruleKind": "BUG",
+    "kind": "BUG",
     "description": "rule 2"
   },
   {
     "id": 3,
-    "ruleKind": "SECURITY_HOTSPOT",
+    "kind": "SECURITY_HOTSPOT",
     "description": "rule 3"
   }
 ]
