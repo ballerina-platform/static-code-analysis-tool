@@ -28,9 +28,12 @@ import java.util.Map;
 public interface PlatformPluginContext {
 
     /**
-     * Returns the  platform arguments defined in the Scan.toml file as a map.
+     * <p>
+     * Returns the platform specific arguments that are defined in addition to the 'name' and 'path' arguments in the
+     * Scan.toml file as a map. These arguments can be used for modifying the behavior of the specific platform plugin.
+     *</p>
      *
-     * @return in-memory representation of the arguments defined in the Scan.toml file.
+     * @return in-memory representation of the additional platform specific arguments defined in the Scan.toml file.
      */
     Map<String, String> platformArgs();
 

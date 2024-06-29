@@ -41,7 +41,7 @@ public interface StaticCodeAnalysisPlatformPlugin {
     void init(PlatformPluginContext platformPluginContext);
 
     /**
-     * Reports the issues to the platform.
+     * The method that gets invoked when the scan is complete.
      *
      * @param issues list of issues passed from the scan tool.
      */

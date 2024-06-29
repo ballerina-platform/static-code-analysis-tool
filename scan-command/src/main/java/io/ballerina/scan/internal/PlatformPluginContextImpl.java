@@ -26,7 +26,7 @@ import java.util.Map;
 /**
  * Represents the implementation of the {@link PlatformPluginContext} interface.
  *
- * @param platformArgs in-memory representation of platform specific arguments defined in the Scan.toml
+ * @param platformArgs in-memory representation of platform specific arguments defined in the Scan.toml file
  * @param initiatedByPlatform true if the plugin is initiated by the platform, false otherwise
  *
  * @since 0.1.0

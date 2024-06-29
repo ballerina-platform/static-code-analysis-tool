@@ -210,7 +210,7 @@ public class ScanCmdTest extends BaseTest {
                 .resolve("issues-report.txt");
         } else {
                 validationResultsFilePath = testResources.resolve("command-outputs")
-                .resolve("ubuntu").resolve("issues-report.txt");
+                .resolve("unix").resolve("issues-report.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -240,7 +240,7 @@ public class ScanCmdTest extends BaseTest {
                 .resolve("issues-html-report.txt");
         } else {
                 validationResultsFilePath = testResources.resolve("command-outputs")
-                .resolve("ubuntu").resolve("issues-html-report.txt");
+                .resolve("unix").resolve("issues-html-report.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -268,7 +268,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("print-rules-to-console.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("print-rules-to-console.txt");
+                    .resolve("unix").resolve("print-rules-to-console.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -291,7 +291,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("list-rules-output.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("list-rules-output.txt");
+                    .resolve("unix").resolve("list-rules-output.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -342,32 +342,21 @@ public class ScanCmdTest extends BaseTest {
         return new Object[][] {
                 {
                     new ArrayList<>(List.of(
-                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL,
-                                    BALLERINA_ORG, "exampleModule"),
-                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG,
-                                    BALLERINAX_ORG, "exampleModule"),
-                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY,
-                                    "wso2", "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINA_ORG, "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINAX_ORG, "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "wso2", "exampleModule"),
                             RuleFactory.createRule(3, "rule 3", RuleKind.BUG),
-                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL,
-                                    "exampleOrg", "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "exampleOrg", "exampleModule"),
                             RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY),
-                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL,
-                                    BALLERINAX_ORG, "exampleModule"),
-                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG,
-                                    BALLERINA_ORG, "exampleModule"),
-                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY,
-                                    BALLERINAX_ORG, "exampleModule"),
-                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL,
-                                    "wso2", "exampleModule"),
-                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG,
-                                    "exampleOrg", "exampleModule"),
-                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY,
-                                    "exampleOrg", "exampleModule"),
-                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG,
-                                    "wso2", "exampleModule"),
-                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY,
-                                    BALLERINA_ORG, "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, BALLERINAX_ORG, "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, BALLERINA_ORG, "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINAX_ORG,
+                                    "exampleModule"),
+                            RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL, "wso2", "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "exampleOrg", "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, "exampleOrg", "exampleModule"),
+                            RuleFactory.createRule(3, "rule 3", RuleKind.BUG, "wso2", "exampleModule"),
+                            RuleFactory.createRule(2, "rule 2", RuleKind.VULNERABILITY, BALLERINA_ORG, "exampleModule"),
                             RuleFactory.createRule(1, "rule 1", RuleKind.CODE_SMELL)
                         )),
                         new String[] {
@@ -410,7 +399,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("include-rules-issues-report.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("include-rules-issues-report.txt");
+                    .resolve("unix").resolve("include-rules-issues-report.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -436,7 +425,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("exclude-rules-issues-report.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("exclude-rules-issues-report.txt");
+                    .resolve("unix").resolve("exclude-rules-issues-report.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -459,7 +448,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("include-exclude-rules.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("include-exclude-rules.txt");
+                    .resolve("unix").resolve("include-exclude-rules.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -483,7 +472,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("toml-include-rules-issues-report.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("toml-include-rules-issues-report.txt");
+                    .resolve("unix").resolve("toml-include-rules-issues-report.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -509,7 +498,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("toml-exclude-rules-issues-report.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("toml-exclude-rules-issues-report.txt");
+                    .resolve("unix").resolve("toml-exclude-rules-issues-report.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -532,7 +521,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("toml-include-exclude-rules.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("toml-include-exclude-rules.txt");
+                    .resolve("unix").resolve("toml-include-exclude-rules.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -580,7 +569,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("platform-plugin-issue-output.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("platform-plugin-issue-output.txt");
+                    .resolve("unix").resolve("platform-plugin-issue-output.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -623,7 +612,7 @@ public class ScanCmdTest extends BaseTest {
                     .resolve("invalid-platform-plugin-configurations.txt");
         } else {
             validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("ubuntu").resolve("invalid-platform-plugin-configurations.txt");
+                    .resolve("unix").resolve("invalid-platform-plugin-configurations.txt");
         }
         String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
