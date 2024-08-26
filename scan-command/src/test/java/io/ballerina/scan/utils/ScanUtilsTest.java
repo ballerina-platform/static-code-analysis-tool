@@ -18,7 +18,6 @@
 
 package io.ballerina.scan.utils;
 
-import io.ballerina.cli.utils.OsUtils;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
@@ -97,10 +96,7 @@ public class ScanUtilsTest extends BaseTest {
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, null);
         String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Path validationScanReportPath = testResources.resolve("command-outputs")
-                .resolve("empty-issues-html-report.txt");
-        String expected = Files.readString(validationScanReportPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("empty-issues-html-report.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -112,10 +108,7 @@ public class ScanUtilsTest extends BaseTest {
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, RESULTS_DIRECTORY);
         String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Path validationScanReportPath = testResources.resolve("command-outputs")
-                .resolve("empty-issues-html-report.txt");
-        String expected = Files.readString(validationScanReportPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("empty-issues-html-report.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -179,16 +172,7 @@ public class ScanUtilsTest extends BaseTest {
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
         Assert.assertNull(scanTomlFile);
-        Path invalidPlatformTxtPath;
-        if (OsUtils.isWindows()) {
-            invalidPlatformTxtPath = testResources.resolve("command-outputs")
-                    .resolve("scan-toml-invalid-platform-jar.txt");
-        } else {
-            invalidPlatformTxtPath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("scan-toml-invalid-platform-jar.txt");
-        }
-        String expected = Files.readString(invalidPlatformTxtPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("scan-toml-invalid-platform-jar.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -202,16 +186,7 @@ public class ScanUtilsTest extends BaseTest {
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
         Assert.assertNull(scanTomlFile);
-        Path invalidPlatformTxtPath;
-        if (OsUtils.isWindows()) {
-            invalidPlatformTxtPath = testResources.resolve("command-outputs")
-                    .resolve("scan-toml-invalid-platform-config.txt");
-        } else {
-            invalidPlatformTxtPath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("scan-toml-invalid-platform-config.txt");
-        }
-        String expected = Files.readString(invalidPlatformTxtPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("scan-toml-invalid-platform-config.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 

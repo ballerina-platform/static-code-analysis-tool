@@ -18,7 +18,6 @@
 
 package io.ballerina.scan.internal;
 
-import io.ballerina.cli.utils.OsUtils;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
@@ -89,9 +88,7 @@ public class ScanCmdTest extends BaseTest {
 
         StringBuilder longDescription = new StringBuilder();
         scanCmd.printLongDesc(longDescription);
-        Path helpTextPath = testResources.resolve("command-outputs").resolve("tool-help.txt");
-        expected = Files.readString(helpTextPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR).trim();
+        expected = getExpectedOutput("tool-help.txt");
         Assert.assertEquals(longDescription.toString()
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR), expected);
     }
@@ -102,10 +99,8 @@ public class ScanCmdTest extends BaseTest {
         String[] args = {"--help"};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        Path helpTextPath = testResources.resolve("command-outputs").resolve("tool-help.txt");
-        String expected = Files.readString(helpTextPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Assert.assertEquals(readOutput(true), expected);
+        String expected = getExpectedOutput("tool-help.txt");
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test scan command with Ballerina project")
@@ -204,16 +199,7 @@ public class ScanCmdTest extends BaseTest {
         Path resultsFile = ScanUtils.saveToDirectory(issues, project, null);
         String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-                validationResultsFilePath = testResources.resolve("command-outputs")
-                .resolve("issues-report.txt");
-        } else {
-                validationResultsFilePath = testResources.resolve("command-outputs")
-                .resolve("unix").resolve("issues-report.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("issues-report.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -234,16 +220,7 @@ public class ScanCmdTest extends BaseTest {
         Path resultsFile = ScanUtils.generateScanReport(issues, project, null);
         String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-                validationResultsFilePath = testResources.resolve("command-outputs")
-                .resolve("issues-html-report.txt");
-        } else {
-                validationResultsFilePath = testResources.resolve("command-outputs")
-                .resolve("unix").resolve("issues-html-report.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("issues-html-report.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -262,16 +239,7 @@ public class ScanCmdTest extends BaseTest {
         List<Rule> rules = CoreRule.rules();
         externalAnalyzers.values().forEach(rules::addAll);
         ScanUtils.printRulesToConsole(rules, printStream);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("print-rules-to-console.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("print-rules-to-console.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("print-rules-to-console.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -285,17 +253,8 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("list-rules-output.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("list-rules-output.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Assert.assertEquals(readOutput(true), expected);
+        String expected = getExpectedOutput("list-rules-output.txt");
+        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test scan command with target directory flag on single file project")
@@ -306,10 +265,7 @@ public class ScanCmdTest extends BaseTest {
         String[] args = {singleFileProject.toString(), "--target-dir=results"};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        Path validationResultsFilePath = testResources.resolve("command-outputs")
-                .resolve("single-file-report-generation.txt");
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("single-file-report-generation.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -321,10 +277,7 @@ public class ScanCmdTest extends BaseTest {
         String[] args = {singleFileProject.toString(), "--scan-report"};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        Path validationResultsFilePath = testResources.resolve("command-outputs")
-                .resolve("single-file-scan-report-generation.txt");
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("single-file-scan-report-generation.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -393,16 +346,7 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("include-rules-issues-report.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("include-rules-issues-report.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("include-rules-issues-report.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -419,16 +363,7 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("exclude-rules-issues-report.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("exclude-rules-issues-report.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("exclude-rules-issues-report.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -442,16 +377,7 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("include-exclude-rules.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("include-exclude-rules.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("include-exclude-rules.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -466,16 +392,7 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("toml-include-rules-issues-report.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("toml-include-rules-issues-report.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("toml-include-rules-issues-report.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -492,16 +409,7 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("toml-exclude-rules-issues-report.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("toml-exclude-rules-issues-report.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("toml-exclude-rules-issues-report.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -515,16 +423,7 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("toml-include-exclude-rules.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("toml-include-exclude-rules.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("toml-include-exclude-rules.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -563,22 +462,10 @@ public class ScanCmdTest extends BaseTest {
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         removeFile(result);
 
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("platform-plugin-issue-output.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("platform-plugin-issue-output.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("platform-plugin-issue-output.txt");
         Assert.assertEquals(platformIssuesOutput, expected);
 
-        validationResultsFilePath = testResources.resolve("command-outputs")
-                .resolve("platform-plugin-arguments-output.txt");
-        expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        expected = getExpectedOutput("platform-plugin-arguments-output.txt");
         Assert.assertEquals(platformArgumentsOutput, expected);
     }
 
@@ -606,16 +493,7 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        Path validationResultsFilePath;
-        if (OsUtils.isWindows()) {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("invalid-platform-plugin-configurations.txt");
-        } else {
-            validationResultsFilePath = testResources.resolve("command-outputs")
-                    .resolve("unix").resolve("invalid-platform-plugin-configurations.txt");
-        }
-        String expected = Files.readString(validationResultsFilePath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("invalid-platform-plugin-configurations.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 }

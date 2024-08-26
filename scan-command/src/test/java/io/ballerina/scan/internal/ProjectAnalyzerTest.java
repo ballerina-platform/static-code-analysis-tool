@@ -38,9 +38,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -172,10 +169,7 @@ public class ProjectAnalyzerTest extends BaseTest {
             result = ex.getMessage();
         }
         Assert.assertNull(externalAnalyzers);
-        Path invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                .resolve("invalid-json-format-for-rules.txt");
-        String expected = Files.readString(invalidExternalAnalyzerRulesPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("invalid-json-format-for-rules.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -197,10 +191,7 @@ public class ProjectAnalyzerTest extends BaseTest {
             result = ex.getMessage();
         }
         Assert.assertNull(externalAnalyzers);
-        Path invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                .resolve("invalid-json-rule-format.txt");
-        String expected = Files.readString(invalidExternalAnalyzerRulesPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("invalid-json-rule-format.txt");
         Assert.assertEquals(result, expected);
     }
 
@@ -222,10 +213,7 @@ public class ProjectAnalyzerTest extends BaseTest {
             result = ex.getMessage();
         }
         Assert.assertNull(externalAnalyzers);
-        Path invalidExternalAnalyzerRulesPath = testResources.resolve("command-outputs")
-                .resolve("invalid-json-rule-kind.txt");
-        String expected = Files.readString(invalidExternalAnalyzerRulesPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("invalid-json-rule-kind.txt");
         Assert.assertEquals(result, expected);
     }
 }
