@@ -1,22 +1,13 @@
 [
   {
     "location": {
-      "lineRange": {
-        "fileName": "main.bal",
-        "startLine": {
-          "line": 16,
-          "offset": 17
-        },
-        "endLine": {
-          "line": 23,
-          "offset": 1
-        }
-      },
-      "textRange": {
-        "startOffset": 748,
-        "endOffset": 752,
-        "length": 4
-      }
+      "filePath": "main.bal",
+      "startLine": 16,
+      "endLine": 23,
+      "startColumn": 17,
+      "endColumn": 1,
+      "startOffset": 748,
+      "length": 4
     },
     "rule": {
       "id": "ballerina:101",
@@ -30,22 +21,13 @@
   },
   {
     "location": {
-      "lineRange": {
-        "fileName": "main.bal",
-        "startLine": {
-          "line": 16,
-          "offset": 17
-        },
-        "endLine": {
-          "line": 23,
-          "offset": 1
-        }
-      },
-      "textRange": {
-        "startOffset": 748,
-        "endOffset": 752,
-        "length": 4
-      }
+      "filePath": "main.bal",
+      "startLine": 16,
+      "endLine": 23,
+      "startColumn": 17,
+      "endColumn": 1,
+      "startOffset": 748,
+      "length": 4
     },
     "rule": {
       "id": "exampleOrg/exampleName:101",

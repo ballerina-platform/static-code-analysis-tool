@@ -1,22 +1,13 @@
 [
   {
     "location": {
-      "lineRange": {
-        "fileName": "main.bal",
-        "startLine": {
-          "line": 16,
-          "offset": 0
-        },
-        "endLine": {
-          "line": 21,
-          "offset": 1
-        }
-      },
-      "textRange": {
-        "startOffset": 664,
-        "endOffset": 803,
-        "length": 139
-      }
+      "filePath": "main.bal",
+      "startLine": 16,
+      "endLine": 21,
+      "startColumn": 0,
+      "endColumn": 1,
+      "startOffset": 664,
+      "length": 139
     },
     "rule": {
       "id": "ballerina/example_module_static_code_analyzer:1",
@@ -30,22 +21,13 @@
   },
   {
     "location": {
-      "lineRange": {
-        "fileName": "main.bal",
-        "startLine": {
-          "line": 16,
-          "offset": 0
-        },
-        "endLine": {
-          "line": 21,
-          "offset": 1
-        }
-      },
-      "textRange": {
-        "startOffset": 664,
-        "endOffset": 803,
-        "length": 139
-      }
+      "filePath": "main.bal",
+      "startLine": 16,
+      "endLine": 21,
+      "startColumn": 0,
+      "endColumn": 1,
+      "startOffset": 664,
+      "length": 139
     },
     "rule": {
       "id": "exampleOrg/example_module_static_code_analyzer:1",
@@ -59,22 +41,13 @@
   },
   {
     "location": {
-      "lineRange": {
-        "fileName": "main.bal",
-        "startLine": {
-          "line": 16,
-          "offset": 0
-        },
-        "endLine": {
-          "line": 21,
-          "offset": 1
-        }
-      },
-      "textRange": {
-        "startOffset": 664,
-        "endOffset": 803,
-        "length": 139
-      }
+      "filePath": "main.bal",
+      "startLine": 16,
+      "endLine": 21,
+      "startColumn": 0,
+      "endColumn": 1,
+      "startOffset": 664,
+      "length": 139
     },
     "rule": {
       "id": "ballerinax/example_module_static_code_analyzer:1",
