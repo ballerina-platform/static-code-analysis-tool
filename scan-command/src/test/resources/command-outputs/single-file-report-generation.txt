@@ -1,5 +1,0 @@
-Running Scans
-
-[]
-
-generating reports is not supported with single bal files. ignoring the flag and continuing the scans

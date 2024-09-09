@@ -18,6 +18,7 @@
 
 package io.ballerina.scan;
 
+import io.ballerina.cli.utils.OsUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 
@@ -25,6 +26,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -65,5 +67,15 @@ public abstract class BaseTest {
             out.println(output);
         }
         return output;
+    }
+
+    protected String getExpectedOutput(String path) throws IOException {
+        Path expectedFilePath = testResources.resolve("command-outputs").resolve("common").resolve(path);
+        if (!expectedFilePath.toFile().isFile()) {
+            expectedFilePath = testResources.resolve("command-outputs")
+                    .resolve(OsUtils.isWindows() ? "windows" : "unix").resolve(path);
+        }
+        return Files.readString(expectedFilePath, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR).trim();
     }
 }

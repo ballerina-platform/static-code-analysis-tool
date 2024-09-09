@@ -26,10 +26,13 @@ import io.ballerina.projects.directory.SingleFileProject;
 import io.ballerina.projects.util.ProjectConstants;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
+import io.ballerina.scan.PlatformPluginContext;
 import io.ballerina.scan.Rule;
+import io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
+import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
 import picocli.CommandLine;
 
@@ -38,14 +41,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceLoader;
 
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 
@@ -141,9 +150,6 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        outputStream.println();
-        outputStream.println("Running Scans");
-
         Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project.get(), outputStream);
         if (scanTomlFile.isEmpty()) {
            return;
@@ -165,36 +171,88 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        List<Issue> issues = projectAnalyzer.analyze(coreRules);
-        issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
-        if (!platforms.isEmpty() || platformTriggered) {
+        List<String> externalJarFilePaths = new ArrayList<>();
+        Map<String, PlatformPluginContext> platformContexts = new HashMap<>();
+        scanTomlFile.get().getPlatforms().forEach(platform -> {
+            String platformName = platform.name();
+            externalJarFilePaths.add(platform.path());
+            Map<String, String> platformArgs = new HashMap<>();
+            platform.arguments().forEach((key, value) -> platformArgs.put(key, value.toString()));
+            platformContexts.put(platformName, new PlatformPluginContextImpl(platformArgs, platformTriggered));
+            if (!platformTriggered || platforms.size() != 1 || !platforms.contains(platformName)) {
+                  platforms.add(platformName);
+            }
+        });
+
+        URLClassLoader ucl = loadPlatformPlugins(externalJarFilePaths);
+        ServiceLoader<StaticCodeAnalysisPlatformPlugin> scannerPlatformPlugins = ServiceLoader.load(
+                StaticCodeAnalysisPlatformPlugin.class, ucl);
+        scannerPlatformPlugins.forEach(staticCodeAnalysisPlatformPlugin -> {
+            if (platforms.contains(staticCodeAnalysisPlatformPlugin.platform())) {
+                PlatformPluginContext platformPluginContext = platformContexts.get(staticCodeAnalysisPlatformPlugin
+                        .platform());
+                staticCodeAnalysisPlatformPlugin.init(platformPluginContext);
+            }
+        });
+
+        scanTomlFile.get().getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id).forEach(includeRules::add);
+        scanTomlFile.get().getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id).forEach(excludeRules::add);
+        if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
+            outputStream.println(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
             return;
         }
 
-        ScanUtils.printToConsole(issues, outputStream);
-        if (project.get().kind().equals(ProjectKind.BUILD_PROJECT)) {
-            Path reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir);
-            outputStream.println();
-            outputStream.println("View scan results at:");
-            outputStream.println("\t" + reportPath.toUri() + System.lineSeparator());
+        outputStream.println();
+        outputStream.println("Running Scans");
 
-            if (scanReport) {
-                Path scanReportPath = ScanUtils.generateScanReport(issues, project.get(), targetDir);
-                outputStream.println();
-                outputStream.println("View scan report at:");
-                outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
-            }
-        } else {
-            if (targetDir != null) {
-                outputStream.println();
-                outputStream.println(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
-            }
+        List<Issue> issues = projectAnalyzer.analyze(coreRules);
+        issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
 
-            if (scanReport) {
+        if (!includeRules.isEmpty()) {
+            issues.removeIf(issue -> !includeRules.contains(issue.rule().id()));
+        }
+        if (!excludeRules.isEmpty()) {
+            issues.removeIf(issue -> excludeRules.contains(issue.rule().id()));
+        }
+
+        if (platforms.isEmpty() && !platformTriggered) {
+            ScanUtils.printToConsole(issues, outputStream);
+            if (project.get().kind().equals(ProjectKind.BUILD_PROJECT)) {
+                Path reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir);
                 outputStream.println();
-                outputStream.println(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
+                outputStream.println("View scan results at:");
+                outputStream.println("\t" + reportPath.toUri() + System.lineSeparator());
+                if (scanReport) {
+                    Path scanReportPath = ScanUtils.generateScanReport(issues, project.get(), targetDir);
+                    outputStream.println();
+                    outputStream.println("View scan report at:");
+                    outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
+                }
+            } else {
+                if (targetDir != null) {
+                    outputStream.println();
+                    outputStream.println(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
+                }
+
+                if (scanReport) {
+                    outputStream.println();
+                    outputStream.println(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
+                }
             }
         }
+
+        scannerPlatformPlugins.forEach(staticCodeAnalysisPlatformPlugin -> {
+            if (platforms.contains(staticCodeAnalysisPlatformPlugin.platform())) {
+                outputStream.println("Reporting issues to: " + staticCodeAnalysisPlatformPlugin.platform());
+                staticCodeAnalysisPlatformPlugin.onScan(issues);
+                platforms.removeAll(Collections.singleton(staticCodeAnalysisPlatformPlugin.platform()));
+            }
+        });
+        platforms.forEach(remainingPlatform -> {
+            outputStream.println();
+            outputStream.println("The specified platform '" + remainingPlatform + "' is not available.");
+            outputStream.println("Please ensure that the required platform plugin path is specified in 'Scan.toml'.");
+        });
     }
 
     private StringBuilder helpMessage() {
@@ -242,6 +300,19 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println(ex.getMessage());
             return Optional.empty();
         }
+    }
+
+    private URLClassLoader loadPlatformPlugins(List<String> jarPaths) {
+        List<URL> jarUrls = new ArrayList<>(jarPaths.size());
+        jarPaths.forEach(jarPath -> {
+            try {
+                URL jarUrl = Path.of(jarPath).toUri().toURL();
+                jarUrls.add(jarUrl);
+            } catch (MalformedURLException ex) {
+                throw new ScanToolException(ex.getMessage());
+            }
+        });
+        return new URLClassLoader(jarUrls.toArray(URL[]::new), this.getClass().getClassLoader());
     }
 
     private static class StringToListConverter implements CommandLine.ITypeConverter<List<String>> {

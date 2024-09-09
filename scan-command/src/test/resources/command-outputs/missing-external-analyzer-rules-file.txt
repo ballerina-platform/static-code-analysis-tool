@@ -1,1 +1,0 @@
-failed to load analysis rules from 'invalid/invalid_module_rulefilemissing_static_code_analyzer': cannot find file 'rules.json'
