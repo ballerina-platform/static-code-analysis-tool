@@ -61,6 +61,16 @@ public class Constants {
     static final String RULE_KIND_COLUMN = "Rule Kind";
     static final String RULE_DESCRIPTION_COLUMN = "Rule Description";
     static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerina/", "ballerinax/", "wso2/"};
+    public static final String MAIN_METHOD = "main";
+    public static final String INIT_METHOD = "init";
+
+    public static class RuleDescription {
+        public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
+        public static final String PUBLIC_NON_ISOLATED_CONSTRUCT = "Non isolated public class or function/method";
+
+        private RuleDescription() {
+        }
+    }
 
     private Constants() {
     }
