@@ -18,13 +18,22 @@
 
 package io.ballerina.scan.internal;
 
+import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.symbols.ClassFieldSymbol;
+import io.ballerina.compiler.api.symbols.Qualifier;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
+import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
+import io.ballerina.scan.utils.StaticCodeAnalyzerUtils;
+
+import java.util.List;
+
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.PRIVATE_KEYWORD;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.
@@ -35,8 +44,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private final Document document;
     private final SyntaxTree syntaxTree;
     private final ScannerContext scannerContext;
+    private final SemanticModel semanticModel;
 
     StaticCodeAnalyzer(Document document, ScannerContextImpl scannerContext) {
+        this.semanticModel = document.module().getCompilation().getSemanticModel();
         this.document = document;
         this.syntaxTree = document.syntaxTree();
         this.scannerContext = scannerContext;
@@ -57,5 +68,20 @@ class StaticCodeAnalyzer extends NodeVisitor {
             scannerContext.getReporter().reportIssue(document, checkExpressionNode.location(),
                     CoreRule.AVOID_CHECKPANIC.rule());
         }
+    }
+
+    @Override
+    public void visit(ObjectFieldNode objectFieldNode) {
+        semanticModel.symbol(objectFieldNode).ifPresent(symbol -> {
+            if (symbol instanceof ClassFieldSymbol classFieldSymbol) {
+                List<Qualifier> qualifiers = classFieldSymbol.qualifiers();
+                if (StaticCodeAnalyzerUtils.getQualifier(qualifiers, PRIVATE_KEYWORD.stringValue())) {
+                    if (semanticModel.references(symbol).size() == 1) {
+                        StaticCodeAnalyzerUtils.reportIssue(scannerContext, document, objectFieldNode,
+                                CoreRule.UNUSED_PRIVATE_FIELDS.rule());
+                    }
+                }
+            }
+        });
     }
 }
