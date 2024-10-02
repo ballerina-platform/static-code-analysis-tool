@@ -18,13 +18,18 @@
 
 package io.ballerina.scan.internal;
 
+import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
+import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
+import io.ballerina.compiler.syntax.tree.MethodCallExpressionNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
+
+import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.reportIssue;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.
@@ -35,11 +40,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private final Document document;
     private final SyntaxTree syntaxTree;
     private final ScannerContext scannerContext;
+    private final SemanticModel semanticModel;
 
     StaticCodeAnalyzer(Document document, ScannerContextImpl scannerContext) {
         this.document = document;
         this.syntaxTree = document.syntaxTree();
         this.scannerContext = scannerContext;
+        semanticModel = document.module().getCompilation().getSemanticModel();
     }
 
     void analyze() {
@@ -54,8 +61,39 @@ class StaticCodeAnalyzer extends NodeVisitor {
     @Override
     public void visit(CheckExpressionNode checkExpressionNode) {
         if (checkExpressionNode.checkKeyword().kind().equals(SyntaxKind.CHECKPANIC_KEYWORD)) {
-            scannerContext.getReporter().reportIssue(document, checkExpressionNode.location(),
+            reportIssue(scannerContext, document, checkExpressionNode,
                     CoreRule.AVOID_CHECKPANIC.rule());
         }
+    }
+
+    @Override
+    public void visit(ModulePartNode modulePartNode) {
+        modulePartNode.members().forEach(member -> member.accept(this));
+    }
+
+    @Override
+    public void visit(FunctionSignatureNode functionSignatureNode) {
+        functionSignatureNode.parameters().forEach(parameter -> {
+            semanticModel.symbol(parameter).ifPresent(symbol -> {
+                if (semanticModel.references(symbol).size() == 1) {
+                    reportIssue(scannerContext, document, parameter,
+                            CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
+                }
+            });
+            parameter.accept(this);
+        });
+    }
+
+    @Override
+    public void visit(MethodCallExpressionNode methodCallExpressionNode) {
+        methodCallExpressionNode.arguments().forEach(argument -> {
+            semanticModel.symbol(argument).ifPresent(symbol -> {
+                if (semanticModel.references(symbol).size() == 1) {
+                    reportIssue(scannerContext, document, argument,
+                            CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
+                }
+            });
+            argument.accept(this);
+        });
     }
 }
