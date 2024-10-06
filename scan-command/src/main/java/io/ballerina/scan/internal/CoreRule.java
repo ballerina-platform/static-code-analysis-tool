@@ -20,6 +20,7 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.utils.Constants;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +31,13 @@ import java.util.List;
  * @since 0.1.0
  * */
 enum CoreRule {
-    AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL));
+    AVOID_CHECKPANIC(RuleFactory.createRule(1, Constants.RuleDescription.AVOID_CHECKPANIC, RuleKind.CODE_SMELL)),
+    OPERATION_ALWAYS_EVALUATE_TO_TRUE(RuleFactory.createRule(6,
+            Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_TRUE, RuleKind.CODE_SMELL)),
+    OPERATION_ALWAYS_EVALUATE_TO_FALSE(RuleFactory.createRule(6,
+            Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_FALSE, RuleKind.CODE_SMELL)),
+    OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE(RuleFactory.createRule(6,
+            Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE, RuleKind.CODE_SMELL));
 
     private final Rule rule;
 

@@ -62,6 +62,19 @@ public class Constants {
     static final String RULE_DESCRIPTION_COLUMN = "Rule Description";
     static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerina/", "ballerinax/", "wso2/"};
 
+    public static class RuleDescription {
+        public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
+        public static final String OPERATION_ALWAYS_EVALUATE_TO_TRUE
+                = "This operation always evaluate to true";
+        public static final String OPERATION_ALWAYS_EVALUATE_TO_FALSE
+                = "This operation always evaluate to false";
+        public static final String OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE
+                = "This operation always evaluate to false";
+
+        private RuleDescription() {
+        }
+    }
+
     private Constants() {
     }
 }
