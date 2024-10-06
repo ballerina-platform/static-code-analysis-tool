@@ -75,6 +75,21 @@ public class Constants {
         }
     }
 
+    public static class Token {
+        public static String FLOAT = "float";
+        public static String INT = "int";
+        public static String INFINITY = "Infinity";
+        public static String MAX_VALUE = "MAX_VALUE";
+        public static String MIN_VALUE = "MIN_VALUE";
+        public static String TRUE = "true";
+        public static String FALSE = "false";
+        public static String ZERO = "0";
+        public static String ONE = "1";
+        public static String MINUS_ONE = "-1";
+        private Token() {
+        }
+    }
+
     private Constants() {
     }
 }
