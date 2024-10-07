@@ -70,6 +70,7 @@ public class Constants {
                 = "This operation always evaluate to false";
         public static final String OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE
                 = "This operation always evaluate to false";
+        public static final String SELF_ASSIGNMENT = "Self assignment";
 
         private RuleDescription() {
         }

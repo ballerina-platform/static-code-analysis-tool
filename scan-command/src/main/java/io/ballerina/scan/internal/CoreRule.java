@@ -37,7 +37,9 @@ enum CoreRule {
     OPERATION_ALWAYS_EVALUATE_TO_FALSE(RuleFactory.createRule(7,
             Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_FALSE, RuleKind.CODE_SMELL)),
     OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE(RuleFactory.createRule(8,
-            Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE, RuleKind.CODE_SMELL));
+            Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE, RuleKind.CODE_SMELL)),
+    SELF_ASSIGNMENT(RuleFactory.createRule(9,
+            Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL));;
 
     private final Rule rule;
 

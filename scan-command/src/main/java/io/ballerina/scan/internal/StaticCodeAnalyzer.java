@@ -19,8 +19,10 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
+import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeLocation;
@@ -88,7 +90,28 @@ class StaticCodeAnalyzer extends NodeVisitor {
         });
     }
 
+    @Override
+    public void visit(AssignmentStatementNode assignmentStatementNode) {
+        checkSameUsageInAssignment(assignmentStatementNode.varRef(), assignmentStatementNode.expression(),
+                CoreRule.SELF_ASSIGNMENT, assignmentStatementNode.location());
+        this.visitSyntaxNode(assignmentStatementNode);
+    }
+
+    @Override
+    public void visit(CompoundAssignmentStatementNode compoundAssignmentStatementNode) {
+        checkSameUsageInAssignment(compoundAssignmentStatementNode.lhsExpression(),
+                compoundAssignmentStatementNode.rhsExpression(), CoreRule.SELF_ASSIGNMENT,
+                compoundAssignmentStatementNode.location());
+        this.visitSyntaxNode(compoundAssignmentStatementNode);
+    }
+
     private void checkSameUsageInBinaryOperator(Node lhs, Node rhs, CoreRule rule, NodeLocation location) {
+        if (isSameSimpleExpression(lhs, rhs)) {
+            reportIssue(scannerContext, document, location, rule.rule());
+        }
+    }
+
+    private void checkSameUsageInAssignment(Node lhs, Node rhs, CoreRule rule, NodeLocation location) {
         if (isSameSimpleExpression(lhs, rhs)) {
             reportIssue(scannerContext, document, location, rule.rule());
         }

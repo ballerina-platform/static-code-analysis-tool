@@ -199,6 +199,62 @@ public class StaticCodeAnalyzerTest extends BaseTest {
                 Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_FALSE, RuleKind.CODE_SMELL);
     }
 
+    @Test(description = "test self assignment")
+    void testSelfAssignmentAnalyzer() {
+        String documentName = "self_assignment.bal";
+        Document document = loadDocument(documentName);
+        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.SELF_ASSIGNMENT.rule()));
+        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext);
+        staticCodeAnalyzer.analyze();
+        List<Issue> issues = scannerContext.getReporter().getIssues();
+
+        Assert.assertEquals(issues.size(), 22);
+        assertIssue(issues.get(0), documentName, 5, 4, 5, 10, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(1), documentName, 6, 4, 6, 11, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(2), documentName, 7, 4, 7, 11, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(3), documentName, 8, 4, 8, 11, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(4), documentName, 9, 4, 9, 11, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(5), documentName, 10, 4, 10, 11, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(6), documentName, 11, 4, 11, 11, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(7), documentName, 12, 4, 12, 11, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(8), documentName, 13, 4, 13, 12, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(9), documentName, 14, 4, 14, 12, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(10), documentName, 15, 4, 15, 13, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(11), documentName, 28, 4, 28, 14, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(12), documentName, 29, 4, 29, 15, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(13), documentName, 30, 4, 30, 15, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(14), documentName, 31, 4, 31, 15, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(15), documentName, 32, 4, 32, 15, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(16), documentName, 33, 4, 33, 15, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(17), documentName, 34, 4, 34, 15, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(18), documentName, 35, 4, 35, 15, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(19), documentName, 36, 4, 36, 16, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(20), documentName, 37, 4, 37, 16, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(21), documentName, 38, 4, 38, 17, "ballerina:9", 9,
+                Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+    }
+
     void assertIssue(Issue issue, String documentName, int startLine, int startOffset, int endLine, int endOffset,
                      String ruleId, int numericId, String description, RuleKind ruleKind) {
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
