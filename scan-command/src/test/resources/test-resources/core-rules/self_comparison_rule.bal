@@ -66,6 +66,32 @@ function testQualifiedVariableReference() {
     test2(i <= i:SIGNED8_MIN_VALUE);
 }
 
+function testIndexedExpression() {
+    map<int> a = {};
+    map<int> b = {};
+
+    test2(a["a"] <= a["a"]);  // warning
+    test2(a["a"] >= a["a"]);  // warning
+    test2(a["a"] == a["a"]);  // warning
+    test2(a["a"] != a["a"]);  // warning
+    test2(a["a"] < a["a"]);  // warning
+    test2(a["a"] > a["a"]);  // warning
+    test2(a["a"] === a["a"]);  // warning
+    test2(a["a"] !== a["a"]);  // warning
+    test2(a["a"] & a["a"]);  // warning
+    test2(a["a"] | a["a"]);  // warning
+    test2(b["a"] && b["a"]);  // warning
+    test2(b["a"] || b["a"]);  // warning
+
+    test2(a["a"] <= b["a"]);
+    test2(a["a"] || b["a"]);
+    test2(a["a"] == "b[\"a\"]");
+
+    test2(a["a"] <= a["b"]);
+    test2(a["a"] || a["b"]);
+    test2(a["a"] == "a[\"b\"]");
+}
+
 class A {
     int a = 3;
     boolean b = false;

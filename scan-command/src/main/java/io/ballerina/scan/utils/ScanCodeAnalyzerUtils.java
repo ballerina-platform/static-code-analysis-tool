@@ -2,9 +2,12 @@ package io.ballerina.scan.utils;
 
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.BuiltinSimpleNameReferenceNode;
+import io.ballerina.compiler.syntax.tree.ExpressionNode;
 import io.ballerina.compiler.syntax.tree.FieldAccessExpressionNode;
+import io.ballerina.compiler.syntax.tree.IndexedExpressionNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
+import io.ballerina.compiler.syntax.tree.SeparatedNodeList;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
@@ -39,11 +42,36 @@ public class ScanCodeAnalyzerUtils {
                     && isSameSimpleExpression(lhsExp.expression(), rhsExpr.expression());
         }
 
+        if (n1 instanceof IndexedExpressionNode lhsExp && n2 instanceof IndexedExpressionNode rhsExpr) {
+            // only the simple field access expressions will be considered.
+            return isSameSimpleExpression(lhsExp.containerExpression(), rhsExpr.containerExpression())
+                    && isSameKeyExpression(lhsExp.keyExpression(), rhsExpr.keyExpression());
+        }
+
         if (n1 instanceof BuiltinSimpleNameReferenceNode lhsExp
                 && n2 instanceof BuiltinSimpleNameReferenceNode rhsExpr) {
             return lhsExp.name().text().equals(rhsExpr.name().text());
         }
+
+        if (n1 instanceof BasicLiteralNode lhsExp && n2 instanceof BasicLiteralNode rhsExpr) {
+            return lhsExp.literalToken().text().equals(rhsExpr.literalToken().text());
+        }
+
         return false;
+    }
+
+    private static boolean isSameKeyExpression(SeparatedNodeList<ExpressionNode> lhsKeyExpNodes,
+                                               SeparatedNodeList<ExpressionNode> rhsKeyExpNodes) {
+        if (lhsKeyExpNodes.size() != rhsKeyExpNodes.size()) {
+            return false;
+        }
+
+        for (int i = 0; i < lhsKeyExpNodes.size(); i++) {
+            if (!isSameSimpleExpression(lhsKeyExpNodes.get(i), rhsKeyExpNodes.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static boolean isDefinedQualifiedNameReference(Node node, String module, String identifier) {

@@ -55,3 +55,25 @@ class A {
 function test2(any c) {
     _ = c;
 }
+
+function t() {
+    map<json> a = {};
+    map<json> b = {};
+
+    a["a"] = a["a"]; // warning
+    a["a"] += a["a"];  // warning
+    a["a"] -= a["a"];  // warning
+    a["a"] *= a["a"];  // warning
+    a["a"] /= a["a"];  // warning
+    a["a"] &= a["a"];  // warning
+    a["a"] |= a["a"];  // warning
+    a["a"] ^= a["a"];  // warning
+    a["a"] <<= a["a"];  // warning
+    a["a"] >>= a["a"];  // warning
+    a["a"] >>>= a["a"];  // warning
+
+    a["a"] = b["a"];
+    a.["a3"] = "a.[\"a3\"]";
+    a.["a"] += 1;
+    a.["a"] += a.["a4"];
+}
