@@ -120,19 +120,4 @@ spotbugsTest {
     }
 }
 
-tasks.register('validateSpotbugs') {
-    doLast {
-        if (spotbugsMain.reports.size() > 0 && spotbugsMain.reports[0].destination.exists() &&
-                spotbugsMain.reports[0].destination.text.readLines().size() > 0) {
-            spotbugsMain.reports[0].destination?.eachLine {
-                println 'Failure: ' + it
-            }
-        } else {
-            throw new GradleException("Spotbugs rule violations were found.");
-        }
-    }
-}
-
-spotbugsMain.finalizedBy validateSpotbugs
-
 jar.archiveFileName = "${project.name}.jar";
