@@ -160,7 +160,7 @@ function doNothing(int a) { // warning
     return;
 }
 
-public function t(int a, int b, int c) { // warning
-    var fn = function(int a2, int b2) returns int => b;
+public function t(int a, int b, int c) { // warning * 2
+    var fn = function(int a2, int b2) returns int => b; // warning * 2
     int _ = fn(1,2);
 }
