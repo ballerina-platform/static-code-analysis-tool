@@ -20,6 +20,7 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.utils.Constants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -31,7 +32,7 @@ import org.testng.annotations.Test;
 public class CoreRuleTest {
     @Test(description = "test all rules")
     void testAllRules() {
-        Assert.assertEquals(CoreRule.rules().size(), 1);
+        Assert.assertEquals(CoreRule.rules().size(), 2);
     }
 
     @Test(description = "test checkpanic rule")
@@ -39,7 +40,16 @@ public class CoreRuleTest {
         Rule rule = CoreRule.AVOID_CHECKPANIC.rule();
         Assert.assertEquals(rule.id(), "ballerina:1");
         Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), "Avoid checkpanic");
+        Assert.assertEquals(rule.description(), Constants.RuleDescription.AVOID_CHECKPANIC);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test unused function parameters test")
+    void testUnusedFunctionParameterRule() {
+        Rule rule = CoreRule.UNUSED_FUNCTION_PARAMETERS.rule();
+        Assert.assertEquals(rule.id(), "ballerina:2");
+        Assert.assertEquals(rule.numericId(), 2);
+        Assert.assertEquals(rule.description(), Constants.RuleDescription.UNUSED_FUNCTION_PARAMETERS);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }
