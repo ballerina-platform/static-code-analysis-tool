@@ -85,7 +85,7 @@ artifacts.add('default', file("${project.buildDir}/suppressions.xml")) {
 }
 
 def excludePattern = '**/module-info.java'
-tasks.withType(Checkstyle) {
+tasks.withType(Checkstyle).configureEach {
     exclude excludePattern
 }
 
@@ -106,8 +106,8 @@ spotbugsMain {
     reportsDir = file("$project.buildDir/reports/spotbugs")
 
     reports {
-        html.enabled true
-        text.enabled = true
+        html.required.set(true)
+        text.required.set(true)
     }
 
     def excludeFile = file("${projectDir}/spotbugs-exclude.xml")
@@ -123,8 +123,8 @@ spotbugsTest {
     reportsDir = file("$project.buildDir/reports/spotbugs")
 
     reports {
-        html.enabled true
-        text.enabled = true
+        html.required.set(true)
+        text.required.set(true)
     }
 
     def excludeFile = file("${projectDir}/spotbugs-exclude.xml")
