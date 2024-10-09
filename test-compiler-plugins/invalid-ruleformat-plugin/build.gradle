@@ -85,7 +85,7 @@ artifacts.add('default', file("${project.buildDir}/suppressions.xml")) {
 }
 
 def excludePattern = '**/module-info.java'
-tasks.withType(Checkstyle) {
+tasks.withType(Checkstyle).configureEach {
     exclude excludePattern
 }
 
@@ -106,8 +106,8 @@ spotbugsMain {
     reportsDir = file("$project.buildDir/reports/spotbugs")
 
     reports {
-        html.enabled true
-        text.enabled = true
+        html.required.set(true)
+        text.required.set(true)
     }
 
     def excludeFile = file("${projectDir}/spotbugs-exclude.xml")
@@ -123,8 +123,8 @@ spotbugsTest {
     reportsDir = file("$project.buildDir/reports/spotbugs")
 
     reports {
-        html.enabled true
-        text.enabled = true
+        html.required.set(true)
+        text.required.set(true)
     }
 
     def excludeFile = file("${projectDir}/spotbugs-exclude.xml")
@@ -132,21 +132,6 @@ spotbugsTest {
         excludeFilter = excludeFile
     }
 }
-
-tasks.register('validateSpotbugs') {
-    doLast {
-        if (spotbugsMain.reports.size() > 0 && spotbugsMain.reports[0].destination.exists() &&
-                spotbugsMain.reports[0].destination.text.readLines().size() > 0) {
-            spotbugsMain.reports[0].destination?.eachLine {
-                println 'Failure: ' + it
-            }
-        } else {
-            throw new GradleException("Spotbugs rule violations were found.");
-        }
-    }
-}
-
-spotbugsMain.finalizedBy validateSpotbugs
 
 // Configurations to automatically build and deploy custom static code analyzer compiler plugin
 def packageOrg = "invalid"
