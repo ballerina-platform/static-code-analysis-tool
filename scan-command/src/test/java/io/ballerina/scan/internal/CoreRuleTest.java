@@ -20,7 +20,7 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
-import io.ballerina.scan.utils.Constants;
+import io.ballerina.scan.utils.RuleDescription;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -40,7 +40,7 @@ public class CoreRuleTest {
         Rule rule = CoreRule.AVOID_CHECKPANIC.rule();
         Assert.assertEquals(rule.id(), "ballerina:1");
         Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), Constants.RuleDescription.AVOID_CHECKPANIC);
+        Assert.assertEquals(rule.description(), RuleDescription.AVOID_CHECKPANIC);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 
@@ -49,7 +49,7 @@ public class CoreRuleTest {
         Rule rule = CoreRule.UNUSED_FUNCTION_PARAMETERS.rule();
         Assert.assertEquals(rule.id(), "ballerina:2");
         Assert.assertEquals(rule.numericId(), 2);
-        Assert.assertEquals(rule.description(), Constants.RuleDescription.UNUSED_FUNCTION_PARAMETERS);
+        Assert.assertEquals(rule.description(), RuleDescription.UNUSED_FUNCTION_PARAMETERS);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }

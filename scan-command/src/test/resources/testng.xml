@@ -29,7 +29,8 @@ under the License.
             <class name="io.ballerina.scan.internal.IssueImplTest"/>
             <class name="io.ballerina.scan.internal.ReporterImplTest"/>
             <class name="io.ballerina.scan.internal.CoreRuleTest"/>
-            <class name="io.ballerina.scan.internal.StaticCodeAnalyzerTest"/>
+            <class name="io.ballerina.scan.internal.CheckPanicAnalyzerTest"/>
+            <class name="io.ballerina.scan.internal.UnusedFunctionParamAnalyzerTest"/>
             <class name="io.ballerina.scan.internal.ProjectAnalyzerTest"/>
             <class name="io.ballerina.scan.utils.ScanUtilsTest"/>
             <class name="io.ballerina.scan.utils.DiagnosticLogTest"/>

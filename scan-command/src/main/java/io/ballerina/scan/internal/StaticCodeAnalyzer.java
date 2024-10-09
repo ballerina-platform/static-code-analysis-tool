@@ -19,17 +19,23 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
-import io.ballerina.compiler.syntax.tree.MethodCallExpressionNode;
+import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionExpressionNode;
+import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionParameters;
+import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
+import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
+import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.projects.Document;
+import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScannerContext;
 
-import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.reportIssue;
+import java.util.Optional;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.
@@ -42,11 +48,11 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private final ScannerContext scannerContext;
     private final SemanticModel semanticModel;
 
-    StaticCodeAnalyzer(Document document, ScannerContextImpl scannerContext) {
+    StaticCodeAnalyzer(Document document, ScannerContextImpl scannerContext, SemanticModel semanticModel) {
         this.document = document;
         this.syntaxTree = document.syntaxTree();
         this.scannerContext = scannerContext;
-        semanticModel = document.module().getCompilation().getSemanticModel();
+        this.semanticModel = semanticModel;
     }
 
     void analyze() {
@@ -61,39 +67,65 @@ class StaticCodeAnalyzer extends NodeVisitor {
     @Override
     public void visit(CheckExpressionNode checkExpressionNode) {
         if (checkExpressionNode.checkKeyword().kind().equals(SyntaxKind.CHECKPANIC_KEYWORD)) {
-            reportIssue(scannerContext, document, checkExpressionNode,
-                    CoreRule.AVOID_CHECKPANIC.rule());
+            reportIssue(scannerContext, document, checkExpressionNode, CoreRule.AVOID_CHECKPANIC.rule());
         }
-    }
-
-    @Override
-    public void visit(ModulePartNode modulePartNode) {
-        modulePartNode.members().forEach(member -> member.accept(this));
     }
 
     @Override
     public void visit(FunctionSignatureNode functionSignatureNode) {
         functionSignatureNode.parameters().forEach(parameter -> {
-            semanticModel.symbol(parameter).ifPresent(symbol -> {
-                if (semanticModel.references(symbol).size() == 1) {
-                    reportIssue(scannerContext, document, parameter,
-                            CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
-                }
-            });
-            parameter.accept(this);
+            if (parameter instanceof IncludedRecordParameterNode includedRecordParameterNode) {
+                includedRecordParameterNode.paramName().ifPresent(name -> {
+                    if (isUnusedNode(name, semanticModel)) {
+                        reportIssue(scannerContext, document, name, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
+                    }
+                });
+                return;
+            }
+
+            if (isUnusedNode(parameter, semanticModel)) {
+                reportIssue(scannerContext, document, parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
+            }
+            this.visitSyntaxNode(parameter);
         });
+        functionSignatureNode.returnTypeDesc().ifPresent(returnTypeDesc -> returnTypeDesc.accept(this));
     }
 
     @Override
-    public void visit(MethodCallExpressionNode methodCallExpressionNode) {
-        methodCallExpressionNode.arguments().forEach(argument -> {
-            semanticModel.symbol(argument).ifPresent(symbol -> {
-                if (semanticModel.references(symbol).size() == 1) {
-                    reportIssue(scannerContext, document, argument,
-                            CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
+    public void visit(ImplicitAnonymousFunctionExpressionNode implicitAnonymousFunctionExpressionNode) {
+        checkUnusedParametersInImplicitFunctionExpression(implicitAnonymousFunctionExpressionNode.params());
+        this.visitSyntaxNode(implicitAnonymousFunctionExpressionNode.expression());
+    }
+
+    private void checkUnusedParametersInImplicitFunctionExpression(Node params) {
+        if (params instanceof ImplicitAnonymousFunctionParameters parameters) {
+            parameters.parameters().forEach(parameter -> {
+                if (isUnusedNode(parameter, semanticModel)) {
+                    reportIssue(scannerContext, document, parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
                 }
             });
-            argument.accept(this);
-        });
+        }
+
+        if (params instanceof SimpleNameReferenceNode) {
+            if (isUnusedNode(params, semanticModel)) {
+                reportIssue(scannerContext, document, params, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
+            }
+        }
+    }
+
+    private void reportIssue(ScannerContext scannerContext, Document document, Node node, Rule rule) {
+        scannerContext.getReporter().reportIssue(document, node.location(), rule);
+    }
+
+    private boolean isUnusedNode(Node node, SemanticModel semanticModel) {
+        Optional<Symbol> symbol = semanticModel.symbol(node);
+        if (symbol.isEmpty()) {
+            return false;
+        }
+
+        if (semanticModel.references(symbol.get()).size() == 1) {
+            return true;
+        }
+        return false;
     }
 }

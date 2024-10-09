@@ -113,7 +113,8 @@ class ProjectAnalyzer {
     private Consumer<DocumentId> analyzeDocument(Module module, ScannerContextImpl scannerContext) {
         return documentId -> {
             Document document = module.document(documentId);
-            StaticCodeAnalyzer analyzer = new StaticCodeAnalyzer(document, scannerContext);
+            StaticCodeAnalyzer analyzer = new StaticCodeAnalyzer(document, scannerContext,
+                    module.getCompilation().getSemanticModel());
             analyzer.analyze();
         };
     }
