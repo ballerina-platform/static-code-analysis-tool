@@ -80,11 +80,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
                         reportIssue(scannerContext, document, name, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
                     }
                 });
-                return;
-            }
-
-            if (isUnusedNode(parameter, semanticModel)) {
-                reportIssue(scannerContext, document, parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
+            } else {
+                if (isUnusedNode(parameter, semanticModel)) {
+                    reportIssue(scannerContext, document, parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
+                }
             }
             this.visitSyntaxNode(parameter);
         });
@@ -104,6 +103,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
                     reportIssue(scannerContext, document, parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
                 }
             });
+            return;
         }
 
         if (params instanceof SimpleNameReferenceNode) {
@@ -123,9 +123,6 @@ class StaticCodeAnalyzer extends NodeVisitor {
             return false;
         }
 
-        if (semanticModel.references(symbol.get()).size() == 1) {
-            return true;
-        }
-        return false;
+        return semanticModel.references(symbol.get()).size() == 1;
     }
 }
