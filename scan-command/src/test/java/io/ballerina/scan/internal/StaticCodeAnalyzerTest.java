@@ -27,13 +27,10 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Source;
-import io.ballerina.scan.utils.RuleDescription;
 import io.ballerina.tools.text.LineRange;
 import org.testng.Assert;
-import org.testng.annotations.Test;
 
 import java.nio.file.Path;
-import java.util.List;
 
 /**
  * Core analyzer tests.
