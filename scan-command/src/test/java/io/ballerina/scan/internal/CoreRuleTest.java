@@ -20,6 +20,7 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.utils.RuleDescription;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -31,7 +32,7 @@ import org.testng.annotations.Test;
 public class CoreRuleTest {
     @Test(description = "test all rules")
     void testAllRules() {
-        Assert.assertEquals(CoreRule.rules().size(), 1);
+        Assert.assertEquals(CoreRule.rules().size(), 2);
     }
 
     @Test(description = "test checkpanic rule")
@@ -39,7 +40,16 @@ public class CoreRuleTest {
         Rule rule = CoreRule.AVOID_CHECKPANIC.rule();
         Assert.assertEquals(rule.id(), "ballerina:1");
         Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), "Avoid checkpanic");
+        Assert.assertEquals(rule.description(), RuleDescription.AVOID_CHECKPANIC);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test checkpanic rule")
+    void testNonIsolatedPublicConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:3");
+        Assert.assertEquals(rule.numericId(), 3);
+        Assert.assertEquals(rule.description(), RuleDescription.PUBLIC_NON_ISOLATED_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }
