@@ -21,6 +21,8 @@ package io.ballerina.scan.internal;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
+import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
+import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
 import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionParameters;
@@ -71,7 +73,34 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     @Override
-    public void visit(FunctionSignatureNode functionSignatureNode) {
+    public void visit(FunctionDefinitionNode functionDefinitionNode) {
+        checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
+        this.visitSyntaxNode(functionDefinitionNode);
+    }
+
+    @Override
+    public void visit(ExplicitAnonymousFunctionExpressionNode explicitAnonymousFunctionExpressionNode) {
+        checkUnusedFunctionParameters(explicitAnonymousFunctionExpressionNode.functionSignature());
+        this.visitSyntaxNode(explicitAnonymousFunctionExpressionNode);
+    }
+
+    @Override
+    public void visit(ImplicitAnonymousFunctionExpressionNode implicitAnonymousFunctionExpressionNode) {
+        Node params = implicitAnonymousFunctionExpressionNode.params();
+        if (params instanceof ImplicitAnonymousFunctionParameters parameters) {
+            parameters.parameters().forEach(parameter -> {
+                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS);
+            });
+            return;
+        }
+        if (params instanceof SimpleNameReferenceNode) {
+            reportIssueIfNodeIsUnused(params, CoreRule.UNUSED_FUNCTION_PARAMETERS);
+        }
+
+        this.visitSyntaxNode(implicitAnonymousFunctionExpressionNode.expression());
+    }
+
+    private void checkUnusedFunctionParameters(FunctionSignatureNode functionSignatureNode) {
         functionSignatureNode.parameters().forEach(parameter -> {
             if (parameter instanceof IncludedRecordParameterNode includedRecordParameterNode) {
                 includedRecordParameterNode.paramName().ifPresent(name -> {
@@ -82,27 +111,6 @@ class StaticCodeAnalyzer extends NodeVisitor {
             }
             this.visitSyntaxNode(parameter);
         });
-        functionSignatureNode.parameters().forEach(parameterNode -> parameterNode.accept(this));
-        functionSignatureNode.returnTypeDesc().ifPresent(returnTypeDesc -> returnTypeDesc.accept(this));
-    }
-
-    @Override
-    public void visit(ImplicitAnonymousFunctionExpressionNode implicitAnonymousFunctionExpressionNode) {
-        checkUnusedParametersInImplicitFunctionExpression(implicitAnonymousFunctionExpressionNode.params());
-        this.visitSyntaxNode(implicitAnonymousFunctionExpressionNode.expression());
-    }
-
-    private void checkUnusedParametersInImplicitFunctionExpression(Node params) {
-        if (params instanceof ImplicitAnonymousFunctionParameters parameters) {
-            parameters.parameters().forEach(parameter -> {
-                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS);
-            });
-            return;
-        }
-
-        if (params instanceof SimpleNameReferenceNode) {
-            reportIssueIfNodeIsUnused(params, CoreRule.UNUSED_FUNCTION_PARAMETERS);
-        }
     }
 
     private void reportIssueIfNodeIsUnused(Node node, CoreRule coreRule) {

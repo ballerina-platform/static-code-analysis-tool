@@ -17,7 +17,7 @@
 import ballerina/http;
 
 type TestObjType object {
-    function t(int, int) returns int;
+    function t(int a, int a2) returns int;
 };
 
 function test(int a, int b) returns int {
@@ -60,15 +60,6 @@ class A {
     }
 
     function test7(int a, int b, int... c) returns string => a.toString(); // warning * 2
-
-    function testIncludedParams(*IncludedRecord includedRecordParam) {// warning
-        return;
-    }
-
-    function testIncludedParams2(*IncludedRecord includedRecordParam) {
-        _ = includedRecordParam;
-        return;
-    }
 }
 
 service /a on new http:Listener(8080) {
@@ -77,21 +68,6 @@ service /a on new http:Listener(8080) {
     }
 
     resource function get test2(int a, int b) returns int => a + b;
-
-    function testIncludedParams(*IncludedRecord includedparam) {// warning
-        return;
-    }
-
-    function testIncludedParams2(*IncludedRecord includedparam) {
-        _ = includedparam;
-        return;
-    }
-}
-
-public function main(int a, int b, int c) { // warning
-    _ = test(a, c);
-    [1,2].forEach(element => ()); // warning
-    [1,2].forEach(element => doNothing(element));
 }
 
 function doNothing(int a) { // warning
@@ -105,11 +81,11 @@ public function t(int a, int b, int c) { // warning * 2
 
 type IncludedRecord record {int a;};
 
-function testIncludedParams(*IncludedRecord includedparam) {// warning
+function testIncludedParams(*IncludedRecord includedRecordParam) {// warning
     return;
 }
 
-function testIncludedParams2(*IncludedRecord includedparam) {
-    _ = includedparam;
+function testIncludedParams2(*IncludedRecord includedRecordParam) {
+    _ = includedRecordParam;
     return;
 }

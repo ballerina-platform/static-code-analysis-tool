@@ -42,10 +42,6 @@ type R record {
     };
 };
 
-function doNothing(any a) { // warning
-    return;
-}
-
 public function testInlineFunctionDecl() {
     F[] _ = [
         (a, b) => a, // warning
@@ -53,4 +49,15 @@ public function testInlineFunctionDecl() {
             return b;
         }
     ];
+}
+
+public function main(int a, int b, int c) { // warning
+    _ = doNothing(a);
+    _ = doNothing(c);
+    [1,2].forEach((element) => ()); // warning
+    [1,2].forEach((element) => doNothing(element));
+}
+
+function doNothing(any a) { // warning
+    return;
 }
