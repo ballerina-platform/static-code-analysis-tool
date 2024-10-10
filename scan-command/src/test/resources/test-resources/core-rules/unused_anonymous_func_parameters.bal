@@ -23,9 +23,9 @@ function (int, int) returns int anonFunc1 = (x, y) => x + y;
 
 function (int, int) returns int anonFunc2 = function (int x, int y) returns int => x + y;
 
-public function anonFunc4(int a) => [1,2].forEach(element => doNothing(element)); // warning
+public function anonFunc3(int a) => [1,2].forEach(element => doNothing(element)); // warning
 
-public function anonFunc3(int a) => [1,2].forEach(element => doNothing(a)); // warning
+public function anonFunc4(int a) => [1,2].forEach(element => doNothing(a)); // warning
 
 function (int, int) returns int anonFunc5 = (x, y) => x; // warning
 

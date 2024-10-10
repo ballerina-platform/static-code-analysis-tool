@@ -32,7 +32,6 @@ import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.projects.Document;
-import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScannerContext;
 
 import java.util.Optional;
@@ -67,7 +66,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
     @Override
     public void visit(CheckExpressionNode checkExpressionNode) {
         if (checkExpressionNode.checkKeyword().kind().equals(SyntaxKind.CHECKPANIC_KEYWORD)) {
-            reportIssue(scannerContext, document, checkExpressionNode, CoreRule.AVOID_CHECKPANIC.rule());
+            reportIssue(checkExpressionNode, CoreRule.AVOID_CHECKPANIC);
         }
     }
 
@@ -76,17 +75,14 @@ class StaticCodeAnalyzer extends NodeVisitor {
         functionSignatureNode.parameters().forEach(parameter -> {
             if (parameter instanceof IncludedRecordParameterNode includedRecordParameterNode) {
                 includedRecordParameterNode.paramName().ifPresent(name -> {
-                    if (isUnusedNode(name, semanticModel)) {
-                        reportIssue(scannerContext, document, name, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
-                    }
+                    reportIssueIfNodeIsUnused(name, CoreRule.UNUSED_FUNCTION_PARAMETERS);
                 });
             } else {
-                if (isUnusedNode(parameter, semanticModel)) {
-                    reportIssue(scannerContext, document, parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
-                }
+                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS);
             }
             this.visitSyntaxNode(parameter);
         });
+        functionSignatureNode.parameters().forEach(parameterNode -> parameterNode.accept(this));
         functionSignatureNode.returnTypeDesc().ifPresent(returnTypeDesc -> returnTypeDesc.accept(this));
     }
 
@@ -99,30 +95,28 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private void checkUnusedParametersInImplicitFunctionExpression(Node params) {
         if (params instanceof ImplicitAnonymousFunctionParameters parameters) {
             parameters.parameters().forEach(parameter -> {
-                if (isUnusedNode(parameter, semanticModel)) {
-                    reportIssue(scannerContext, document, parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
-                }
+                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS);
             });
             return;
         }
 
         if (params instanceof SimpleNameReferenceNode) {
-            if (isUnusedNode(params, semanticModel)) {
-                reportIssue(scannerContext, document, params, CoreRule.UNUSED_FUNCTION_PARAMETERS.rule());
-            }
+            reportIssueIfNodeIsUnused(params, CoreRule.UNUSED_FUNCTION_PARAMETERS);
         }
     }
 
-    private void reportIssue(ScannerContext scannerContext, Document document, Node node, Rule rule) {
-        scannerContext.getReporter().reportIssue(document, node.location(), rule);
+    private void reportIssueIfNodeIsUnused(Node node, CoreRule coreRule) {
+        if (isUnusedNode(node)) {
+            reportIssue(node, coreRule);
+        }
     }
 
-    private boolean isUnusedNode(Node node, SemanticModel semanticModel) {
+    private void reportIssue(Node node, CoreRule coreRule) {
+        scannerContext.getReporter().reportIssue(document, node.location(), coreRule.rule());
+    }
+
+    private boolean isUnusedNode(Node node) {
         Optional<Symbol> symbol = semanticModel.symbol(node);
-        if (symbol.isEmpty()) {
-            return false;
-        }
-
-        return semanticModel.references(symbol.get()).size() == 1;
+        return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
     }
 }
