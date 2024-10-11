@@ -28,11 +28,11 @@ import org.testng.annotations.Test;
 import java.util.List;
 
 /**
- * Checkpanic analyzer tests.
+ * Checkpanic expression analyzer tests.
  *
  * @since 0.1.0
  */
-public class CheckpanicAnalyzerTest extends StaticCodeAnalyzerTest {
+public class CheckpanicExpressionAnalyzerTest extends StaticCodeAnalyzerTest {
 
     @Test(description = "test checkpanic analyzer")
     void testCheckpanicAnalyzer() {
