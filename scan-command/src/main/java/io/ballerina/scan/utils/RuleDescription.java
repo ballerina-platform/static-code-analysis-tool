@@ -19,22 +19,13 @@
 package io.ballerina.scan.utils;
 
 /**
- *
- * This class provides the descriptions for Ballerina static coding rules.
+ * {@code RuleDescription} provides descriptions for Ballerina static coding rules.
  *
  * @since 0.1.0
  */
 public class RuleDescription {
-
-    /**
-     * Description for the rule that advises avoiding the use of 'checkpanic'.
-     */
     public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
-
-    /**
-     * Description for the rule that warns against unused function parameters.
-     */
-    public static final String UNUSED_FUNCTION_PARAMETERS = "Unused function parameters";
+    public static final String UNUSED_FUNCTION_PARAMETER = "Unused function parameter";
 
     private RuleDescription() {
     }

@@ -46,10 +46,10 @@ public class CoreRuleTest {
 
     @Test(description = "test unused function parameters test")
     void testUnusedFunctionParameterRule() {
-        Rule rule = CoreRule.UNUSED_FUNCTION_PARAMETERS.rule();
+        Rule rule = CoreRule.UNUSED_FUNCTION_PARAMETER.rule();
         Assert.assertEquals(rule.id(), "ballerina:2");
         Assert.assertEquals(rule.numericId(), 2);
-        Assert.assertEquals(rule.description(), RuleDescription.UNUSED_FUNCTION_PARAMETERS);
+        Assert.assertEquals(rule.description(), RuleDescription.UNUSED_FUNCTION_PARAMETER);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }

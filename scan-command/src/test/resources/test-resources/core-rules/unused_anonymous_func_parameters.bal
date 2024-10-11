@@ -61,3 +61,7 @@ public function main(int a, int b, int c) { // warning
 function doNothing(any a) { // warning
     return;
 }
+
+function (int a , int b) returns int v = (x, y) => x + y;
+
+function (int a , int b) returns int v2 = (x, y) => x; // warning

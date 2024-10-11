@@ -32,8 +32,8 @@ import java.util.List;
  * */
 enum CoreRule {
     AVOID_CHECKPANIC(RuleFactory.createRule(1, RuleDescription.AVOID_CHECKPANIC, RuleKind.CODE_SMELL)),
-    UNUSED_FUNCTION_PARAMETERS(RuleFactory.createRule(2,
-            RuleDescription.UNUSED_FUNCTION_PARAMETERS, RuleKind.CODE_SMELL));
+    UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
+            RuleDescription.UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL));
 
     private final Rule rule;
 

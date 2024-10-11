@@ -89,12 +89,12 @@ class StaticCodeAnalyzer extends NodeVisitor {
         Node params = implicitAnonymousFunctionExpressionNode.params();
         if (params instanceof ImplicitAnonymousFunctionParameters parameters) {
             parameters.parameters().forEach(parameter -> {
-                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS);
+                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETER);
             });
             return;
         }
         if (params instanceof SimpleNameReferenceNode) {
-            reportIssueIfNodeIsUnused(params, CoreRule.UNUSED_FUNCTION_PARAMETERS);
+            reportIssueIfNodeIsUnused(params, CoreRule.UNUSED_FUNCTION_PARAMETER);
         }
 
         this.visitSyntaxNode(implicitAnonymousFunctionExpressionNode.expression());
@@ -104,10 +104,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
         functionSignatureNode.parameters().forEach(parameter -> {
             if (parameter instanceof IncludedRecordParameterNode includedRecordParameterNode) {
                 includedRecordParameterNode.paramName().ifPresent(name -> {
-                    reportIssueIfNodeIsUnused(name, CoreRule.UNUSED_FUNCTION_PARAMETERS);
+                    reportIssueIfNodeIsUnused(name, CoreRule.UNUSED_FUNCTION_PARAMETER);
                 });
             } else {
-                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETERS);
+                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETER);
             }
             this.visitSyntaxNode(parameter);
         });
