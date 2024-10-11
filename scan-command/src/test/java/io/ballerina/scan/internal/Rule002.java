@@ -14,11 +14,11 @@ import java.util.List;
  *
  * @since 0.1.0
  */
-public class UnusedFunctionParamAnalyzerTest extends StaticCodeAnalyzerTest {
+public class Rule002 extends StaticCodeAnalyzerTest {
 
     @Test(description = "test unused function parameters analyzer")
     void testUnusedFunctionParameterAnalyzer() {
-        String documentName = "unused_func_parameters.bal";
+        String documentName = "rule002_unused_func_parameters.bal";
         Document document = loadDocument(documentName);
         ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document,
@@ -65,7 +65,7 @@ public class UnusedFunctionParamAnalyzerTest extends StaticCodeAnalyzerTest {
 
     @Test(description = "test unused anonymous function parameters analyzer")
     void testUnusedAnonymousFunctionParameterAnalyzer() {
-        String documentName = "unused_anonymous_func_parameters.bal";
+        String documentName = "rule002_unused_anonymous_func_parameters.bal";
         Document document = loadDocument(documentName);
         ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document,

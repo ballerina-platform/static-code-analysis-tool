@@ -32,11 +32,11 @@ import java.util.List;
  *
  * @since 0.1.0
  */
-public class CheckpanicExpressionAnalyzerTest extends StaticCodeAnalyzerTest {
+public class Rule001 extends StaticCodeAnalyzerTest {
 
     @Test(description = "test checkpanic analyzer")
     void testCheckpanicAnalyzer() {
-        String documentName = "rule_checkpanic.bal";
+        String documentName = "rule001_rule_checkpanic.bal";
         Document document = loadDocument(documentName);
         ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.AVOID_CHECKPANIC.rule()));
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document,

@@ -19,7 +19,7 @@
 package io.ballerina.scan.utils;
 
 /**
- * {@code RuleDescription} provides descriptions for Ballerina static coding rules.
+ * {@code RuleDescription} represents the descriptions for static code analysis rules.
  *
  * @since 0.1.0
  */
