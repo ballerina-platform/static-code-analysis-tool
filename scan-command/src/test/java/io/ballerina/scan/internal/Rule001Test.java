@@ -21,21 +21,21 @@ package io.ballerina.scan.internal;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.RuleKind;
-import io.ballerina.scan.utils.RuleDescription;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.util.List;
 
 /**
- * Checkpanic expression analyzer tests.
+ * Checkpanic usage analyzer tests.
  *
  * @since 0.1.0
  */
-public class Rule001 extends StaticCodeAnalyzerTest {
+public class Rule001Test extends StaticCodeAnalyzerTest {
+    public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
 
     @Test(description = "test checkpanic analyzer")
-    void testCheckpanicAnalyzer() {
+    void testCheckpanicUsage() {
         String documentName = "rule001_rule_checkpanic.bal";
         Document document = loadDocument(documentName);
         ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.AVOID_CHECKPANIC.rule()));
@@ -46,6 +46,6 @@ public class Rule001 extends StaticCodeAnalyzerTest {
         Assert.assertEquals(issues.size(), 1);
 
         assertIssue(issues.get(0), documentName, 20, 17, 20, 39, "ballerina:1", 1,
-                RuleDescription.AVOID_CHECKPANIC, RuleKind.CODE_SMELL);
+                AVOID_CHECKPANIC, RuleKind.CODE_SMELL);
     }
 }
