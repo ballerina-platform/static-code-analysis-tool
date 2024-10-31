@@ -21,24 +21,30 @@ package io.ballerina.scan.internal;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.ClassSymbol;
 import io.ballerina.compiler.api.symbols.Qualifier;
+import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.SymbolKind;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
+import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
+import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
+import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionExpressionNode;
+import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionParameters;
+import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
+import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.Token;
 import io.ballerina.projects.Document;
-import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScannerContext;
 
 import java.util.List;
+import java.util.Optional;
 
-import static io.ballerina.compiler.syntax.tree.SyntaxKind.CHECKPANIC_KEYWORD;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.ISOLATED_KEYWORD;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.PUBLIC_KEYWORD;
 import static io.ballerina.scan.utils.Constants.INIT_METHOD;
@@ -73,9 +79,42 @@ class StaticCodeAnalyzer extends NodeVisitor {
      */
     @Override
     public void visit(CheckExpressionNode checkExpressionNode) {
-        if (checkExpressionNode.checkKeyword().kind().equals(CHECKPANIC_KEYWORD)) {
-            reportIssue(scannerContext, document, checkExpressionNode, CoreRule.AVOID_CHECKPANIC.rule());
+        if (checkExpressionNode.checkKeyword().kind().equals(SyntaxKind.CHECKPANIC_KEYWORD)) {
+            reportIssue(checkExpressionNode, CoreRule.AVOID_CHECKPANIC);
         }
+    }
+
+    @Override
+    public void visit(FunctionDefinitionNode functionDefinitionNode) {
+        checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
+        if (!functionDefinitionNode.functionName().text().equals(MAIN_METHOD) &&
+                !functionDefinitionNode.functionName().text().equals(INIT_METHOD)) {
+            checkNonIsolatedPublicFunctions(functionDefinitionNode);
+        }
+        functionDefinitionNode.functionBody().children().forEach(child -> child.accept(this));
+        this.visitSyntaxNode(functionDefinitionNode);
+    }
+
+    @Override
+    public void visit(ExplicitAnonymousFunctionExpressionNode explicitAnonymousFunctionExpressionNode) {
+        checkUnusedFunctionParameters(explicitAnonymousFunctionExpressionNode.functionSignature());
+        this.visitSyntaxNode(explicitAnonymousFunctionExpressionNode);
+    }
+
+    @Override
+    public void visit(ImplicitAnonymousFunctionExpressionNode implicitAnonymousFunctionExpressionNode) {
+        Node params = implicitAnonymousFunctionExpressionNode.params();
+        if (params instanceof ImplicitAnonymousFunctionParameters parameters) {
+            parameters.parameters().forEach(parameter -> {
+                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETER);
+            });
+            return;
+        }
+        if (params instanceof SimpleNameReferenceNode) {
+            reportIssueIfNodeIsUnused(params, CoreRule.UNUSED_FUNCTION_PARAMETER);
+        }
+
+        this.visitSyntaxNode(implicitAnonymousFunctionExpressionNode.expression());
     }
 
     @Override
@@ -84,23 +123,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
         checkNonIsolatedPublicClassMembers(classDefinitionNode);
     }
 
-    @Override
-    public void visit(FunctionDefinitionNode functionDefinitionNode) {
-        if (!functionDefinitionNode.functionName().text().equals(MAIN_METHOD) &&
-                    !functionDefinitionNode.functionName().text().equals(INIT_METHOD)) {
-            checkNonIsolatedPublicFunctions(functionDefinitionNode);
-        }
-        functionDefinitionNode.functionBody().children().forEach(child -> child.accept(this));
-    }
-
     private void checkNonIsolatedPublicClassDefinitions(ClassDefinitionNode classDefinitionNode) {
         semanticModel.symbol(classDefinitionNode).ifPresent(symbol -> {
             if (symbol instanceof ClassSymbol classSymbol) {
                 List<Qualifier> qualifiers = classSymbol.qualifiers();
                 if (getQualifier(qualifiers, PUBLIC_KEYWORD.stringValue()) &&
                         !getQualifier(qualifiers, ISOLATED_KEYWORD.stringValue())) {
-                    reportIssue(scannerContext, document, classDefinitionNode,
-                            CoreRule.PUBLIC_NON_ISOLATED_CONSTRUCT.rule());
+                    reportIssue(classDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_CONSTRUCT);
                 }
             }
         });
@@ -124,7 +153,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 if (getQualifier(classSymbol.qualifiers(), PUBLIC_KEYWORD.stringValue()) &&
                         getQualifier(member.qualifierList(), PUBLIC_KEYWORD) &&
                         !getQualifier(member.qualifierList(), ISOLATED_KEYWORD)) {
-                    reportIssue(scannerContext, document, member, CoreRule.PUBLIC_NON_ISOLATED_CONSTRUCT.rule());
+                    reportIssue(member, CoreRule.PUBLIC_NON_ISOLATED_CONSTRUCT);
                 }
             }
         });
@@ -135,8 +164,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (symbol.kind() != SymbolKind.METHOD) {
                 NodeList<Token> qualifiers = functionDefinitionNode.qualifierList();
                 if (getQualifier(qualifiers, PUBLIC_KEYWORD) && !getQualifier(qualifiers, ISOLATED_KEYWORD)) {
-                    reportIssue(scannerContext, document, functionDefinitionNode,
-                            CoreRule.PUBLIC_NON_ISOLATED_CONSTRUCT.rule());
+                    reportIssue(functionDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_CONSTRUCT);
                 }
             }
         });
@@ -160,7 +188,31 @@ class StaticCodeAnalyzer extends NodeVisitor {
         return false;
     }
 
-    private void reportIssue(ScannerContext scannerContext, Document document, Node node, Rule rule) {
-        scannerContext.getReporter().reportIssue(document, node.location(), rule);
+    private void checkUnusedFunctionParameters(FunctionSignatureNode functionSignatureNode) {
+        functionSignatureNode.parameters().forEach(parameter -> {
+            if (parameter instanceof IncludedRecordParameterNode includedRecordParameterNode) {
+                includedRecordParameterNode.paramName().ifPresent(name -> {
+                    reportIssueIfNodeIsUnused(name, CoreRule.UNUSED_FUNCTION_PARAMETER);
+                });
+            } else {
+                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETER);
+            }
+            this.visitSyntaxNode(parameter);
+        });
+    }
+
+    private void reportIssueIfNodeIsUnused(Node node, CoreRule coreRule) {
+        if (isUnusedNode(node)) {
+            reportIssue(node, coreRule);
+        }
+    }
+
+    private void reportIssue(Node node, CoreRule coreRule) {
+        scannerContext.getReporter().reportIssue(document, node.location(), coreRule.rule());
+    }
+
+    private boolean isUnusedNode(Node node) {
+        Optional<Symbol> symbol = semanticModel.symbol(node);
+        return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
     }
 }

@@ -30,9 +30,12 @@ import org.testng.annotations.Test;
  * @since 0.1.0
  */
 public class CoreRuleTest {
+    public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
+    public static final String UNUSED_FUNCTION_PARAMETER = "Unused function parameter";
+
     @Test(description = "test all rules")
     void testAllRules() {
-        Assert.assertEquals(CoreRule.rules().size(), 2);
+        Assert.assertEquals(CoreRule.rules().size(), 3);
     }
 
     @Test(description = "test checkpanic rule")
@@ -40,7 +43,16 @@ public class CoreRuleTest {
         Rule rule = CoreRule.AVOID_CHECKPANIC.rule();
         Assert.assertEquals(rule.id(), "ballerina:1");
         Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), RuleDescription.AVOID_CHECKPANIC);
+        Assert.assertEquals(rule.description(), AVOID_CHECKPANIC);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test unused function parameters test")
+    void testUnusedFunctionParameterRule() {
+        Rule rule = CoreRule.UNUSED_FUNCTION_PARAMETER.rule();
+        Assert.assertEquals(rule.id(), "ballerina:2");
+        Assert.assertEquals(rule.numericId(), 2);
+        Assert.assertEquals(rule.description(), UNUSED_FUNCTION_PARAMETER);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 
@@ -50,6 +62,7 @@ public class CoreRuleTest {
         Assert.assertEquals(rule.id(), "ballerina:3");
         Assert.assertEquals(rule.numericId(), 3);
         Assert.assertEquals(rule.description(), RuleDescription.PUBLIC_NON_ISOLATED_CONSTRUCT);
+        Assert.assertEquals(rule.description(), RuleDescription.AVOID_CHECKPANIC);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }

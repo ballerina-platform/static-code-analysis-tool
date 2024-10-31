@@ -33,7 +33,7 @@ import org.testng.Assert;
 import java.nio.file.Path;
 
 /**
- * Core analyzer tests.
+ * Static code analyzer test.
  *
  * @since 0.1.0
  */
