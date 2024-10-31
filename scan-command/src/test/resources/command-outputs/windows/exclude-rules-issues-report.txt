@@ -2,11 +2,11 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 21,
-      "startColumn": 0,
-      "endColumn": 1,
-      "startOffset": 664,
+      "startLine": 17,
+      "endLine": 22,
+      "startColumn": 1,
+      "endColumn": 2,
+      "startOffset": 649,
       "length": 139
     },
     "rule": {
@@ -22,12 +22,12 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 21,
-      "startColumn": 0,
-      "endColumn": 1,
-      "startOffset": 664,
-      "length": 139
+      "startLine": 17,
+      "endLine": 22,
+      "startColumn": 1,
+      "endColumn": 2,
+      "startOffset": 649,
+      "length": 134
     },
     "rule": {
       "id": "exampleOrg/example_module_static_code_analyzer:1",
@@ -42,12 +42,12 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 21,
-      "startColumn": 0,
-      "endColumn": 1,
-      "startOffset": 664,
-      "length": 139
+      "startLine": 17,
+      "endLine": 22,
+      "startColumn": 1,
+      "endColumn": 2,
+      "startOffset": 649,
+      "length": 134
     },
     "rule": {
       "id": "ballerinax/example_module_static_code_analyzer:1",

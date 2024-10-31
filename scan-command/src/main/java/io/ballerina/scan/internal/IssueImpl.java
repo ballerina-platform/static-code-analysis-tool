@@ -45,9 +45,9 @@ public class IssueImpl implements Issue {
               String filePath) {
         LineRange lineRange = location.lineRange();
         TextRange textRange = location.textRange();
-        this.location = new BLangDiagnosticLocation(lineRange.fileName(), lineRange.startLine().line(),
-                lineRange.endLine().line(), lineRange.startLine().offset(), lineRange.endLine().offset(),
-                textRange.startOffset(), textRange.length());
+        this.location = new BLangDiagnosticLocation(lineRange.fileName(), lineRange.startLine().line() + 1,
+                lineRange.endLine().line() + 1, lineRange.startLine().offset() + 1, lineRange.endLine().offset() + 1,
+                textRange.startOffset() + 1, textRange.length());
         this.rule = (RuleImpl) rule;
         this.source = source;
         this.fileName = fileName;

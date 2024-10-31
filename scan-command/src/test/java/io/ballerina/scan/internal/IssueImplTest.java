@@ -38,7 +38,10 @@ public class IssueImplTest {
                 17, 1, 748, 4);
         IssueImpl issue = new IssueImpl(location, rule, Source.BUILT_IN, "main.bal",
                 "valid_bal_project/main.bal");
-        Assert.assertEquals(issue.location(), location);
+        Assert.assertEquals(issue.location().lineRange().startLine().line(), 17);
+        Assert.assertEquals(issue.location().lineRange().endLine().line(), 24);
+        Assert.assertEquals(issue.location().lineRange().startLine().offset(), 18);
+        Assert.assertEquals(issue.location().lineRange().endLine().offset(), 2);
         Assert.assertEquals(issue.rule(), rule);
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
         Assert.assertEquals(issue.fileName(), "main.bal");

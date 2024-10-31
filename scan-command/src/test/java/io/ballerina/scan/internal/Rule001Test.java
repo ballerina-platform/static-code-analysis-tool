@@ -45,7 +45,7 @@ public class Rule001Test extends StaticCodeAnalyzerTest {
         List<Issue> issues = scannerContext.getReporter().getIssues();
         Assert.assertEquals(issues.size(), 1);
 
-        assertIssue(issues.get(0), documentName, 20, 17, 20, 39, "ballerina:1", 1,
+        assertIssue(issues.get(0), documentName, 21, 18, 21, 40, "ballerina:1", 1,
                 AVOID_CHECKPANIC, RuleKind.CODE_SMELL);
     }
 }

@@ -2,11 +2,11 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 21,
-      "startColumn": 0,
-      "endColumn": 1,
-      "startOffset": 648,
+      "startLine": 17,
+      "endLine": 22,
+      "startColumn": 1,
+      "endColumn": 2,
+      "startOffset": 649,
       "length": 134
     },
     "rule": {
@@ -22,11 +22,11 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 21,
-      "startColumn": 0,
-      "endColumn": 1,
-      "startOffset": 648,
+      "startLine": 17,
+      "endLine": 22,
+      "startColumn": 1,
+      "endColumn": 2,
+      "startOffset": 649,
       "length": 134
     },
     "rule": {
@@ -42,11 +42,11 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 21,
-      "startColumn": 0,
-      "endColumn": 1,
-      "startOffset": 648,
+      "startLine": 17,
+      "endLine": 22,
+      "startColumn": 1,
+      "endColumn": 2,
+      "startOffset": 649,
       "length": 134
     },
     "rule": {

@@ -69,7 +69,16 @@ public class ReporterImplTest {
         reporter.reportIssue(document, issueLocation, 101);
         List<Issue> issues = reporter.getIssues();
         Issue issue = issues.get(0);
-        Assert.assertEquals(issue.location(), issueLocation);
+        Assert.assertEquals(issue.location().lineRange().startLine().line(),
+                issueLocation.lineRange().startLine().line() + 1);
+        Assert.assertEquals(issue.location().lineRange().endLine().line(),
+                issueLocation.lineRange().endLine().line() + 1);
+        Assert.assertEquals(issue.location().lineRange().startLine().offset(),
+                issueLocation.lineRange().startLine().offset() + 1);
+        Assert.assertEquals(issue.location().lineRange().endLine().offset(),
+                issueLocation.lineRange().endLine().offset() + 1);
+        Assert.assertEquals(issue.location().textRange().length(),
+                issueLocation.textRange().length());
         Assert.assertEquals(issue.rule(), rule);
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
     }
@@ -93,13 +102,22 @@ public class ReporterImplTest {
         TextRange textRange = location.textRange();
 
         BLangDiagnosticLocation issueLocation = new BLangDiagnosticLocation(lineRange.fileName(),
-                lineRange.startLine().line(), lineRange.endLine().line(),
-                lineRange.startLine().offset(), lineRange.endLine().offset(),
-                textRange.startOffset(), textRange.length());
+                lineRange.startLine().line() + 1, lineRange.endLine().line() + 1,
+                lineRange.startLine().offset() + 1, lineRange.endLine().offset() + 1,
+                textRange.startOffset() + 1, textRange.length());
         reporter.reportIssue(document, issueLocation, 101);
         List<Issue> issues = reporter.getIssues();
         Issue issue = issues.get(0);
-        Assert.assertEquals(issue.location(), issueLocation);
+        Assert.assertEquals(issue.location().lineRange().startLine().line(),
+                issueLocation.lineRange().startLine().line() + 1);
+        Assert.assertEquals(issue.location().lineRange().endLine().line(),
+                issueLocation.lineRange().endLine().line() + 1);
+        Assert.assertEquals(issue.location().lineRange().startLine().offset(),
+                issueLocation.lineRange().startLine().offset() + 1);
+        Assert.assertEquals(issue.location().lineRange().endLine().offset(),
+                issueLocation.lineRange().endLine().offset() + 1);
+        Assert.assertEquals(issue.location().textRange().length(),
+                issueLocation.textRange().length());
         Assert.assertEquals(issue.rule(), rule);
         Assert.assertEquals(issue.source(), Source.EXTERNAL);
     }
@@ -152,7 +170,16 @@ public class ReporterImplTest {
         reporter.reportIssue(document, issueLocation, rule);
         List<Issue> issues = reporter.getIssues();
         Issue issue = issues.get(0);
-        Assert.assertEquals(issue.location(), issueLocation);
+        Assert.assertEquals(issue.location().lineRange().startLine().line(),
+                issueLocation.lineRange().startLine().line() + 1);
+        Assert.assertEquals(issue.location().lineRange().endLine().line(),
+                issueLocation.lineRange().endLine().line() + 1);
+        Assert.assertEquals(issue.location().lineRange().startLine().offset(),
+                issueLocation.lineRange().startLine().offset() + 1);
+        Assert.assertEquals(issue.location().lineRange().endLine().offset(),
+                issueLocation.lineRange().endLine().offset() + 1);
+        Assert.assertEquals(issue.location().textRange().length(),
+                issueLocation.textRange().length());
         Assert.assertEquals(issue.rule(), rule);
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
     }
@@ -181,7 +208,16 @@ public class ReporterImplTest {
         reporter.reportIssue(document, issueLocation, rule);
         List<Issue> issues = reporter.getIssues();
         Issue issue = issues.get(0);
-        Assert.assertEquals(issue.location(), issueLocation);
+        Assert.assertEquals(issue.location().lineRange().startLine().line(),
+                issueLocation.lineRange().startLine().line() + 1);
+        Assert.assertEquals(issue.location().lineRange().endLine().line(),
+                issueLocation.lineRange().endLine().line() + 1);
+        Assert.assertEquals(issue.location().lineRange().startLine().offset(),
+                issueLocation.lineRange().startLine().offset() + 1);
+        Assert.assertEquals(issue.location().lineRange().endLine().offset(),
+                issueLocation.lineRange().endLine().offset() + 1);
+        Assert.assertEquals(issue.location().textRange().length(),
+                issueLocation.textRange().length());
         Assert.assertEquals(issue.rule(), rule);
         Assert.assertEquals(issue.source(), Source.EXTERNAL);
     }

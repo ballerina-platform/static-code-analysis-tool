@@ -188,8 +188,8 @@ public class ScanCmdTest extends BaseTest {
         Rule coreRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
         Rule externalRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG, "exampleOrg",
                 "exampleName");
-        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 16, 23,
-                17, 1, 748, 4);
+        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 15, 22,
+                16, 0, 747, 4);
         List<Issue> issues = new ArrayList<>();
         issues.add(new IssueImpl(location, coreRule, Source.BUILT_IN, "main.bal",
                 validBalProject.resolve("main.bal").toString()));
@@ -209,8 +209,8 @@ public class ScanCmdTest extends BaseTest {
         Rule coreRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
         Rule externalRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG, "exampleOrg",
                 "exampleName");
-        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 16, 23,
-                17, 1, 748, 4);
+        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 15, 22,
+                16, 0, 747, 4);
         List<Issue> issues = new ArrayList<>();
         issues.add(new IssueImpl(location, coreRule, Source.BUILT_IN, "main.bal",
                 validBalProject.resolve("main.bal").toString()));

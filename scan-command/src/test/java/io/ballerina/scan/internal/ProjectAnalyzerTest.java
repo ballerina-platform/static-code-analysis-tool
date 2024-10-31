@@ -74,10 +74,10 @@ public class ProjectAnalyzerTest extends BaseTest {
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
         LineRange location = issue.location().lineRange();
         Assert.assertEquals(location.fileName(), "main.bal");
-        Assert.assertEquals(location.startLine().line(), 20);
-        Assert.assertEquals(location.startLine().offset(), 17);
-        Assert.assertEquals(location.endLine().line(), 20);
-        Assert.assertEquals(location.endLine().offset(), 39);
+        Assert.assertEquals(location.startLine().line(), 21);
+        Assert.assertEquals(location.startLine().offset(), 18);
+        Assert.assertEquals(location.endLine().line(), 21);
+        Assert.assertEquals(location.endLine().offset(), 40);
         Rule rule = issue.rule();
         Assert.assertEquals(rule.id(), "ballerina:1");
         Assert.assertEquals(rule.numericId(), 1);
@@ -92,13 +92,13 @@ public class ProjectAnalyzerTest extends BaseTest {
         List<Issue> issues = projectAnalyzer.runExternalAnalyzers(externalAnalyzers);
         Assert.assertEquals(issues.size(), 3);
 
-        assertIssue(issues.get(0), "main.bal", 16, 0, 21, 1, Source.BUILT_IN,
+        assertIssue(issues.get(0), "main.bal", 17, 1, 22, 2, Source.BUILT_IN,
                 "ballerina/example_module_static_code_analyzer:1", 1, "rule 1",
                 RuleKind.CODE_SMELL);
-        assertIssue(issues.get(1), "main.bal", 16, 0, 21, 1, Source.EXTERNAL,
+        assertIssue(issues.get(1), "main.bal", 17, 1, 22, 2, Source.EXTERNAL,
                 "exampleOrg/example_module_static_code_analyzer:1", 1, "rule 1",
                 RuleKind.CODE_SMELL);
-        assertIssue(issues.get(2), "main.bal", 16, 0, 21, 1, Source.BUILT_IN,
+        assertIssue(issues.get(2), "main.bal", 17, 1, 22, 2, Source.BUILT_IN,
                 "ballerinax/example_module_static_code_analyzer:1", 1, "rule 1",
                 RuleKind.CODE_SMELL);
         Module defaultModule = project.currentPackage().getDefaultModule();
