@@ -30,7 +30,9 @@ import java.util.List;
  * @since 0.1.0
  * */
 enum CoreRule {
-    AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL));
+    AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
+    UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
+            "Unused function parameter", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 

@@ -29,46 +29,36 @@ import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Source;
 import io.ballerina.tools.text.LineRange;
 import org.testng.Assert;
-import org.testng.annotations.Test;
 
 import java.nio.file.Path;
-import java.util.List;
 
 /**
- * Core analyzer tests.
+ * Static code analyzer test.
  *
  * @since 0.1.0
  */
 public class StaticCodeAnalyzerTest extends BaseTest {
     private final Path coreRuleBalFiles = testResources.resolve("test-resources").resolve("core-rules");
 
-    private Document loadDocument(String documentName) {
+    Document loadDocument(String documentName) {
         Project project = SingleFileProject.load(coreRuleBalFiles.resolve(documentName));
         Module defaultModule = project.currentPackage().getDefaultModule();
         return defaultModule.document(defaultModule.documentIds().iterator().next());
     }
 
-    @Test(description = "test checkpanic analyzer")
-    void testCheckpanicAnalyzer() {
-        String documentName = "rule_checkpanic.bal";
-        Document document = loadDocument(documentName);
-        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.AVOID_CHECKPANIC.rule()));
-        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext);
-        staticCodeAnalyzer.analyze();
-        List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 1);
-        Issue issue = issues.get(0);
+    void assertIssue(Issue issue, String documentName, int startLine, int startOffset, int endLine, int endOffset,
+                     String ruleId, int numericId, String description, RuleKind ruleKind) {
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
         LineRange location = issue.location().lineRange();
         Assert.assertEquals(location.fileName(), documentName);
-        Assert.assertEquals(location.startLine().line(), 20);
-        Assert.assertEquals(location.startLine().offset(), 17);
-        Assert.assertEquals(location.endLine().line(), 20);
-        Assert.assertEquals(location.endLine().offset(), 39);
+        Assert.assertEquals(location.startLine().line(), startLine);
+        Assert.assertEquals(location.startLine().offset(), startOffset);
+        Assert.assertEquals(location.endLine().line(), endLine);
+        Assert.assertEquals(location.endLine().offset(), endOffset);
         Rule rule = issue.rule();
-        Assert.assertEquals(rule.id(), "ballerina:1");
-        Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), "Avoid checkpanic");
-        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.id(), ruleId);
+        Assert.assertEquals(rule.numericId(), numericId);
+        Assert.assertEquals(rule.description(), description);
+        Assert.assertEquals(rule.kind(), ruleKind);
     }
 }
