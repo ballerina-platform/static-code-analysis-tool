@@ -2,7 +2,7 @@
 org = "ballerina"
 name = "tool_scan"
 version = "0.1.0"
-distribution = "2201.10.1"
+distribution = "2201.10.2"
 authors = ["Ballerina"]
 keywords = ["scan", "static code analysis"]
 license = ["Apache-2.0"]
