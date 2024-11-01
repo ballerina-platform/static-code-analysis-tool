@@ -17,7 +17,7 @@
     },
     "source": "BUILT_IN",
     "fileName": "bal_project_with_analyzer_configurations/main.bal",
-    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-analyzer-configurations\\main.bal"
+    "filePath": "src\test\resources\test-resources\bal-project-with-analyzer-configurations\main.bal"
   },
   {
     "location": {
@@ -37,7 +37,7 @@
     },
     "source": "EXTERNAL",
     "fileName": "bal_project_with_analyzer_configurations/main.bal",
-    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-analyzer-configurations\\main.bal"
+    "filePath": "src\test\resources\test-resources\bal-project-with-analyzer-configurations\main.bal"
   },
   {
     "location": {
@@ -57,6 +57,6 @@
     },
     "source": "BUILT_IN",
     "fileName": "bal_project_with_analyzer_configurations/main.bal",
-    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-analyzer-configurations\\main.bal"
+    "filePath": "src\test\resources\test-resources\bal-project-with-analyzer-configurations\main.bal"
   }
 ]
