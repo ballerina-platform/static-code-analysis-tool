@@ -7,7 +7,7 @@
       "startColumn": 1,
       "endColumn": 2,
       "startOffset": 649,
-      "length": 139
+      "length": 134
     },
     "rule": {
       "id": "ballerina/example_module_static_code_analyzer:1",
