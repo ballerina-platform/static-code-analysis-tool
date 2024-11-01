@@ -1,5 +1,5 @@
 Loading scan tool configurations from src\test\resources\test-resources\bal-project-with-config-file\Scan.toml
-	RuleID                                           | Rule Kind     | Rule Description
+	RuleID                                           | Rule Kind     | Rule Description                            
 	----------------------------------------------------------------------------------------------------------------
 	ballerina:1                                      | CODE_SMELL    | Avoid checkpanic
 	ballerina:2                                      | CODE_SMELL    | Unused function parameter
