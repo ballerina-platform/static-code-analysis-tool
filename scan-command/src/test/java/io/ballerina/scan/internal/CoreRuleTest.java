@@ -20,7 +20,6 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
-import io.ballerina.scan.utils.RuleDescription;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,6 +31,7 @@ import org.testng.annotations.Test;
 public class CoreRuleTest {
     public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
     public static final String UNUSED_FUNCTION_PARAMETER = "Unused function parameter";
+    public static final String PUBLIC_NON_ISOLATED_CONSTRUCT = "Non isolated public class or function/method";
 
     @Test(description = "test all rules")
     void testAllRules() {
@@ -61,8 +61,7 @@ public class CoreRuleTest {
         Rule rule = CoreRule.PUBLIC_NON_ISOLATED_CONSTRUCT.rule();
         Assert.assertEquals(rule.id(), "ballerina:3");
         Assert.assertEquals(rule.numericId(), 3);
-        Assert.assertEquals(rule.description(), RuleDescription.PUBLIC_NON_ISOLATED_CONSTRUCT);
-        Assert.assertEquals(rule.description(), RuleDescription.AVOID_CHECKPANIC);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }

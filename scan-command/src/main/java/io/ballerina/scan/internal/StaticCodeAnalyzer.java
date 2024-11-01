@@ -91,7 +91,6 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 !functionDefinitionNode.functionName().text().equals(INIT_METHOD)) {
             checkNonIsolatedPublicFunctions(functionDefinitionNode);
         }
-        functionDefinitionNode.functionBody().children().forEach(child -> child.accept(this));
         this.visitSyntaxNode(functionDefinitionNode);
     }
 

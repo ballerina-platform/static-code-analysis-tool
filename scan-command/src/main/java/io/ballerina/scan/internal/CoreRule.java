@@ -20,7 +20,6 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
-import io.ballerina.scan.utils.RuleDescription;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,7 +32,8 @@ import java.util.List;
 enum CoreRule {
     AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
     UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2, "Unused function parameter", RuleKind.CODE_SMELL)),
-    PUBLIC_NON_ISOLATED_CONSTRUCT(RuleFactory.createRule(3, RuleDescription.PUBLIC_NON_ISOLATED_CONSTRUCT, RuleKind.CODE_SMELL));
+    PUBLIC_NON_ISOLATED_CONSTRUCT(RuleFactory.createRule(3,
+            "Non isolated public class or function/method", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 
