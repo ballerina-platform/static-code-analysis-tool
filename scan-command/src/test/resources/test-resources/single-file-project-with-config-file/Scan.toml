@@ -1,0 +1,55 @@
+# custom compiler plugins
+[[analyzer]]
+org = "exampleOrg"
+name = "example_module_static_code_analyzer"
+
+[[analyzer]]
+org = "ballerina"
+name = "example_module_static_code_analyzer"
+version = "0.1.0"
+
+[[analyzer]]
+org = "ballerinax"
+name = "example_module_static_code_analyzer"
+version = "0.1.0"
+repository = "local"
+
+# rules to include/exclude
+[rule]
+include = [
+    "ballerina:1",
+    "exampleOrg/example_module_static_code_analyzer:1",
+    "ballerina/example_module_static_code_analyzer:1",
+    "ballerinax/example_module_static_code_analyzer:1",
+]
+exclude = ["ballerina:1"]
+
+# Invalid use cases which are filtered by scan tool
+[[analyzer]]
+org = "org3"
+name = "name3"
+version = "version" # version will be ignored
+
+[[analyzer]]
+org = ""
+name = ""
+version = ""
+repository = ""
+
+[[analyzer]]
+org = 10
+name = 20
+version = 30
+repository = 40
+
+[[analyzer]]
+
+[[platform]]
+name = ""
+path = "https://example.com/example-platform-analyzer-1.0.jar"
+
+[[platform]]
+name = 10
+path = "https://example.com/example-platform-analyzer-1.0.jar"
+
+[[platform]]

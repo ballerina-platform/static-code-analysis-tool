@@ -16,17 +16,17 @@
  * under the License.
  */
 
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
-    id 'java'
-    id 'application'
     id 'java-library'
     id 'checkstyle'
-    id "com.github.spotbugs" version "${spotbugsPluginVersion}"
-    id "de.undercouch.download" version "${downloadPluginVersion}"
+    id "com.github.spotbugs"
+    id "de.undercouch.download"
 }
 
-group = "${group}"
-version = "${scanToolVersion}"
+group = 'io.ballerina.examplestaticcodeanalyzer'
+version = "0.1.0"
 
 repositories {
     mavenLocal()
@@ -46,7 +46,6 @@ repositories {
 }
 
 dependencies {
-    implementation group: 'info.picocli', name: 'picocli', version: "${picoCLIVersion}"
     implementation "com.google.code.gson:gson:${gsonVersion}"
     implementation group: 'org.ballerinalang', name: 'ballerina-lang', version: "${ballerinaLangVersion}"
     implementation group: 'org.ballerinalang', name: 'ballerina-parser', version: "${ballerinaLangVersion}"
@@ -54,8 +53,12 @@ dependencies {
     implementation group: 'org.ballerinalang', name: 'ballerina-tools-api', version: "${ballerinaLangVersion}"
     implementation group: 'org.ballerinalang', name: 'jballerina-tools', version: "${ballerinaLangVersion}"
     implementation group: 'org.ballerinalang', name: 'ballerina-cli', version: "${ballerinaLangVersion}"
+    implementation group: 'org.ballerinalang', name: 'toml-parser', version: "${ballerinaLangVersion}"
 
     checkstyle group: 'com.puppycrawl.tools', name: 'checkstyle', version: "${puppycrawlCheckstyleVersion}"
+
+    // Adding dependency to the scan-command module to use interfaces
+    implementation project(':scan-command')
 }
 
 tasks.withType(JavaExec).configureEach {
@@ -63,7 +66,7 @@ tasks.withType(JavaExec).configureEach {
 }
 
 // Setting up checkstyles
-task downloadCheckstyleRuleFiles(type: Download) {
+tasks.register('downloadCheckstyleRuleFiles', Download) {
     src([
             'https://raw.githubusercontent.com/wso2/code-quality-tools/v1.4/checkstyle/jdk-17/checkstyle.xml',
             'https://raw.githubusercontent.com/wso2/code-quality-tools/v1.4/checkstyle/jdk-17/suppressions.xml'
@@ -82,7 +85,7 @@ artifacts.add('default', file("${project.buildDir}/suppressions.xml")) {
 }
 
 def excludePattern = '**/module-info.java'
-tasks.withType(Checkstyle) {
+tasks.withType(Checkstyle).configureEach {
     exclude excludePattern
 }
 
@@ -103,8 +106,8 @@ spotbugsMain {
     reportsDir = file("$project.buildDir/reports/spotbugs")
 
     reports {
-        html.enabled true
-        text.enabled = true
+        html.required.set(true)
+        text.required.set(true)
     }
 
     def excludeFile = file("${projectDir}/spotbugs-exclude.xml")
@@ -120,12 +123,57 @@ spotbugsTest {
     reportsDir = file("$project.buildDir/reports/spotbugs")
 
     reports {
-        html.enabled true
-        text.enabled = true
+        html.required.set(true)
+        text.required.set(true)
     }
 
     def excludeFile = file("${projectDir}/spotbugs-exclude.xml")
     if (excludeFile.exists()) {
         excludeFilter = excludeFile
     }
+}
+
+// Configurations to automatically build and deploy custom static code analyzer compiler plugin
+def packageOrg = "ballerina"
+def packageName = "example_module_static_code_analyzer"
+def pluginCentralDirectory = System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io/bala/${packageOrg}"
+def pluginLocalDir = System.getProperty("user.home") + "/.ballerina/repositories/local/bala/${packageOrg}"
+def balCentralCacheDir = project.file(System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io")
+
+tasks.register('buildCompilerPlugin') {
+    doLast {
+        // Pack and push to local repo of distribution
+        exec {
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                commandLine 'cmd', '/c', 'cd example-module-static-code-analyzer & bal pack & bal push --repository=local'
+            } else {
+                commandLine 'sh', '-c', 'cd example-module-static-code-analyzer ; bal pack ; bal push --repository=local'
+            }
+        }
+        println("Successfully build and pushed the package ${packageOrg}/${packageName} to the local repository")
+
+        // Remove the cache directories in the central repository
+        delete {
+            fileTree(balCentralCacheDir).matching {
+                include 'cache-*'
+            }
+        }
+        println("Successfully cleaned the .ballerina/cache* directories")
+
+        // Update the central repository
+        def balDestinationDir = "$pluginCentralDirectory/$packageName"
+        def balSourceDir = "$pluginLocalDir/$packageName"
+        if (file(balDestinationDir).exists()) {
+            file(balDestinationDir).deleteDir()
+        }
+        copy {
+            from balSourceDir
+            into balDestinationDir
+        }
+        println("Successfully copied package ${packageOrg}/${packageName} from local/bala the central.ballerina.io/bala directory")
+    }
+}
+
+build {
+    dependsOn buildCompilerPlugin
 }

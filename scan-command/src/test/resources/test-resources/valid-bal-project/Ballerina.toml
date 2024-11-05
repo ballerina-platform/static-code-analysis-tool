@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "valid_bal_project"
+version = "0.1.0"

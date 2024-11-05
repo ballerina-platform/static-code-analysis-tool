@@ -1,0 +1,5 @@
+[plugin] # Have to check if below path is needed
+class = "org.invalid.rules.CustomStaticCodeAnalyzer"
+
+[[dependency]]
+path = "../build/libs/invalid-rules-plugin-0.1.0.jar"

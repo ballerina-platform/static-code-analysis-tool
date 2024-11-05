@@ -1,0 +1,22 @@
+[
+  {
+    "location": {
+      "filePath": "main.bal",
+      "startLine": 20,
+      "endLine": 20,
+      "startColumn": 17,
+      "endColumn": 39,
+      "startOffset": 777,
+      "length": 22
+    },
+    "rule": {
+      "id": "ballerina:1",
+      "numericId": 1,
+      "description": "Avoid checkpanic",
+      "ruleKind": "CODE_SMELL"
+    },
+    "source": "BUILT_IN",
+    "fileName": "bal_project_with_include_rule_configurations/main.bal",
+    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-include-rule-configurations\\main.bal"
+  }
+]

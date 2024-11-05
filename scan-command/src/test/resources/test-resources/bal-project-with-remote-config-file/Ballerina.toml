@@ -1,0 +1,7 @@
+[package]
+org = "ballerina"
+name = "bal_project_with_remote_config_file"
+version = "0.1.0"
+
+[scan]
+configPath = "https://gist.githubusercontent.com/ballerina-bot/cb9e7fea4481371bde6ad7bf4628f01b/raw/13ee5c979f679fa28474a4bb889a537f6e8d058e/Scan.toml"

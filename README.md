@@ -16,6 +16,37 @@ This repository consists of
 
 2. [Ballerina](https://ballerina.io/)
 
+## Building from the source
+
+Execute the commands below to build from the source.
+
+1. Export GitHub Personal access token with read package permissions as follows,
+
+    ```bash
+    export packageUser=<GitHub username>
+    export packagePAT=<GitHub personal access token>
+    ```
+
+2. To build the package:
+
+    ```bash
+    ./gradlew clean build
+    ```
+   
+> **Note**: The scan tool configurations will be appended to the contents of the `.ballerina/.config/bal-tools.toml` file during the build process.
+
+3. To run the tests:
+
+    ```bash
+    ./gradlew clean test
+    ```
+
+4. To build the package without tests:
+
+    ```bash
+    ./gradlew clean build -x test
+    ```
+
 ## Contribute to Ballerina
 
 As an open-source project, Ballerina welcomes contributions from the community.

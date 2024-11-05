@@ -3,7 +3,6 @@
 
 # Package Files
 *.jar
-*.zip
 
 # Gradle
 .gradle
@@ -12,3 +11,9 @@ build/
 
 # IntelliJ IDEA
 .idea/
+
+# Coverage reports
+.jacoco/
+
+#Ignore all .deb files
+*.deb

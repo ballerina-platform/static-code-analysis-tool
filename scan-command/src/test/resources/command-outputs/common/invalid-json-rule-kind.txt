@@ -1,0 +1,1 @@
+invalid kind for rule object in plugin 'invalid/invalid_module_rulekind_static_code_analyzer'. Expected one of [CODE_SMELL, BUG, VULNERABILITY], but found: 'SECURITY_HOTSPOT'
