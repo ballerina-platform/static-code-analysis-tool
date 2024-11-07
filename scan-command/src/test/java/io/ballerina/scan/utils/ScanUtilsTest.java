@@ -47,7 +47,7 @@ import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
  * @since 0.1.0
  */
 public class ScanUtilsTest extends BaseTest {
-    private final Path validBalProject = testResources.resolve("test-resources")
+    private final Path validBalProject = TEST_RESOURCES.resolve("test-resources")
             .resolve("valid-bal-project");
     private static final String RESULTS_DIRECTORY = "results";
 
@@ -115,7 +115,7 @@ public class ScanUtilsTest extends BaseTest {
     @Test(description =
             "test method for loading configurations from a Scan.toml file in a Ballerina single file project")
     void testloadScanTomlConfigurationsForSingleFileProject() {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("single-file-project-with-config-file").resolve("main.bal");
         Project project = SingleFileProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -126,7 +126,7 @@ public class ScanUtilsTest extends BaseTest {
 
     @Test(description = "test method for loading configurations from a Scan.toml file")
     void testloadScanTomlConfigurations() {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -165,7 +165,7 @@ public class ScanUtilsTest extends BaseTest {
     @Test(description =
             "test method for loading configurations from a Scan.toml file with invalid platform JAR")
     void testloadInvalidPlatformJAR() throws IOException {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-invalid-platform-jar");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -179,7 +179,7 @@ public class ScanUtilsTest extends BaseTest {
     @Test(description =
             "test method for loading configurations from a Scan.toml file with invalid platform configuration")
     void testloadInvalidPlatformScanTomlConfigurations() throws IOException {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-invalid-platform-config-file");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -193,7 +193,7 @@ public class ScanUtilsTest extends BaseTest {
     @Test(description =
             "test method for loading configurations from a Scan.toml file with invalid Ballerina.toml configuration")
     void testloadScanTomlConfigurationsWithInvalidBallerinaTomlConfiguration() throws IOException {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-invalid-file-configuration");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -206,7 +206,7 @@ public class ScanUtilsTest extends BaseTest {
 
     @Test(description = "test method for loading configurations from an external configuration file")
     void testloadExternalScanTomlConfigurations() {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-external-config-file");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -244,7 +244,7 @@ public class ScanUtilsTest extends BaseTest {
 
     @Test(description = "test method for loading configurations from an invalid external configuration file")
     void testloadInvalidExternalScanTomlConfigurations() throws IOException {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-config-file");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -257,7 +257,7 @@ public class ScanUtilsTest extends BaseTest {
 
     @Test(description = "test method for loading configurations from a remote configuration file")
     void testloadRemoteScanTomlConfigurations() {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-remote-config-file");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -295,7 +295,7 @@ public class ScanUtilsTest extends BaseTest {
 
     @Test(description = "test method for loading configurations from an invalid remote configuration file")
     void testloadInvalidRemoteScanTomlConfigurations() throws IOException {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-invalid-remote-config-file");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());

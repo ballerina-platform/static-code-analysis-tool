@@ -51,7 +51,7 @@ import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
  * @since 0.1.0
  */
 public class ProjectAnalyzerTest extends BaseTest {
-    private final Project project = BuildProject.load(testResources.resolve("test-resources")
+    private final Project project = BuildProject.load(TEST_RESOURCES.resolve("test-resources")
             .resolve("bal-project-with-config-file"));
     private ProjectAnalyzer projectAnalyzer = null;
 
@@ -153,7 +153,7 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with invalid external analyzer rules.json configurations")
     void testAnalyzingProjectWithInvalidExternalAnalyzerRules() throws IOException {
-        Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
+        Project invalidProject = BuildProject.load(TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-analyzer-rules"));
         System.setProperty("user.dir", invalidProject.sourceRoot().toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
@@ -175,7 +175,7 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with invalid external analyzer rule format")
     void testAnalyzingProjectWithInvalidExternalAnalyzerRuleFormat() throws IOException {
-        Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
+        Project invalidProject = BuildProject.load(TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-analyzer-rule-format"));
         System.setProperty("user.dir", invalidProject.sourceRoot().toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
@@ -197,7 +197,7 @@ public class ProjectAnalyzerTest extends BaseTest {
 
     @Test(description = "Test analyzing project with invalid external analyzer rule kind")
     void testAnalyzingProjectWithInvalidExternalAnalyzerRuleKind() throws IOException {
-        Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
+        Project invalidProject = BuildProject.load(TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-analyzer-rule-kind"));
         System.setProperty("user.dir", invalidProject.sourceRoot().toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)

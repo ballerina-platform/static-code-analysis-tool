@@ -81,7 +81,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.VULNERABILITY;
  * Represents the project analyzer used for analyzing projects.
  *
  * @since 0.1.0
- * */
+ */
 class ProjectAnalyzer {
     private final Project project;
     private final ScanTomlFile scanTomlFile;
@@ -103,12 +103,29 @@ class ProjectAnalyzer {
 
     List<Issue> analyze(List<Rule> inbuiltRules) {
         ScannerContextImpl scannerContext = new ScannerContextImpl(inbuiltRules);
+        // Phase 1: Scan the entire codebase and collect necessary user data across documents
+        project.currentPackage().moduleIds().forEach(moduleId -> {
+            Module module = project.currentPackage().module(moduleId);
+            module.documentIds().forEach(scanDocument(module, scannerContext));
+            module.testDocumentIds().forEach(scanDocument(module, scannerContext));
+        });
+        // Phase 2: Analyze the documents individually, which may use the user data collected in the previous phase
         project.currentPackage().moduleIds().forEach(moduleId -> {
             Module module = project.currentPackage().module(moduleId);
             module.documentIds().forEach(analyzeDocument(module, scannerContext));
             module.testDocumentIds().forEach(analyzeDocument(module, scannerContext));
         });
         return scannerContext.getReporter().getIssues();
+    }
+
+    private Consumer<DocumentId> scanDocument(Module module, ScannerContextImpl scannerContext) {
+        SemanticModel semanticModel = module.getCompilation().getSemanticModel();
+        return documentId -> {
+            Document document = module.document(documentId);
+            SensitiveParameterTracker scanner = new SensitiveParameterTracker(document.syntaxTree(),
+                    scannerContext, semanticModel);
+            scanner.scan();
+        };
     }
 
     private Consumer<DocumentId> analyzeDocument(Module module, ScannerContextImpl scannerContext) {

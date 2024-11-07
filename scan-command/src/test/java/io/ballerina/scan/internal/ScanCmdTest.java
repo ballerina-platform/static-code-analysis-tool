@@ -58,7 +58,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
  * @since 0.1.0
  */
 public class ScanCmdTest extends BaseTest {
-    private final Path validBalProject = testResources.resolve("test-resources")
+    private final Path validBalProject = TEST_RESOURCES.resolve("test-resources")
             .resolve("valid-bal-project");
 
     private static final String RESULTS_DIRECTORY = "results";
@@ -115,7 +115,7 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with an empty Ballerina project")
     void testScanCommandEmptyProject() throws IOException {
-        Path emptyBalProject = testResources.resolve("test-resources").resolve("empty-bal-project");
+        Path emptyBalProject = TEST_RESOURCES.resolve("test-resources").resolve("empty-bal-project");
         ScanCmd scanCmd = new ScanCmd(printStream);
         System.setProperty("user.dir", emptyBalProject.toString());
         scanCmd.execute();
@@ -137,7 +137,7 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with single file project with single file as argument")
     void testScanCommandSingleFileProject() throws IOException {
-        Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
+        Path validBalProject = TEST_RESOURCES.resolve("test-resources").resolve("valid-single-file-project");
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {validBalProject.resolve("main.bal").toString()};
         new CommandLine(scanCmd).parseArgs(args);
@@ -148,7 +148,7 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with single file project with project directory as argument")
     void testScanCommandSingleFileProjectWithDirectoryAsArgument() throws IOException {
-        Path parentDirectory = testResources.resolve("test-resources").toAbsolutePath();
+        Path parentDirectory = TEST_RESOURCES.resolve("test-resources").toAbsolutePath();
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {parentDirectory.resolve("valid-single-file-project").toString()};
         new CommandLine(scanCmd).parseArgs(args);
@@ -160,7 +160,7 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with single file project without arguments")
     void testScanCommandSingleFileProjectWithoutArgument() throws IOException {
-        Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
+        Path validBalProject = TEST_RESOURCES.resolve("test-resources").resolve("valid-single-file-project");
         ScanCmd scanCmd = new ScanCmd(printStream);
         System.setProperty("user.dir", validBalProject.toString());
         scanCmd.execute();
@@ -172,7 +172,7 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with single file project with too many arguments")
     void testScanCommandSingleFileProjectWithTooManyArguments() throws IOException {
-        Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
+        Path validBalProject = TEST_RESOURCES.resolve("test-resources").resolve("valid-single-file-project");
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"main.bal", "argument2"};
         new CommandLine(scanCmd).parseArgs(args);
@@ -226,7 +226,7 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test method for printing static code analysis rules to the console")
     void testPrintRulesToConsole() throws IOException {
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
         Project project = BuildProject.load(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -248,7 +248,7 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"--list-rules"};
         new CommandLine(scanCmd).parseArgs(args);
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
@@ -260,7 +260,7 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with target directory flag on single file project")
     void testScanCommandWithTargetDirFlagOnSingleFileProject() throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream);
-        Path singleFileProject = testResources.resolve("test-resources")
+        Path singleFileProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("valid-single-file-project").resolve("main.bal");
         String[] args = {singleFileProject.toString(), "--target-dir=results"};
         new CommandLine(scanCmd).parseArgs(args);
@@ -272,7 +272,7 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with scan report flag on single file project")
     void testScanCommandWithScanReportFlagOnSingleFileProject() throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream);
-        Path singleFileProject = testResources.resolve("test-resources")
+        Path singleFileProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("valid-single-file-project").resolve("main.bal");
         String[] args = {singleFileProject.toString(), "--scan-report"};
         new CommandLine(scanCmd).parseArgs(args);
@@ -338,7 +338,7 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"--include-rules=ballerina:1"};
         new CommandLine(scanCmd).parseArgs(args);
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-analyzer-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
@@ -355,7 +355,7 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"--exclude-rules=ballerina:1"};
         new CommandLine(scanCmd).parseArgs(args);
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-analyzer-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
@@ -372,7 +372,7 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
         new CommandLine(scanCmd).parseArgs(args);
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-analyzer-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
@@ -384,7 +384,7 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with include rules Scan.toml configurations")
     void testScanCommandWithIncludeRulesScanTomlConfigurations() throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream);
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-include-rule-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
@@ -401,7 +401,7 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"--exclude-rules=ballerina:1"};
         new CommandLine(scanCmd).parseArgs(args);
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-exclude-rule-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
@@ -418,7 +418,7 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
         new CommandLine(scanCmd).parseArgs(args);
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-include-exclude-rule-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
         scanCmd.execute();
@@ -430,7 +430,7 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with platform plugin configurations")
     void testScanCommandWithPlatformPluginConfigurations() throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream);
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-platform-configurations");
         Path rootProject = Path.of(System.getProperty("user.dir")).getParent();
         Assert.assertNotNull(rootProject);
@@ -441,7 +441,7 @@ public class ScanCmdTest extends BaseTest {
                 .resolve("libs")
                 .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
         Assert.assertNotNull(platformPluginPath);
-        String tomlConfigurations = Files.readString(testResources.resolve("test-resources")
+        String tomlConfigurations = Files.readString(TEST_RESOURCES.resolve("test-resources")
                 .resolve("platform-plugin-configurations.txt"));
         tomlConfigurations = tomlConfigurations.replace("__platform_name__", "examplePlatform");
         tomlConfigurations = tomlConfigurations.replace("__platform_plugin_path__",
@@ -472,7 +472,7 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with invalid platform plugin configurations")
     void testScanCommandWithInvalidPlatformPluginConfigurations() throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream);
-        Path ballerinaProject = testResources.resolve("test-resources")
+        Path ballerinaProject = TEST_RESOURCES.resolve("test-resources")
                 .resolve("bal-project-with-invalid-platform-configurations");
         Path rootProject = Path.of(System.getProperty("user.dir")).getParent();
         Assert.assertNotNull(rootProject);
@@ -482,7 +482,7 @@ public class ScanCmdTest extends BaseTest {
                 .resolve("build")
                 .resolve("libs")
                 .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
-        String tomlConfigurations = Files.readString(testResources.resolve("test-resources")
+        String tomlConfigurations = Files.readString(TEST_RESOURCES.resolve("test-resources")
                 .resolve("platform-plugin-configurations.txt"));
         tomlConfigurations = tomlConfigurations.replace("__platform_name__", "invalidExamplePlatform");
         tomlConfigurations = tomlConfigurations.replace("__platform_plugin_path__",

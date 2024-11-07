@@ -21,22 +21,31 @@ package io.ballerina.scan.internal;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScannerContext;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents the implementation of the {@link ScannerContext} interface.
  *
  * @since 0.1.0
- * */
+ */
 class ScannerContextImpl implements ScannerContext {
     private final ReporterImpl reporter;
+    private final Map<String, Object> userData;
 
     ScannerContextImpl(List<Rule> rules) {
-        this.reporter = new ReporterImpl(rules);
+        reporter = new ReporterImpl(rules);
+        userData = new HashMap<>();
     }
 
     @Override
     public ReporterImpl getReporter() {
         return reporter;
+    }
+
+    @Override
+    public Map<String, Object> userData() {
+        return userData;
     }
 }

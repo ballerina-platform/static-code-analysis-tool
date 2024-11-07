@@ -10,7 +10,7 @@ distribution-version = "2201.10.2"
 [[package]]
 org = "ballerina"
 name = "tool_scan"
-version = "0.5.0"
+version = "0.5.1"
 modules = [
 	{org = "ballerina", packageName = "tool_scan", moduleName = "tool_scan"}
 ]

@@ -58,6 +58,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     void analyze() {
         this.visit((ModulePartNode) syntaxTree.rootNode());
+        SecretChecker secretChecker = new SecretChecker(document, scannerContext, semanticModel);
+        secretChecker.analyze();
     }
 
     /**
