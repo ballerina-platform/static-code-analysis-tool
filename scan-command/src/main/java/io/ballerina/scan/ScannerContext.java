@@ -17,6 +17,7 @@
  */
 
 package io.ballerina.scan;
+import java.util.Map;
 
 /**
  * {@code ScannerContext} represents a context that exposes properties required by scanner plugins from the scan tool.
@@ -30,4 +31,6 @@ public interface ScannerContext {
      * @return reporter that needs to be used to report issues identified.
      * */
     Reporter getReporter();
+    
+    Map<String, Object> userData();
 }

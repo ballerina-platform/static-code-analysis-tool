@@ -44,10 +44,12 @@ public class CoreRuleTest {
             "Non isolated public class";
     public static final String PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT =
             "Non isolated public object";
+    public static final String HARD_CODED_SECRET = "Hard-coded secrets are security-sensitive";
+    public static final String NON_CONFIGURABLE_SECRET = "Non configurable secrets are security-sensitive";
 
     @Test(description = "test all rules")
     void testAllRules() {
-        Assert.assertEquals(CoreRule.rules().size(), 12);
+        Assert.assertEquals(CoreRule.rules().size(), 14);
     }
 
     @Test(description = "test checkpanic rule")
@@ -145,5 +147,23 @@ public class CoreRuleTest {
         Assert.assertEquals(rule.numericId(), 6);
         Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test hard coded secret")
+    void testHardCodedSecretRule() {
+        Rule rule = CoreRule.HARD_CODED_SECRET.rule();
+        Assert.assertEquals(rule.id(), "ballerina:13");
+        Assert.assertEquals(rule.numericId(), 13);
+        Assert.assertEquals(rule.description(), HARD_CODED_SECRET);
+        Assert.assertEquals(rule.kind(), RuleKind.VULNERABILITY);
+    }
+
+    @Test(description = "test non configurable coded secret")
+    void testNonConfigurableSecretRule() {
+        Rule rule = CoreRule.NON_CONFIGURABLE_SECRET.rule();
+        Assert.assertEquals(rule.id(), "ballerina:14");
+        Assert.assertEquals(rule.numericId(), 14);
+        Assert.assertEquals(rule.description(), NON_CONFIGURABLE_SECRET);
+        Assert.assertEquals(rule.kind(), RuleKind.VULNERABILITY);
     }
 }

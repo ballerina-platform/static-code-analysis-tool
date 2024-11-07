@@ -565,6 +565,21 @@ public class ScanCmdTest extends BaseTest {
     void testScanCommandWithValidJsonFormatFlag() throws IOException {
         System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--format=json"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+
+        System.setProperty("user.dir", userDir);
+        String expected = "Running Scans";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        Path jsonReport = validBalProject.resolve("target").resolve("report").resolve("scan_results.json");
+        Assert.assertTrue(Files.exists(jsonReport), "JSON report file should be created");
+    }
+
+    @Test(description = "test scan command with valid ballerina format flag")
+    void testScanCommandWithValidBallerinaFormatFlag() throws IOException {
+        System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"--format=ballerina"};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();

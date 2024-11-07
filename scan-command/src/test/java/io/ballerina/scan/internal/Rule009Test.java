@@ -38,7 +38,7 @@ public class Rule009Test extends StaticCodeAnalyzerTest {
 
     @Test(description = "test evaluate to the same value")
     void testSelfEvaluates() {
-        String documentName = "rule_009_evaluates_same_value.bal";
+        String documentName = "rule009_evaluates_same_value.bal";
         Document document = loadDocument(documentName);
         ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(
                 CoreRule.OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE.rule()));

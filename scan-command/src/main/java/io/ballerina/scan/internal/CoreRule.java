@@ -53,7 +53,11 @@ enum CoreRule {
     UNUSED_PRIVATE_CLASS_FIELD(RuleFactory.createRule(11,
             "Unused class private fields", RuleKind.CODE_SMELL)),
     INVALID_RANGE_EXPRESSION(RuleFactory.createRule(12, 
-    "Invalid range expression", RuleKind.CODE_SMELL));
+            "Invalid range expression", RuleKind.CODE_SMELL)),
+    HARD_CODED_SECRET(RuleFactory.createRule(13, 
+            "Hard-coded secrets are security-sensitive", RuleKind.VULNERABILITY)),
+    NON_CONFIGURABLE_SECRET(RuleFactory.createRule(14, 
+            "Non configurable secrets are security-sensitive", RuleKind.VULNERABILITY));
 
     private final Rule rule;
 

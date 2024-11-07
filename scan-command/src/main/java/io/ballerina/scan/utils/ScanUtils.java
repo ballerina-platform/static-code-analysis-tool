@@ -451,6 +451,7 @@ public final class ScanUtils {
                 JsonObject issueObject = getJsonIssue(issueImpl);
                 issuesArray.add(issueObject);
                 scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
+                scanReportPathAndFile.put(filePath, scanReportFile);
             } else {
                 JsonObject scanReportFile = new JsonObject();
                 scanReportFile.addProperty(SCAN_REPORT_FILE_NAME, issueImpl.fileName());

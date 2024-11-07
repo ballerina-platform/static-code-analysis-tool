@@ -21,7 +21,9 @@ package io.ballerina.scan.test;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScannerContext;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Test utility subclass of {@link ScannerContext}.
@@ -30,9 +32,11 @@ import java.util.List;
  */
 class TestScannerContext implements ScannerContext {
     private final TestReporter reporter;
+    private final Map<String, Object> userData;
 
     TestScannerContext(List<Rule> rules) {
         this.reporter = new TestReporter(rules);
+        this.userData = new HashMap<>();
     }
 
     /**
@@ -43,5 +47,10 @@ class TestScannerContext implements ScannerContext {
     @Override
     public TestReporter getReporter() {
         return reporter;
+    }
+
+    @Override
+    public Map<String, Object> userData() {
+        return userData;
     }
 }
