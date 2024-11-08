@@ -39,7 +39,7 @@ import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
  * @since 0.1.0
  */
 public abstract class BaseTest {
-    protected final Path testResources = Paths.get("src", "test", "resources");
+    protected static final Path TEST_RESOURCES = Paths.get("src", "test", "resources");
     private ByteArrayOutputStream console;
     protected PrintStream printStream;
     protected final String userDir = System.getProperty("user.dir");
@@ -70,9 +70,9 @@ public abstract class BaseTest {
     }
 
     protected String getExpectedOutput(String path) throws IOException {
-        Path expectedFilePath = testResources.resolve("command-outputs").resolve("common").resolve(path);
+        Path expectedFilePath = TEST_RESOURCES.resolve("command-outputs").resolve("common").resolve(path);
         if (!expectedFilePath.toFile().isFile()) {
-            expectedFilePath = testResources.resolve("command-outputs")
+            expectedFilePath = TEST_RESOURCES.resolve("command-outputs")
                     .resolve(OsUtils.isWindows() ? "windows" : "unix").resolve(path);
         }
         return Files.readString(expectedFilePath, StandardCharsets.UTF_8)
