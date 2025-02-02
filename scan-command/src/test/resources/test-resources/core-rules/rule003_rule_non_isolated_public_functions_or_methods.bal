@@ -56,7 +56,7 @@ class A {
     }
 }
 
-public class A2 { // warning
+public isolated class A2 {
     public isolated function c2() {
 
     }
