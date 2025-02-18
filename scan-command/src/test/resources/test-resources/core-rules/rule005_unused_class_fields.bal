@@ -32,6 +32,7 @@ public class A3 {
     private boolean? e; // warning
     private int|boolean f = 0;
     private boolean g = false; // warning
+    public string h;
 
     function init() {
         self.a = 0;
@@ -59,6 +60,20 @@ public class A3 {
 }
 
 class A4 {
+    private string c = "";
+    private string d = "";
+
+    function init() {
+        self.test(self.d);
+    }
+
+    public function test(string s) {
+        self.c = s;
+    }
+}
+
+service class SA {
+    private string b; // warning
     private string c = "";
     private string d = "";
 

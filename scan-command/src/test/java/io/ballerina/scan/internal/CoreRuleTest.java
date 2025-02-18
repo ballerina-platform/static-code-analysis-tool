@@ -42,4 +42,13 @@ public class CoreRuleTest {
         Assert.assertEquals(rule.description(), "Avoid checkpanic");
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
+
+    @Test(description = "test unused class fields rule")
+    void testUnusedClassFieldsRule() {
+        Rule rule = CoreRule.UNUSED_CLASS_FIELDS.rule();
+        Assert.assertEquals(rule.id(), "ballerina:5");
+        Assert.assertEquals(rule.numericId(), 5);
+        Assert.assertEquals(rule.description(), "Unused private fields");
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
 }

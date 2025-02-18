@@ -43,7 +43,7 @@ import java.util.List;
 public class StaticCodeAnalyzerTest extends BaseTest {
     private final Path coreRuleBalFiles = testResources.resolve("test-resources").resolve("core-rules");
 
-    private Document loadDocument(String documentName) {
+    protected Document loadDocument(String documentName) {
         Project project = SingleFileProject.load(coreRuleBalFiles.resolve(documentName));
         Module defaultModule = project.currentPackage().getDefaultModule();
         return defaultModule.document(defaultModule.documentIds().iterator().next());
@@ -60,25 +60,6 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         Assert.assertEquals(issues.size(), 1);
         assertIssue(issues.get(0), documentName, 20, 17, 20, 39, "ballerina:1", 1,
                 Constants.RuleDescription.AVOID_CHECKPANIC, RuleKind.CODE_SMELL);
-    }
-
-    @Test(description = "test checkpanic analyzer")
-    void testUnusedClassFieldsAnalyzer() {
-        String documentName = "unused_class_fields.bal";
-        Document document = loadDocument(documentName);
-        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.AVOID_CHECKPANIC.rule()));
-        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext);
-        staticCodeAnalyzer.analyze();
-        List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 4);
-        assertIssue(issues.get(0), documentName, 17, 4, 17, 21, "ballerina:3", 3,
-                Constants.RuleDescription.UNUSED_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(1), documentName, 23, 4, 23, 21, "ballerina:3", 3,
-                Constants.RuleDescription.UNUSED_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(2), documentName, 31, 4, 31, 23, "ballerina:3", 3,
-                Constants.RuleDescription.UNUSED_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(3), documentName, 33, 4, 33, 30, "ballerina:3", 3,
-                Constants.RuleDescription.UNUSED_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
     }
 
     void assertIssue(Issue issue, String documentName, int startLine, int startOffset, int endLine, int endOffset,

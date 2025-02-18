@@ -78,7 +78,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 if (StaticCodeAnalyzerUtils.getQualifier(qualifiers, PRIVATE_KEYWORD.stringValue())) {
                     if (semanticModel.references(symbol).size() == 1) {
                         StaticCodeAnalyzerUtils.reportIssue(scannerContext, document, objectFieldNode,
-                                CoreRule.UNUSED_PRIVATE_FIELDS.rule());
+                                CoreRule.UNUSED_CLASS_FIELDS.rule());
                     }
                 }
             }
