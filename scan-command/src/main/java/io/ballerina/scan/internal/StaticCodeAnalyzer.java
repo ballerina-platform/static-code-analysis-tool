@@ -37,7 +37,6 @@ import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
-import io.ballerina.compiler.syntax.tree.ObjectTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
@@ -142,6 +141,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 }
             }
         });
+        this.visitSyntaxNode(typeDefinitionNode);
     }
 
     private void checkNonIsolatedPublicClassDefinition(ClassDefinitionNode classDefinitionNode) {
@@ -169,17 +169,6 @@ class StaticCodeAnalyzer extends NodeVisitor {
                     });
                 });
             }
-        });
-    }
-
-    private void checkNonIsolatedPublicObjectMembers(ObjectTypeDescriptorNode objectTypeDescriptorNode) {
-        objectTypeDescriptorNode.members().forEach(member -> {
-            semanticModel.symbol(member).ifPresent(memberSymbol -> {
-                if (memberSymbol.kind() == SymbolKind.METHOD) {
-                    checkNonIsolatedPublicMethods((FunctionDefinitionNode) member);
-                }
-                member.accept(this);
-            });
         });
     }
 

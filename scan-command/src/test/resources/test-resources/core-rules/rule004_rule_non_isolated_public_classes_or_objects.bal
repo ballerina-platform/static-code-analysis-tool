@@ -32,16 +32,46 @@ public isolated class D {
 
 type E object {
     public function hash() returns int;
+    function hash2() returns int;
 };
 
 public type F object { // warning
     public function hash() returns int;
+    function hash2() returns int;
 };
 
 isolated type G object {
     public isolated function hash() returns int;
+    function hash2() returns int;
 };
 
-public isolated type Hashable object {
+public type Hashable isolated object {
     public function hash() returns int;
+    function hash2() returns int;
 };
+
+type H object {
+    public isolated function hash() returns int;
+    function hash2() returns int;
+};
+
+public type I object { // warning
+    public isolated function hash() returns int;
+    function hash2() returns int;
+};
+
+isolated service class A {
+
+}
+
+service class SA2 {
+
+}
+
+public isolated service class SA3 {
+
+}
+
+public service class SA4 { // warning
+
+}

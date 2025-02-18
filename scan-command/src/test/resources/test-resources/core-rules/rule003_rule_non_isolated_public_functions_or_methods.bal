@@ -78,7 +78,7 @@ public isolated class A2 {
     }
 }
 
-public isolated class A2 {
+public isolated class A3 {
     public isolated function c2() {
 
     }
@@ -96,6 +96,72 @@ public isolated class A2 {
     }
 
     public function main() { // warning
+
+    }
+}
+
+public class A4 { // warning
+    function init() {
+
+    }
+
+    public isolated function c2() {
+
+    }
+
+    public function c() { // warning
+
+    }
+
+    function d() {
+
+    }
+
+    public isolated function main() {
+
+    }
+}
+
+public isolated service class {
+    function init() {
+
+    }
+
+    public isolated function c2() {
+
+    }
+
+    public function c() {
+
+    }
+
+    function d() {
+
+    }
+
+    public isolated function main() {
+
+    }
+}
+
+public service class SC { // warning
+    function init() {
+
+    }
+
+    public isolated function c2() {
+
+    }
+
+    public function c() { // warning
+
+    }
+
+    function d() {
+
+    }
+
+    public isolated function main() {
 
     }
 }
