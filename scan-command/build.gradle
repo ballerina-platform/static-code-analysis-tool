@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort
 import org.apache.tools.ant.taskdefs.condition.Os
 
 import java.nio.file.Paths
@@ -118,8 +120,8 @@ checkstyleTest.dependsOn(downloadCheckstyleRuleFiles)
 
 // Setting up spotbugs
 spotbugsMain {
-    effort "max"
-    reportLevel "low"
+    effort = Effort.valueOf("MAX")
+    reportLevel = Confidence.valueOf("LOW")
 
     reportsDir = file("$project.buildDir/reports/spotbugs")
 
@@ -135,8 +137,8 @@ spotbugsMain {
 }
 
 spotbugsTest {
-    effort = "max"
-    reportLevel = "low"
+    effort = Effort.valueOf("MAX")
+    reportLevel = Confidence.valueOf("LOW")
 
     reportsDir = file("$project.buildDir/reports/spotbugs")
 
