@@ -32,8 +32,8 @@ import java.util.List;
  * */
 enum CoreRule {
     AVOID_CHECKPANIC(RuleFactory.createRule(1, Constants.RuleDescription.AVOID_CHECKPANIC, RuleKind.CODE_SMELL)),
-    UNUSED_CLASS_FIELDS(RuleFactory.createRule(5,
-            "Unused private fields", RuleKind.CODE_SMELL));
+    UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2, "Unused function parameter", RuleKind.CODE_SMELL)),
+    UNUSED_CLASS_FIELDS(RuleFactory.createRule(5, "Unused private fields", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 
