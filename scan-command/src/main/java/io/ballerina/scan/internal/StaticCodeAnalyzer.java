@@ -38,13 +38,11 @@ import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
-import io.ballerina.scan.utils.StaticCodeAnalyzerUtils;
 
 import java.util.List;
+import java.util.Optional;
 
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.PRIVATE_KEYWORD;
-
-import java.util.Optional;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.
@@ -78,6 +76,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
         if (checkExpressionNode.checkKeyword().kind().equals(SyntaxKind.CHECKPANIC_KEYWORD)) {
             reportIssue(checkExpressionNode, CoreRule.AVOID_CHECKPANIC);
         }
+        this.visitSyntaxNode(checkExpressionNode);
     }
 
     @Override
@@ -85,14 +84,14 @@ class StaticCodeAnalyzer extends NodeVisitor {
         semanticModel.symbol(objectFieldNode).ifPresent(symbol -> {
             if (symbol instanceof ClassFieldSymbol classFieldSymbol) {
                 List<Qualifier> qualifiers = classFieldSymbol.qualifiers();
-                if (StaticCodeAnalyzerUtils.getQualifier(qualifiers, PRIVATE_KEYWORD.stringValue())) {
+                if (hasQualifier(qualifiers, PRIVATE_KEYWORD)) {
                     if (semanticModel.references(symbol).size() == 1) {
-                        StaticCodeAnalyzerUtils.reportIssue(scannerContext, document, objectFieldNode,
-                                CoreRule.UNUSED_CLASS_FIELDS.rule());
+                        reportIssue(objectFieldNode, CoreRule.UNUSED_CLASS_FIELDS);
                     }
                 }
             }
         });
+        this.visitSyntaxNode(objectFieldNode);
     }
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
         checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
@@ -147,5 +146,15 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private boolean isUnusedNode(Node node) {
         Optional<Symbol> symbol = semanticModel.symbol(node);
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
+    }
+
+    private boolean hasQualifier(List<Qualifier> qualifierList, SyntaxKind qualifierValue) {
+        String qualifierValueStr = qualifierValue.stringValue();
+        for (Qualifier qualifier : qualifierList) {
+            if (qualifier.getValue().equals(qualifierValueStr)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

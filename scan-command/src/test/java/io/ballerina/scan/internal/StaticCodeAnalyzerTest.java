@@ -27,7 +27,6 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Source;
-import io.ballerina.scan.utils.Constants;
 import io.ballerina.tools.text.LineRange;
 import org.testng.Assert;
 
