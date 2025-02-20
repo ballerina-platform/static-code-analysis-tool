@@ -18,15 +18,10 @@
 
 package io.ballerina.scan.internal;
 
-import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
-import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
-import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
-import io.ballerina.compiler.syntax.tree.ExpressionNode;
-import io.ballerina.compiler.syntax.tree.ModulePartNode;
-import io.ballerina.compiler.syntax.tree.Node;
-import io.ballerina.compiler.syntax.tree.NodeLocation;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.Symbol;
+import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
+import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
@@ -36,6 +31,7 @@ import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionParameters;
 import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
+import io.ballerina.compiler.syntax.tree.NodeLocation;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
@@ -45,9 +41,10 @@ import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
 
+import java.util.Optional;
+
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.DOUBLE_DOT_LT_TOKEN;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.ELLIPSIS_TOKEN;
-import java.util.Optional;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.

@@ -62,14 +62,6 @@ public class Constants {
     static final String RULE_DESCRIPTION_COLUMN = "Rule Description";
     static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerina/", "ballerinax/", "wso2/"};
 
-    public static class RuleDescription {
-        public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
-        public static final String INVALID_RANGE_OPERATOR = "Invalid range operator";
-
-        private RuleDescription() {
-        }
-    }
-
     private Constants() {
     }
 }

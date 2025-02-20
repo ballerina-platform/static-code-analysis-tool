@@ -34,7 +34,7 @@ public class CoreRuleTest {
 
     @Test(description = "test all rules")
     void testAllRules() {
-        Assert.assertEquals(CoreRule.rules().size(), 2);
+        Assert.assertEquals(CoreRule.rules().size(), 3);
     }
 
     @Test(description = "test checkpanic rule")
