@@ -25,6 +25,7 @@ pluginManagement {
         id 'com.github.spotbugs' version "${spotbugsPluginVersion}"
         id 'de.undercouch.download' version "${downloadPluginVersion}"
         id "net.researchgate.release" version "${releasePluginVersion}"
+        id "com.gradle.enterprise" version "${enterprisePluginVersion}"
     }
 }
 
@@ -38,3 +39,12 @@ include 'test-compiler-plugins:invalid-rules-plugin'
 include 'test-compiler-plugins:invalid-ruleformat-plugin'
 include 'test-compiler-plugins:invalid-rulekind-plugin'
 include 'test-static-code-analysis-platform-plugins:exampleOrg-static-code-analysis-platform-plugin'
+
+if (gradle.startParameter.buildScan) {
+    gradleEnterprise {
+        buildScan {
+            termsOfServiceUrl = 'https://gradle.com/terms-of-service'
+            termsOfServiceAgree = 'yes'
+        }
+    }
+}

@@ -31,7 +31,10 @@ import java.util.List;
  * @since 0.1.0
  * */
 enum CoreRule {
-    AVOID_CHECKPANIC(RuleFactory.createRule(1, Constants.RuleDescription.AVOID_CHECKPANIC, RuleKind.CODE_SMELL)),
+
+    AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
+    UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
+            "Unused function parameter", RuleKind.CODE_SMELL)),
     OPERATION_ALWAYS_EVALUATE_TO_TRUE(RuleFactory.createRule(6,
             Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_TRUE, RuleKind.CODE_SMELL)),
     OPERATION_ALWAYS_EVALUATE_TO_FALSE(RuleFactory.createRule(7,
@@ -39,7 +42,7 @@ enum CoreRule {
     OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE(RuleFactory.createRule(8,
             Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE, RuleKind.CODE_SMELL)),
     SELF_ASSIGNMENT(RuleFactory.createRule(9,
-            Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL));;
+            Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL));
 
     private final Rule rule;
 

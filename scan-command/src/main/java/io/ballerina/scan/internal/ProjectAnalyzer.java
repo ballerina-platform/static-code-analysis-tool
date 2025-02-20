@@ -22,6 +22,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.projects.CompilerPluginCache;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentConfig;
@@ -111,9 +112,10 @@ class ProjectAnalyzer {
     }
 
     private Consumer<DocumentId> analyzeDocument(Module module, ScannerContextImpl scannerContext) {
+        SemanticModel semanticModel = module.getCompilation().getSemanticModel();
         return documentId -> {
             Document document = module.document(documentId);
-            StaticCodeAnalyzer analyzer = new StaticCodeAnalyzer(document, scannerContext);
+            StaticCodeAnalyzer analyzer = new StaticCodeAnalyzer(document, scannerContext, semanticModel);
             analyzer.analyze();
         };
     }

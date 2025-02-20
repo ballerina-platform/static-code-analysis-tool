@@ -1,1 +1,0 @@
-Ballerina Scan tool
