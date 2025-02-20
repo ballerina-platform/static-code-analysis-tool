@@ -32,6 +32,8 @@ import java.util.List;
  * */
 enum CoreRule {
     AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
+    UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
+            "Unused function parameter", RuleKind.CODE_SMELL)),
     INVALID_RANGE_OPERATOR(RuleFactory.createRule(10,
             Constants.RuleDescription.INVALID_RANGE_OPERATOR, RuleKind.CODE_SMELL));
 

@@ -30,36 +30,21 @@ import io.ballerina.scan.Source;
 import io.ballerina.scan.utils.Constants;
 import io.ballerina.tools.text.LineRange;
 import org.testng.Assert;
-import org.testng.annotations.Test;
 
 import java.nio.file.Path;
-import java.util.List;
 
 /**
- * Core analyzer tests.
+ * Static code analyzer test.
  *
  * @since 0.1.0
  */
 public class StaticCodeAnalyzerTest extends BaseTest {
     private final Path coreRuleBalFiles = testResources.resolve("test-resources").resolve("core-rules");
 
-    private Document loadDocument(String documentName) {
+    Document loadDocument(String documentName) {
         Project project = SingleFileProject.load(coreRuleBalFiles.resolve(documentName));
         Module defaultModule = project.currentPackage().getDefaultModule();
         return defaultModule.document(defaultModule.documentIds().iterator().next());
-    }
-
-    @Test(description = "test checkpanic analyzer")
-    void testCheckpanicAnalyzer() {
-        String documentName = "rule_checkpanic.bal";
-        Document document = loadDocument(documentName);
-        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.AVOID_CHECKPANIC.rule()));
-        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext);
-        staticCodeAnalyzer.analyze();
-        List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 1);
-        assertIssue(issues.get(0), documentName, 20, 17, 20, 39, "ballerina:1", 1,
-                Constants.RuleDescription.AVOID_CHECKPANIC, RuleKind.CODE_SMELL);
     }
 
     @Test(description = "test checkpanic analyzer")
