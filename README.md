@@ -12,7 +12,7 @@ This repository consists of
 
 ## Prerequisites
 
-1. OpenJDK 17 ([Adopt OpenJDK](https://adoptium.net/temurin/releases/?version=17) or any other OpenJDK distribution)
+1. OpenJDK 21 ([Adopt OpenJDK](https://adoptium.net/temurin/releases/?version=21) or any other OpenJDK distribution)
 
 2. [Ballerina](https://ballerina.io/)
 
