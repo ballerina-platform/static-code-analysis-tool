@@ -19,15 +19,11 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
-import io.ballerina.compiler.syntax.tree.ModulePartNode;
-import io.ballerina.compiler.syntax.tree.Node;
-import io.ballerina.compiler.syntax.tree.NodeLocation;
-import io.ballerina.compiler.api.symbols.Symbol;
-import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
@@ -47,13 +43,9 @@ import io.ballerina.scan.utils.Constants;
 
 import java.util.Optional;
 
-import static io.ballerina.compiler.syntax.tree.SyntaxKind.CHECKPANIC_KEYWORD;
 import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference;
 import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isEqualToProvidedLiteralIdentifier;
 import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isSameSimpleExpression;
-import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.reportIssue;
-
-import java.util.Optional;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.
@@ -70,7 +62,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
         this.document = document;
         this.syntaxTree = document.syntaxTree();
         this.scannerContext = scannerContext;
-        semanticModel = document.module().getCompilation().getSemanticModel();
+        this.semanticModel = semanticModel;
     }
 
     void analyze() {
@@ -90,23 +82,18 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     @Override
-    public void visit(ModulePartNode modulePartNode) {
-        modulePartNode.members().forEach(member -> member.accept(this));
-    }
-
-    @Override
     public void visit(BinaryExpressionNode binaryExpressionNode) {
         reportIssuesForTrivialOperations(binaryExpressionNode);
         isSameOperandRestrictedInOperator(binaryExpressionNode.operator()).ifPresent(rule -> {
             checkSameUsageInBinaryOperator(binaryExpressionNode.lhsExpr(),
-                    binaryExpressionNode.rhsExpr(), rule, binaryExpressionNode.location());
+                    binaryExpressionNode.rhsExpr(), rule, binaryExpressionNode);
         });
     }
 
     @Override
     public void visit(AssignmentStatementNode assignmentStatementNode) {
         checkSameUsageInAssignment(assignmentStatementNode.varRef(), assignmentStatementNode.expression(),
-                CoreRule.SELF_ASSIGNMENT, assignmentStatementNode.location());
+                CoreRule.SELF_ASSIGNMENT, assignmentStatementNode);
         this.visitSyntaxNode(assignmentStatementNode);
     }
 
@@ -114,19 +101,19 @@ class StaticCodeAnalyzer extends NodeVisitor {
     public void visit(CompoundAssignmentStatementNode compoundAssignmentStatementNode) {
         checkSameUsageInAssignment(compoundAssignmentStatementNode.lhsExpression(),
                 compoundAssignmentStatementNode.rhsExpression(), CoreRule.SELF_ASSIGNMENT,
-                compoundAssignmentStatementNode.location());
+                compoundAssignmentStatementNode);
         this.visitSyntaxNode(compoundAssignmentStatementNode);
     }
 
-    private void checkSameUsageInBinaryOperator(Node lhs, Node rhs, CoreRule rule, NodeLocation location) {
+    private void checkSameUsageInBinaryOperator(Node lhs, Node rhs, CoreRule rule, Node node) {
         if (isSameSimpleExpression(lhs, rhs)) {
-            reportIssue(scannerContext, document, location, rule.rule());
+            reportIssue(node, rule);
         }
     }
 
-    private void checkSameUsageInAssignment(Node lhs, Node rhs, CoreRule rule, NodeLocation location) {
+    private void checkSameUsageInAssignment(Node lhs, Node rhs, CoreRule rule, Node node) {
         if (isSameSimpleExpression(lhs, rhs)) {
-            reportIssue(scannerContext, document, location, rule.rule());
+            reportIssue(node, rule);
         }
     }
 
@@ -135,15 +122,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.FLOAT, Constants.Token.INFINITY)) {
                 // a > Infinity is always false.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
             }
 
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.INT, Constants.Token.MAX_VALUE)) {
                 // a > MAX_VALUE is always false.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
             }
         }
 
@@ -151,15 +136,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.FLOAT, Constants.Token.INFINITY)) {
                 // a <= Infinity is always true.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
             }
 
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.INT, Constants.Token.MAX_VALUE)) {
                 // a <= MAX_VALUE is always true.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
             }
         }
 
@@ -167,8 +150,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.INT, Constants.Token.MIN_VALUE)) {
                 // a < MIN_VALUE is always false.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
             }
         }
 
@@ -176,8 +158,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.INT, Constants.Token.MIN_VALUE)) {
                 // a >= MIN_VALUE is always true.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
             }
         }
 
@@ -185,15 +166,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.FALSE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.FALSE)) {
                 // a && false is always false.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE.rule());
+                reportIssue(binaryExpressionNode,  CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
             }
 
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.TRUE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.TRUE)) {
                 // a && true is always `a`.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
             }
         }
 
@@ -201,15 +180,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.FALSE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.FALSE)) {
                 // a || false is always `a`.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
             }
 
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.TRUE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.TRUE)) {
                 // a || true is always true.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
             }
         }
 
@@ -217,15 +194,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.ZERO)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.ZERO)) {
                 // a & 0 is always false.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
             }
 
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.MINUS_ONE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.MINUS_ONE)) {
                 // a & -1 is always `a`.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
             }
         }
 
@@ -233,15 +208,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.ZERO)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.ZERO)) {
                 // a | 0 is always `a`.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
             }
 
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.MINUS_ONE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.MINUS_ONE)) {
                 // a | -1 is always true.
-                reportIssue(scannerContext, document, binaryExpressionNode,
-                        CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE.rule());
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
             }
         }
     }
@@ -259,6 +232,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
             }
         }
         return Optional.empty();
+    }
+
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
         checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
         this.visitSyntaxNode(functionDefinitionNode);

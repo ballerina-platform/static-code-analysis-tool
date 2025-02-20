@@ -62,31 +62,17 @@ public class Constants {
     static final String RULE_DESCRIPTION_COLUMN = "Rule Description";
     static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerina/", "ballerinax/", "wso2/"};
 
-    public static class RuleDescription {
-        public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
-        public static final String OPERATION_ALWAYS_EVALUATE_TO_TRUE
-                = "This operation always evaluate to true";
-        public static final String OPERATION_ALWAYS_EVALUATE_TO_FALSE
-                = "This operation always evaluate to false";
-        public static final String OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE
-                = "This operation always evaluate to false";
-        public static final String SELF_ASSIGNMENT = "Self assignment";
-
-        private RuleDescription() {
-        }
-    }
-
     public static class Token {
-        public static String FLOAT = "float";
-        public static String INT = "int";
-        public static String INFINITY = "Infinity";
-        public static String MAX_VALUE = "MAX_VALUE";
-        public static String MIN_VALUE = "MIN_VALUE";
-        public static String TRUE = "true";
-        public static String FALSE = "false";
-        public static String ZERO = "0";
-        public static String ONE = "1";
-        public static String MINUS_ONE = "-1";
+        public static final String FLOAT = "float";
+        public static final String INT = "int";
+        public static final String INFINITY = "Infinity";
+        public static final String MAX_VALUE = "MAX_VALUE";
+        public static final String MIN_VALUE = "MIN_VALUE";
+        public static final String TRUE = "true";
+        public static final String FALSE = "false";
+        public static final String ZERO = "0";
+        public static final String ONE = "1";
+        public static final String MINUS_ONE = "-1";
         private Token() {
         }
     }

@@ -20,7 +20,6 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
-import io.ballerina.scan.utils.Constants;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,13 +35,13 @@ enum CoreRule {
     UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
             "Unused function parameter", RuleKind.CODE_SMELL)),
     OPERATION_ALWAYS_EVALUATE_TO_TRUE(RuleFactory.createRule(6,
-            Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_TRUE, RuleKind.CODE_SMELL)),
+            "This operation always evaluate to true", RuleKind.CODE_SMELL)),
     OPERATION_ALWAYS_EVALUATE_TO_FALSE(RuleFactory.createRule(7,
-            Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_FALSE, RuleKind.CODE_SMELL)),
+            "This operation always evaluate to false", RuleKind.CODE_SMELL)),
     OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE(RuleFactory.createRule(8,
-            Constants.RuleDescription.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE, RuleKind.CODE_SMELL)),
+            "This operation always evaluate to the same value", RuleKind.CODE_SMELL)),
     SELF_ASSIGNMENT(RuleFactory.createRule(9,
-            Constants.RuleDescription.SELF_ASSIGNMENT, RuleKind.CODE_SMELL));
+            "Self assignment", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 
