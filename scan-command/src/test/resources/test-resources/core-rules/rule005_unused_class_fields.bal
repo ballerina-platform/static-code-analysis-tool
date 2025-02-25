@@ -15,24 +15,24 @@
 // under the License.
 
 class A {
-    private string c; // warning
+    private string c = ""; // warning
 }
 
 public class A2 {
     int a = 1;
     public string b = "";
-    private string c; // warning
+    private string c = ""; // warning
 }
 
 public class A3 {
     int a;
     public string b;
     private string c;
-    private boolean d;
-    private boolean? e; // warning
+    private boolean d = true;
+    private boolean? e = true; // warning
     private int|boolean f = 0;
     private boolean g = false; // warning
-    public string h;
+    public string h = "";
 
     function init() {
         self.a = 0;
@@ -73,7 +73,7 @@ class A4 {
 }
 
 service class SA {
-    private string b; // warning
+    private string b = ""; // warning
     private string c = "";
     private string d = "";
 
