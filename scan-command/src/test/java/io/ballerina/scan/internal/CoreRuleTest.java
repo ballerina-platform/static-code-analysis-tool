@@ -31,10 +31,13 @@ import org.testng.annotations.Test;
 public class CoreRuleTest {
     public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
     public static final String UNUSED_FUNCTION_PARAMETER = "Unused function parameter";
+    public static final String PUBLIC_NON_ISOLATED_FUNCTIONS_OR_METHOD_CONSTRUCT =
+            "Non isolated public function or method";
+    public static final String PUBLIC_NON_ISOLATED_CLASS_OR_OBJECT_CONSTRUCT = "Non isolated public class or object";
 
     @Test(description = "test all rules")
     void testAllRules() {
-        Assert.assertEquals(CoreRule.rules().size(), 2);
+        Assert.assertEquals(CoreRule.rules().size(), 4);
     }
 
     @Test(description = "test checkpanic rule")
@@ -52,6 +55,24 @@ public class CoreRuleTest {
         Assert.assertEquals(rule.id(), "ballerina:2");
         Assert.assertEquals(rule.numericId(), 2);
         Assert.assertEquals(rule.description(), UNUSED_FUNCTION_PARAMETER);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test non isolated public functions or methods")
+    void testNonIsolatedPublicFunctionOrMethodConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_FUNCTIONS_OR_METHOD_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:3");
+        Assert.assertEquals(rule.numericId(), 3);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_FUNCTIONS_OR_METHOD_CONSTRUCT);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test non isolated public class or object constructs")
+    void testNonIsolatedPublicClassOrObjectConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_CLASS_OR_OBJECT_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:4");
+        Assert.assertEquals(rule.numericId(), 4);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_CLASS_OR_OBJECT_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }
