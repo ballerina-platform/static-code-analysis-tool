@@ -30,9 +30,18 @@ import java.util.List;
  * @since 0.1.0
  * */
 enum CoreRule {
+
     AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
     UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
-            "Unused function parameter", RuleKind.CODE_SMELL));
+            "Unused function parameter", RuleKind.CODE_SMELL)),
+    OPERATION_ALWAYS_EVALUATES_TO_TRUE(RuleFactory.createRule(6,
+            "This operation always evaluates to true", RuleKind.CODE_SMELL)),
+    OPERATION_ALWAYS_EVALUATES_TO_FALSE(RuleFactory.createRule(7,
+            "This operation always evaluates to false", RuleKind.CODE_SMELL)),
+    OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE(RuleFactory.createRule(8,
+            "This operation always evaluates to the same value", RuleKind.CODE_SMELL)),
+    SELF_ASSIGNMENT(RuleFactory.createRule(9,
+            "This variable is assigned to itself", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 
