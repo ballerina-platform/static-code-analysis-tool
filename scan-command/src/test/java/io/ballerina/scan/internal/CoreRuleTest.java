@@ -31,11 +31,11 @@ import org.testng.annotations.Test;
 public class CoreRuleTest {
     public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
     public static final String UNUSED_FUNCTION_PARAMETER = "Unused function parameter";
-    public static final String OPERATION_ALWAYS_EVALUATE_TO_TRUE = "This operation always evaluate to true";
-    public static final String OPERATION_ALWAYS_EVALUATE_TO_FALSE = "This operation always evaluate to false";
-    public static final String OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE =
-            "This operation always evaluate to the same value";
-    public static final String SELF_ASSIGNMENT = "Self assignment";
+    public static final String OPERATION_ALWAYS_EVALUATES_TO_TRUE = "This operation always evaluates to true";
+    public static final String OPERATION_ALWAYS_EVALUATES_TO_FALSE = "This operation always evaluates to false";
+    public static final String OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE =
+            "This operation always evaluates to the same value";
+    public static final String SELF_ASSIGNMENT = "This variable is assigned to itself";
 
     @Test(description = "test all rules")
     void testAllRules() {
@@ -62,28 +62,28 @@ public class CoreRuleTest {
 
     @Test(description = "test always true evaluates")
     void testTrueEvaluates() {
-        Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE.rule();
+        Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE.rule();
         Assert.assertEquals(rule.id(), "ballerina:6");
         Assert.assertEquals(rule.numericId(), 6);
-        Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATE_TO_TRUE);
+        Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATES_TO_TRUE);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 
     @Test(description = "test always false evaluates")
     void testFalseEvaluates() {
-        Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE.rule();
+        Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE.rule();
         Assert.assertEquals(rule.id(), "ballerina:7");
         Assert.assertEquals(rule.numericId(), 7);
-        Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATE_TO_FALSE);
+        Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATES_TO_FALSE);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 
     @Test(description = "test evaluate to the same value")
     void testSelfEvaluates() {
-        Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE.rule();
+        Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE.rule();
         Assert.assertEquals(rule.id(), "ballerina:8");
         Assert.assertEquals(rule.numericId(), 8);
-        Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
+        Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 

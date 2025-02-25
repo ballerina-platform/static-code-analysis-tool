@@ -1,12 +1,12 @@
 Loading scan tool configurations from src/test/resources/test-resources/bal-project-with-config-file/Scan.toml
-	RuleID                                           | Rule Kind     | Rule Description                                
-	--------------------------------------------------------------------------------------------------------------------
+	RuleID                                           | Rule Kind     | Rule Description                                 
+	---------------------------------------------------------------------------------------------------------------------
 	ballerina:1                                      | CODE_SMELL    | Avoid checkpanic
 	ballerina:2                                      | CODE_SMELL    | Unused function parameter
-	ballerina:6                                      | CODE_SMELL    | This operation always evaluate to true
-	ballerina:7                                      | CODE_SMELL    | This operation always evaluate to false
-	ballerina:8                                      | CODE_SMELL    | This operation always evaluate to the same value
-	ballerina:9                                      | CODE_SMELL    | Self assignment
+	ballerina:6                                      | CODE_SMELL    | This operation always evaluates to true
+	ballerina:7                                      | CODE_SMELL    | This operation always evaluates to false
+	ballerina:8                                      | CODE_SMELL    | This operation always evaluates to the same value
+	ballerina:9                                      | CODE_SMELL    | This variable is assigned to itself
 	ballerina/example_module_static_code_analyzer:1  | CODE_SMELL    | rule 1
 	ballerina/example_module_static_code_analyzer:2  | BUG           | rule 2
 	ballerina/example_module_static_code_analyzer:3  | VULNERABILITY | rule 3

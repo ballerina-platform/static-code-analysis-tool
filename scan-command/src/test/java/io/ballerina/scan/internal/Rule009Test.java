@@ -33,7 +33,7 @@ import java.util.List;
  * @since 0.1.0
  */
 public class Rule009Test extends StaticCodeAnalyzerTest {
-    public static final String SELF_ASSIGNMENT = "Self assignment";
+    public static final String SELF_ASSIGNMENT = "This variable is assigned to itself";
 
     @Test(description = "test self assignment")
     void testSelfAssignmentAnalyzer() {

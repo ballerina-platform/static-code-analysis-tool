@@ -83,152 +83,153 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     @Override
     public void visit(BinaryExpressionNode binaryExpressionNode) {
-        reportIssuesForTrivialOperations(binaryExpressionNode);
-        isSameOperandRestrictedInOperator(binaryExpressionNode.operator()).ifPresent(rule -> {
-            checkSameUsageInBinaryOperator(binaryExpressionNode.lhsExpr(),
+        reportIssuesWithTrivialOperations(binaryExpressionNode);
+        filterSameReferenceIssueBasedOnOperandType(binaryExpressionNode.operator()).ifPresent(rule -> {
+            checkUsageOfSameOperandInBinaryExpr(binaryExpressionNode.lhsExpr(),
                     binaryExpressionNode.rhsExpr(), rule, binaryExpressionNode);
         });
     }
 
     @Override
     public void visit(AssignmentStatementNode assignmentStatementNode) {
-        checkSameUsageInAssignment(assignmentStatementNode.varRef(), assignmentStatementNode.expression(),
+        checkUsageOfAssignment(assignmentStatementNode.varRef(), assignmentStatementNode.expression(),
                 CoreRule.SELF_ASSIGNMENT, assignmentStatementNode);
         this.visitSyntaxNode(assignmentStatementNode);
     }
 
     @Override
     public void visit(CompoundAssignmentStatementNode compoundAssignmentStatementNode) {
-        checkSameUsageInAssignment(compoundAssignmentStatementNode.lhsExpression(),
+        checkUsageOfAssignment(compoundAssignmentStatementNode.lhsExpression(),
                 compoundAssignmentStatementNode.rhsExpression(), CoreRule.SELF_ASSIGNMENT,
                 compoundAssignmentStatementNode);
         this.visitSyntaxNode(compoundAssignmentStatementNode);
     }
 
-    private void checkSameUsageInBinaryOperator(Node lhs, Node rhs, CoreRule rule, Node node) {
+    private void checkUsageOfSameOperandInBinaryExpr(Node lhs, Node rhs, CoreRule rule, Node binaryExprNode) {
         if (isSameSimpleExpression(lhs, rhs)) {
-            reportIssue(node, rule);
+            reportIssue(binaryExprNode, rule);
         }
     }
 
-    private void checkSameUsageInAssignment(Node lhs, Node rhs, CoreRule rule, Node node) {
+    private void checkUsageOfAssignment(Node lhs, Node rhs, CoreRule rule, Node assignmentNode) {
         if (isSameSimpleExpression(lhs, rhs)) {
-            reportIssue(node, rule);
+            reportIssue(assignmentNode, rule);
         }
     }
 
-    public void reportIssuesForTrivialOperations(BinaryExpressionNode binaryExpressionNode) {
-        if (binaryExpressionNode.operator().kind() == SyntaxKind.GT_TOKEN) {
+    private void reportIssuesWithTrivialOperations(BinaryExpressionNode binaryExpressionNode) {
+        SyntaxKind binaryOperatorKind = binaryExpressionNode.operator().kind();
+        if (binaryOperatorKind == SyntaxKind.GT_TOKEN) {
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.FLOAT, Constants.Token.INFINITY)) {
                 // a > Infinity is always false.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
             }
 
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.INT, Constants.Token.MAX_VALUE)) {
                 // a > MAX_VALUE is always false.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
             }
         }
 
-        if (binaryExpressionNode.operator().kind() == SyntaxKind.LT_EQUAL_TOKEN) {
+        if (binaryOperatorKind == SyntaxKind.LT_EQUAL_TOKEN) {
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.FLOAT, Constants.Token.INFINITY)) {
                 // a <= Infinity is always true.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
             }
 
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.INT, Constants.Token.MAX_VALUE)) {
                 // a <= MAX_VALUE is always true.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
             }
         }
 
-        if (binaryExpressionNode.operator().kind() == SyntaxKind.LT_TOKEN) {
+        if (binaryOperatorKind == SyntaxKind.LT_TOKEN) {
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.INT, Constants.Token.MIN_VALUE)) {
                 // a < MIN_VALUE is always false.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
             }
         }
 
-        if (binaryExpressionNode.operator().kind() == SyntaxKind.GT_EQUAL_TOKEN) {
+        if (binaryOperatorKind == SyntaxKind.GT_EQUAL_TOKEN) {
             if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
                     Constants.Token.INT, Constants.Token.MIN_VALUE)) {
                 // a >= MIN_VALUE is always true.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
             }
         }
 
-        if (binaryExpressionNode.operator().kind() == SyntaxKind.LOGICAL_AND_TOKEN) {
+        if (binaryOperatorKind == SyntaxKind.LOGICAL_AND_TOKEN) {
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.FALSE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.FALSE)) {
                 // a && false is always false.
-                reportIssue(binaryExpressionNode,  CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
+                reportIssue(binaryExpressionNode,  CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
             }
 
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.TRUE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.TRUE)) {
                 // a && true is always `a`.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE);
             }
         }
 
-        if (binaryExpressionNode.operator().kind() == SyntaxKind.LOGICAL_OR_TOKEN) {
+        if (binaryOperatorKind == SyntaxKind.LOGICAL_OR_TOKEN) {
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.FALSE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.FALSE)) {
                 // a || false is always `a`.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE);
             }
 
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.TRUE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.TRUE)) {
                 // a || true is always true.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
             }
         }
 
-        if (binaryExpressionNode.operator().kind() == SyntaxKind.BITWISE_AND_TOKEN) {
+        if (binaryOperatorKind == SyntaxKind.BITWISE_AND_TOKEN) {
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.ZERO)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.ZERO)) {
                 // a & 0 is always false.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
             }
 
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.MINUS_ONE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.MINUS_ONE)) {
                 // a & -1 is always `a`.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE);
             }
         }
 
-        if (binaryExpressionNode.operator().kind() == SyntaxKind.PIPE_TOKEN) {
+        if (binaryOperatorKind == SyntaxKind.PIPE_TOKEN) {
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.ZERO)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.ZERO)) {
                 // a | 0 is always `a`.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE);
             }
 
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.MINUS_ONE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.MINUS_ONE)) {
                 // a | -1 is always true.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
+                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
             }
         }
     }
 
-    private Optional<CoreRule> isSameOperandRestrictedInOperator(Token operator) {
+    private Optional<CoreRule> filterSameReferenceIssueBasedOnOperandType(Token operator) {
         switch (operator.kind()) {
             case GT_EQUAL_TOKEN, LT_EQUAL_TOKEN, DOUBLE_EQUAL_TOKEN, TRIPPLE_EQUAL_TOKEN -> {
-                return Optional.of(CoreRule.OPERATION_ALWAYS_EVALUATE_TO_TRUE);
+                return Optional.of(CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
             }
             case GT_TOKEN, LT_TOKEN, NOT_DOUBLE_EQUAL_TOKEN, NOT_EQUAL_TOKEN -> {
-                return Optional.of(CoreRule.OPERATION_ALWAYS_EVALUATE_TO_FALSE);
+                return Optional.of(CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
             }
             case LOGICAL_OR_TOKEN, LOGICAL_AND_TOKEN, BITWISE_AND_TOKEN, PIPE_TOKEN -> {
-                return Optional.of(CoreRule.OPERATION_ALWAYS_EVALUATE_TO_SELF_VALUE);
+                return Optional.of(CoreRule.OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE);
             }
         }
         return Optional.empty();
