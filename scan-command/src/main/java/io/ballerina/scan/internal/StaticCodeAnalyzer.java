@@ -81,66 +81,40 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     public void visit(BinaryExpressionNode binaryExpressionNode) {
-        if (binaryExpressionNode.operator().kind().equals(ELLIPSIS_TOKEN)
-                || binaryExpressionNode.operator().kind().equals(DOUBLE_DOT_LT_TOKEN)) {
+        SyntaxKind binaryOperatorKind = binaryExpressionNode.operator().kind();
+        if (binaryOperatorKind.equals(ELLIPSIS_TOKEN)
+                || binaryOperatorKind.equals(DOUBLE_DOT_LT_TOKEN)) {
             validateRangeExpressionOperator(scannerContext, document, binaryExpressionNode.lhsExpr(),
                     binaryExpressionNode.rhsExpr(), binaryExpressionNode.operator(), binaryExpressionNode.location());
         }
     }
 
     private void validateRangeExpressionOperator(ScannerContext scannerContext, Document document,
-                                                 Node n1, Node n2, Token operator, NodeLocation location) {
-        String lhsExpr = null;
-        String rhsExpr = null;
-        boolean isMinusOperatorPresentInLhs = false;
-        boolean isMinusOperatorPresentInRhs = false;
+                                                 Node lhsNode, Node rhsNode, Token operator, NodeLocation location) {
+        Optional<String> lhsExpr = getExprStringValueFromRangeExprNode(lhsNode);
+        Optional<String> rhsExpr = getExprStringValueFromRangeExprNode(rhsNode);
 
-        if (n1 instanceof UnaryExpressionNode unaryN1) {
-            if (unaryN1.unaryOperator().kind() == SyntaxKind.MINUS_TOKEN) {
-                isMinusOperatorPresentInLhs = true;
-            }
-            n1 = unaryN1.expression();
-        }
-        if (n2 instanceof UnaryExpressionNode unaryN2) {
-            if (unaryN2.unaryOperator().kind() == SyntaxKind.MINUS_TOKEN) {
-                isMinusOperatorPresentInRhs = true;
-            }
-            n2 = unaryN2.expression();
+        if (lhsExpr.isEmpty() || rhsExpr.isEmpty()) {
+            return;
         }
 
-        if (n1 instanceof BasicLiteralNode lhsExprNode) {
-            lhsExpr = lhsExprNode.literalToken().text();
-            if (isMinusOperatorPresentInLhs) {
-                lhsExpr = "-" + lhsExpr;
-            }
-        }
-
-        if (n2 instanceof BasicLiteralNode rhsExprNode) {
-            rhsExpr = rhsExprNode.literalToken().text();
-            if (isMinusOperatorPresentInRhs) {
-                rhsExpr = "-" + rhsExpr;
-            }
-        }
-
-        if (lhsExpr != null && rhsExpr != null) {
-            // According to the spec, these literal tokens are integers. So no need to cast or check.
-            try {
-                int lhs = Integer.parseInt(lhsExpr);
-                int rhs = Integer.parseInt(rhsExpr);
-                if (operator.kind() == DOUBLE_DOT_LT_TOKEN) {
-                    if (lhs >= rhs) {
-                        scannerContext.getReporter().reportIssue(document, location,
-                                CoreRule.INVALID_RANGE_OPERATOR.rule());
-                    }
-                } else if (operator.kind() == ELLIPSIS_TOKEN) {
-                    if (lhs > rhs) {
-                        scannerContext.getReporter().reportIssue(document, location,
-                                CoreRule.INVALID_RANGE_OPERATOR.rule());
-                    }
+        // According to the spec, these literal tokens are integers. So no need to cast or check.
+        try {
+            int lhsValue = Integer.parseInt(lhsExpr.get());
+            int rhsValue = Integer.parseInt(rhsExpr.get());
+            if (operator.kind() == DOUBLE_DOT_LT_TOKEN) {
+                if (lhsValue >= rhsValue) {
+                    scannerContext.getReporter().reportIssue(document, location,
+                            CoreRule.INVALID_RANGE_EXPRESSION.rule());
                 }
-            } catch (NumberFormatException e) {
-                // ignore
+            } else if (operator.kind() == ELLIPSIS_TOKEN) {
+                if (lhsValue > rhsValue) {
+                    scannerContext.getReporter().reportIssue(document, location,
+                            CoreRule.INVALID_RANGE_EXPRESSION.rule());
+                }
             }
+        } catch (NumberFormatException e) {
+            // ignore
         }
     }
     
@@ -198,5 +172,26 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private boolean isUnusedNode(Node node) {
         Optional<Symbol> symbol = semanticModel.symbol(node);
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
+    }
+
+    private Optional<String> getExprStringValueFromRangeExprNode(Node rangeExprNode) {
+        boolean isMinusOperatorPresent = false;
+
+        if (rangeExprNode instanceof UnaryExpressionNode unaryNode) {
+            if (unaryNode.unaryOperator().kind() == SyntaxKind.MINUS_TOKEN) {
+                isMinusOperatorPresent = true;
+            }
+            rangeExprNode = unaryNode.expression();
+        }
+
+        if (rangeExprNode instanceof BasicLiteralNode literalNode) {
+            String expr = literalNode.literalToken().text();
+            if (isMinusOperatorPresent) {
+                expr = "-" + expr;
+            }
+            return Optional.of(expr);
+        }
+
+        return Optional.empty();
     }
 }

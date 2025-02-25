@@ -33,7 +33,7 @@ enum CoreRule {
     AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
     UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
             "Unused function parameter", RuleKind.CODE_SMELL)),
-    INVALID_RANGE_OPERATOR(RuleFactory.createRule(10, "Invalid range operator", RuleKind.CODE_SMELL));
+    INVALID_RANGE_EXPRESSION(RuleFactory.createRule(10, "Invalid range expression", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 
