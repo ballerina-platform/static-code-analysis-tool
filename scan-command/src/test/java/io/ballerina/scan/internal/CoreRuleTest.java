@@ -34,7 +34,7 @@ public class CoreRuleTest {
 
     @Test(description = "test all rules")
     void testAllRules() {
-        Assert.assertEquals(CoreRule.rules().size(), 2);
+        Assert.assertEquals(CoreRule.rules().size(), 3);
     }
 
     @Test(description = "test checkpanic rule")
@@ -52,6 +52,15 @@ public class CoreRuleTest {
         Assert.assertEquals(rule.id(), "ballerina:2");
         Assert.assertEquals(rule.numericId(), 2);
         Assert.assertEquals(rule.description(), UNUSED_FUNCTION_PARAMETER);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test unused class fields rule")
+    void testUnusedClassFieldsRule() {
+        Rule rule = CoreRule.UNUSED_PRIVATE_CLASS_FIELD.rule();
+        Assert.assertEquals(rule.id(), "ballerina:5");
+        Assert.assertEquals(rule.numericId(), 5);
+        Assert.assertEquals(rule.description(), "Unused class private fields");
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }

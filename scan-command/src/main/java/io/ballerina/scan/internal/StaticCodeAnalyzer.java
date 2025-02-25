@@ -19,6 +19,8 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.symbols.ClassFieldSymbol;
+import io.ballerina.compiler.api.symbols.Qualifier;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
@@ -30,13 +32,17 @@ import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
+import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
 
+import java.util.List;
 import java.util.Optional;
+
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.PRIVATE_KEYWORD;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.
@@ -70,9 +76,23 @@ class StaticCodeAnalyzer extends NodeVisitor {
         if (checkExpressionNode.checkKeyword().kind().equals(SyntaxKind.CHECKPANIC_KEYWORD)) {
             reportIssue(checkExpressionNode, CoreRule.AVOID_CHECKPANIC);
         }
+        this.visitSyntaxNode(checkExpressionNode);
     }
 
     @Override
+    public void visit(ObjectFieldNode objectFieldNode) {
+        semanticModel.symbol(objectFieldNode).ifPresent(symbol -> {
+            if (symbol instanceof ClassFieldSymbol classFieldSymbol) {
+                List<Qualifier> qualifiers = classFieldSymbol.qualifiers();
+                if (hasQualifier(qualifiers, PRIVATE_KEYWORD)) {
+                    if (semanticModel.references(symbol).size() == 1) {
+                        reportIssue(objectFieldNode, CoreRule.UNUSED_PRIVATE_CLASS_FIELD);
+                    }
+                }
+            }
+        });
+        this.visitSyntaxNode(objectFieldNode);
+    }
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
         checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
         this.visitSyntaxNode(functionDefinitionNode);
@@ -126,5 +146,15 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private boolean isUnusedNode(Node node) {
         Optional<Symbol> symbol = semanticModel.symbol(node);
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
+    }
+
+    private boolean hasQualifier(List<Qualifier> qualifierList, SyntaxKind qualifierValue) {
+        String qualifierValueStr = qualifierValue.stringValue();
+        for (Qualifier qualifier : qualifierList) {
+            if (qualifier.getValue().equals(qualifierValueStr)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
