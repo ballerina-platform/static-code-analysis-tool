@@ -91,9 +91,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
         checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
         String functionName = functionDefinitionNode.functionName().text();
-        if (!functionName.equals(MAIN_FUNCTION) &&
-                !functionName.equals(INIT_FUNCTION)) {
-            checkNonIsolatedPublicFunctions(functionDefinitionNode);
+        if (!functionName.equals(MAIN_FUNCTION) && !functionName.equals(INIT_FUNCTION)) {
+            checkNonIsolatedPublicFunction(functionDefinitionNode);
         }
         this.visitSyntaxNode(functionDefinitionNode);
     }
@@ -123,11 +122,17 @@ class StaticCodeAnalyzer extends NodeVisitor {
     @Override
     public void visit(ClassDefinitionNode classDefinitionNode) {
         checkNonIsolatedPublicClassDefinition(classDefinitionNode);
-        checkNonIsolatedPublicClassMembers(classDefinitionNode);
+        checkNonIsolatedPublicClassMethod(classDefinitionNode);
+        this.visitSyntaxNode(classDefinitionNode);
     }
 
     @Override
     public void visit(TypeDefinitionNode typeDefinitionNode) {
+        checkNonIsolatedConstructsInTypeDefinition(typeDefinitionNode);
+        this.visitSyntaxNode(typeDefinitionNode);
+    }
+
+    private void checkNonIsolatedConstructsInTypeDefinition(TypeDefinitionNode typeDefinitionNode) {
         semanticModel.symbol(typeDefinitionNode).ifPresent(symbol -> {
             if (symbol instanceof TypeDefinitionSymbol typeDefinitionSymbol) {
                 TypeSymbol typeSymbol = typeDefinitionSymbol.typeDescriptor();
@@ -141,49 +146,45 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 }
             }
         });
-        this.visitSyntaxNode(typeDefinitionNode);
     }
 
     private void checkNonIsolatedPublicClassDefinition(ClassDefinitionNode classDefinitionNode) {
         semanticModel.symbol(classDefinitionNode).ifPresent(symbol -> {
             if (symbol instanceof ObjectTypeSymbol objectTypeSymbol) {
                 List<Qualifier> qualifiers = objectTypeSymbol.qualifiers();
-                if (hasQualifier(qualifiers, PUBLIC_KEYWORD) &&
-                        !hasQualifier(qualifiers, ISOLATED_KEYWORD)) {
+                if (isPublicIsolatedConstruct(qualifiers)) {
                     reportIssue(classDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_CLASS_OR_OBJECT_CONSTRUCT);
                 }
             }
         });
     }
 
-    private void checkNonIsolatedPublicClassMembers(ClassDefinitionNode classDefinitionNode) {
+    private void checkNonIsolatedPublicClassMethod(ClassDefinitionNode classDefinitionNode) {
         semanticModel.symbol(classDefinitionNode).ifPresent(classSymbol -> {
             if (classSymbol instanceof ObjectTypeSymbol objectTypeSymbol) {
                 boolean isPublicObjectTypeSymbol = hasQualifier(objectTypeSymbol.qualifiers(), PUBLIC_KEYWORD);
                 classDefinitionNode.members().forEach(member -> {
                     semanticModel.symbol(member).ifPresent(memberSymbol -> {
                         if (isPublicObjectTypeSymbol && memberSymbol.kind() == SymbolKind.METHOD) {
-                            checkNonIsolatedPublicMethods((FunctionDefinitionNode) member);
+                            checkNonIsolatedPublicMethod((FunctionDefinitionNode) member);
                         }
-                        member.accept(this);
                     });
                 });
             }
         });
     }
 
-    private void checkNonIsolatedPublicMethods(FunctionDefinitionNode member) {
-        if (hasQualifier(member.qualifierList(), PUBLIC_KEYWORD) &&
-                !hasQualifier(member.qualifierList(), ISOLATED_KEYWORD)) {
+    private void checkNonIsolatedPublicMethod(FunctionDefinitionNode member) {
+        if (isPublicIsolatedConstruct(member.qualifierList())) {
             reportIssue(member, CoreRule.PUBLIC_NON_ISOLATED_FUNCTIONS_OR_METHOD_CONSTRUCT);
         }
     }
 
-    private void checkNonIsolatedPublicFunctions(FunctionDefinitionNode functionDefinitionNode) {
+    private void checkNonIsolatedPublicFunction(FunctionDefinitionNode functionDefinitionNode) {
         semanticModel.symbol(functionDefinitionNode).ifPresent(symbol -> {
             if (symbol.kind() != SymbolKind.METHOD) {
                 NodeList<Token> qualifiers = functionDefinitionNode.qualifierList();
-                if (hasQualifier(qualifiers, PUBLIC_KEYWORD) && !hasQualifier(qualifiers, ISOLATED_KEYWORD)) {
+                if (isPublicIsolatedConstruct(qualifiers)) {
                     reportIssue(functionDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_FUNCTIONS_OR_METHOD_CONSTRUCT);
                 }
             }
@@ -235,5 +236,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private boolean isUnusedNode(Node node) {
         Optional<Symbol> symbol = semanticModel.symbol(node);
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
+    }
+
+    private boolean isPublicIsolatedConstruct(NodeList<Token> qualifiers) {
+        return hasQualifier(qualifiers, PUBLIC_KEYWORD) && !hasQualifier(qualifiers, ISOLATED_KEYWORD);
+    }
+
+    private boolean isPublicIsolatedConstruct(List<Qualifier> qualifiers) {
+        return hasQualifier(qualifiers, PUBLIC_KEYWORD) && !hasQualifier(qualifiers, ISOLATED_KEYWORD);
     }
 }
