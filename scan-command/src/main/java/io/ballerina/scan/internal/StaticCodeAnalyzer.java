@@ -20,6 +20,8 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.Symbol;
+import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
+import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
@@ -29,14 +31,20 @@ import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionParameters;
 import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
+import io.ballerina.compiler.syntax.tree.NodeLocation;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
+import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
 
 import java.util.Optional;
+
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.DOUBLE_DOT_LT_TOKEN;
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.ELLIPSIS_TOKEN;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.
@@ -72,6 +80,44 @@ class StaticCodeAnalyzer extends NodeVisitor {
         }
     }
 
+    public void visit(BinaryExpressionNode binaryExpressionNode) {
+        SyntaxKind binaryOperatorKind = binaryExpressionNode.operator().kind();
+        if (binaryOperatorKind.equals(ELLIPSIS_TOKEN)
+                || binaryOperatorKind.equals(DOUBLE_DOT_LT_TOKEN)) {
+            validateRangeExpressionOperator(scannerContext, document, binaryExpressionNode.lhsExpr(),
+                    binaryExpressionNode.rhsExpr(), binaryExpressionNode.operator(), binaryExpressionNode.location());
+        }
+    }
+
+    private void validateRangeExpressionOperator(ScannerContext scannerContext, Document document,
+                                                 Node lhsNode, Node rhsNode, Token operator, NodeLocation location) {
+        Optional<String> lhsExpr = getExprStringValueFromRangeExprNode(lhsNode);
+        Optional<String> rhsExpr = getExprStringValueFromRangeExprNode(rhsNode);
+
+        if (lhsExpr.isEmpty() || rhsExpr.isEmpty()) {
+            return;
+        }
+
+        // According to the spec, these literal tokens are integers. So no need to cast or check.
+        try {
+            int lhsValue = Integer.parseInt(lhsExpr.get());
+            int rhsValue = Integer.parseInt(rhsExpr.get());
+            if (operator.kind() == DOUBLE_DOT_LT_TOKEN) {
+                if (lhsValue >= rhsValue) {
+                    scannerContext.getReporter().reportIssue(document, location,
+                            CoreRule.INVALID_RANGE_EXPRESSION.rule());
+                }
+            } else if (operator.kind() == ELLIPSIS_TOKEN) {
+                if (lhsValue > rhsValue) {
+                    scannerContext.getReporter().reportIssue(document, location,
+                            CoreRule.INVALID_RANGE_EXPRESSION.rule());
+                }
+            }
+        } catch (NumberFormatException e) {
+            // ignore
+        }
+    }
+    
     @Override
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
         checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
@@ -126,5 +172,26 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private boolean isUnusedNode(Node node) {
         Optional<Symbol> symbol = semanticModel.symbol(node);
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
+    }
+
+    private Optional<String> getExprStringValueFromRangeExprNode(Node rangeExprNode) {
+        boolean isMinusOperatorPresent = false;
+
+        if (rangeExprNode instanceof UnaryExpressionNode unaryNode) {
+            if (unaryNode.unaryOperator().kind() == SyntaxKind.MINUS_TOKEN) {
+                isMinusOperatorPresent = true;
+            }
+            rangeExprNode = unaryNode.expression();
+        }
+
+        if (rangeExprNode instanceof BasicLiteralNode literalNode) {
+            String expr = literalNode.literalToken().text();
+            if (isMinusOperatorPresent) {
+                expr = "-" + expr;
+            }
+            return Optional.of(expr);
+        }
+
+        return Optional.empty();
     }
 }
