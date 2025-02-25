@@ -2,7 +2,7 @@ Loading scan tool configurations from src\test\resources\test-resources\bal-proj
 	RuleID                                           | Rule Kind     | Rule Description         
 	---------------------------------------------------------------------------------------------
 	ballerina:1                                      | CODE_SMELL    | Avoid checkpanic
-	ballerina:10                                     | CODE_SMELL    | Invalid range exprssion
+	ballerina:10                                     | CODE_SMELL    | Invalid range expression
 	ballerina:2                                      | CODE_SMELL    | Unused function parameter
 	ballerina/example_module_static_code_analyzer:1  | CODE_SMELL    | rule 1
 	ballerina/example_module_static_code_analyzer:2  | BUG           | rule 2
