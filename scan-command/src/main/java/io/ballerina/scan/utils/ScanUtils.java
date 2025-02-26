@@ -609,8 +609,10 @@ public final class ScanUtils {
     public static void sortRules(List<Rule> rules) {
         List<String> priorities = List.of(RULE_PRIORITY_LIST);
         Comparator<Rule> ruleComparator = (r1, r2) -> {
-            AbstractMap.SimpleEntry<Integer, Boolean> priority1 = getPriority(r1.id().split(":")[0], priorities);
-            AbstractMap.SimpleEntry<Integer, Boolean> priority2 = getPriority(r2.id().split(":")[0], priorities);
+            String ruleIdPrefix1 = r1.id().split(":")[0];
+            String ruleIdPrefix2 = r2.id().split(":")[0];
+            AbstractMap.SimpleEntry<Integer, Boolean> priority1 = getPriority(ruleIdPrefix1, priorities);
+            AbstractMap.SimpleEntry<Integer, Boolean> priority2 = getPriority(ruleIdPrefix2, priorities);
             int comparison = Integer.compare(priority1.getKey(), priority2.getKey());
             if (comparison != 0) {
                 return comparison;
@@ -619,7 +621,11 @@ public final class ScanUtils {
             if (comparison != 0) {
                 return comparison;
             }
-            return r1.id().compareTo(r2.id());
+            comparison = ruleIdPrefix1.compareTo(ruleIdPrefix2);
+            if (comparison != 0) {
+                return comparison;
+            }
+            return Integer.compare(r1.numericId(), r2.numericId());
         };
         rules.sort(ruleComparator);
     }
@@ -636,7 +642,7 @@ public final class ScanUtils {
             if (ruleId.equals(priorities.get(i))) {
                 return new AbstractMap.SimpleEntry<>(i, true);
             }
-            if (ruleId.startsWith(priorities.get(i))) {
+            if (ruleId.split("/")[0].equals(priorities.get(i))) {
                 return new AbstractMap.SimpleEntry<>(i, false);
             }
         }
