@@ -34,7 +34,7 @@ public class Rule005Test extends StaticCodeAnalyzerTest {
     private static final String UNUSED_CLASS_PRIVATE_FIELDS = "Unused class private fields";
 
     @Test(description = "test unused private class fields")
-    void testUnusedClassFieldsAnalyzer() {
+    void testUnusedPrivateFieldsAnalyzer() {
         String documentName = "rule005_unused_class_fields.bal";
         Document document = loadDocument(documentName);
         ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.UNUSED_PRIVATE_CLASS_FIELD.rule()));
