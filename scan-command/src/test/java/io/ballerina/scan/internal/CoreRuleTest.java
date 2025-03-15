@@ -58,8 +58,8 @@ public class CoreRuleTest {
     @Test(description = "test unused class fields rule")
     void testUnusedClassFieldsRule() {
         Rule rule = CoreRule.UNUSED_PRIVATE_CLASS_FIELD.rule();
-        Assert.assertEquals(rule.id(), "ballerina:5");
-        Assert.assertEquals(rule.numericId(), 5);
+        Assert.assertEquals(rule.id(), "ballerina:11");
+        Assert.assertEquals(rule.numericId(), 11);
         Assert.assertEquals(rule.description(), "Unused class private fields");
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }

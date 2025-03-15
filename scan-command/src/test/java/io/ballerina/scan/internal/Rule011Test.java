@@ -30,12 +30,12 @@ import java.util.List;
  *
  * @since 0.5.0
  */
-public class Rule005Test extends StaticCodeAnalyzerTest {
+public class Rule011Test extends StaticCodeAnalyzerTest {
     private static final String UNUSED_CLASS_PRIVATE_FIELDS = "Unused class private fields";
 
     @Test(description = "test unused private class fields")
     void testUnusedPrivateFieldsAnalyzer() {
-        String documentName = "rule005_unused_class_fields.bal";
+        String documentName = "rule011_unused_class_fields.bal";
         Document document = loadDocument(documentName);
         ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.UNUSED_PRIVATE_CLASS_FIELD.rule()));
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext,
@@ -43,15 +43,15 @@ public class Rule005Test extends StaticCodeAnalyzerTest {
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
         Assert.assertEquals(issues.size(), 5);
-        assertIssue(issues.get(0), documentName, 17, 4, 17, 26, "ballerina:5", 5,
+        assertIssue(issues.get(0), documentName, 17, 4, 17, 26, "ballerina:11", 11,
                 UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(1), documentName, 23, 4, 23, 26, "ballerina:5", 5,
+        assertIssue(issues.get(1), documentName, 23, 4, 23, 26, "ballerina:11", 11,
                 UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(2), documentName, 31, 4, 31, 30, "ballerina:5", 5,
+        assertIssue(issues.get(2), documentName, 31, 4, 31, 30, "ballerina:11", 11,
                 UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(3), documentName, 33, 4, 33, 30, "ballerina:5", 5,
+        assertIssue(issues.get(3), documentName, 33, 4, 33, 30, "ballerina:11", 11,
                 UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(4), documentName, 75, 4, 75, 26, "ballerina:5", 5,
+        assertIssue(issues.get(4), documentName, 75, 4, 75, 26, "ballerina:11", 11,
                 UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
     }
 }
