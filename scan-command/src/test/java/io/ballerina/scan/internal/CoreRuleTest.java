@@ -63,8 +63,8 @@ public class CoreRuleTest {
     @Test(description = "test always true evaluates")
     void testTrueEvaluates() {
         Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE.rule();
-        Assert.assertEquals(rule.id(), "ballerina:6");
-        Assert.assertEquals(rule.numericId(), 6);
+        Assert.assertEquals(rule.id(), "ballerina:7");
+        Assert.assertEquals(rule.numericId(), 7);
         Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATES_TO_TRUE);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
@@ -72,8 +72,8 @@ public class CoreRuleTest {
     @Test(description = "test always false evaluates")
     void testFalseEvaluates() {
         Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE.rule();
-        Assert.assertEquals(rule.id(), "ballerina:7");
-        Assert.assertEquals(rule.numericId(), 7);
+        Assert.assertEquals(rule.id(), "ballerina:8");
+        Assert.assertEquals(rule.numericId(), 8);
         Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATES_TO_FALSE);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
@@ -81,8 +81,8 @@ public class CoreRuleTest {
     @Test(description = "test evaluate to the same value")
     void testSelfEvaluates() {
         Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE.rule();
-        Assert.assertEquals(rule.id(), "ballerina:8");
-        Assert.assertEquals(rule.numericId(), 8);
+        Assert.assertEquals(rule.id(), "ballerina:9");
+        Assert.assertEquals(rule.numericId(), 9);
         Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
@@ -90,8 +90,8 @@ public class CoreRuleTest {
     @Test(description = "test self assignment")
     void testSelfAssignmentAnalyzer() {
         Rule rule = CoreRule.SELF_ASSIGNMENT.rule();
-        Assert.assertEquals(rule.id(), "ballerina:9");
-        Assert.assertEquals(rule.numericId(), 9);
+        Assert.assertEquals(rule.id(), "ballerina:10");
+        Assert.assertEquals(rule.numericId(), 10);
         Assert.assertEquals(rule.description(), SELF_ASSIGNMENT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
