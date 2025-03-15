@@ -40,7 +40,7 @@ public type F object { // warning
     function hash2() returns int;
 };
 
-isolated type G object {
+type G isolated object {
     public isolated function hash() returns int;
     function hash2() returns int;
 };
@@ -60,7 +60,7 @@ public type I object { // warning
     function hash2() returns int;
 };
 
-isolated service class A {
+isolated service class J {
 
 }
 

@@ -141,7 +141,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
                     List<Qualifier> typeDefQualifiers = typeDefinitionSymbol.qualifiers();
                     if (hasQualifier(typeDefQualifiers, PUBLIC_KEYWORD) &&
                             !hasQualifier(qualifiers, ISOLATED_KEYWORD)) {
-                        reportIssue(typeDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_CLASS_OR_OBJECT_CONSTRUCT);
+                        reportIssue(typeDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
                     }
                 }
             }
@@ -153,7 +153,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (symbol instanceof ObjectTypeSymbol objectTypeSymbol) {
                 List<Qualifier> qualifiers = objectTypeSymbol.qualifiers();
                 if (isPublicIsolatedConstruct(qualifiers)) {
-                    reportIssue(classDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_CLASS_OR_OBJECT_CONSTRUCT);
+                    reportIssue(classDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT);
                 }
             }
         });
@@ -176,7 +176,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     private void checkNonIsolatedPublicMethod(FunctionDefinitionNode member) {
         if (isPublicIsolatedConstruct(member.qualifierList())) {
-            reportIssue(member, CoreRule.PUBLIC_NON_ISOLATED_FUNCTIONS_OR_METHOD_CONSTRUCT);
+            reportIssue(member, CoreRule.PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT);
         }
     }
 
@@ -185,7 +185,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (symbol.kind() != SymbolKind.METHOD) {
                 NodeList<Token> qualifiers = functionDefinitionNode.qualifierList();
                 if (isPublicIsolatedConstruct(qualifiers)) {
-                    reportIssue(functionDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_FUNCTIONS_OR_METHOD_CONSTRUCT);
+                    reportIssue(functionDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT);
                 }
             }
         });

@@ -32,10 +32,14 @@ import java.util.List;
 enum CoreRule {
     AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
     UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2, "Unused function parameter", RuleKind.CODE_SMELL)),
-    PUBLIC_NON_ISOLATED_FUNCTIONS_OR_METHOD_CONSTRUCT(RuleFactory.createRule(3,
-            "Non isolated public function or method", RuleKind.CODE_SMELL)),
-    PUBLIC_NON_ISOLATED_CLASS_OR_OBJECT_CONSTRUCT(RuleFactory.createRule(4,
-            "Non isolated public class or object", RuleKind.CODE_SMELL));
+    PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT(RuleFactory.createRule(3,
+            "Non isolated public function", RuleKind.CODE_SMELL)),
+    PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT(RuleFactory.createRule(4,
+            "Non isolated public method", RuleKind.CODE_SMELL)),
+    PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT(RuleFactory.createRule(5,
+            "Non isolated public class", RuleKind.CODE_SMELL)),
+    PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT(RuleFactory.createRule(6,
+            "Non isolated public object", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 

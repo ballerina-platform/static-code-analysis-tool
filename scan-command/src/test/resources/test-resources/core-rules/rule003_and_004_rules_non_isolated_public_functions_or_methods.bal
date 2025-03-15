@@ -122,7 +122,7 @@ public class A4 { // warning
     }
 }
 
-public isolated service class {
+public isolated service class SC4 {
     function init() {
 
     }
@@ -131,7 +131,7 @@ public isolated service class {
 
     }
 
-    public function c() {
+    public function c() { // warning
 
     }
 
@@ -164,4 +164,26 @@ public service class SC { // warning
     public isolated function main() {
 
     }
+}
+
+public isolated service class SC3 {
+    isolated function c2() {
+
+    }
+}
+
+isolated service class SC6 {
+    isolated function c2() {
+
+    }
+}
+
+public service class SC5 { // warning
+    isolated function c2() {
+
+    }
+}
+
+isolated function a3() {
+
 }
