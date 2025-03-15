@@ -22,15 +22,14 @@ import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.ObjectTypeSymbol;
 import io.ballerina.compiler.api.symbols.Qualifier;
 import io.ballerina.compiler.api.symbols.Symbol;
-import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
-import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
-import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
-import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
 import io.ballerina.compiler.api.symbols.SymbolKind;
 import io.ballerina.compiler.api.symbols.TypeDefinitionSymbol;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
+import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
+import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
+import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
@@ -53,13 +52,13 @@ import io.ballerina.scan.utils.Constants;
 import java.util.List;
 import java.util.Optional;
 
-import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference;
-import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isEqualToProvidedLiteralIdentifier;
-import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isSameSimpleExpression;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.ISOLATED_KEYWORD;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.PUBLIC_KEYWORD;
 import static io.ballerina.scan.utils.Constants.INIT_FUNCTION;
 import static io.ballerina.scan.utils.Constants.MAIN_FUNCTION;
+import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference;
+import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isEqualToProvidedLiteralIdentifier;
+import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isSameSimpleExpression;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.

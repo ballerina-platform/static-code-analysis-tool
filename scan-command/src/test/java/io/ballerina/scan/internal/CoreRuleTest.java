@@ -47,7 +47,7 @@ public class CoreRuleTest {
 
     @Test(description = "test all rules")
     void testAllRules() {
-        Assert.assertEquals(CoreRule.rules().size(), 6);
+        Assert.assertEquals(CoreRule.rules().size(), 10);
     }
 
     @Test(description = "test checkpanic rule")
@@ -101,6 +101,8 @@ public class CoreRuleTest {
         Assert.assertEquals(rule.id(), "ballerina:10");
         Assert.assertEquals(rule.numericId(), 10);
         Assert.assertEquals(rule.description(), SELF_ASSIGNMENT);
+    }
+
     @Test(description = "test non isolated public functions")
     void testNonIsolatedPublicFunctionConstructsRule() {
         Rule rule = CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT.rule();
