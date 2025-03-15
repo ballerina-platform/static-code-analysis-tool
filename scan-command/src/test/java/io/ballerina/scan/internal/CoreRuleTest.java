@@ -31,10 +31,18 @@ import org.testng.annotations.Test;
 public class CoreRuleTest {
     public static final String AVOID_CHECKPANIC = "Avoid checkpanic";
     public static final String UNUSED_FUNCTION_PARAMETER = "Unused function parameter";
+    public static final String PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT =
+            "Non isolated public function";
+    public static final String PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT =
+            "Non isolated public method";
+    public static final String PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT =
+            "Non isolated public class";
+    public static final String PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT =
+            "Non isolated public object";
 
     @Test(description = "test all rules")
     void testAllRules() {
-        Assert.assertEquals(CoreRule.rules().size(), 2);
+        Assert.assertEquals(CoreRule.rules().size(), 6);
     }
 
     @Test(description = "test checkpanic rule")
@@ -52,6 +60,42 @@ public class CoreRuleTest {
         Assert.assertEquals(rule.id(), "ballerina:2");
         Assert.assertEquals(rule.numericId(), 2);
         Assert.assertEquals(rule.description(), UNUSED_FUNCTION_PARAMETER);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test non isolated public functions")
+    void testNonIsolatedPublicFunctionConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:3");
+        Assert.assertEquals(rule.numericId(), 3);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test non isolated public methods")
+    void testNonIsolatedPublicMethodConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:4");
+        Assert.assertEquals(rule.numericId(), 4);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test non isolated public classes")
+    void testNonIsolatedPublicClassConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:5");
+        Assert.assertEquals(rule.numericId(), 5);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test non isolated public objects")
+    void testNonIsolatedPublicObjectConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:6");
+        Assert.assertEquals(rule.numericId(), 6);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }
