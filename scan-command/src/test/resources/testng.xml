@@ -35,7 +35,8 @@ under the License.
             <class name="io.ballerina.scan.internal.Rule008Test"/>
             <class name="io.ballerina.scan.internal.Rule009Test"/>
             <class name="io.ballerina.scan.internal.Rule010Test"/>
-            <class name="io.ballerina.scan.internal.StaticCodeAnalyzerTest"/>
+            <class name="io.ballerina.scan.internal.Rule003And004Test"/>
+            <class name="io.ballerina.scan.internal.Rule005And006Test"/>
             <class name="io.ballerina.scan.internal.ProjectAnalyzerTest"/>
             <class name="io.ballerina.scan.utils.ScanUtilsTest"/>
             <class name="io.ballerina.scan.utils.DiagnosticLogTest"/>

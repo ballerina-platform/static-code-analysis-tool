@@ -19,11 +19,18 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.symbols.ObjectTypeSymbol;
+import io.ballerina.compiler.api.symbols.Qualifier;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
+import io.ballerina.compiler.api.symbols.SymbolKind;
+import io.ballerina.compiler.api.symbols.TypeDefinitionSymbol;
+import io.ballerina.compiler.api.symbols.TypeSymbol;
+import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
+import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
@@ -32,20 +39,27 @@ import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionParameters;
 import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
+import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.utils.Constants;
 
+import java.util.List;
 import java.util.Optional;
 
 import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference;
 import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isEqualToProvidedLiteralIdentifier;
 import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isSameSimpleExpression;
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.ISOLATED_KEYWORD;
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.PUBLIC_KEYWORD;
+import static io.ballerina.scan.utils.Constants.INIT_FUNCTION;
+import static io.ballerina.scan.utils.Constants.MAIN_FUNCTION;
 
 /**
  * {@code StaticCodeAnalyzer} contains the logic to perform core static code analysis on Ballerina documents.
@@ -237,6 +251,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
         checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
+        String functionName = functionDefinitionNode.functionName().text();
+        if (!functionName.equals(MAIN_FUNCTION) && !functionName.equals(INIT_FUNCTION)) {
+            checkNonIsolatedPublicFunction(functionDefinitionNode);
+        }
         this.visitSyntaxNode(functionDefinitionNode);
     }
 
@@ -260,6 +278,97 @@ class StaticCodeAnalyzer extends NodeVisitor {
         }
 
         this.visitSyntaxNode(implicitAnonymousFunctionExpressionNode.expression());
+    }
+
+    @Override
+    public void visit(ClassDefinitionNode classDefinitionNode) {
+        checkNonIsolatedPublicClassDefinition(classDefinitionNode);
+        checkNonIsolatedPublicClassMethod(classDefinitionNode);
+        this.visitSyntaxNode(classDefinitionNode);
+    }
+
+    @Override
+    public void visit(TypeDefinitionNode typeDefinitionNode) {
+        checkNonIsolatedConstructsInTypeDefinition(typeDefinitionNode);
+        this.visitSyntaxNode(typeDefinitionNode);
+    }
+
+    private void checkNonIsolatedConstructsInTypeDefinition(TypeDefinitionNode typeDefinitionNode) {
+        semanticModel.symbol(typeDefinitionNode).ifPresent(symbol -> {
+            if (symbol instanceof TypeDefinitionSymbol typeDefinitionSymbol) {
+                TypeSymbol typeSymbol = typeDefinitionSymbol.typeDescriptor();
+                if (typeSymbol instanceof ObjectTypeSymbol objectTypeSymbol) {
+                    List<Qualifier> qualifiers = objectTypeSymbol.qualifiers();
+                    List<Qualifier> typeDefQualifiers = typeDefinitionSymbol.qualifiers();
+                    if (hasQualifier(typeDefQualifiers, PUBLIC_KEYWORD) &&
+                            !hasQualifier(qualifiers, ISOLATED_KEYWORD)) {
+                        reportIssue(typeDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
+                    }
+                }
+            }
+        });
+    }
+
+    private void checkNonIsolatedPublicClassDefinition(ClassDefinitionNode classDefinitionNode) {
+        semanticModel.symbol(classDefinitionNode).ifPresent(symbol -> {
+            if (symbol instanceof ObjectTypeSymbol objectTypeSymbol) {
+                List<Qualifier> qualifiers = objectTypeSymbol.qualifiers();
+                if (isPublicIsolatedConstruct(qualifiers)) {
+                    reportIssue(classDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT);
+                }
+            }
+        });
+    }
+
+    private void checkNonIsolatedPublicClassMethod(ClassDefinitionNode classDefinitionNode) {
+        semanticModel.symbol(classDefinitionNode).ifPresent(classSymbol -> {
+            if (classSymbol instanceof ObjectTypeSymbol objectTypeSymbol) {
+                boolean isPublicObjectTypeSymbol = hasQualifier(objectTypeSymbol.qualifiers(), PUBLIC_KEYWORD);
+                classDefinitionNode.members().forEach(member -> {
+                    semanticModel.symbol(member).ifPresent(memberSymbol -> {
+                        if (isPublicObjectTypeSymbol && memberSymbol.kind() == SymbolKind.METHOD) {
+                            checkNonIsolatedPublicMethod((FunctionDefinitionNode) member);
+                        }
+                    });
+                });
+            }
+        });
+    }
+
+    private void checkNonIsolatedPublicMethod(FunctionDefinitionNode member) {
+        if (isPublicIsolatedConstruct(member.qualifierList())) {
+            reportIssue(member, CoreRule.PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT);
+        }
+    }
+
+    private void checkNonIsolatedPublicFunction(FunctionDefinitionNode functionDefinitionNode) {
+        semanticModel.symbol(functionDefinitionNode).ifPresent(symbol -> {
+            if (symbol.kind() != SymbolKind.METHOD) {
+                NodeList<Token> qualifiers = functionDefinitionNode.qualifierList();
+                if (isPublicIsolatedConstruct(qualifiers)) {
+                    reportIssue(functionDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT);
+                }
+            }
+        });
+    }
+
+    private boolean hasQualifier(List<Qualifier> qualifierList, SyntaxKind qualifierValue) {
+        String qualifierValueStr = qualifierValue.stringValue();
+        for (Qualifier qualifier : qualifierList) {
+            if (qualifier.getValue().equals(qualifierValueStr)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasQualifier(NodeList<Token> qualifierList, SyntaxKind qualifier) {
+        for (Token token : qualifierList) {
+            if (qualifier == token.kind()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void checkUnusedFunctionParameters(FunctionSignatureNode functionSignatureNode) {
@@ -288,5 +397,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private boolean isUnusedNode(Node node) {
         Optional<Symbol> symbol = semanticModel.symbol(node);
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
+    }
+
+    private boolean isPublicIsolatedConstruct(NodeList<Token> qualifiers) {
+        return hasQualifier(qualifiers, PUBLIC_KEYWORD) && !hasQualifier(qualifiers, ISOLATED_KEYWORD);
+    }
+
+    private boolean isPublicIsolatedConstruct(List<Qualifier> qualifiers) {
+        return hasQualifier(qualifiers, PUBLIC_KEYWORD) && !hasQualifier(qualifiers, ISOLATED_KEYWORD);
     }
 }

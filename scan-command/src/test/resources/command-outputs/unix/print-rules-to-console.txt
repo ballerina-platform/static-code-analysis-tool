@@ -3,6 +3,10 @@ Loading scan tool configurations from src/test/resources/test-resources/bal-proj
 	---------------------------------------------------------------------------------------------------------------------
 	ballerina:1                                      | CODE_SMELL    | Avoid checkpanic
 	ballerina:2                                      | CODE_SMELL    | Unused function parameter
+	ballerina:3                                      | CODE_SMELL    | Non isolated public function
+	ballerina:4                                      | CODE_SMELL    | Non isolated public method
+	ballerina:5                                      | CODE_SMELL    | Non isolated public class
+	ballerina:6                                      | CODE_SMELL    | Non isolated public object
 	ballerina:7                                      | CODE_SMELL    | This operation always evaluates to true
 	ballerina:8                                      | CODE_SMELL    | This operation always evaluates to false
 	ballerina:9                                      | CODE_SMELL    | This operation always evaluates to the same value

@@ -36,6 +36,14 @@ public class CoreRuleTest {
     public static final String OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE =
             "This operation always evaluates to the same value";
     public static final String SELF_ASSIGNMENT = "This variable is assigned to itself";
+    public static final String PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT =
+            "Non isolated public function";
+    public static final String PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT =
+            "Non isolated public method";
+    public static final String PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT =
+            "Non isolated public class";
+    public static final String PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT =
+            "Non isolated public object";
 
     @Test(description = "test all rules")
     void testAllRules() {
@@ -93,6 +101,39 @@ public class CoreRuleTest {
         Assert.assertEquals(rule.id(), "ballerina:10");
         Assert.assertEquals(rule.numericId(), 10);
         Assert.assertEquals(rule.description(), SELF_ASSIGNMENT);
+    @Test(description = "test non isolated public functions")
+    void testNonIsolatedPublicFunctionConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:3");
+        Assert.assertEquals(rule.numericId(), 3);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test non isolated public methods")
+    void testNonIsolatedPublicMethodConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:4");
+        Assert.assertEquals(rule.numericId(), 4);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test non isolated public classes")
+    void testNonIsolatedPublicClassConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:5");
+        Assert.assertEquals(rule.numericId(), 5);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT);
+        Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test non isolated public objects")
+    void testNonIsolatedPublicObjectConstructsRule() {
+        Rule rule = CoreRule.PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT.rule();
+        Assert.assertEquals(rule.id(), "ballerina:6");
+        Assert.assertEquals(rule.numericId(), 6);
+        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 }
