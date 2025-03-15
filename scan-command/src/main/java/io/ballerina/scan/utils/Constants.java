@@ -60,7 +60,7 @@ public class Constants {
     static final String RULE_ID_COLUMN = "RuleID";
     static final String RULE_KIND_COLUMN = "Rule Kind";
     static final String RULE_DESCRIPTION_COLUMN = "Rule Description";
-    static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerina/", "ballerinax/", "wso2/"};
+    static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerinax", "wso2"};
 
     public static class Token {
         public static final String FLOAT = "float";
