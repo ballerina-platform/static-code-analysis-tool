@@ -26,7 +26,7 @@ jobs:
       - name: Set Up Ballerina
         uses: ballerina-platform/setup-ballerina@v1.1.1
         with:
-          version: latest
+          version: 2201.12.0
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -66,7 +66,7 @@ jobs:
       - name: Set Up Ballerina
         uses: ballerina-platform/setup-ballerina@v1.1.1
         with:
-          version: latest
+          version: 2201.12.0
 
       - name: Build with Gradle
         env:

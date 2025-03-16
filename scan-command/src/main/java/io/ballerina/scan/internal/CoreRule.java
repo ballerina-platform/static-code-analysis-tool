@@ -32,7 +32,8 @@ import java.util.List;
 enum CoreRule {
 
     AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
-    UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2, "Unused function parameter", RuleKind.CODE_SMELL)),
+    UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
+            "Unused function parameter", RuleKind.CODE_SMELL)),
     PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT(RuleFactory.createRule(3,
             "Non isolated public function", RuleKind.CODE_SMELL)),
     PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT(RuleFactory.createRule(4,
@@ -50,7 +51,9 @@ enum CoreRule {
     SELF_ASSIGNMENT(RuleFactory.createRule(10,
             "This variable is assigned to itself", RuleKind.CODE_SMELL)),
     UNUSED_PRIVATE_CLASS_FIELD(RuleFactory.createRule(11,
-            "Unused class private fields", RuleKind.CODE_SMELL));
+            "Unused class private fields", RuleKind.CODE_SMELL)),
+    INVALID_RANGE_EXPRESSION(RuleFactory.createRule(12, 
+    "Invalid range expression", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 

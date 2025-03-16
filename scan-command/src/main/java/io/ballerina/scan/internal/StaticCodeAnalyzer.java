@@ -27,6 +27,7 @@ import io.ballerina.compiler.api.symbols.SymbolKind;
 import io.ballerina.compiler.api.symbols.TypeDefinitionSymbol;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
+import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
@@ -40,6 +41,7 @@ import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeList;
+import io.ballerina.compiler.syntax.tree.NodeLocation;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
@@ -47,6 +49,7 @@ import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.Token;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
+import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.utils.Constants;
@@ -54,8 +57,10 @@ import io.ballerina.scan.utils.Constants;
 import java.util.List;
 import java.util.Optional;
 
-import static io.ballerina.compiler.syntax.tree.SyntaxKind.PRIVATE_KEYWORD;
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.DOUBLE_DOT_LT_TOKEN;
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.ELLIPSIS_TOKEN;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.ISOLATED_KEYWORD;
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.PRIVATE_KEYWORD;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.PUBLIC_KEYWORD;
 import static io.ballerina.scan.utils.Constants.INIT_FUNCTION;
 import static io.ballerina.scan.utils.Constants.MAIN_FUNCTION;
@@ -98,6 +103,51 @@ class StaticCodeAnalyzer extends NodeVisitor {
         this.visitSyntaxNode(checkExpressionNode);
     }
 
+    public void visit(BinaryExpressionNode binaryExpressionNode) {
+        reportIssuesWithTrivialOperations(binaryExpressionNode);
+        filterSameReferenceIssueBasedOnOperandType(binaryExpressionNode.operator()).ifPresent(rule -> {
+            checkUsageOfSameOperandInBinaryExpr(binaryExpressionNode.lhsExpr(),
+                    binaryExpressionNode.rhsExpr(), rule, binaryExpressionNode);
+        });
+
+        SyntaxKind binaryOperatorKind = binaryExpressionNode.operator().kind();
+        if (binaryOperatorKind.equals(ELLIPSIS_TOKEN)
+                || binaryOperatorKind.equals(DOUBLE_DOT_LT_TOKEN)) {
+            validateRangeExpressionOperator(scannerContext, document, binaryExpressionNode.lhsExpr(),
+                    binaryExpressionNode.rhsExpr(), binaryExpressionNode.operator(), binaryExpressionNode.location());
+        }
+        this.visitSyntaxNode(binaryExpressionNode);
+    }
+
+    private void validateRangeExpressionOperator(ScannerContext scannerContext, Document document,
+                                                 Node lhsNode, Node rhsNode, Token operator, NodeLocation location) {
+        Optional<String> lhsExpr = getExprStringValueFromRangeExprNode(lhsNode);
+        Optional<String> rhsExpr = getExprStringValueFromRangeExprNode(rhsNode);
+
+        if (lhsExpr.isEmpty() || rhsExpr.isEmpty()) {
+            return;
+        }
+
+        // According to the spec, these literal tokens are integers. So no need to cast or check.
+        try {
+            int lhsValue = Integer.parseInt(lhsExpr.get());
+            int rhsValue = Integer.parseInt(rhsExpr.get());
+            if (operator.kind() == DOUBLE_DOT_LT_TOKEN) {
+                if (lhsValue >= rhsValue) {
+                    scannerContext.getReporter().reportIssue(document, location,
+                            CoreRule.INVALID_RANGE_EXPRESSION.rule());
+                }
+            } else if (operator.kind() == ELLIPSIS_TOKEN) {
+                if (lhsValue > rhsValue) {
+                    scannerContext.getReporter().reportIssue(document, location,
+                            CoreRule.INVALID_RANGE_EXPRESSION.rule());
+                }
+            }
+        } catch (NumberFormatException e) {
+            // ignore
+        }
+    }
+    
     @Override
     public void visit(ObjectFieldNode objectFieldNode) {
         semanticModel.symbol(objectFieldNode).ifPresent(symbol -> {
@@ -111,13 +161,6 @@ class StaticCodeAnalyzer extends NodeVisitor {
             }
         });
         this.visitSyntaxNode(objectFieldNode);
-    }
-    public void visit(BinaryExpressionNode binaryExpressionNode) {
-        reportIssuesWithTrivialOperations(binaryExpressionNode);
-        filterSameReferenceIssueBasedOnOperandType(binaryExpressionNode.operator()).ifPresent(rule -> {
-            checkUsageOfSameOperandInBinaryExpr(binaryExpressionNode.lhsExpr(),
-                    binaryExpressionNode.rhsExpr(), rule, binaryExpressionNode);
-        });
     }
 
     @Override
@@ -413,6 +456,27 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private boolean isUnusedNode(Node node) {
         Optional<Symbol> symbol = semanticModel.symbol(node);
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
+    }
+
+    private Optional<String> getExprStringValueFromRangeExprNode(Node rangeExprNode) {
+        boolean isMinusOperatorPresent = false;
+
+        if (rangeExprNode instanceof UnaryExpressionNode unaryNode) {
+            if (unaryNode.unaryOperator().kind() == SyntaxKind.MINUS_TOKEN) {
+                isMinusOperatorPresent = true;
+            }
+            rangeExprNode = unaryNode.expression();
+        }
+
+        if (rangeExprNode instanceof BasicLiteralNode literalNode) {
+            String expr = literalNode.literalToken().text();
+            if (isMinusOperatorPresent) {
+                expr = "-" + expr;
+            }
+            return Optional.of(expr);
+        }
+
+        return Optional.empty();
     }
     
     private boolean isPublicIsolatedConstruct(NodeList<Token> qualifiers) {
