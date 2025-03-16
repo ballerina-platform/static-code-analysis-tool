@@ -30,10 +30,30 @@ import java.util.List;
  * @since 0.1.0
  * */
 enum CoreRule {
+
     AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
     UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
             "Unused function parameter", RuleKind.CODE_SMELL)),
-    INVALID_RANGE_EXPRESSION(RuleFactory.createRule(12, "Invalid range expression", RuleKind.CODE_SMELL));
+    PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT(RuleFactory.createRule(3,
+            "Non isolated public function", RuleKind.CODE_SMELL)),
+    PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT(RuleFactory.createRule(4,
+            "Non isolated public method", RuleKind.CODE_SMELL)),
+    PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT(RuleFactory.createRule(5,
+            "Non isolated public class", RuleKind.CODE_SMELL)),
+    PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT(RuleFactory.createRule(6,
+            "Non isolated public object", RuleKind.CODE_SMELL)),
+    OPERATION_ALWAYS_EVALUATES_TO_TRUE(RuleFactory.createRule(7,
+            "This operation always evaluates to true", RuleKind.CODE_SMELL)),
+    OPERATION_ALWAYS_EVALUATES_TO_FALSE(RuleFactory.createRule(8,
+            "This operation always evaluates to false", RuleKind.CODE_SMELL)),
+    OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE(RuleFactory.createRule(9,
+            "This operation always evaluates to the same value", RuleKind.CODE_SMELL)),
+    SELF_ASSIGNMENT(RuleFactory.createRule(10,
+            "This variable is assigned to itself", RuleKind.CODE_SMELL)),
+    UNUSED_PRIVATE_CLASS_FIELD(RuleFactory.createRule(11,
+            "Unused class private fields", RuleKind.CODE_SMELL)),
+    INVALID_RANGE_EXPRESSION(RuleFactory.createRule(12, 
+    "Invalid range expression", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 
