@@ -33,9 +33,6 @@ enum CoreRule {
 
     AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
     UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2, "Unused function parameter", RuleKind.CODE_SMELL)),
-    UNUSED_PRIVATE_CLASS_FIELD(RuleFactory.createRule(11, "Unused class private fields", RuleKind.CODE_SMELL));
-    UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
-            "Unused function parameter", RuleKind.CODE_SMELL)),
     PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT(RuleFactory.createRule(3,
             "Non isolated public function", RuleKind.CODE_SMELL)),
     PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT(RuleFactory.createRule(4,
@@ -51,7 +48,9 @@ enum CoreRule {
     OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE(RuleFactory.createRule(9,
             "This operation always evaluates to the same value", RuleKind.CODE_SMELL)),
     SELF_ASSIGNMENT(RuleFactory.createRule(10,
-            "This variable is assigned to itself", RuleKind.CODE_SMELL));
+            "This variable is assigned to itself", RuleKind.CODE_SMELL)),
+    UNUSED_PRIVATE_CLASS_FIELD(RuleFactory.createRule(11,
+            "Unused class private fields", RuleKind.CODE_SMELL));
 
     private final Rule rule;
 

@@ -18,13 +18,13 @@ class A {
     private string c = ""; // warning
 }
 
-public class A2 {
+public isolated class A2 {
     int a = 1;
     public string b = "";
     private string c = ""; // warning
 }
 
-public class A3 {
+public isolated class A3 {
     int a;
     public string b;
     private string c;
@@ -40,18 +40,18 @@ public class A3 {
         self.c = "";
     }
 
-    public function test(boolean d) {
+    public isolated function test(boolean d) {
         self.d = d;
     }
 
-    public function test2(boolean? e) {
+    public isolated function test2(boolean? e) {
         if (e is ()) {
             return;
         }
         self.d = e;
     }
 
-    public function test3(boolean e) {
+    public isolated function test3(boolean e) {
         if (self.f is int) {
             return;
         }
@@ -67,7 +67,7 @@ class A4 {
         self.test(self.d);
     }
 
-    public function test(string s) {
+    function test(string s) {
         self.c = s;
     }
 }
@@ -81,7 +81,7 @@ service class SA {
         self.test(self.d);
     }
 
-    public function test(string s) {
+    isolated function test(string s) {
         self.c = s;
     }
 }

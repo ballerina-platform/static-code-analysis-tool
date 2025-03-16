@@ -414,16 +414,6 @@ class StaticCodeAnalyzer extends NodeVisitor {
         Optional<Symbol> symbol = semanticModel.symbol(node);
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
     }
-
-    private boolean hasQualifier(List<Qualifier> qualifierList, SyntaxKind qualifierValue) {
-        String qualifierValueStr = qualifierValue.stringValue();
-        for (Qualifier qualifier : qualifierList) {
-            if (qualifier.getValue().equals(qualifierValueStr)) {
-                return true;
-            }
-        }
-        return false;
-    }
     
     private boolean isPublicIsolatedConstruct(NodeList<Token> qualifiers) {
         return hasQualifier(qualifiers, PUBLIC_KEYWORD) && !hasQualifier(qualifiers, ISOLATED_KEYWORD);
