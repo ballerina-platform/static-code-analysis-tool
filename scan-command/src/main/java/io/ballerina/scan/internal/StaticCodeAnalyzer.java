@@ -19,6 +19,7 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.symbols.ClassFieldSymbol;
 import io.ballerina.compiler.api.symbols.ObjectTypeSymbol;
 import io.ballerina.compiler.api.symbols.Qualifier;
 import io.ballerina.compiler.api.symbols.Symbol;
@@ -40,6 +41,7 @@ import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
+import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
@@ -52,6 +54,7 @@ import io.ballerina.scan.utils.Constants;
 import java.util.List;
 import java.util.Optional;
 
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.PRIVATE_KEYWORD;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.ISOLATED_KEYWORD;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.PUBLIC_KEYWORD;
 import static io.ballerina.scan.utils.Constants.INIT_FUNCTION;
@@ -92,9 +95,23 @@ class StaticCodeAnalyzer extends NodeVisitor {
         if (checkExpressionNode.checkKeyword().kind().equals(SyntaxKind.CHECKPANIC_KEYWORD)) {
             reportIssue(checkExpressionNode, CoreRule.AVOID_CHECKPANIC);
         }
+        this.visitSyntaxNode(checkExpressionNode);
     }
 
     @Override
+    public void visit(ObjectFieldNode objectFieldNode) {
+        semanticModel.symbol(objectFieldNode).ifPresent(symbol -> {
+            if (symbol instanceof ClassFieldSymbol classFieldSymbol) {
+                List<Qualifier> qualifiers = classFieldSymbol.qualifiers();
+                if (hasQualifier(qualifiers, PRIVATE_KEYWORD)) {
+                    if (semanticModel.references(symbol).size() == 1) {
+                        reportIssue(objectFieldNode, CoreRule.UNUSED_PRIVATE_CLASS_FIELD);
+                    }
+                }
+            }
+        });
+        this.visitSyntaxNode(objectFieldNode);
+    }
     public void visit(BinaryExpressionNode binaryExpressionNode) {
         reportIssuesWithTrivialOperations(binaryExpressionNode);
         filterSameReferenceIssueBasedOnOperandType(binaryExpressionNode.operator()).ifPresent(rule -> {
@@ -397,7 +414,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
         Optional<Symbol> symbol = semanticModel.symbol(node);
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
     }
-
+    
     private boolean isPublicIsolatedConstruct(NodeList<Token> qualifiers) {
         return hasQualifier(qualifiers, PUBLIC_KEYWORD) && !hasQualifier(qualifiers, ISOLATED_KEYWORD);
     }
