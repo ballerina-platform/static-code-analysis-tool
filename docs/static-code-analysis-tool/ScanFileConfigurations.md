@@ -91,7 +91,3 @@ Define the rules to exclude in the analysis:
 [rules]
 exclude = ["ballerina:101", "ballerina/io:101"]
 ```
-
-# References
-
-- [Ballerina Scan Tool](https://docs.google.com/document/d/1l_XvRGPaTJ7YOnn-HQ07erjJQDKjilFRE_mtyga3C-I/edit?usp=sharing)
