@@ -82,13 +82,13 @@ import static io.ballerina.scan.internal.ScanToolConstants.VULNERABILITY;
  *
  * @since 0.1.0
  * */
-class ProjectAnalyzer {
+public class ProjectAnalyzer {
     private final Project project;
     private final ScanTomlFile scanTomlFile;
     private final Gson gson = new Gson();
     private String pluginImportsDocumentName;
 
-    ProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
+    protected ProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
         this.project = project;
         this.scanTomlFile = scanTomlFile;
         Module defaultModule = project.currentPackage().getDefaultModule();
@@ -284,7 +284,7 @@ class ProjectAnalyzer {
     List<Issue> runExternalAnalyzers(Map<String, List<Rule>> externalAnalyzers) {
         List<ScannerContext> scannerContextList = new ArrayList<>(externalAnalyzers.size());
         for (Map.Entry<String, List<Rule>> externalAnalyzer : externalAnalyzers.entrySet()) {
-            ScannerContextImpl scannerContext = new ScannerContextImpl(externalAnalyzer.getValue());
+            ScannerContext scannerContext = getScannerContext(externalAnalyzer.getValue());
             scannerContextList.add(scannerContext);
 
             // Save the scanner context to plugin cache for the compiler plugin to use during package compilation
@@ -306,5 +306,9 @@ class ProjectAnalyzer {
             }
         }
         return externalIssues;
+    }
+
+    protected ScannerContext getScannerContext(List<Rule> rules) {
+        return new ScannerContextImpl(rules);
     }
 }

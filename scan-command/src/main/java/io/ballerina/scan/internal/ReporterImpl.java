@@ -46,14 +46,12 @@ import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
  *
  * @since 0.1.0
  * */
-class ReporterImpl implements Reporter {
+public class ReporterImpl implements Reporter {
     private final List<Issue> issues = new ArrayList<>();
     private final Map<Integer, Rule> rules = new HashMap<>();
 
-    ReporterImpl(List<Rule> rules) {
-        rules.forEach(rule -> {
-            this.rules.put(rule.numericId(), rule);
-        });
+    protected ReporterImpl(List<Rule> rules) {
+        rules.forEach(rule -> this.rules.put(rule.numericId(), rule));
     }
 
     @Override
@@ -96,7 +94,7 @@ class ReporterImpl implements Reporter {
                 issuesFilePath.toString());
     }
 
-    List<Issue> getIssues() {
+    protected List<Issue> getIssues() {
         return issues;
     }
 }
