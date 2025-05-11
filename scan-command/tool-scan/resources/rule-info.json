@@ -1,0 +1,331 @@
+[
+  {
+    "title": "Avoid checkpanic",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "error-handling"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:1",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Unused function parameter",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "unused"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:2",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Non isolated public function",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "concurrency"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:3",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Non isolated public method",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "concurrency"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:4",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Non isolated public class",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "concurrency"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:5",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Non isolated public object",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "concurrency"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:6",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "This operation always evaluates to true",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "trivial"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:7",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "This operation always evaluates to false",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "trivial"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:8",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "This operation always evaluates to the same value",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "trivial"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:9",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "This variable is assigned to itself",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "trivial"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:10",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Unused class private fields",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "unused"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:11",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Invalid range expression",
+    "type": "CODE_SMELL",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "pitfall"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:12",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Avoid using publicly writable directories for file operations without proper access controls",
+    "type": "VULNERABILITY",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "file"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina/file:1",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "I/O function calls should not be vulnerable to path injection attacks",
+    "type": "VULNERABILITY",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "file",
+      "injection"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina/file:2",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Avoid allowing default resource accessor",
+    "type": "VULNERABILITY",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "http",
+      "csrf"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina/http:1",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Avoid permissive Cross-Origin Resource Sharing",
+    "type": "VULNERABILITY",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "cors",
+      "http"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina/http:2",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "I/O function calls should not be vulnerable to path injection attacks",
+    "type": "VULNERABILITY",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "io",
+      "injection"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina/io:1",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Potentially-sensitive configurable variables are logged",
+    "type": "VULNERABILITY",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "log",
+      "leak"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina/log:1",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Avoid constructing system command arguments from user input without proper sanitization",
+    "type": "VULNERABILITY",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "os",
+      "injection"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina/os:1",
+    "scope": "All",
+    "quickfix": "unknown"
+  }
+]
