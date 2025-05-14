@@ -1,7 +1,7 @@
 {
     "name": "static-code-analysis-report",
     "homepage": ".",
-    "version": "0.1.0",
+    "version": "0.9.1-SNAPSHOT",
     "private": true,
     "dependencies": {
         "@emotion/react": "^11.11.3",

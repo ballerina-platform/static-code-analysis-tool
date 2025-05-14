@@ -53,29 +53,29 @@ public class Rule003And004Test extends StaticCodeAnalyzerTest {
 
         List<Issue> issues = scannerContext.getReporter().getIssues();
         Assert.assertEquals(issues.size(), 12);
-        assertIssue(issues.get(0), documentName, 16, 0, 18, 1, "ballerina:3", 3,
+        assertIssue(issues.get(0), documentName, 16, 0, 16, 6, "ballerina:3", 3,
                 PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(1), documentName, 63, 4, 65, 5, "ballerina:4", 4,
+        assertIssue(issues.get(1), documentName, 63, 4, 63, 10, "ballerina:4", 4,
                 PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(2), documentName, 67, 4, 69, 5, "ballerina:4", 4,
+        assertIssue(issues.get(2), documentName, 67, 4, 67, 10, "ballerina:4", 4,
                 PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(3), documentName, 75, 4, 77, 5, "ballerina:4", 4,
+        assertIssue(issues.get(3), documentName, 75, 4, 75, 10, "ballerina:4", 4,
                 PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(4), documentName, 89, 4, 91, 5, "ballerina:4", 4,
+        assertIssue(issues.get(4), documentName, 89, 4, 89, 10, "ballerina:4", 4,
                 PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(5), documentName, 97, 4, 99, 5, "ballerina:4", 4,
+        assertIssue(issues.get(5), documentName, 97, 4, 97, 10, "ballerina:4", 4,
                 PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(6), documentName, 102, 0, 122, 1, "ballerina:5", 5,
+        assertIssue(issues.get(6), documentName, 102, 0, 102, 6, "ballerina:5", 5,
                 PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(7), documentName, 111, 4, 113, 5, "ballerina:4", 4,
+        assertIssue(issues.get(7), documentName, 111, 4, 111, 10, "ballerina:4", 4,
                 PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(8), documentName, 133, 4, 135, 5, "ballerina:4", 4,
+        assertIssue(issues.get(8), documentName, 133, 4, 133, 10, "ballerina:4", 4,
                 PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(9), documentName, 146, 0, 166, 1, "ballerina:5", 5,
+        assertIssue(issues.get(9), documentName, 146, 0, 146, 6, "ballerina:5", 5,
                 PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(10), documentName, 155, 4, 157, 5, "ballerina:4", 4,
+        assertIssue(issues.get(10), documentName, 155, 4, 155, 10, "ballerina:4", 4,
                 PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(11), documentName, 180, 0, 184, 1, "ballerina:5", 5,
+        assertIssue(issues.get(11), documentName, 180, 0, 180, 6, "ballerina:5", 5,
                 PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT, RuleKind.CODE_SMELL);
     }
 }

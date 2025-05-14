@@ -50,13 +50,13 @@ public class Rule005And006Test extends StaticCodeAnalyzerTest {
 
         List<Issue> issues = scannerContext.getReporter().getIssues();
         Assert.assertEquals(issues.size(), 4);
-        assertIssue(issues.get(0), documentName, 20, 0, 22, 1, "ballerina:5", 5,
+        assertIssue(issues.get(0), documentName, 20, 0, 20, 6, "ballerina:5", 5,
                 PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(1), documentName, 37, 0, 40, 2, "ballerina:6", 6,
+        assertIssue(issues.get(1), documentName, 37, 0, 37, 6, "ballerina:6", 6,
                 PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(2), documentName, 57, 0, 60, 2, "ballerina:6", 6,
+        assertIssue(issues.get(2), documentName, 57, 0, 57, 6, "ballerina:6", 6,
                 PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(3), documentName, 74, 0, 76, 1, "ballerina:5", 5,
+        assertIssue(issues.get(3), documentName, 74, 0, 74, 6, "ballerina:5", 5,
                 PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT, RuleKind.CODE_SMELL);
     }
 }

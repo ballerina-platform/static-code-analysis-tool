@@ -7,11 +7,25 @@ function SingleFileContent({ issues, fileContent }) {
 
     useEffect(() => {
         if (issues?.length !== 0) {
+            const allIssueLines = [];
             issues?.forEach((issue) => {
-                const newIssueLine = issue.textRange.startLine + REACT_REPORT_OFFSET;
-
-                setIssueLines(prevIssueLines => [...prevIssueLines, newIssueLine]);
-            })
+                if (!issue?.textRange
+                    || typeof issue.textRange.startLine !== 'number'
+                    || typeof issue.textRange.endLine !== 'number') {
+                    throw new Error(`Invalid issue format: ${JSON.stringify(issue)}`);
+                }
+                const issueStartLine = issue.textRange.startLine + REACT_REPORT_OFFSET;
+                const issueEndLine = issue.textRange.endLine + REACT_REPORT_OFFSET;
+                if (issueStartLine > issueEndLine) {
+                    throw new Error(`Invalid line range: startLine (${issueStartLine}) > endLine (${issueEndLine})`);
+                }
+                const issueLineRange = Array.from(
+                    { length: issueEndLine - issueStartLine + 1 }, (_, i) => issueStartLine + i);
+                allIssueLines.push(...issueLineRange);
+            });
+            setIssueLines(allIssueLines);
+        } else {
+            setIssueLines([]);
         }
     }, [issues])
 
