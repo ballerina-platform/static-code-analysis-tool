@@ -207,7 +207,7 @@ public function main() {
 }
 ```
 
-### ballerina:3 - Unused function parameter
+### ballerina:3 - Non isolated public function
 A non-isolated function will not be called concurrently. Only isolated functions are called concurrently given that
 they are guaranteed to be safe if the arguments are also safe. To allow being called concurrently,
 a public function should be marked as isolated.
@@ -240,12 +240,10 @@ a public method should be marked as isolated.
 
 ```ballerina
 class EvenNumber {
-int i = 1;
+    int i = 1;
 
     public function generate() returns int {
-        lock {
-            return self.i * 2;
-        }
+        return self.i * 2;
     }
 }
 ```
@@ -342,6 +340,7 @@ public function main() {
 
 Conditions that are always false indicate unreachable code or logic that will never execute.
 This can clutter the codebase, make it harder to understand, and potentially hide bugs or unintentional logic errors.
+
 #### Noncompliant Code Example
 
 ```ballerina
