@@ -358,10 +358,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 TypeSymbol typeSymbol = typeDefinitionSymbol.typeDescriptor();
                 if (typeSymbol instanceof ObjectTypeSymbol objectTypeSymbol) {
                     List<Qualifier> qualifiers = objectTypeSymbol.qualifiers();
-                    List<Qualifier> typeDefQualifiers = typeDefinitionSymbol.qualifiers();
-                    if (hasQualifier(typeDefQualifiers, PUBLIC_KEYWORD) &&
-                            !hasQualifier(qualifiers, ISOLATED_KEYWORD)) {
-                        reportIssue(typeDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
+                    Optional<Token> visibilityQualifier = typeDefinitionNode.visibilityQualifier();
+                    if (visibilityQualifier.isPresent() && visibilityQualifier.get().kind().equals(PUBLIC_KEYWORD)
+                            && !hasQualifier(qualifiers, ISOLATED_KEYWORD)) {
+                        reportIssue(visibilityQualifier.get(), CoreRule.PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
                     }
                 }
             }
@@ -373,7 +373,9 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (symbol instanceof ObjectTypeSymbol objectTypeSymbol) {
                 List<Qualifier> qualifiers = objectTypeSymbol.qualifiers();
                 if (isPublicIsolatedConstruct(qualifiers)) {
-                    reportIssue(classDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT);
+                    Token visibilityQualifier = classDefinitionNode.visibilityQualifier().orElseThrow(
+                            () -> new IllegalStateException("Expected visibility qualifier to be present"));
+                    reportIssue(visibilityQualifier, CoreRule.PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT);
                 }
             }
         });
@@ -395,8 +397,11 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     private void checkNonIsolatedPublicMethod(FunctionDefinitionNode member) {
-        if (isPublicIsolatedConstruct(member.qualifierList())) {
-            reportIssue(member, CoreRule.PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT);
+        NodeList<Token> qualifiers = member.qualifierList();
+        if (isPublicIsolatedConstruct(qualifiers)) {
+            Token publicToken = getQualifier(qualifiers, PUBLIC_KEYWORD).orElseThrow(
+                    () -> new IllegalStateException("Expected public token to be present"));
+            reportIssue(publicToken, CoreRule.PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT);
         }
     }
 
@@ -405,10 +410,18 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (symbol.kind() != SymbolKind.METHOD) {
                 NodeList<Token> qualifiers = functionDefinitionNode.qualifierList();
                 if (isPublicIsolatedConstruct(qualifiers)) {
-                    reportIssue(functionDefinitionNode, CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT);
+                    Token publicToken = getQualifier(qualifiers, PUBLIC_KEYWORD).orElseThrow(
+                            () -> new IllegalStateException("Expected public token to be present"));
+                    reportIssue(publicToken, CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT);
                 }
             }
         });
+    }
+
+    private Optional<Token> getQualifier(NodeList<Token> qualifierList, SyntaxKind qualifier) {
+        return qualifierList.stream()
+                .filter(t -> t.kind() == qualifier)
+                .findFirst();
     }
 
     private boolean hasQualifier(List<Qualifier> qualifierList, SyntaxKind qualifierValue) {
