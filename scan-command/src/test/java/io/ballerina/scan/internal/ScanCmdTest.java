@@ -105,8 +105,8 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with Ballerina project")
     void testScanCommandProject() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
         System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = "Running Scans";
@@ -116,8 +116,8 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with an empty Ballerina project")
     void testScanCommandEmptyProject() throws IOException {
         Path emptyBalProject = testResources.resolve("test-resources").resolve("empty-bal-project");
-        ScanCmd scanCmd = new ScanCmd(printStream);
         System.setProperty("user.dir", emptyBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = DiagnosticLog.error(DiagnosticCode.EMPTY_PACKAGE);
@@ -161,8 +161,8 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with single file project without arguments")
     void testScanCommandSingleFileProjectWithoutArgument() throws IOException {
         Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
-        ScanCmd scanCmd = new ScanCmd(printStream);
         System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = "Invalid Ballerina package directory: " + validBalProject +
@@ -173,14 +173,18 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with single file project with too many arguments")
     void testScanCommandSingleFileProjectWithTooManyArguments() throws IOException {
         Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
+        System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"main.bal", "argument2"};
-        new CommandLine(scanCmd).parseArgs(args);
-        System.setProperty("user.dir", validBalProject.toString());
-        scanCmd.execute();
+        try {
+            new CommandLine(scanCmd).parseArgs(args);
+            Assert.fail("Expected CommandLine.UnmatchedArgumentException");
+        } catch (CommandLine.UnmatchedArgumentException e) {
+            String expected = "picocli.CommandLine$UnmatchedArgumentException: " +
+                    "Unmatched argument at index 1: 'argument2'";
+            Assert.assertEquals(e.toString(), expected);
+        }
         System.setProperty("user.dir", userDir);
-        String expected = DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, 2);
-        Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
     @Test(description = "test scan command with method for saving results to file when analysis issues are present")
@@ -245,12 +249,12 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with list rules flag")
     void testScanCommandWithListRulesFlag() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--list-rules"};
-        new CommandLine(scanCmd).parseArgs(args);
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
         System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--list-rules"};
+        new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = getExpectedOutput("list-rules-output.txt");
@@ -335,12 +339,12 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with include rules flag")
     void testScanCommandWithIncludeRulesFlag() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--include-rules=ballerina:1"};
-        new CommandLine(scanCmd).parseArgs(args);
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-analyzer-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--include-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
@@ -352,12 +356,12 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with exclude rules flag")
     void testScanCommandWithExcludeRulesFlag() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--exclude-rules=ballerina:1"};
-        new CommandLine(scanCmd).parseArgs(args);
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-analyzer-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--exclude-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
@@ -369,12 +373,12 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with include and exclude rules flag")
     void testScanCommandWithIncludeAndExcludeRulesFlags() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
-        new CommandLine(scanCmd).parseArgs(args);
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-analyzer-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = getExpectedOutput("include-exclude-rules.txt");
@@ -383,10 +387,10 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with include rules Scan.toml configurations")
     void testScanCommandWithIncludeRulesScanTomlConfigurations() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-include-rule-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
@@ -398,12 +402,12 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with exclude rules Scan.toml configurations")
     void testScanCommandWithExcludeRulesScanTomlConfigurations() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--exclude-rules=ballerina:1"};
-        new CommandLine(scanCmd).parseArgs(args);
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-exclude-rule-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--exclude-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
@@ -415,12 +419,12 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with include and exclude rules Scan.toml configurations")
     void testScanCommandWithIncludeAndExcludeRulesScanTomlConfigurations() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
-        new CommandLine(scanCmd).parseArgs(args);
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-include-exclude-rule-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = getExpectedOutput("toml-include-exclude-rules.txt");
@@ -429,7 +433,6 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with platform plugin configurations")
     void testScanCommandWithPlatformPluginConfigurations() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-platform-configurations");
         Path rootProject = Path.of(System.getProperty("user.dir")).getParent();
@@ -450,6 +453,7 @@ public class ScanCmdTest extends BaseTest {
                 StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
 
         System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
 
@@ -471,7 +475,6 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with invalid platform plugin configurations")
     void testScanCommandWithInvalidPlatformPluginConfigurations() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-platform-configurations");
         Path rootProject = Path.of(System.getProperty("user.dir")).getParent();
@@ -491,6 +494,7 @@ public class ScanCmdTest extends BaseTest {
                 StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
 
         System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = getExpectedOutput("invalid-platform-plugin-configurations.txt");

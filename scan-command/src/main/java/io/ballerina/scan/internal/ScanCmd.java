@@ -67,8 +67,8 @@ import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 public class ScanCmd implements BLauncherCmd {
     private final PrintStream outputStream;
 
-    @CommandLine.Parameters(description = "Program arguments")
-    private final List<String> argList = new ArrayList<>();
+    @CommandLine.Parameters (arity = "0..1")
+    private final Path projectPath;
 
     @CommandLine.Option(names = {"--help", "-h", "?"}, hidden = true)
     private boolean helpFlag;
@@ -103,12 +103,39 @@ public class ScanCmd implements BLauncherCmd {
             description = "Specify the comma separated list of static code analysis platforms to report issues")
     private List<String> platforms = new ArrayList<>();
 
+    private final List<Rule> allRules = new ArrayList<>();
+
     public ScanCmd() {
-        this.outputStream = System.out;
+        this(System.out);
     }
 
     ScanCmd(PrintStream outputStream) {
+        this.projectPath = Paths.get(System.getProperty(ProjectConstants.USER_DIR));
         this.outputStream = outputStream;
+    }
+
+    protected ScanCmd(
+            Path projectPath,
+            PrintStream outputStream,
+            boolean helpFlag,
+            boolean platformTriggered,
+            String targetDir,
+            boolean scanReport,
+            boolean listRules,
+            List<Rule> includeRules,
+            List<Rule> excludeRules,
+            List<String> platforms
+    ) {
+        this.projectPath = projectPath;
+        this.outputStream = outputStream;
+        this.helpFlag = helpFlag;
+        this.platformTriggered = platformTriggered;
+        this.targetDir = targetDir;
+        this.scanReport = scanReport;
+        this.listRules = listRules;
+        this.includeRules.addAll(includeRules.stream().map(Rule::id).toList());
+        this.excludeRules.addAll(excludeRules.stream().map(Rule::id).toList());
+        this.platforms.addAll(platforms);
     }
 
     @Override
@@ -155,7 +182,7 @@ public class ScanCmd implements BLauncherCmd {
            return;
         }
 
-        ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(project.get(), scanTomlFile.get());
+        ProjectAnalyzer projectAnalyzer = getProjectAnalyzer(project.get(), scanTomlFile.get());
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers;
         try {
@@ -165,9 +192,10 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
+        allRules.addAll(coreRules);
+        externalAnalyzers.values().forEach(allRules::addAll);
         if (listRules) {
-            externalAnalyzers.values().forEach(coreRules::addAll);
-            ScanUtils.printRulesToConsole(coreRules, outputStream);
+            ScanUtils.printRulesToConsole(allRules, outputStream);
             return;
         }
 
@@ -275,31 +303,29 @@ public class ScanCmd implements BLauncherCmd {
         return builder;
     }
 
-    private Optional<Project> getProject() {
-        if (argList.isEmpty()) {
-            try {
-                return Optional.of(BuildProject.load(Paths.get(System.getProperty(ProjectConstants.USER_DIR))));
-            } catch (RuntimeException ex) {
-                outputStream.println(ex.getMessage());
-                return Optional.empty();
-            }
-        }
-
-        if (argList.size() != 1) {
-            outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, argList.size()));
-            return Optional.empty();
-        }
-
-        Path path = Paths.get(argList.get(0));
+    protected Optional<Project> getProject() {
         try {
-            if (path.toFile().isDirectory()) {
-                return Optional.of(BuildProject.load(path));
+            if (projectPath.toFile().isDirectory()) {
+                return Optional.of(BuildProject.load(projectPath));
             }
-            return Optional.of(SingleFileProject.load(path));
+            return Optional.of(SingleFileProject.load(projectPath));
         } catch (RuntimeException ex) {
             outputStream.println(ex.getMessage());
             return Optional.empty();
         }
+    }
+
+    protected ProjectAnalyzer getProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
+        return new ProjectAnalyzer(project, scanTomlFile);
+    }
+
+    /**
+     * Get the list of all rules available for the given project.
+     *
+     * @return an unmodifiable list of all rules
+     */
+    public List<Rule> getAllRules() {
+        return Collections.unmodifiableList(allRules);
     }
 
     private URLClassLoader loadPlatformPlugins(List<String> jarPaths) {
