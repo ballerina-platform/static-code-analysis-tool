@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.org)
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -16,26 +16,20 @@
  * under the License.
  */
 
-package io.ballerina.scan.test;
-
-import io.ballerina.scan.Issue;
-import io.ballerina.scan.Rule;
-import io.ballerina.scan.internal.ReporterImpl;
-
-import java.util.List;
+package io.ballerina.scan;
 
 /**
- * Test utility implementation of {@link ReporterImpl}.
+ * Service provider interface for discovering rules from code analyzers.
+ * This interface should be implemented by classes that extend CodeAnalyzer
+ * and want to provide rules through the service loading mechanism.
  *
  * @since 0.10.0
  */
-class TestReporter extends ReporterImpl {
-    TestReporter(List<Rule> rules) {
-        super(rules);
-    }
-
-    @Override
-    public List<Issue> getIssues() {
-        return super.getIssues();
-    }
+public interface RuleProvider {
+    /**
+     * Returns all Rule instances provided by this analyzer.
+     * 
+     * @return an iterable of rules provided by this analyzer
+     */
+    Iterable<Rule> getRules();
 }

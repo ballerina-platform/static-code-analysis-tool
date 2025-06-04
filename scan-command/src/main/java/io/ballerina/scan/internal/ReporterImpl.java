@@ -45,7 +45,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
  * Represents the implementation of the {@link Reporter} interface.
  *
  * @since 0.1.0
- * */
+ */
 public class ReporterImpl implements Reporter {
     private final List<Issue> issues = new ArrayList<>();
     private final Map<Integer, Rule> rules = new HashMap<>();
@@ -65,7 +65,7 @@ public class ReporterImpl implements Reporter {
 
     @Override
     public void reportIssue(Document reportedDocument, Location location, Rule rule) {
-        issues.add(createIssue(reportedDocument, location, rule));
+        issues.add(createIssue(reportedDocument, location, rules.get(rule.numericId())));
     }
 
     private Issue createIssue(Document reportedDocument, Location location, Rule rule) {
