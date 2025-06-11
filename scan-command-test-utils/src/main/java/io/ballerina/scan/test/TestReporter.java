@@ -35,7 +35,7 @@ class TestReporter extends ReporterImpl {
     }
 
     @Override
-    protected List<Issue> getIssues() {
+    public List<Issue> getIssues() {
         return super.getIssues();
     }
 }

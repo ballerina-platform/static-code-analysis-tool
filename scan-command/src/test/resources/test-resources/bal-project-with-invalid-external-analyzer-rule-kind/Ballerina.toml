@@ -1,4 +1,0 @@
-[package]
-org = "ballerina"
-name = "bal_project_with_invalid_external_analyzer_rule_kind"
-version = "0.1.0"

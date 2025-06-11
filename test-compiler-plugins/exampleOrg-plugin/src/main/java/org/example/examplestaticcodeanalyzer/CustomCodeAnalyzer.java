@@ -21,15 +21,23 @@ package org.example.examplestaticcodeanalyzer;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.projects.plugins.CodeAnalysisContext;
 import io.ballerina.projects.plugins.CodeAnalyzer;
+import io.ballerina.scan.Rule;
+import io.ballerina.scan.RuleProvider;
 import io.ballerina.scan.ScannerContext;
 
+import java.util.List;
+
 /**
- * Represents a code analyzer for a custom module.
+ * Represents a code analyzer for a example module.
  *
  * @since 0.1.0
- * */
-public class CustomCodeAnalyzer extends CodeAnalyzer {
-    private final ScannerContext scannerContext;
+ */
+public class CustomCodeAnalyzer extends CodeAnalyzer implements RuleProvider {
+    private ScannerContext scannerContext;
+
+    public CustomCodeAnalyzer() {
+        // Default constructor for service loading
+    }
 
     public CustomCodeAnalyzer(ScannerContext scannerContext) {
         this.scannerContext = scannerContext;
@@ -38,5 +46,15 @@ public class CustomCodeAnalyzer extends CodeAnalyzer {
     @Override
     public void init(CodeAnalysisContext codeAnalysisContext) {
         codeAnalysisContext.addSyntaxNodeAnalysisTask(new CustomAnalysisTask(scannerContext), SyntaxKind.MODULE_PART);
+    }
+
+    /**
+     * Returns all Rule instances provided by this analyzer.
+     *
+     * @return an iterable of rules provided by this analyzer
+     */
+    @Override
+    public Iterable<Rule> getRules() {
+        return List.of(CustomRule.values());
     }
 }
