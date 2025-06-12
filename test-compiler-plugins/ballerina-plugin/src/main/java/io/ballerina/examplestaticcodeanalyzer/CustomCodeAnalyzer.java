@@ -20,9 +20,8 @@ package io.ballerina.examplestaticcodeanalyzer;
 
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.projects.plugins.CodeAnalysisContext;
-import io.ballerina.projects.plugins.CodeAnalyzer;
+import io.ballerina.scan.ExternalCodeAnalyzer;
 import io.ballerina.scan.Rule;
-import io.ballerina.scan.RuleProvider;
 import io.ballerina.scan.ScannerContext;
 
 import java.util.List;
@@ -31,8 +30,8 @@ import java.util.List;
  * Represents a code analyzer for a ballerina module.
  *
  * @since 0.1.0
- * */
-public class CustomCodeAnalyzer extends CodeAnalyzer implements RuleProvider {
+ */
+public class CustomCodeAnalyzer extends ExternalCodeAnalyzer {
     private ScannerContext scannerContext;
 
     public CustomCodeAnalyzer() {
