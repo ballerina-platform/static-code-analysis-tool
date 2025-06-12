@@ -1,5 +1,0 @@
-[plugin] # Have to check if below path is needed
-class = "org.invalid.rulekind.CustomStaticCodeAnalyzer"
-
-[[dependency]]
-path = "../build/libs/invalid-rulekind-plugin-0.1.0.jar"

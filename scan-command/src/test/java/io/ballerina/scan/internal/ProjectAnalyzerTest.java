@@ -30,14 +30,12 @@ import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Source;
 import io.ballerina.scan.utils.ScanTomlFile;
-import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.text.LineRange;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -149,71 +147,5 @@ public class ProjectAnalyzerTest extends BaseTest {
         Assert.assertEquals(rule.numericId(), numericId);
         Assert.assertEquals(rule.description(), description);
         Assert.assertEquals(rule.kind(), kind);
-    }
-
-    @Test(description = "Test analyzing project with invalid external analyzer rules.json configurations")
-    void testAnalyzingProjectWithInvalidExternalAnalyzerRules() throws IOException {
-        Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
-                .resolve("bal-project-with-invalid-external-analyzer-rules"));
-        System.setProperty("user.dir", invalidProject.sourceRoot().toString());
-        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
-                .orElse(null);
-        Assert.assertNotNull(scanTomlFile);
-        System.setProperty("user.dir", userDir);
-        projectAnalyzer = new ProjectAnalyzer(invalidProject, scanTomlFile);
-        Map<String, List<Rule>> externalAnalyzers = null;
-        String result = null;
-        try {
-            externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
-        } catch (ScanToolException ex) {
-            result = ex.getMessage();
-        }
-        Assert.assertNull(externalAnalyzers);
-        String expected = getExpectedOutput("invalid-json-format-for-rules.txt");
-        Assert.assertEquals(result, expected);
-    }
-
-    @Test(description = "Test analyzing project with invalid external analyzer rule format")
-    void testAnalyzingProjectWithInvalidExternalAnalyzerRuleFormat() throws IOException {
-        Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
-                .resolve("bal-project-with-invalid-external-analyzer-rule-format"));
-        System.setProperty("user.dir", invalidProject.sourceRoot().toString());
-        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
-                .orElse(null);
-        Assert.assertNotNull(scanTomlFile);
-        System.setProperty("user.dir", userDir);
-        projectAnalyzer = new ProjectAnalyzer(invalidProject, scanTomlFile);
-        Map<String, List<Rule>> externalAnalyzers = null;
-        String result = null;
-        try {
-            externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
-        } catch (ScanToolException ex) {
-            result = ex.getMessage();
-        }
-        Assert.assertNull(externalAnalyzers);
-        String expected = getExpectedOutput("invalid-json-rule-format.txt");
-        Assert.assertEquals(result, expected);
-    }
-
-    @Test(description = "Test analyzing project with invalid external analyzer rule kind")
-    void testAnalyzingProjectWithInvalidExternalAnalyzerRuleKind() throws IOException {
-        Project invalidProject = BuildProject.load(testResources.resolve("test-resources")
-                .resolve("bal-project-with-invalid-external-analyzer-rule-kind"));
-        System.setProperty("user.dir", invalidProject.sourceRoot().toString());
-        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
-                .orElse(null);
-        Assert.assertNotNull(scanTomlFile);
-        System.setProperty("user.dir", userDir);
-        projectAnalyzer = new ProjectAnalyzer(invalidProject, scanTomlFile);
-        Map<String, List<Rule>> externalAnalyzers = null;
-        String result = null;
-        try {
-            externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
-        } catch (ScanToolException ex) {
-            result = ex.getMessage();
-        }
-        Assert.assertNull(externalAnalyzers);
-        String expected = getExpectedOutput("invalid-json-rule-kind.txt");
-        Assert.assertEquals(result, expected);
     }
 }

@@ -2,4 +2,4 @@
 id = "scan"
 
 [[dependency]]
-path = "../build/libs/scan-command-0.10.0.jar"
+path = "../build/libs/scan-command-0.10.1-SNAPSHOT.jar"
