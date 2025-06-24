@@ -25,6 +25,7 @@ package io.ballerina.scan.utils;
  */
 public class Constants {
     static final String RESULTS_JSON_FILE = "scan_results.json";
+    static final String RESULTS_SARIF_FILE = "scan_results.sarif";
     static final String RESULTS_HTML_FILE = "index.html";
     static final String REPORT_DATA_PLACEHOLDER = "__data__";
     static final String SCAN_REPORT_PROJECT_NAME = "projectName";
@@ -75,6 +76,7 @@ public class Constants {
         public static final String ZERO = "0";
         public static final String ONE = "1";
         public static final String MINUS_ONE = "-1";
+
         private Token() {
         }
     }

@@ -247,9 +247,11 @@ public class ScanCmd implements BLauncherCmd {
             ScanUtils.printToConsole(issues, outputStream);
             if (project.get().kind().equals(ProjectKind.BUILD_PROJECT)) {
                 Path reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir);
+                Path sarifReportPath = reportPath.getParent().resolve("scan_results.sarif");
                 outputStream.println();
                 outputStream.println("View scan results at:");
-                outputStream.println("\t" + reportPath.toUri() + System.lineSeparator());
+                outputStream.println("\t" + reportPath.toUri());
+                outputStream.println("\t" + sarifReportPath.toUri() + System.lineSeparator());
                 if (scanReport) {
                     Path scanReportPath = ScanUtils.generateScanReport(issues, project.get(), targetDir);
                     outputStream.println();
