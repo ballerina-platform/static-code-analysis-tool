@@ -33,7 +33,7 @@ import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
  * */
 public class IssueImpl implements Issue {
     private final BLangDiagnosticLocation location;
-    private final RuleImpl rule;
+    private final Rule rule;
     private final Source source;
     private final String fileName;
     private final String filePath;
@@ -48,7 +48,7 @@ public class IssueImpl implements Issue {
         this.location = new BLangDiagnosticLocation(lineRange.fileName(), lineRange.startLine().line(),
                 lineRange.endLine().line(), lineRange.startLine().offset(), lineRange.endLine().offset(),
                 textRange.startOffset(), textRange.length());
-        this.rule = (RuleImpl) rule;
+        this.rule = rule;
         this.source = source;
         this.fileName = fileName;
         this.filePath = filePath;

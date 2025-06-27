@@ -24,7 +24,7 @@ import io.ballerina.projects.plugins.CodeAnalyzer;
 import io.ballerina.scan.ScannerContext;
 
 /**
- * Represents a code analyzer for a custom module.
+ * Represents a code analyzer for a ballerina module.
  *
  * @since 0.1.0
  * */
