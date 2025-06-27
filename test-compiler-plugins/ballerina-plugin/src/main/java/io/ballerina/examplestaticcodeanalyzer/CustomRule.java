@@ -9,8 +9,7 @@ import static io.ballerina.scan.RuleKind.VULNERABILITY;
 
 public enum CustomRule implements Rule {
     RULE_1(1, "rule 1", CODE_SMELL),
-    RULE_2(2, "rule 2",
-            BUG),
+    RULE_2(2, "rule 2", BUG),
     RULE_3(3, "rule 3", VULNERABILITY);
 
     private final int id;
