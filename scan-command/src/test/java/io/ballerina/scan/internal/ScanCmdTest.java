@@ -27,8 +27,6 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Source;
-import io.ballerina.scan.utils.DiagnosticCode;
-import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanUtils;
 import org.testng.Assert;
@@ -51,6 +49,9 @@ import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
+import static io.ballerina.scan.utils.DiagnosticCode.EMPTY_PACKAGE;
+import static io.ballerina.scan.utils.DiagnosticCode.INVALID_FORMAT;
+import static io.ballerina.scan.utils.DiagnosticLog.error;
 
 /**
  * Scan command tests.
@@ -120,7 +121,7 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = DiagnosticLog.error(DiagnosticCode.EMPTY_PACKAGE);
+        String expected = error(EMPTY_PACKAGE);
         Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
     }
 
@@ -499,5 +500,100 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", userDir);
         String expected = getExpectedOutput("invalid-platform-plugin-configurations.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
+    }
+
+    @Test(description = "test scan command with valid json format flag")
+    void testScanCommandWithValidJsonFormatFlag() throws IOException {
+        System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--format=json"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+
+        System.setProperty("user.dir", userDir);
+        String expected = "Running Scans";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        Path jsonReport = validBalProject.resolve("target").resolve("report").resolve("scan_results.json");
+        Assert.assertTrue(Files.exists(jsonReport), "JSON report file should be created");
+    }
+
+    @Test(description = "test scan command with valid sarif format flag")
+    void testScanCommandWithValidSarifFormatFlag() throws IOException {
+        System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--format=sarif"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+
+        System.setProperty("user.dir", userDir);
+        String expected = "Running Scans";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        Path sarifReport = validBalProject.resolve("target").resolve("report").resolve("scan_results.sarif");
+        Assert.assertTrue(Files.exists(sarifReport), "SARIF report file should be created");
+    }
+
+    @Test(description = "test scan command with invalid format flag")
+    void testScanCommandWithInvalidFormatFlag() throws IOException {
+        System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--format=xml"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+
+        System.setProperty("user.dir", userDir);
+        String output = readOutput(true).trim();
+        Assert.assertTrue(output.contains(error(INVALID_FORMAT, "xml")), "Should show invalid format error");
+        Assert.assertTrue(output.contains("xml"), "Error message should mention the invalid format");
+    }
+
+    @Test(description = "test scan command with format flag case insensitive")
+    void testScanCommandWithFormatFlagCaseInsensitive() throws IOException {
+        System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--format=JSON"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+
+        System.setProperty("user.dir", userDir);
+        String expected = "Running Scans";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        System.setProperty("user.dir", validBalProject.toString());
+        scanCmd = new ScanCmd(printStream);
+        String[] sarifArgs = {"--format=SARIF"};
+        new CommandLine(scanCmd).parseArgs(sarifArgs);
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        expected = "Running Scans";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+    }
+
+    @Test(description = "test scan command with format flag combined with target-dir")
+    void testScanCommandWithFormatFlagAndTargetDir() throws IOException {
+        System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--format=sarif", "--target-dir=custom-results"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+
+        System.setProperty("user.dir", userDir);
+        String expected = "Running Scans";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        Path sarifReport = validBalProject.resolve("custom-results").resolve("report")
+                .resolve("scan_results.sarif");
+        Assert.assertTrue(Files.exists(sarifReport), "SARIF report file should be created in custom directory");
+        removeFile(validBalProject.resolve("custom-results"));
+    }
+
+    @Test(description = "test scan command default format behavior")
+    void testScanCommandDefaultFormatBehavior() throws IOException {
+        System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        scanCmd.execute();
+
+        System.setProperty("user.dir", userDir);
+        String expected = "Running Scans";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        Path jsonReport = validBalProject.resolve("target").resolve("report").resolve("scan_results.json");
+        Assert.assertTrue(Files.exists(jsonReport), "JSON report file should be created by default");
     }
 }
