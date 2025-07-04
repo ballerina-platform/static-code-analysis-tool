@@ -25,6 +25,12 @@ bal scan [OPTIONS] [<package>|<source-file>]
 --scan-report
 ```
 
+- Specify the output format (json or sarif). Default is json.
+
+```text
+--format=<json|sarif>
+```
+
 -  List all available rules
 
 ```text
@@ -73,6 +79,12 @@ bal scan --target-dir="results"
 
 ```bash
 bal scan --scan-report
+```
+
+- Run analysis and specify the output format as SARIF.
+
+```bash
+bal scan --format=sarif
 ```
 
 - View all available rules.
