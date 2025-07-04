@@ -20,6 +20,9 @@ OPTIONS
         --scan-report
                 Generate an HTML report containing the analysis results (only for Ballerina projects).
 
+        --format=<json|sarif>
+                Specify the format of the report. Default is json.
+
         --list-rules
                 List all available rules.
 
@@ -46,6 +49,12 @@ EXAMPLES
 
         Run analysis and generate an HTML report in the target directory.
                 $ bal scan --scan-report
+
+        Run analysis and generate report in JSON format (default).
+                $ bal scan --format=json
+
+        Run analysis and generate report in SARIF format.
+                $ bal scan --format=sarif
 
         View all available rules.
                 $ bal scan --list-rules

@@ -40,6 +40,7 @@ public enum DiagnosticCode {
     FAILED_TO_COPY_SCAN_REPORT("STATIC_ANALYSIS_ERROR_014", "failed.to.copy.scan.report"),
     RULE_NOT_FOUND("STATIC_ANALYSIS_ERROR_015", "rule.not.found"),
     ATTEMPT_TO_INCLUDE_AND_EXCLUDE("STATIC_ANALYSIS_ERROR_016", "attempt.to.include.and.exclude"),
+    INVALID_FORMAT("STATIC_ANALYSIS_ERROR_017", "invalid.format"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported");
 

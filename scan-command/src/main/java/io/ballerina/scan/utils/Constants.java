@@ -64,6 +64,13 @@ public class Constants {
     static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerinax", "wso2"};
     public static final String MAIN_FUNCTION = "main";
     public static final String INIT_FUNCTION = "init";
+    public static final String SARIF_VERSION = "2.1.0";
+    public static final String SARIF_SCHEMA = "https://www.schemastore.org/schemas/json/" +
+            "sarif-2.1.0.json";
+    public static final String SARIF_TOOL_NAME = "Ballerina Scan Tool";
+    public static final String SARIF_TOOL_ORGANIZATION = "WSO2";
+    public static final String SARIF_TOOL_VERSION = "0.10.0";
+    public static final String SARIF_TOOL_URI = "https://central.ballerina.io/ballerina/tool_scan/";
 
     public static class Token {
         public static final String FLOAT = "float";

@@ -37,20 +37,22 @@ public class TestOptions {
     private final boolean platformTriggered;
     private final String targetDir;
     private final boolean scanReport;
+    private final String format;
     private final boolean listRules;
     private final List<Rule> includeRules;
     private final List<Rule> excludeRules;
     private final List<String> platforms;
 
     private TestOptions(Project project, PrintStream outputStream, boolean helpFlag, boolean platformTriggered,
-                        String targetDir, boolean scanReport, boolean listRules, List<Rule> includeRules,
-                        List<Rule> excludeRules, List<String> platforms) {
+            String targetDir, boolean scanReport, String format, boolean listRules, List<Rule> includeRules,
+            List<Rule> excludeRules, List<String> platforms) {
         this.project = project;
         this.outputStream = outputStream;
         this.helpFlag = helpFlag;
         this.platformTriggered = platformTriggered;
         this.targetDir = targetDir;
         this.scanReport = scanReport;
+        this.format = format;
         this.listRules = listRules;
         this.includeRules = includeRules;
         this.excludeRules = excludeRules;
@@ -72,9 +74,9 @@ public class TestOptions {
      *
      * @return the project to be scanned
      */
-     Project project() {
+    Project project() {
         return project;
-     }
+    }
 
     /**
      * Get the output stream.
@@ -122,6 +124,15 @@ public class TestOptions {
     }
 
     /**
+     * Get the format of the report.
+     *
+     * @return the format of the report
+     */
+    String format() {
+        return format;
+    }
+
+    /**
      * Get if the rules should be listed or not.
      *
      * @return true if the rules should be listed, false otherwise
@@ -164,6 +175,7 @@ public class TestOptions {
         private boolean platformTriggered;
         private String targetDir;
         private boolean scanReport;
+        private String format;
         private boolean listRules;
         private List<Rule> includeRules = List.of();
         private List<Rule> excludeRules = List.of();
@@ -198,7 +210,8 @@ public class TestOptions {
         /**
          * Set if the scan is triggered by a platform.
          *
-         * @param platformTriggered true if the scan is triggered by a platform, false otherwise
+         * @param platformTriggered true if the scan is triggered by a platform, false
+         *                          otherwise
          * @return this builder
          */
         public TestOptionsBuilder setPlatformTriggered(boolean platformTriggered) {
@@ -220,11 +233,23 @@ public class TestOptions {
         /**
          * Set if the scan report needs to be enabled.
          *
-         * @param scanReport true if the scan report needs to be enabled, false otherwise
+         * @param scanReport true if the scan report needs to be enabled, false
+         *                   otherwise
          * @return this builder
          */
         public TestOptionsBuilder setScanReport(boolean scanReport) {
             this.scanReport = scanReport;
+            return this;
+        }
+
+        /**
+         * Set the format of the report.
+         *
+         * @param format the format of the report
+         * @return this builder
+         */
+        public TestOptionsBuilder setFormat(String format) {
+            this.format = format;
             return this;
         }
 
@@ -279,7 +304,7 @@ public class TestOptions {
          */
         public TestOptions build() {
             return new TestOptions(project, outputStream, helpFlag, platformTriggered,
-                    targetDir, scanReport, listRules, includeRules, excludeRules, platforms);
+                    targetDir, scanReport, format, listRules, includeRules, excludeRules, platforms);
         }
     }
 }
