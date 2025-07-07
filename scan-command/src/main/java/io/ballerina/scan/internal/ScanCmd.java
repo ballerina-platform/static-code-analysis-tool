@@ -27,6 +27,7 @@ import io.ballerina.projects.util.ProjectConstants;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.PlatformPluginContext;
+import io.ballerina.scan.ReportFormat;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
 import io.ballerina.scan.utils.DiagnosticCode;
@@ -85,8 +86,9 @@ public class ScanCmd implements BLauncherCmd {
     private boolean scanReport;
 
     @CommandLine.Option(names = "--format",
-            description = "Specify the format of the report (json/sarif). Default is json")
-    private String format = "json";
+            description = "Specify the format of the report (json/sarif). Default is json",
+            converter = ReportFormatConverter.class)
+    private ReportFormat format = ReportFormat.JSON;
 
     @CommandLine.Option(names = "--list-rules", description = "List the rules available in the Ballerina scan tool")
     private boolean listRules;
@@ -121,7 +123,7 @@ public class ScanCmd implements BLauncherCmd {
             boolean platformTriggered,
             String targetDir,
             boolean scanReport,
-            String format,
+            ReportFormat format,
             boolean listRules,
             List<Rule> includeRules,
             List<Rule> excludeRules,
@@ -165,12 +167,6 @@ public class ScanCmd implements BLauncherCmd {
         if (helpFlag) {
             StringBuilder builder = helpMessage();
             outputStream.println(builder);
-            return;
-        }
-
-        // Validate format parameter
-        if (!format.equalsIgnoreCase("json") && !format.equalsIgnoreCase("sarif")) {
-            outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_FORMAT, format));
             return;
         }
 
@@ -251,7 +247,7 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         if (platforms.isEmpty() && !platformTriggered) {
-            boolean isSarifFormat = "sarif".equalsIgnoreCase(format);
+            boolean isSarifFormat = ReportFormat.SARIF.equals(format);
             ScanUtils.printToConsole(issues, outputStream, isSarifFormat, project.get());
             if (project.get().kind().equals(ProjectKind.BUILD_PROJECT)) {
                 Path reportPath;
@@ -358,6 +354,13 @@ public class ScanCmd implements BLauncherCmd {
         @Override
         public List<String> convert(String value) {
             return Arrays.stream(value.split(",", -1)).map(String::trim).toList();
+        }
+    }
+
+    private static class ReportFormatConverter implements CommandLine.ITypeConverter<ReportFormat> {
+        @Override
+        public ReportFormat convert(String value) {
+            return ReportFormat.fromString(value);
         }
     }
 }

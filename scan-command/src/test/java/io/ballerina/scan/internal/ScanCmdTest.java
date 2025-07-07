@@ -50,7 +50,6 @@ import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 import static io.ballerina.scan.utils.DiagnosticCode.EMPTY_PACKAGE;
-import static io.ballerina.scan.utils.DiagnosticCode.INVALID_FORMAT;
 import static io.ballerina.scan.utils.DiagnosticLog.error;
 
 /**
@@ -533,17 +532,19 @@ public class ScanCmdTest extends BaseTest {
     }
 
     @Test(description = "test scan command with invalid format flag")
-    void testScanCommandWithInvalidFormatFlag() throws IOException {
+    void testScanCommandWithInvalidFormatFlag() {
         System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"--format=xml"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-
+        try {
+            new CommandLine(scanCmd).parseArgs(args);
+            Assert.fail("Expected ParameterException to be thrown for invalid format");
+        } catch (CommandLine.ParameterException e) {
+            Assert.assertTrue(e.getMessage().contains("xml"), "Error message should mention the invalid format");
+            Assert.assertTrue(e.getMessage().contains("Unknown report format"),
+                    "Error message should indicate unknown format");
+        }
         System.setProperty("user.dir", userDir);
-        String output = readOutput(true).trim();
-        Assert.assertTrue(output.contains(error(INVALID_FORMAT, "xml")), "Should show invalid format error");
-        Assert.assertTrue(output.contains("xml"), "Error message should mention the invalid format");
     }
 
     @Test(description = "test scan command with format flag case insensitive")
