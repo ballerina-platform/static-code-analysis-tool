@@ -112,6 +112,7 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_NAME;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SCANNED_FILES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ZIP_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_TABLE;
+import static java.util.Locale.ROOT;
 
 /**
  * {@code ScanUtils} contains all the utility functions used by the scan tool.
@@ -205,8 +206,8 @@ public final class ScanUtils {
                 JsonObject obj = new JsonObject();
                 obj.addProperty("id", id);
 
-                // Construct helpUri based on rule ID format
-                String helpUri = constructHelpUri(id, issueImpl.rule().numericId());
+                // Construct helpUri based on rule ID and description
+                String helpUri = constructHelpUri(id, issueImpl.rule().description());
                 obj.addProperty("helpUri", helpUri);
 
                 JsonObject shortDescription = new JsonObject();
@@ -279,34 +280,22 @@ public final class ScanUtils {
     }
 
     /**
-     * Constructs the helpUri based on rule ID format.
+     * Constructs the helpUri based on rule ID and description.
      *
      * @param ruleId the rule ID
-     * @param numericId the numeric ID of the rule
+     * @param description the rule description
      * @return the constructed helpUri
      */
-    private static String constructHelpUri(String ruleId, int numericId) {
+    private static String constructHelpUri(String ruleId, String description) {
         String baseUri = SARIF_TOOL_URI + SARIF_TOOL_VERSION;
-        String[] parts = ruleId.split(":");
-
-        if (ruleId.contains("/")) {
-            // Standard library rule format: ballerina/module:numericId -> #rules-ballerina-module-numericId
-            if (parts.length == 2) {
-                String libPart = parts[0].replace("/", "-");
-                String numericPart = parts[1];
-                return baseUri + "#rules-" + libPart + "-" + numericPart;
-            }
-        } else {
-            // Core rule format: ballerina:numericId -> #rules-ballerina-numericId
-            if (parts.length == 2) {
-                String corePart = parts[0];
-                String numericPart = parts[1];
-                return baseUri + "#rules-" + corePart + "-" + numericPart;
-            }
-        }
-
-        // Fallback to original format if parsing fails
-        return baseUri + numericId;
+        String anchor;
+        String idPart = ruleId.replace(":", "").replace("/", "");
+        String descPart = description.toLowerCase(ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("-$", "")
+                .replaceAll("^-", "");
+        anchor = "#" + idPart + "---" + descPart;
+        return baseUri + anchor;
     }
 
     /**
