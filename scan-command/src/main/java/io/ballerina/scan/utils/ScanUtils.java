@@ -285,7 +285,7 @@ public final class ScanUtils {
     /**
      * Constructs the helpUri based on rule ID and description.
      *
-     * @param ruleId the rule ID
+     * @param ruleId      the rule ID
      * @param description the rule description
      * @return the constructed helpUri
      */
@@ -430,34 +430,30 @@ public final class ScanUtils {
             IssueImpl issueImpl = (IssueImpl) issue;
             String filePath = issueImpl.filePath();
 
-            scanReportPathAndFile.computeIfPresent(filePath, (key, scanReportFile) -> {
+            if (scanReportPathAndFile.containsKey(filePath)) {
+                JsonObject scanReportFile = scanReportPathAndFile.get(filePath);
                 JsonArray issuesArray = scanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES);
                 JsonObject issueObject = getJsonIssue(issueImpl);
                 issuesArray.add(issueObject);
                 scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
-                return scanReportFile;
-            });
-            if (scanReportPathAndFile.containsKey(filePath)) {
-                continue;
+            } else {
+                JsonObject scanReportFile = new JsonObject();
+                scanReportFile.addProperty(SCAN_REPORT_FILE_NAME, issueImpl.fileName());
+                scanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
+                String fileContent;
+                try {
+                    fileContent = Files.readString(Path.of(filePath));
+                } catch (IOException ex) {
+                    throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_BALLERINA_FILE,
+                            ex.getMessage()));
+                }
+                scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
+                JsonArray issuesArray = new JsonArray();
+                JsonObject issueObject = getJsonIssue(issueImpl);
+                issuesArray.add(issueObject);
+                scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
+                scanReportPathAndFile.put(filePath, scanReportFile);
             }
-
-            JsonObject scanReportFile = new JsonObject();
-            scanReportFile.addProperty(SCAN_REPORT_FILE_NAME, issueImpl.fileName());
-            scanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
-            String fileContent;
-            try {
-                fileContent = Files.readString(Path.of(filePath));
-            } catch (IOException ex) {
-                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_BALLERINA_FILE,
-                        ex.getMessage()));
-            }
-            scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
-            JsonArray issuesArray = new JsonArray();
-            JsonObject issueObject = getJsonIssue(issueImpl);
-            issuesArray.add(issueObject);
-            scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
-
-            scanReportPathAndFile.put(filePath, scanReportFile);
         }
 
         JsonArray scannedFiles = new JsonArray();
