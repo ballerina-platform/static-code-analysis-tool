@@ -21,7 +21,7 @@ package io.ballerina.scan;
 /**
  * Enum representing the report formats supported by the scan command.
  *
- * @since 0.10.0
+ * @since 0.11.0
  */
 public enum ReportFormat {
     BALLERINA("ballerina"),
