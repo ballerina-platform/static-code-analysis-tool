@@ -25,10 +25,10 @@ bal scan [OPTIONS] [<package>|<source-file>]
 --scan-report
 ```
 
-- Specify the output format (json or sarif). Default is json.
+- Specify the output format (ballerina or sarif). Default is ballerina.
 
 ```text
---format=<json|sarif>
+--format=<ballerina|sarif>
 ```
 
 -  List all available rules

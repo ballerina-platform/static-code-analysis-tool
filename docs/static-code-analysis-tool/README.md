@@ -79,13 +79,13 @@ bal scan --target-dir="results"
 bal scan --scan-report
 ```
 
-5. Run analysis and specify the output format (json or sarif).
+5. Run analysis and specify the output format (ballerina or sarif).
 
 ```bash
 bal scan --format=sarif
 ```
 
-> Note: The default format is json. The tool supports both json and sarif formats for analysis results.
+> Note: The default format is ballerina. The tool supports both ballerina and sarif formats for analysis results.
 
 6. View all available rules.
 

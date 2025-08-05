@@ -138,7 +138,7 @@ public final class ScanUtils {
      *
      * @param issues       generated issues
      * @param outputStream print stream
-     * @param printSarif   whether to print SARIF format instead of JSON
+     * @param printSarif   whether to print SARIF format instead of default BALLERINA format
      * @param project      Ballerina project (required for SARIF format)
      */
     public static void printToConsole(List<Issue> issues, PrintStream outputStream, boolean printSarif,

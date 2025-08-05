@@ -86,9 +86,9 @@ public class ScanCmd implements BLauncherCmd {
     private boolean scanReport;
 
     @CommandLine.Option(names = "--format",
-            description = "Specify the format of the report (json/sarif). Default is json",
+            description = "Specify the format of the report (ballerina/sarif). Default is ballerina",
             converter = ReportFormatConverter.class)
-    private ReportFormat format = ReportFormat.JSON;
+    private ReportFormat format = ReportFormat.BALLERINA;
 
     @CommandLine.Option(names = "--list-rules", description = "List the rules available in the Ballerina scan tool")
     private boolean listRules;

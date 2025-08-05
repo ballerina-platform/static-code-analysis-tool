@@ -505,7 +505,7 @@ public class ScanCmdTest extends BaseTest {
     void testScanCommandWithValidJsonFormatFlag() throws IOException {
         System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--format=json"};
+        String[] args = {"--format=ballerina"};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
 
@@ -551,7 +551,7 @@ public class ScanCmdTest extends BaseTest {
     void testScanCommandWithFormatFlagCaseInsensitive() throws IOException {
         System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--format=JSON"};
+        String[] args = {"--format=BALLERINA"};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
 

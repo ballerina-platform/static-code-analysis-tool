@@ -32,7 +32,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Optional;
 
-import static io.ballerina.scan.ReportFormat.JSON;
+import static io.ballerina.scan.ReportFormat.BALLERINA;
 
 /**
  * TestScanCmd extends ScanCmd to extend it for testing purposes.
@@ -67,7 +67,7 @@ public class TestScanCmd extends ScanCmd {
                 false,
                 null,
                 false,
-                JSON,
+                BALLERINA,
                 false,
                 Collections.emptyList(),
                 Collections.emptyList(),

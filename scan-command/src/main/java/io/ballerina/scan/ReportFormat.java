@@ -24,7 +24,7 @@ package io.ballerina.scan;
  * @since 0.10.0
  */
 public enum ReportFormat {
-    JSON("json"),
+    BALLERINA("ballerina"),
     SARIF("sarif");
 
     private final String format;
