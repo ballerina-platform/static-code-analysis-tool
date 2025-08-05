@@ -18,6 +18,10 @@
 
 package io.ballerina.scan.utils;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
 /**
  * {@code Constants} contains the constants used by the scan tool utilities.
  *
@@ -69,8 +73,22 @@ public class Constants {
             "sarif-2.1.0.json";
     public static final String SARIF_TOOL_NAME = "Ballerina Scan Tool";
     public static final String SARIF_TOOL_ORGANIZATION = "WSO2";
-    public static final String SARIF_TOOL_VERSION = "0.10.0";
+    public static final String SARIF_TOOL_VERSION = getAppVersion();
     public static final String SARIF_TOOL_URI = "https://central.ballerina.io/ballerina/tool_scan/";
+
+    private static String getAppVersion() {
+        try (InputStream input = Constants.class.getClassLoader().getResourceAsStream("version.properties")) {
+            if (input != null) {
+                Properties props = new Properties();
+                props.load(input);
+                return props.getProperty("app.version", "0.1.0");
+            }
+        } catch (IOException ex) {
+            DiagnosticLog.error(DiagnosticCode.FAILED_TO_LOAD_VERSION_PROPERTIES,
+                    ex.getMessage());
+        }
+        return System.getProperty("app.version", "0.1.0");
+    }
 
     public static class Token {
         public static final String FLOAT = "float";
