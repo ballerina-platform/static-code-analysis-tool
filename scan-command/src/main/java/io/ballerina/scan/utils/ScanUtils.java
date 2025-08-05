@@ -58,9 +58,11 @@ import java.nio.file.Paths;
 import java.util.AbstractMap;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -196,6 +198,7 @@ public final class ScanUtils {
         // Create rules array for the tool
         JsonArray rules = new JsonArray();
         Map<String, JsonObject> ruleMap = new HashMap<>();
+        Set<String> addedRuleIds = new HashSet<>();
 
         // Collect unique rules from issues
         for (Issue issue : issues) {
@@ -221,7 +224,7 @@ public final class ScanUtils {
 
                 return obj;
             });
-            if (!rules.contains(ruleObject)) {
+            if (addedRuleIds.add(ruleId)) {
                 rules.add(ruleObject);
             }
         }
