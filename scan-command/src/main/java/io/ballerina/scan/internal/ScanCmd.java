@@ -27,6 +27,7 @@ import io.ballerina.projects.util.ProjectConstants;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.PlatformPluginContext;
+import io.ballerina.scan.ReportFormat;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
 import io.ballerina.scan.utils.DiagnosticCode;
@@ -62,15 +63,15 @@ import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
  * Represents the "bal scan" command.
  *
  * @since 0.1.0
- * */
+ */
 @CommandLine.Command(name = SCAN_COMMAND, description = "Perform static code analysis for Ballerina packages")
 public class ScanCmd implements BLauncherCmd {
     private final PrintStream outputStream;
 
-    @CommandLine.Parameters (arity = "0..1")
+    @CommandLine.Parameters(arity = "0..1")
     private final Path projectPath;
 
-    @CommandLine.Option(names = {"--help", "-h", "?"}, hidden = true)
+    @CommandLine.Option(names = { "--help", "-h", "?" }, hidden = true)
     private boolean helpFlag;
 
     @CommandLine.Option(names = "--platform-triggered",
@@ -84,22 +85,23 @@ public class ScanCmd implements BLauncherCmd {
     @CommandLine.Option(names = "--scan-report", description = "Enable HTML scan report generation")
     private boolean scanReport;
 
-    @CommandLine.Option(names = "--list-rules",
-            description = "List the rules available in the Ballerina scan tool")
+    @CommandLine.Option(names = "--format",
+            description = "Specify the format of the report (ballerina/sarif). Default is ballerina",
+            converter = ReportFormatConverter.class)
+    private ReportFormat format = ReportFormat.BALLERINA;
+
+    @CommandLine.Option(names = "--list-rules", description = "List the rules available in the Ballerina scan tool")
     private boolean listRules;
 
-    @CommandLine.Option(names = "--include-rules",
-            converter = StringToListConverter.class,
+    @CommandLine.Option(names = "--include-rules", converter = StringToListConverter.class,
             description = "Specify the comma separated list of rules to include specific analysis issues")
     private List<String> includeRules = new ArrayList<>();
 
-    @CommandLine.Option(names = "--exclude-rules",
-            converter = StringToListConverter.class,
+    @CommandLine.Option(names = "--exclude-rules", converter = StringToListConverter.class,
             description = "Specify the comma separated list of rules to exclude specific analysis issues")
     private List<String> excludeRules = new ArrayList<>();
 
-    @CommandLine.Option(names = "--platforms",
-            converter = StringToListConverter.class,
+    @CommandLine.Option(names = "--platforms", converter = StringToListConverter.class,
             description = "Specify the comma separated list of static code analysis platforms to report issues")
     private List<String> platforms = new ArrayList<>();
 
@@ -121,17 +123,18 @@ public class ScanCmd implements BLauncherCmd {
             boolean platformTriggered,
             String targetDir,
             boolean scanReport,
+            ReportFormat format,
             boolean listRules,
             List<Rule> includeRules,
             List<Rule> excludeRules,
-            List<String> platforms
-    ) {
+            List<String> platforms) {
         this.projectPath = projectPath;
         this.outputStream = outputStream;
         this.helpFlag = helpFlag;
         this.platformTriggered = platformTriggered;
         this.targetDir = targetDir;
         this.scanReport = scanReport;
+        this.format = format;
         this.listRules = listRules;
         this.includeRules.addAll(includeRules.stream().map(Rule::id).toList());
         this.excludeRules.addAll(excludeRules.stream().map(Rule::id).toList());
@@ -179,7 +182,7 @@ public class ScanCmd implements BLauncherCmd {
 
         Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project.get(), outputStream);
         if (scanTomlFile.isEmpty()) {
-           return;
+            return;
         }
 
         ProjectAnalyzer projectAnalyzer = getProjectAnalyzer(project.get(), scanTomlFile.get());
@@ -208,7 +211,7 @@ public class ScanCmd implements BLauncherCmd {
             platform.arguments().forEach((key, value) -> platformArgs.put(key, value.toString()));
             platformContexts.put(platformName, new PlatformPluginContextImpl(platformArgs, platformTriggered));
             if (!platformTriggered || platforms.size() != 1 || !platforms.contains(platformName)) {
-                  platforms.add(platformName);
+                platforms.add(platformName);
             }
         });
 
@@ -244,12 +247,19 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         if (platforms.isEmpty() && !platformTriggered) {
-            ScanUtils.printToConsole(issues, outputStream);
+            boolean isSarifFormat = ReportFormat.SARIF.equals(format);
+            ScanUtils.printToConsole(issues, outputStream, isSarifFormat, project.get());
             if (project.get().kind().equals(ProjectKind.BUILD_PROJECT)) {
-                Path reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir);
+                Path reportPath;
+                if (isSarifFormat) {
+                    reportPath = ScanUtils.saveSarifToDirectory(issues, project.get(), targetDir);
+                } else {
+                    reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir);
+                }
                 outputStream.println();
                 outputStream.println("View scan results at:");
-                outputStream.println("\t" + reportPath.toUri() + System.lineSeparator());
+                outputStream.println("\t" + reportPath.toUri());
+                outputStream.println();
                 if (scanReport) {
                     Path scanReportPath = ScanUtils.generateScanReport(issues, project.get(), targetDir);
                     outputStream.println();
@@ -289,8 +299,7 @@ public class ScanCmd implements BLauncherCmd {
         if (inputStream != null) {
             try (
                     InputStreamReader inputStreamReader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
-                    BufferedReader br = new BufferedReader(inputStreamReader)
-            ) {
+                    BufferedReader br = new BufferedReader(inputStreamReader)) {
                 String content = br.readLine();
                 builder.append(content);
                 while ((content = br.readLine()) != null) {
@@ -345,6 +354,13 @@ public class ScanCmd implements BLauncherCmd {
         @Override
         public List<String> convert(String value) {
             return Arrays.stream(value.split(",", -1)).map(String::trim).toList();
+        }
+    }
+
+    private static class ReportFormatConverter implements CommandLine.ITypeConverter<ReportFormat> {
+        @Override
+        public ReportFormat convert(String value) {
+            return ReportFormat.fromString(value);
         }
     }
 }

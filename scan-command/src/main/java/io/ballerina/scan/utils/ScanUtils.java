@@ -29,12 +29,14 @@ import io.ballerina.projects.TomlDocument;
 import io.ballerina.projects.internal.model.Target;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
+import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.internal.IssueImpl;
 import io.ballerina.toml.api.Toml;
 import io.ballerina.toml.semantic.TomlType;
 import io.ballerina.toml.semantic.ast.TomlArrayValueNode;
 import io.ballerina.toml.semantic.ast.TomlValueNode;
 import io.ballerina.tools.text.LineRange;
+import io.ballerina.tools.text.TextRange;
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
@@ -56,9 +58,11 @@ import java.nio.file.Paths;
 import java.util.AbstractMap;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -79,17 +83,23 @@ import static io.ballerina.scan.utils.Constants.PLATFORM_TABLE;
 import static io.ballerina.scan.utils.Constants.REPORT_DATA_PLACEHOLDER;
 import static io.ballerina.scan.utils.Constants.RESULTS_HTML_FILE;
 import static io.ballerina.scan.utils.Constants.RESULTS_JSON_FILE;
-import static io.ballerina.scan.utils.Constants.RULES_TABLE;
+import static io.ballerina.scan.utils.Constants.RESULTS_SARIF_FILE;
 import static io.ballerina.scan.utils.Constants.RULE_DESCRIPTION_COLUMN;
 import static io.ballerina.scan.utils.Constants.RULE_ID_COLUMN;
-import static io.ballerina.scan.utils.Constants.RULE_PRIORITY_LIST;
 import static io.ballerina.scan.utils.Constants.RULE_KIND_COLUMN;
+import static io.ballerina.scan.utils.Constants.RULE_PRIORITY_LIST;
+import static io.ballerina.scan.utils.Constants.RULES_TABLE;
+import static io.ballerina.scan.utils.Constants.SARIF_SCHEMA;
+import static io.ballerina.scan.utils.Constants.SARIF_TOOL_NAME;
+import static io.ballerina.scan.utils.Constants.SARIF_TOOL_ORGANIZATION;
+import static io.ballerina.scan.utils.Constants.SARIF_TOOL_URI;
+import static io.ballerina.scan.utils.Constants.SARIF_TOOL_VERSION;
+import static io.ballerina.scan.utils.Constants.SARIF_VERSION;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE_FIELD;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_CONTENT;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_NAME;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_PATH;
-import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_MESSAGE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_RULE_ID;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_SEVERITY;
@@ -99,16 +109,18 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_END
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TYPE;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_NAME;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SCANNED_FILES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ZIP_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_TABLE;
+import static java.util.Locale.ROOT;
 
 /**
  * {@code ScanUtils} contains all the utility functions used by the scan tool.
  *
  * @since 0.1.0
- * */
+ */
 public final class ScanUtils {
     private ScanUtils() {
     }
@@ -118,11 +130,29 @@ public final class ScanUtils {
      *
      * @param issues       generated issues
      * @param outputStream print stream
-     * */
+     */
     public static void printToConsole(List<Issue> issues, PrintStream outputStream) {
-        String jsonOutput = convertIssuesToJsonString(issues);
+        printToConsole(issues, outputStream, false, null);
+    }
+
+    /**
+     * Prints issues generated via static code analyzers to the console.
+     *
+     * @param issues       generated issues
+     * @param outputStream print stream
+     * @param printSarif   whether to print SARIF format instead of default BALLERINA format
+     * @param project      Ballerina project (required for SARIF format)
+     */
+    public static void printToConsole(List<Issue> issues, PrintStream outputStream, boolean printSarif,
+                                      Project project) {
+        String output;
+        if (printSarif && project != null) {
+            output = convertIssuesToSarifString(issues, project);
+        } else {
+            output = convertIssuesToJsonString(issues);
+        }
         outputStream.println();
-        outputStream.println(jsonOutput);
+        outputStream.println(output);
     }
 
     /**
@@ -130,7 +160,7 @@ public final class ScanUtils {
      *
      * @param issues generated issues
      * @return json string array of generated issues
-     * */
+     */
     private static String convertIssuesToJsonString(List<Issue> issues) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         JsonArray issuesAsJson = gson.toJsonTree(issues).getAsJsonArray();
@@ -138,26 +168,195 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the {@link Path} of the json analysis report where generated issues are saved.
+     * Returns the SARIF (Static Analysis Results Interchange Format) {@link String}
+     * representation of generated issues.
+     *
+     * @param issues  generated issues
+     * @param project Ballerina project
+     * @return SARIF string representation of generated issues
+     */
+    private static String convertIssuesToSarifString(List<Issue> issues, Project project) {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+        // Create SARIF root object
+        JsonObject sarif = new JsonObject();
+        sarif.addProperty("version", SARIF_VERSION);
+        sarif.addProperty("$schema", SARIF_SCHEMA);
+
+        // Create runs array
+        JsonArray runs = new JsonArray();
+        JsonObject run = new JsonObject();
+
+        // Create tool information
+        JsonObject tool = new JsonObject();
+        JsonObject driver = new JsonObject();
+        driver.addProperty("name", SARIF_TOOL_NAME);
+        driver.addProperty("organization", SARIF_TOOL_ORGANIZATION);
+        driver.addProperty("semanticVersion", SARIF_TOOL_VERSION);
+        driver.addProperty("informationUri", SARIF_TOOL_URI + SARIF_TOOL_VERSION);
+
+        // Create rules array for the tool
+        JsonArray rules = new JsonArray();
+        Map<String, JsonObject> ruleMap = new HashMap<>();
+        Set<String> addedRuleIds = new HashSet<>();
+
+        // Collect unique rules from issues
+        for (Issue issue : issues) {
+            IssueImpl issueImpl = (IssueImpl) issue;
+            String ruleId = issueImpl.rule().id();
+
+            JsonObject ruleObject = ruleMap.computeIfAbsent(ruleId, id -> {
+                JsonObject obj = new JsonObject();
+                obj.addProperty("id", id);
+
+                // Construct helpUri based on rule ID and description
+                String helpUri = constructHelpUri(id, issueImpl.rule().description());
+                obj.addProperty("helpUri", helpUri);
+
+                JsonObject shortDescription = new JsonObject();
+                shortDescription.addProperty("text", issueImpl.rule().description());
+                obj.add("shortDescription", shortDescription);
+
+                String level = mapRuleKindToSarifLevel(issueImpl.rule().kind());
+                JsonObject defaultConfiguration = new JsonObject();
+                defaultConfiguration.addProperty("level", level);
+                obj.add("defaultConfiguration", defaultConfiguration);
+
+                return obj;
+            });
+            if (addedRuleIds.add(ruleId)) {
+                rules.add(ruleObject);
+            }
+        }
+
+        driver.add("rules", rules);
+        tool.add("driver", driver);
+        run.add("tool", tool);
+
+        // Create results array
+        JsonArray results = new JsonArray();
+
+        for (Issue issue : issues) {
+            IssueImpl issueImpl = (IssueImpl) issue;
+            JsonObject result = new JsonObject();
+
+            result.addProperty("ruleId", issueImpl.rule().id());
+            result.addProperty("level", mapRuleKindToSarifLevel(issueImpl.rule().kind()));
+
+            JsonObject message = new JsonObject();
+            message.addProperty("text", issueImpl.rule().description());
+            result.add("message", message);
+
+            // Create locations array
+            JsonArray locations = new JsonArray();
+            JsonObject location = new JsonObject();
+            JsonObject physicalLocation = new JsonObject();
+
+            JsonObject artifactLocation = new JsonObject();
+            String relativePath = getRelativePath(issueImpl.filePath(), project.sourceRoot().toString());
+            artifactLocation.addProperty("uri", relativePath.replace("\\", "/"));
+            physicalLocation.add("artifactLocation", artifactLocation);
+
+            JsonObject region = new JsonObject();
+            LineRange lineRange = issueImpl.location().lineRange();
+            TextRange textRange = issueImpl.location().textRange();
+            region.addProperty("startLine", lineRange.startLine().line() + 1);
+            region.addProperty("startColumn", lineRange.startLine().offset() + 1);
+            region.addProperty("endLine", lineRange.endLine().line() + 1);
+            region.addProperty("endColumn", lineRange.endLine().offset() + 1);
+            region.addProperty("charOffset", textRange.startOffset());
+            region.addProperty("charLength", textRange.length());
+            physicalLocation.add("region", region);
+
+            location.add("physicalLocation", physicalLocation);
+            locations.add(location);
+            result.add("locations", locations);
+
+            results.add(result);
+        }
+
+        run.add("results", results);
+        runs.add(run);
+        sarif.add("runs", runs);
+
+        return gson.toJson(sarif);
+    }
+
+    /**
+     * Constructs the helpUri based on rule ID and description.
+     *
+     * @param ruleId      the rule ID
+     * @param description the rule description
+     * @return the constructed helpUri
+     */
+    private static String constructHelpUri(String ruleId, String description) {
+        String baseUri = SARIF_TOOL_URI + SARIF_TOOL_VERSION;
+        String anchor;
+        String idPart = ruleId.replace(":", "").replace("/", "");
+        String descPart = description.toLowerCase(ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("-$", "")
+                .replaceAll("^-", "");
+        anchor = "#" + idPart + "---" + descPart;
+        return baseUri + anchor;
+    }
+
+    /**
+     * Maps RuleKind to SARIF level.
+     *
+     * @param ruleKind the rule kind
+     * @return corresponding SARIF level
+     */
+    private static String mapRuleKindToSarifLevel(RuleKind ruleKind) {
+        return switch (ruleKind) {
+            case BUG -> "error";
+            case CODE_SMELL -> "note";
+            case VULNERABILITY -> "warning";
+        };
+    }
+
+    /**
+     * Returns the relative path from the source root.
+     *
+     * @param filePath   the absolute file path
+     * @param sourceRoot the source root path
+     * @return relative path
+     */
+    private static String getRelativePath(String filePath, String sourceRoot) {
+        Path path = Paths.get(filePath);
+        try {
+            Path source = Paths.get(sourceRoot);
+            return source.relativize(path).toString();
+        } catch (IllegalArgumentException e) {
+            Path fileName = path.getFileName();
+            return fileName != null ? fileName.toString() : filePath;
+        }
+    }
+
+    /**
+     * Returns the {@link Path} of the json analysis report where generated issues
+     * are saved.
+     * Optionally generates a SARIF format report in the same directory.
      *
      * @param issues        generated issues
      * @param project       Ballerina project
      * @param directoryName target directory name
      * @return path of the json analysis report where generated issues are saved
-     * */
+     */
     public static Path saveToDirectory(List<Issue> issues, Project project, String directoryName) {
         Target target = getTargetPath(project, directoryName);
 
         Path jsonFilePath;
         try {
             Path reportPath = target.getReportPath();
+
+            // Save JSON report
             String jsonOutput = convertIssuesToJsonString(issues);
             File jsonFile = new File(reportPath.resolve(RESULTS_JSON_FILE).toString());
-
             try (FileOutputStream fileOutputStream = new FileOutputStream(jsonFile);
                  Writer writer = new OutputStreamWriter(fileOutputStream, StandardCharsets.UTF_8)) {
-                    writer.write(new String(jsonOutput.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
-                    jsonFilePath = jsonFile.toPath();
+                writer.write(new String(jsonOutput.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
+                jsonFilePath = jsonFile.toPath();
             }
         } catch (IOException ex) {
             throw new IllegalStateException(ex);
@@ -166,12 +365,37 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the generated {@link Target} directory where analysis reports are saved.
+     * Saves only the SARIF analysis report to the target directory.
+     *
+     * @param issues        generated issues
+     * @param project       Ballerina project
+     * @param directoryName target directory name
+     * @return path of the SARIF analysis report
+     */
+    public static Path saveSarifToDirectory(List<Issue> issues, Project project, String directoryName) {
+        Target target = getTargetPath(project, directoryName);
+        try {
+            Path reportPath = target.getReportPath();
+            String sarifOutput = convertIssuesToSarifString(issues, project);
+            File sarifFile = new File(reportPath.resolve(RESULTS_SARIF_FILE).toString());
+            try (FileOutputStream fos = new FileOutputStream(sarifFile);
+                 Writer writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
+                writer.write(new String(sarifOutput.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
+            }
+            return sarifFile.toPath();
+        } catch (IOException ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    /**
+     * Returns the generated {@link Target} directory where analysis reports are
+     * saved.
      *
      * @param project       Ballerina project
      * @param directoryName target directory name
      * @return generated target directory
-     * */
+     */
     private static Target getTargetPath(Project project, String directoryName) {
         try {
             if (directoryName == null) {
@@ -189,7 +413,8 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the {@link Path} of the html analysis report where generated issues are saved.
+     * Returns the {@link Path} of the html analysis report where generated issues
+     * are saved.
      *
      * @param issues        generated issues
      * @param project       Ballerina project
@@ -211,27 +436,24 @@ public final class ScanUtils {
                 JsonObject issueObject = getJsonIssue(issueImpl);
                 issuesArray.add(issueObject);
                 scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
+            } else {
+                JsonObject scanReportFile = new JsonObject();
+                scanReportFile.addProperty(SCAN_REPORT_FILE_NAME, issueImpl.fileName());
+                scanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
+                String fileContent;
+                try {
+                    fileContent = Files.readString(Path.of(filePath));
+                } catch (IOException ex) {
+                    throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_BALLERINA_FILE,
+                            ex.getMessage()));
+                }
+                scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
+                JsonArray issuesArray = new JsonArray();
+                JsonObject issueObject = getJsonIssue(issueImpl);
+                issuesArray.add(issueObject);
+                scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
                 scanReportPathAndFile.put(filePath, scanReportFile);
-                continue;
             }
-
-            JsonObject scanReportFile = new JsonObject();
-            scanReportFile.addProperty(SCAN_REPORT_FILE_NAME, issueImpl.fileName());
-            scanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
-            String fileContent;
-            try {
-                fileContent = Files.readString(Path.of(filePath));
-            } catch (IOException ex) {
-                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_BALLERINA_FILE,
-                        ex.getMessage()));
-            }
-            scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
-            JsonArray issuesArray = new JsonArray();
-            JsonObject issueObject = getJsonIssue(issueImpl);
-            issuesArray.add(issueObject);
-            scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
-
-            scanReportPathAndFile.put(filePath, scanReportFile);
         }
 
         JsonArray scannedFiles = new JsonArray();
@@ -262,9 +484,11 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the {@link JsonObject} representation of the static code analysis issue.
+     * Returns the {@link JsonObject} representation of the static code analysis
+     * issue.
      *
-     * @param issueImpl the {@link IssueImpl} representing the issue, to be converted to a JSON object
+     * @param issueImpl the {@link IssueImpl} representing the issue, to be
+     *                  converted to a JSON object
      * @return json object representation of the static code analysis issue
      */
     private static JsonObject getJsonIssue(IssueImpl issueImpl) {
@@ -288,7 +512,8 @@ public final class ScanUtils {
     }
 
     /**
-     * Extracts the HTML report template zip from a provided resource stream to the provided destination.
+     * Extracts the HTML report template zip from a provided resource stream to the
+     * provided destination.
      *
      * @param source resource stream that contains the zip
      * @param target destination to extract contents of the zip
@@ -320,7 +545,8 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the {@link Optional<ScanTomlFile>} representation of a local/remote Scan.toml file.
+     * Returns the {@link Optional<ScanTomlFile>} representation of a local/remote
+     * Scan.toml file.
      *
      * @param project      Ballerina project
      * @param outputStream print stream
@@ -378,7 +604,8 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the {@link Optional<ScanTomlFile>} representation a remote Scan.toml file from the provided URL.
+     * Returns the {@link Optional<ScanTomlFile>} representation a remote Scan.toml
+     * file from the provided URL.
      *
      * @param targetDir    the target directory
      * @param scanTomlPath the remote Scan.toml file path
@@ -407,7 +634,8 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the {@link Optional<ScanTomlFile>} representation of the Scan.toml file.
+     * Returns the {@link Optional<ScanTomlFile>} representation of the Scan.toml
+     * file.
      *
      * @param targetDir        the target directory
      * @param scanTomlFilePath the local Scan.toml file path
@@ -439,7 +667,8 @@ public final class ScanUtils {
     }
 
     /**
-     * Loads an analyzer to the {@link ScanTomlFile} representation of the Scan.toml file.
+     * Loads an analyzer to the {@link ScanTomlFile} representation of the Scan.toml
+     * file.
      *
      * @param scanTomlFile the in-memory representation of the Scan.toml file
      */
@@ -469,46 +698,49 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the boolean value indicating whether the scan process should be continued.
+     * Returns the boolean value indicating whether the scan process should be
+     * continued.
      *
      * @param scanTomlFile the in-memory representation of the Scan.toml file
      * @param targetDir    the target directory
      * @param outputStream the print stream
-     * @return the boolean value indicating whether the scan process should be continued
+     * @return the boolean value indicating whether the scan process should be
+     * continued
      */
     private static boolean loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path targetDir,
                                         PrintStream outputStream) {
-            Map<String, Object> properties = platformTable.toMap();
-            Object platformName = properties.remove(PLATFORM_NAME);
-            Optional<String> name = (platformName instanceof String) ? Optional.of(platformName.toString())
-                    : Optional.empty();
-            Object platformPath = properties.remove(PLATFORM_PATH);
-            Optional<String> path = (platformPath instanceof String) ? Optional.of(platformPath.toString())
-                    : Optional.empty();
+        Map<String, Object> properties = platformTable.toMap();
+        Object platformName = properties.remove(PLATFORM_NAME);
+        Optional<String> name = (platformName instanceof String) ? Optional.of(platformName.toString())
+                : Optional.empty();
+        Object platformPath = properties.remove(PLATFORM_PATH);
+        Optional<String> path = (platformPath instanceof String) ? Optional.of(platformPath.toString())
+                : Optional.empty();
 
-            if (name.isEmpty() || name.get().isEmpty() || path.isEmpty()) {
-                return true;
-            }
+        if (name.isEmpty() || name.get().isEmpty() || path.isEmpty()) {
+            return true;
+        }
 
-            // Download remote JAR if the path is a URL and set the path to the downloaded JAR
-            if (!(new File(path.get()).exists())) {
-                try {
-                    URL url = new URL(path.get());
-                    path = loadRemoteJAR(targetDir, name.get(), url, outputStream);
-                } catch (MalformedURLException ex) {
-                    outputStream.println(DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_PLATFORM_FILE,
-                            ex.getMessage()));
-                    return false;
-                }
-            }
-
-            if (path.isEmpty() || !Files.exists(Path.of(path.get()))) {
+        // Download remote JAR if the path is a URL and set the path to the downloaded
+        // JAR
+        if (!(new File(path.get()).exists())) {
+            try {
+                URL url = new URL(path.get());
+                path = loadRemoteJAR(targetDir, name.get(), url, outputStream);
+            } catch (MalformedURLException ex) {
+                outputStream.println(DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_PLATFORM_FILE,
+                        ex.getMessage()));
                 return false;
             }
+        }
 
-            ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name.get(), path.get(), properties);
-            scanTomlFile.setPlatform(platform);
-            return true;
+        if (path.isEmpty() || !Files.exists(Path.of(path.get()))) {
+            return false;
+        }
+
+        ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name.get(), path.get(), properties);
+        scanTomlFile.setPlatform(platform);
+        return true;
     }
 
     /**
@@ -582,8 +814,10 @@ public final class ScanUtils {
                 + "s%n";
 
         outputStream.printf(format, RULE_ID_COLUMN, RULE_KIND_COLUMN, RULE_DESCRIPTION_COLUMN);
-        outputStream.printf("\t" + "-".repeat(maxRuleIDLength + 1) + "--" +
-                "-".repeat(maxSeverityLength + 1) + "--" + "-".repeat(maxDescriptionLength + 1) + "%n");
+        outputStream.printf("\t%s--%s--%s%n",
+                "-".repeat(maxRuleIDLength + 1),
+                "-".repeat(maxSeverityLength + 1),
+                "-".repeat(maxDescriptionLength + 1));
 
         sortRules(rules);
         for (Rule rule : rules) {
@@ -594,14 +828,17 @@ public final class ScanUtils {
 
     /**
      * <p>
-     *     Sorts a list of rules based on their priorities. The priorities are determined by the rule's id and a
-     *     predefined list of priorities. It achieves this with the following steps:
+     * Sorts a list of rules based on their priorities. The priorities are
+     * determined by the rule's id and a
+     * predefined list of priorities. It achieves this with the following steps:
      * </p>
      * <ol>
-     *     <li>Get the priority of each rule by comparing the rule's id with the predefined list of priorities.</li>
-     *     <li>Sort the rules based on their priorities.</li>
-     *     <li>If both rules have the same priority, the one with an exact match in the priority list comes first </li>
-     *     <li>Otherwise, they are sorted based on the fully qualified rule id.</li>
+     * <li>Get the priority of each rule by comparing the rule's id with the
+     * predefined list of priorities.</li>
+     * <li>Sort the rules based on their priorities.</li>
+     * <li>If both rules have the same priority, the one with an exact match in the
+     * priority list comes first</li>
+     * <li>Otherwise, they are sorted based on the fully qualified rule id.</li>
      * </ol>
      *
      * @param rules The list of rules to be sorted.
@@ -631,11 +868,13 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the priority of the rule as a {@link AbstractMap.SimpleEntry<Integer, Boolean>} pair.
+     * Returns the priority of a rule as a pair of the priority index and whether
+     * the rule is a direct match.
      *
      * @param ruleId     the rule id
      * @param priorities the list of priorities
-     * @return the priority of the rule as a pair of the priority index and whether the rule is a direct match.
+     * @return the priority of the rule as a pair of the priority index and whether
+     * the rule is a direct match.
      */
     private static AbstractMap.SimpleEntry<Integer, Boolean> getPriority(String ruleId, List<String> priorities) {
         for (int i = 0; i < priorities.size(); i++) {

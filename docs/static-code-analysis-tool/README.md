@@ -74,41 +74,50 @@ bal scan --target-dir="results"
 ```
 
 4. Run analysis and generate a HTML analysis report.
+
 ```bash
 bal scan --scan-report
 ```
 
-5. View all available rules.
+5. Run analysis and specify the output format (ballerina or sarif).
+
+```bash
+bal scan --format=sarif
+```
+
+> Note: The default format is ballerina. The tool supports both ballerina and sarif formats for analysis results.
+
+6. View all available rules.
 
 ```bash
 bal scan --list-rules
 ```
 
-6. Run analysis for a specific rule.
+7. Run analysis for a specific rule.
 
 ```bash
 bal scan --include-rules="ballerina:101"
 ```
 
-7. Run analysis for a specific set of rules.
+8. Run analysis for a specific set of rules.
 
 ```bash
 bal scan --include-rules="ballerina:101, ballerina/io:101"
 ```
 
-8. Exclude analysis for a specific rule.
+9. Exclude analysis for a specific rule.
 
 ```bash
 bal scan --exclude-rules="ballerina:101"
 ```
 
-9. Exclude analysis for a specific set of rules.
+10. Exclude analysis for a specific set of rules.
 
 ```bash
 bal scan --exclude-rules="ballerina:101, ballerina/io:101"
 ```
 
-10. Run analysis and report to a static analysis platform (e.g., SonarQube).
+11. Run analysis and report to a static analysis platform (e.g., SonarQube).
 
 ```bash
 bal scan --platforms=sonarqube
@@ -116,13 +125,13 @@ bal scan --platforms=sonarqube
 
 > Note: If the Platform Plugin path is not provided in a `Scan.toml` file, the tool will attempt to download the Platform Plugin for plugins developed by the Ballerina team.
 
-11. Run analysis and report to multiple static analysis platforms.
+12. Run analysis and report to multiple static analysis platforms.
 
 ```bash
 bal scan --platforms="sonarqube, semgrep, codeql"
 ```
 
-12. Configuring the tool's behavior using a configuration file. (e.g., `Scan.toml`)
+13. Configuring the tool's behavior using a configuration file. (e.g., `Scan.toml`)
 
 ```md
 📦ballerina_project

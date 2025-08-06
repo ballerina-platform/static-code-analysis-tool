@@ -19,6 +19,7 @@
 package io.ballerina.scan.test;
 
 import io.ballerina.projects.Project;
+import io.ballerina.scan.ReportFormat;
 import io.ballerina.scan.Rule;
 
 import java.io.PrintStream;
@@ -37,20 +38,22 @@ public class TestOptions {
     private final boolean platformTriggered;
     private final String targetDir;
     private final boolean scanReport;
+    private final ReportFormat format;
     private final boolean listRules;
     private final List<Rule> includeRules;
     private final List<Rule> excludeRules;
     private final List<String> platforms;
 
     private TestOptions(Project project, PrintStream outputStream, boolean helpFlag, boolean platformTriggered,
-                        String targetDir, boolean scanReport, boolean listRules, List<Rule> includeRules,
-                        List<Rule> excludeRules, List<String> platforms) {
+                        String targetDir, boolean scanReport, ReportFormat format, boolean listRules,
+                        List<Rule> includeRules, List<Rule> excludeRules, List<String> platforms) {
         this.project = project;
         this.outputStream = outputStream;
         this.helpFlag = helpFlag;
         this.platformTriggered = platformTriggered;
         this.targetDir = targetDir;
         this.scanReport = scanReport;
+        this.format = format;
         this.listRules = listRules;
         this.includeRules = includeRules;
         this.excludeRules = excludeRules;
@@ -72,9 +75,9 @@ public class TestOptions {
      *
      * @return the project to be scanned
      */
-     Project project() {
+    Project project() {
         return project;
-     }
+    }
 
     /**
      * Get the output stream.
@@ -122,6 +125,15 @@ public class TestOptions {
     }
 
     /**
+     * Get the format of the report.
+     *
+     * @return the format of the report
+     */
+    ReportFormat format() {
+        return format;
+    }
+
+    /**
      * Get if the rules should be listed or not.
      *
      * @return true if the rules should be listed, false otherwise
@@ -164,6 +176,7 @@ public class TestOptions {
         private boolean platformTriggered;
         private String targetDir;
         private boolean scanReport;
+        private ReportFormat format;
         private boolean listRules;
         private List<Rule> includeRules = List.of();
         private List<Rule> excludeRules = List.of();
@@ -179,6 +192,7 @@ public class TestOptions {
          * @param outputStream the output stream
          * @return this builder
          */
+        @SuppressWarnings("unused")
         public TestOptionsBuilder setOutputStream(PrintStream outputStream) {
             this.outputStream = outputStream;
             return this;
@@ -190,6 +204,7 @@ public class TestOptions {
          * @param helpFlag true if the help flag needs to be enabled, false otherwise
          * @return this builder
          */
+        @SuppressWarnings("unused")
         public TestOptionsBuilder setHelpFlag(boolean helpFlag) {
             this.helpFlag = helpFlag;
             return this;
@@ -198,9 +213,11 @@ public class TestOptions {
         /**
          * Set if the scan is triggered by a platform.
          *
-         * @param platformTriggered true if the scan is triggered by a platform, false otherwise
+         * @param platformTriggered true if the scan is triggered by a platform, false
+         *                          otherwise
          * @return this builder
          */
+        @SuppressWarnings("unused")
         public TestOptionsBuilder setPlatformTriggered(boolean platformTriggered) {
             this.platformTriggered = platformTriggered;
             return this;
@@ -212,6 +229,7 @@ public class TestOptions {
          * @param targetDir the target directory
          * @return this builder
          */
+        @SuppressWarnings("unused")
         public TestOptionsBuilder setTargetDir(String targetDir) {
             this.targetDir = targetDir;
             return this;
@@ -220,11 +238,37 @@ public class TestOptions {
         /**
          * Set if the scan report needs to be enabled.
          *
-         * @param scanReport true if the scan report needs to be enabled, false otherwise
+         * @param scanReport true if the scan report needs to be enabled, false
+         *                   otherwise
          * @return this builder
          */
+        @SuppressWarnings("unused")
         public TestOptionsBuilder setScanReport(boolean scanReport) {
             this.scanReport = scanReport;
+            return this;
+        }
+
+        /**
+         * Set the format of the report.
+         *
+         * @param format the format of the report
+         * @return this builder
+         */
+        @SuppressWarnings("unused")
+        public TestOptionsBuilder setFormat(ReportFormat format) {
+            this.format = format;
+            return this;
+        }
+
+        /**
+         * Set the format of the report using string value.
+         *
+         * @param format the format string value
+         * @return this builder
+         */
+        @SuppressWarnings("unused")
+        public TestOptionsBuilder setFormat(String format) {
+            this.format = ReportFormat.fromString(format);
             return this;
         }
 
@@ -234,6 +278,7 @@ public class TestOptions {
          * @param listRules true if the rules should be listed, false otherwise
          * @return this builder
          */
+        @SuppressWarnings("unused")
         public TestOptionsBuilder setListRules(boolean listRules) {
             this.listRules = listRules;
             return this;
@@ -245,6 +290,7 @@ public class TestOptions {
          * @param includeRules the list of rules to be included
          * @return this builder
          */
+        @SuppressWarnings("unused")
         public TestOptionsBuilder setIncludeRules(List<Rule> includeRules) {
             this.includeRules = Collections.unmodifiableList(includeRules);
             return this;
@@ -256,6 +302,7 @@ public class TestOptions {
          * @param excludeRules the list of rules to be excluded
          * @return this builder
          */
+        @SuppressWarnings("unused")
         public TestOptionsBuilder setExcludeRules(List<Rule> excludeRules) {
             this.excludeRules = Collections.unmodifiableList(excludeRules);
             return this;
@@ -267,6 +314,7 @@ public class TestOptions {
          * @param platforms the list of platforms
          * @return this builder
          */
+        @SuppressWarnings("unused")
         public TestOptionsBuilder setPlatforms(List<String> platforms) {
             this.platforms = Collections.unmodifiableList(platforms);
             return this;
@@ -277,9 +325,10 @@ public class TestOptions {
          *
          * @return the built {@code TestOptions} instance
          */
+        @SuppressWarnings("unused")
         public TestOptions build() {
             return new TestOptions(project, outputStream, helpFlag, platformTriggered,
-                    targetDir, scanReport, listRules, includeRules, excludeRules, platforms);
+                    targetDir, scanReport, format, listRules, includeRules, excludeRules, platforms);
         }
     }
 }

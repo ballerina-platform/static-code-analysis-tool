@@ -18,6 +18,10 @@
 
 package io.ballerina.scan.utils;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
 /**
  * {@code Constants} contains the constants used by the scan tool utilities.
  *
@@ -25,6 +29,7 @@ package io.ballerina.scan.utils;
  */
 public class Constants {
     static final String RESULTS_JSON_FILE = "scan_results.json";
+    static final String RESULTS_SARIF_FILE = "scan_results.sarif";
     static final String RESULTS_HTML_FILE = "index.html";
     static final String REPORT_DATA_PLACEHOLDER = "__data__";
     static final String SCAN_REPORT_PROJECT_NAME = "projectName";
@@ -63,6 +68,27 @@ public class Constants {
     static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerinax", "wso2"};
     public static final String MAIN_FUNCTION = "main";
     public static final String INIT_FUNCTION = "init";
+    public static final String SARIF_VERSION = "2.1.0";
+    public static final String SARIF_SCHEMA = "https://www.schemastore.org/schemas/json/" +
+            "sarif-2.1.0.json";
+    public static final String SARIF_TOOL_NAME = "Ballerina Scan Tool";
+    public static final String SARIF_TOOL_ORGANIZATION = "WSO2";
+    public static final String SARIF_TOOL_VERSION = getAppVersion();
+    public static final String SARIF_TOOL_URI = "https://central.ballerina.io/ballerina/tool_scan/";
+
+    private static String getAppVersion() {
+        try (InputStream input = Constants.class.getClassLoader().getResourceAsStream("version.properties")) {
+            if (input != null) {
+                Properties props = new Properties();
+                props.load(input);
+                return props.getProperty("app.version", "0.1.0");
+            }
+        } catch (IOException ex) {
+            DiagnosticLog.error(DiagnosticCode.FAILED_TO_LOAD_VERSION_PROPERTIES,
+                    ex.getMessage());
+        }
+        return System.getProperty("app.version", "0.1.0");
+    }
 
     public static class Token {
         public static final String FLOAT = "float";
@@ -75,6 +101,7 @@ public class Constants {
         public static final String ZERO = "0";
         public static final String ONE = "1";
         public static final String MINUS_ONE = "-1";
+
         private Token() {
         }
     }
