@@ -24,21 +24,13 @@ package io.ballerina.scan.internal;
  * @since 0.1.0
  */
 public class ScanToolConstants {
-    static final String SCAN_COMMAND = "scan";
-    static final String BALLERINA_RULE_PREFIX = "ballerina:";
-    static final String BALLERINA_ORG = "ballerina";
-    static final String BALLERINAI_ORG = "ballerinai";
-    static final String BALLERINAX_ORG = "ballerinax";
-    static final String USE_IMPORT_AS_UNDERSCORE = " as _;";
-    static final String IMPORT_GENERATOR_FILE = "scan_file";
-    static final String RULES_FILE = "rules.json";
-    static final String RULE_KIND = "kind";
-    static final String BUG = "BUG";
-    static final String VULNERABILITY = "VULNERABILITY";
-    static final String CODE_SMELL = "CODE_SMELL";
-    static final String RULE_ID = "id";
-    static final String RULE_DESCRIPTION = "description";
-
+    public static final String SCAN_COMMAND = "scan";
+    public static final String BALLERINA_RULE_PREFIX = "ballerina:";
+    public static final String BALLERINA_ORG = "ballerina";
+    public static final String BALLERINAI_ORG = "ballerinai";
+    public static final String BALLERINAX_ORG = "ballerinax";
+    public static final String USE_IMPORT_AS_UNDERSCORE = " as _;";
+    public static final String IMPORT_GENERATOR_FILE = "scan_file";
     public static final String SCANNER_CONTEXT = "ScannerContext";
     public static final String FORWARD_SLASH = "/";
 
