@@ -38,6 +38,7 @@ public class ScanToolConstants {
     static final String CODE_SMELL = "CODE_SMELL";
     static final String RULE_ID = "id";
     static final String RULE_DESCRIPTION = "description";
+    static final String RUNNING_SCANS_LOG = "Running Scans";
 
     public static final String SCANNER_CONTEXT = "ScannerContext";
     public static final String FORWARD_SLASH = "/";

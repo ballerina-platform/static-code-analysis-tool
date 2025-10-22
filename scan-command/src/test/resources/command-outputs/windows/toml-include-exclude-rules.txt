@@ -1,2 +1,4 @@
 Loading scan tool configurations from src\test\resources\test-resources\bal-project-with-include-exclude-rule-configurations\Scan.toml
+
+Running Scans
 cannot include and exclude rules at the same time

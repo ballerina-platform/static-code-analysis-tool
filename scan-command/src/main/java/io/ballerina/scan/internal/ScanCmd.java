@@ -57,6 +57,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 
+import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 
 /**
@@ -185,6 +186,9 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
+        outputStream.println();
+        outputStream.println(RUNNING_SCANS_LOG);
+
         ProjectAnalyzer projectAnalyzer = getProjectAnalyzer(project.get(), scanTomlFile.get());
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers;
@@ -232,9 +236,6 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
             return;
         }
-
-        outputStream.println();
-        outputStream.println("Running Scans");
 
         List<Issue> issues = projectAnalyzer.analyze(coreRules);
         issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
