@@ -161,7 +161,7 @@ public final class ScanUtils {
      * @param issues generated issues
      * @return json string array of generated issues
      */
-    private static String convertIssuesToJsonString(List<Issue> issues) {
+    public static String convertIssuesToJsonString(List<Issue> issues) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         JsonArray issuesAsJson = gson.toJsonTree(issues).getAsJsonArray();
         return gson.toJson(issuesAsJson);
@@ -396,7 +396,7 @@ public final class ScanUtils {
      * @param directoryName target directory name
      * @return generated target directory
      */
-    private static Target getTargetPath(Project project, String directoryName) {
+    public static Target getTargetPath(Project project, String directoryName) {
         try {
             if (directoryName == null) {
                 return new Target(project.targetDir());
@@ -423,7 +423,13 @@ public final class ScanUtils {
      */
     public static Path generateScanReport(List<Issue> issues, Project project, String directoryName) {
         JsonObject scannedProject = new JsonObject();
-        scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, project.currentPackage().packageName().toString());
+        String name;
+        if (project.kind() == ProjectKind.WORKSPACE_PROJECT) {
+            name = Optional.of(project.sourceRoot().getFileName()).get().toString();
+        } else {
+            name = project.currentPackage().packageName().toString();
+        }
+        scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, name);
         Map<String, JsonObject> scanReportPathAndFile = new HashMap<>();
 
         for (Issue issue : issues) {
@@ -503,8 +509,8 @@ public final class ScanUtils {
         scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE, lineRange.startLine().line());
         scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET, lineRange.startLine()
                 .offset());
-        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE, lineRange.endLine().line());
-        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET, lineRange.endLine()
+        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE, (int) lineRange.endLine().line());
+        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET, (int) lineRange.endLine()
                 .offset());
 
         scanReportIssue.add(SCAN_REPORT_ISSUE_TEXT_RANGE, scanReportIssueTextRange);

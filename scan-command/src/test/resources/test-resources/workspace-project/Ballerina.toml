@@ -1,0 +1,2 @@
+[workspace]
+packages = ["bal-project-with-analyzer-configurations", "bal-project-with-include-rule-configurations"]

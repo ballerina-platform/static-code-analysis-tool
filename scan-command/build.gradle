@@ -279,8 +279,22 @@ build {
 
 // Configuring tests
 tasks.test {
-    systemProperty "ballerina.home", Paths.get(System.getenv("BALLERINA_HOME")).resolve("distributions")
-            .resolve("ballerina-${ballerinaLangVersion}").toString()
+    // set ballerina home is env var is set
+    def ballerinaHome = System.getenv("BALLERINA_HOME")
+    if (ballerinaHome != null) {
+        systemProperty 'ballerina.home', ballerinaHome
+    } else {
+        try {
+            def balHomeOutput = new ByteArrayOutputStream()
+            exec {
+                commandLine 'bal', 'home'
+                standardOutput = balHomeOutput
+            }
+            systemProperty 'ballerina.home', balHomeOutput.toString().trim()
+        } catch (Exception e) {
+            println "Warning: Could not determine ballerina.home from 'bal home' command: ${e.message}"
+        }
+    }
 
     useTestNG() {
         suites 'src/test/resources/testng.xml'
