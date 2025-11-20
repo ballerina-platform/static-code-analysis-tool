@@ -282,7 +282,7 @@ tasks.test {
     // set ballerina home is env var is set
     def ballerinaHome = System.getenv("BALLERINA_HOME")
     if (ballerinaHome != null) {
-        systemProperty 'ballerina.home', ballerinaHome
+        systemProperty "ballerina.home",  Paths.get(ballerinaHome).resolve("distributions").toString()
     } else {
         try {
             def balHomeOutput = new ByteArrayOutputStream()
