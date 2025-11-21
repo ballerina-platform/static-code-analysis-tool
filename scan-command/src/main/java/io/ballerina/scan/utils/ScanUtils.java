@@ -64,12 +64,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static io.ballerina.projects.util.ProjectConstants.LOCAL_REPOSITORY_NAME;
-import static io.ballerina.projects.util.ProjectConstants.USER_DIR_PROPERTY;
 import static io.ballerina.scan.utils.Constants.ANALYZER_NAME;
 import static io.ballerina.scan.utils.Constants.ANALYZER_ORG;
 import static io.ballerina.scan.utils.Constants.ANALYZER_REPOSITORY;
@@ -164,7 +164,16 @@ public final class ScanUtils {
     public static String convertIssuesToJsonString(List<Issue> issues) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         JsonArray issuesAsJson = gson.toJsonTree(issues).getAsJsonArray();
-        return gson.toJson(issuesAsJson);
+        String json = gson.toJson(issuesAsJson);
+        if (File.separator.equals("\\")) {
+            // Gson JSON-escapes backslashes in fileName (\ -> \\), but fileName is a display field
+            // that should preserve the OS-native single backslash separator as-is.
+            Pattern p = Pattern.compile("(\"fileName\"\\s*:\\s*\")([^\"]*)(\")", Pattern.MULTILINE);
+            Matcher m = p.matcher(json);
+            json = m.replaceAll(mr -> Matcher.quoteReplacement(
+                    mr.group(1) + mr.group(2).replace("\\\\", "\\") + mr.group(3)));
+        }
+        return json;
     }
 
     /**
@@ -175,7 +184,7 @@ public final class ScanUtils {
      * @param project Ballerina project
      * @return SARIF string representation of generated issues
      */
-    private static String convertIssuesToSarifString(List<Issue> issues, Project project) {
+    public static String convertIssuesToSarifString(List<Issue> issues, Project project) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
         // Create SARIF root object
@@ -569,7 +578,7 @@ public final class ScanUtils {
 
         Path targetDir = project.targetDir();
         if (ballerinaTomlDocumentContent.getTable(SCAN_TABLE).isEmpty()) {
-            Path scanTomlFilePath = Path.of(System.getProperty(USER_DIR_PROPERTY)).resolve(SCAN_FILE);
+            Path scanTomlFilePath = project.sourceRoot().resolve(SCAN_FILE);
             if (Files.exists(scanTomlFilePath)) {
                 outputStream.println("Loading scan tool configurations from " + scanTomlFilePath);
                 return loadScanFile(targetDir, scanTomlFilePath, outputStream);

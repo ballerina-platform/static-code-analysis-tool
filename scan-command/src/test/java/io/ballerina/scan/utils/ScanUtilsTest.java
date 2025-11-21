@@ -112,7 +112,7 @@ public class ScanUtilsTest extends BaseTest {
 
     @Test(description =
             "test method for loading configurations from a Scan.toml file in a Ballerina single file project")
-    void testloadScanTomlConfigurationsForSingleFileProject() {
+    void testLoadScanTomlConfigurationsForSingleFileProject() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("single-file-project-with-config-file").resolve("main.bal");
         Project project = ProjectLoader.load(ballerinaProject).project();
@@ -170,7 +170,8 @@ public class ScanUtilsTest extends BaseTest {
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
         Assert.assertNull(scanTomlFile);
-        String expected = getExpectedOutput("scan-toml-invalid-platform-jar.txt");
+        String expected = getExpectedOutput("scan-toml-invalid-platform-jar.txt")
+                .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString());
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -184,8 +185,10 @@ public class ScanUtilsTest extends BaseTest {
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
         Assert.assertNull(scanTomlFile);
-        String expected = getExpectedOutput("scan-toml-invalid-platform-config.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        String expected = getExpectedOutput("scan-toml-invalid-platform-config.txt")
+                .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString());
+        String actual = readOutput(true).trim();
+        Assert.assertEquals(actual, expected);
     }
 
     @Test(description =
@@ -254,7 +257,7 @@ public class ScanUtilsTest extends BaseTest {
     }
 
     @Test(description = "test method for loading configurations from a remote configuration file")
-    void testloadRemoteScanTomlConfigurations() {
+    void testLoadRemoteScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-remote-config-file");
         Project project = ProjectLoader.load(ballerinaProject).project();
@@ -292,7 +295,7 @@ public class ScanUtilsTest extends BaseTest {
     }
 
     @Test(description = "test method for loading configurations from an invalid remote configuration file")
-    void testloadInvalidRemoteScanTomlConfigurations() throws IOException {
+    void testLoadInvalidRemoteScanTomlConfigurations() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-remote-config-file");
         Project project = ProjectLoader.load(ballerinaProject).project();

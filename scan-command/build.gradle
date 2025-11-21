@@ -279,21 +279,23 @@ build {
 
 // Configuring tests
 tasks.test {
-    // set ballerina home is env var is set
-    def ballerinaHome = System.getenv("BALLERINA_HOME")
-    if (ballerinaHome != null) {
-        systemProperty "ballerina.home",  Paths.get(ballerinaHome).resolve("distributions").toString()
-    } else {
-        try {
-            def balHomeOutput = new ByteArrayOutputStream()
-            exec {
-                commandLine 'bal', 'home'
-                standardOutput = balHomeOutput
+    // set ballerina home system property for java based tests
+    def balHomeOutput = ""
+    try {
+        balHomeOutput = new ByteArrayOutputStream()
+        exec {
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                // Use cmd so Windows can run the .bat reliably
+                commandLine 'cmd', '/c', 'bal.bat home'
+            } else {
+                commandLine 'sh', '-c', 'bal home'
             }
-            systemProperty 'ballerina.home', balHomeOutput.toString().trim()
-        } catch (Exception e) {
-            println "Warning: Could not determine ballerina.home from 'bal home' command: ${e.message}"
+            standardOutput = balHomeOutput
         }
+        systemProperty 'ballerina.home', balHomeOutput.toString().trim()
+    } catch (Exception e) {
+        println "Warning: Could not determine ballerina.home from 'bal home' command: ${e.message}" +
+                "\nOutput: " + balHomeOutput
     }
 
     useTestNG() {

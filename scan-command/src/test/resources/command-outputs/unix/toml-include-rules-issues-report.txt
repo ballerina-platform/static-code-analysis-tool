@@ -16,7 +16,7 @@
       "ruleKind": "CODE_SMELL"
     },
     "source": "BUILT_IN",
-    "fileName": "bal_project_with_include_rule_configurations/main.bal",
+    "fileName": "main.bal",
     "filePath": "<ABS_SOURCE_ROOT>/main.bal"
   }
 ]

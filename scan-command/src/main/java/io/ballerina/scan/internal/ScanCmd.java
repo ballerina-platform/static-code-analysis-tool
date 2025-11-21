@@ -18,9 +18,6 @@
 
 package io.ballerina.scan.internal;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import io.ballerina.cli.BLauncherCmd;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
@@ -67,6 +64,8 @@ import java.util.ServiceLoader;
 
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
+import static io.ballerina.scan.utils.ScanUtils.convertIssuesToJsonString;
+import static io.ballerina.scan.utils.ScanUtils.convertIssuesToSarifString;
 
 /**
  * Represents the "bal scan" command.
@@ -202,19 +201,7 @@ public class ScanCmd implements BLauncherCmd {
             }
 
             outputStream.println();
-            Path jsonReportPath;
-            try {
-                String reportContent = accumulateWorkspaceReports(topologicallySortedList);
-                jsonReportPath = ScanUtils.getTargetPath(project.get(), targetDir).getReportPath()
-                        .resolve(Constants.RESULTS_JSON_FILE);
-                Files.writeString(jsonReportPath, reportContent);
-            } catch (IOException e) {
-                throw new RuntimeException("Error while obtaining report path: " + e.getMessage());
-            }
-
-            outputStream.println("View scan results at:");
-            outputStream.println("\t" + jsonReportPath.toUri());
-            outputStream.println();
+            accumulateWorkspaceReports(workspaceProject);
             if (scanReport) {
                 Path scanReportPath = ScanUtils.generateScanReport(allIssues, project.get(), targetDir);
                 outputStream.println();
@@ -231,27 +218,26 @@ public class ScanCmd implements BLauncherCmd {
         executeProject(project.get());
     }
 
-    private String accumulateWorkspaceReports(List<BuildProject> topologicallySortedList) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        JsonArray allIssuesArray = new JsonArray();
-
-        for (BuildProject buildProject : topologicallySortedList) {
-            try {
-                Path reportPath = ScanUtils.getTargetPath(buildProject, targetDir).getReportPath()
+    private void accumulateWorkspaceReports(WorkspaceProject workspaceProject) {
+        try {
+            Path finalReportPath;
+            String finalReportContent;
+            if (ReportFormat.SARIF.equals(format)) {
+                finalReportPath = ScanUtils.getTargetPath(workspaceProject, targetDir).getReportPath()
+                        .resolve(Constants.RESULTS_SARIF_FILE);
+                finalReportContent = convertIssuesToSarifString(allIssues, workspaceProject);
+            } else {
+                finalReportPath = ScanUtils.getTargetPath(workspaceProject, targetDir).getReportPath()
                         .resolve(Constants.RESULTS_JSON_FILE);
-                if (Files.exists(reportPath)) {
-                    String content = Files.readString(reportPath, StandardCharsets.UTF_8);
-                    JsonArray issuesArray = gson.fromJson(content, JsonArray.class);
-                    if (issuesArray != null) {
-                        issuesArray.forEach(allIssuesArray::add);
-                    }
-                }
-            } catch (IOException e) {
-                throw new RuntimeException("Error while obtaining report path: " + e.getMessage());
+                finalReportContent = convertIssuesToJsonString(allIssues);
             }
+            Files.writeString(finalReportPath, finalReportContent);
+            outputStream.println("View scan results at:");
+            outputStream.println("\t" + finalReportPath.toUri());
+            outputStream.println();
+        } catch (IOException e) {
+            throw new RuntimeException("Error while obtaining report path: " + e.getMessage());
         }
-
-        return gson.toJson(allIssues);
     }
 
     public void executeProject(Project project) {
