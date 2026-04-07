@@ -199,7 +199,9 @@ public class ScanCmd implements BLauncherCmd {
                 }
                 executeProject(buildProject);
             }
-
+            if (listRules) {
+                return;
+            }
             outputStream.println();
             accumulateWorkspaceReports(workspaceProject);
             if (scanReport) {
@@ -236,7 +238,7 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println("\t" + finalReportPath.toUri());
             outputStream.println();
         } catch (IOException e) {
-            throw new RuntimeException("Error while obtaining report path: " + e.getMessage());
+            throw new RuntimeException("Error while obtaining report path: " + e.getMessage(), e);
         }
     }
 
@@ -290,9 +292,13 @@ public class ScanCmd implements BLauncherCmd {
             }
         });
 
-        scanTomlFile.get().getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id).forEach(includeRules::add);
-        scanTomlFile.get().getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id).forEach(excludeRules::add);
-        if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
+        List<String> projectIncludeRules = new ArrayList<>(includeRules);
+        List<String> projectExcludeRules = new ArrayList<>(excludeRules);
+        scanTomlFile.get().getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id)
+                .forEach(projectIncludeRules::add);
+        scanTomlFile.get().getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id)
+                .forEach(projectExcludeRules::add);
+        if (!projectIncludeRules.isEmpty() && !projectExcludeRules.isEmpty()) {
             outputStream.println(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
             return;
         }
@@ -300,11 +306,11 @@ public class ScanCmd implements BLauncherCmd {
         List<Issue> issues = projectAnalyzer.analyze(coreRules);
         issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
 
-        if (!includeRules.isEmpty()) {
-            issues.removeIf(issue -> !includeRules.contains(issue.rule().id()));
+        if (!projectIncludeRules.isEmpty()) {
+            issues.removeIf(issue -> !projectIncludeRules.contains(issue.rule().id()));
         }
-        if (!excludeRules.isEmpty()) {
-            issues.removeIf(issue -> excludeRules.contains(issue.rule().id()));
+        if (!projectExcludeRules.isEmpty()) {
+            issues.removeIf(issue -> projectExcludeRules.contains(issue.rule().id()));
         }
 
         allIssues.addAll(issues);

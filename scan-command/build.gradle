@@ -296,6 +296,15 @@ tasks.test {
     } catch (Exception e) {
         println "Warning: Could not determine ballerina.home from 'bal home' command: ${e.message}" +
                 "\nOutput: " + balHomeOutput
+        def ballerinaHomeEnv = System.getenv("BALLERINA_HOME")
+        if (ballerinaHomeEnv) {
+            systemProperty 'ballerina.home', ballerinaHomeEnv.trim()
+        } else {
+            throw new GradleException(
+                "'bal home' failed and BALLERINA_HOME is not set — tests cannot run. " +
+                "Output: ${balHomeOutput}"
+            )
+        }
     }
 
     useTestNG() {

@@ -361,7 +361,7 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(result, expected);
     }
 
-    @Test(description = "test scan command with include rules flag")
+    @Test(description = "test scan command in workspace")
     void testScanCommandInWorkspace() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources").resolve("workspace-project");
         System.setProperty("user.dir", ballerinaProject.toString());
@@ -372,7 +372,7 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", userDir);
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);;
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         String expected = getExpectedOutput("workspace-issues.txt")
                 .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString()
                         .replace("\\", "\\\\"));
