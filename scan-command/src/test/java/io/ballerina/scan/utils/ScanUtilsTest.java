@@ -256,7 +256,8 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
-    @Test(description = "test method for loading configurations from a remote configuration file")
+    @Test(enabled = false, // the remote toml location is not available due to the missing bot account
+            description = "test method for loading configurations from a remote configuration file")
     void testLoadRemoteScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-remote-config-file");
