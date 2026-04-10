@@ -89,6 +89,11 @@ import static io.ballerina.scan.utils.Constants.RULE_ID_COLUMN;
 import static io.ballerina.scan.utils.Constants.RULE_KIND_COLUMN;
 import static io.ballerina.scan.utils.Constants.RULE_PRIORITY_LIST;
 import static io.ballerina.scan.utils.Constants.RULES_TABLE;
+import static io.ballerina.scan.utils.Constants.EXCLUSION_TABLE;
+import static io.ballerina.scan.utils.Constants.EXCLUSION_FILE_PATH;
+import static io.ballerina.scan.utils.Constants.EXCLUSION_RULE_ID;
+import static io.ballerina.scan.utils.Constants.EXCLUSION_SYMBOL;
+import static io.ballerina.scan.utils.Constants.EXCLUSION_LINE_HASH;
 import static io.ballerina.scan.utils.Constants.SARIF_SCHEMA;
 import static io.ballerina.scan.utils.Constants.SARIF_TOOL_NAME;
 import static io.ballerina.scan.utils.Constants.SARIF_TOOL_ORGANIZATION;
@@ -663,6 +668,7 @@ public final class ScanUtils {
             ruleTable.get("include").ifPresent(loadRules(scanTomlFile, true));
             ruleTable.get("exclude").ifPresent(loadRules(scanTomlFile, false));
         });
+        scanTomlDocumentContent.getTables(EXCLUSION_TABLE).forEach(loadExclusion(scanTomlFile));
         return Optional.of(scanTomlFile);
     }
 
@@ -763,6 +769,37 @@ public final class ScanUtils {
                     scanTomlFile.setRuleToExclude(ruleToFilter);
                 }
             });
+        };
+    }
+
+    /**
+     * Loads a symbol-based exclusion entry from the Scan.toml file.
+     *
+     * @param scanTomlFile the in-memory representation of the Scan.toml file
+     */
+    private static Consumer<Toml> loadExclusion(ScanTomlFile scanTomlFile) {
+        return exclusionTable -> {
+            Map<String, Object> properties = exclusionTable.toMap();
+            Object filePathObj = properties.get(EXCLUSION_FILE_PATH);
+            Object ruleIdObj = properties.get(EXCLUSION_RULE_ID);
+            Object symbolObj = properties.get(EXCLUSION_SYMBOL);
+            Object lineHashObj = properties.get(EXCLUSION_LINE_HASH);
+
+            if (!(filePathObj instanceof String) || !(ruleIdObj instanceof String)
+                    || !(symbolObj instanceof String) || !(lineHashObj instanceof String)) {
+                return;
+            }
+
+            String filePath = filePathObj.toString();
+            String ruleId = ruleIdObj.toString();
+            String symbol = symbolObj.toString();
+            String lineHash = lineHashObj.toString();
+
+            if (filePath.isEmpty() || ruleId.isEmpty() || symbol.isEmpty() || lineHash.isEmpty()) {
+                return;
+            }
+
+            scanTomlFile.addExclusion(new ScanTomlFile.Exclusion(filePath, ruleId, symbol, lineHash));
         };
     }
 
@@ -886,5 +923,44 @@ public final class ScanUtils {
             }
         }
         return new AbstractMap.SimpleEntry<>(priorities.size(), false);
+    }
+
+    /**
+     * Checks whether an issue matches a symbol-based exclusion entry.
+     *
+     * @param issueFileName the file name from the issue location
+     * @param issueRuleId   the rule ID of the issue
+     * @param issueSymbol   the enclosing symbol name of the issue
+     * @param issueLineHash the hash of the issue line content
+     * @param exclusion     the exclusion entry to match against
+     * @return true if the issue matches the exclusion
+     */
+    public static boolean matchesExclusion(String issueFileName, String issueRuleId, String issueSymbol,
+                                           String issueLineHash, ScanTomlFile.Exclusion exclusion) {
+        if (issueRuleId == null || exclusion.ruleId() == null 
+                || issueFileName == null || exclusion.filePath() == null) {
+            return false;
+        }
+        
+        boolean ruleMatches = exclusion.ruleId().equals(issueRuleId);
+        boolean fileMatches = false;
+        try {
+            fileMatches = java.nio.file.Paths.get(issueFileName).endsWith(java.nio.file.Paths.get(exclusion.filePath()))
+                    || java.nio.file.Paths.get(exclusion.filePath()).endsWith(java.nio.file.Paths.get(issueFileName));
+        } catch (java.nio.file.InvalidPathException e) {
+            // If path parsing fails, fallback to simple string matching
+            fileMatches = issueFileName.endsWith(exclusion.filePath())
+                    || exclusion.filePath().endsWith(issueFileName);
+        }
+        
+        if (!ruleMatches || !fileMatches) {
+            return false;
+        }
+
+        boolean symbolMatches = exclusion.symbol().equals(issueSymbol);
+        boolean hashMatches = exclusion.lineHash().equals(issueLineHash);
+        
+        // Strictly match both criteria
+        return symbolMatches && hashMatches;
     }
 }

@@ -60,6 +60,13 @@ public class Constants {
     static final String ANALYZER_VERSION = "version";
     static final String ANALYZER_REPOSITORY = "repository";
     static final String RULES_TABLE = "rule";
+    static final String EXCLUSION_TABLE = "exclusion";
+    static final String EXCLUSION_FILE_PATH = "filePath";
+    static final String EXCLUSION_RULE_ID = "ruleId";
+    static final String EXCLUSION_SYMBOL = "symbol";
+    static final String EXCLUSION_LINE_HASH = "lineHash";
+    static final String EXCLUDE_KEY = "exclude";
+    public static final String MODULE_LEVEL_SYMBOL = "<module>";
     static final String JAR_PREDICATE = ".jar";
     static final String CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN = "^\\d+\\.\\d+\\.\\d+$";
     static final String RULE_ID_COLUMN = "RuleID";

@@ -35,6 +35,7 @@ import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
+import io.ballerina.scan.utils.SymbolResolver;
 import picocli.CommandLine;
 
 import java.io.BufferedReader;
@@ -56,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.Set;
 
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
@@ -245,6 +247,27 @@ public class ScanCmd implements BLauncherCmd {
         }
         if (!excludeRules.isEmpty()) {
             issues.removeIf(issue -> excludeRules.contains(issue.rule().id()));
+        }
+
+        // Apply symbol-based exclusions
+        Set<ScanTomlFile.Exclusion> exclusions = scanTomlFile.get().getExclusions();
+        if (!exclusions.isEmpty()) {
+            issues.removeIf(issue -> {
+                if (issue.location() == null || issue.location().lineRange() == null 
+                        || issue.location().lineRange().fileName() == null) {
+                    return false;
+                }
+                String issueFileName = issue.location().lineRange().fileName();
+                int issueLine = issue.location().lineRange().startLine().line();
+                String issueSymbol = SymbolResolver.resolveSymbol(project.get(), issueFileName, issueLine);
+                String issueLineHash = SymbolResolver.resolveLineHash(project.get(), issueFileName, issueLine);
+                return exclusions.stream().anyMatch(exclusion ->
+                        ScanUtils.matchesExclusion(issueFileName,
+                                                   issue.rule().id(),
+                                                   issueSymbol,
+                                                   issueLineHash,
+                                                   exclusion));
+            });
         }
 
         if (platforms.isEmpty() && !platformTriggered) {
