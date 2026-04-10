@@ -1,4 +1,4 @@
-Loading scan tool configurations from src/test/resources/test-resources/bal-project-with-analyzer-configurations/Scan.toml
+Loading scan tool configurations from <ABS_SOURCE_ROOT>/Scan.toml
 
 Running Scans
 cannot include and exclude rules at the same time

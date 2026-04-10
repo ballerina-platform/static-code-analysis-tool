@@ -1,4 +1,4 @@
-Loading scan tool configurations from src/test/resources/test-resources/bal-project-with-config-file/Scan.toml
+Loading scan tool configurations from <ABS_SOURCE_ROOT>/Scan.toml
 	RuleID                                           | Rule Kind     | Rule Description                                 
 	---------------------------------------------------------------------------------------------------------------------
 	ballerina:1                                      | CODE_SMELL    | Avoid checkpanic

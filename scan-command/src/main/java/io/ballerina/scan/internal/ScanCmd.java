@@ -21,15 +21,19 @@ package io.ballerina.scan.internal;
 import io.ballerina.cli.BLauncherCmd;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
+import io.ballerina.projects.ProjectLoadResult;
 import io.ballerina.projects.directory.BuildProject;
-import io.ballerina.projects.directory.SingleFileProject;
+import io.ballerina.projects.directory.ProjectLoader;
+import io.ballerina.projects.directory.WorkspaceProject;
 import io.ballerina.projects.util.ProjectConstants;
+import io.ballerina.projects.util.ProjectPaths;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.PlatformPluginContext;
 import io.ballerina.scan.ReportFormat;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
+import io.ballerina.scan.utils.Constants;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
@@ -46,6 +50,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -59,6 +64,8 @@ import java.util.ServiceLoader;
 
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
+import static io.ballerina.scan.utils.ScanUtils.convertIssuesToJsonString;
+import static io.ballerina.scan.utils.ScanUtils.convertIssuesToSarifString;
 
 /**
  * Represents the "bal scan" command.
@@ -107,6 +114,7 @@ public class ScanCmd implements BLauncherCmd {
     private List<String> platforms = new ArrayList<>();
 
     private final List<Rule> allRules = new ArrayList<>();
+    private final List<Issue> allIssues;
 
     public ScanCmd() {
         this(System.out);
@@ -115,6 +123,7 @@ public class ScanCmd implements BLauncherCmd {
     ScanCmd(PrintStream outputStream) {
         this.projectPath = Paths.get(System.getProperty(ProjectConstants.USER_DIR));
         this.outputStream = outputStream;
+        this.allIssues = new ArrayList<>();
     }
 
     protected ScanCmd(
@@ -140,6 +149,7 @@ public class ScanCmd implements BLauncherCmd {
         this.includeRules.addAll(includeRules.stream().map(Rule::id).toList());
         this.excludeRules.addAll(excludeRules.stream().map(Rule::id).toList());
         this.platforms.addAll(platforms);
+        this.allIssues = new ArrayList<>();
     }
 
     @Override
@@ -176,12 +186,64 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
+        if (project.get().kind() == ProjectKind.WORKSPACE_PROJECT) {
+            outputStream.println();
+            outputStream.println("Resolving workspace dependencies");
+            WorkspaceProject workspaceProject = (WorkspaceProject) project.get();
+            List<BuildProject> topologicallySortedList =
+                    workspaceProject.getResolution().dependencyGraph().toTopologicallySortedList();
+            for (BuildProject buildProject : topologicallySortedList) {
+                if (ProjectUtils.isProjectEmpty(buildProject)) {
+                    outputStream.println(DiagnosticLog.error(DiagnosticCode.EMPTY_PACKAGE));
+                    continue;
+                }
+                executeProject(buildProject);
+            }
+            if (listRules) {
+                return;
+            }
+            outputStream.println();
+            accumulateWorkspaceReports(workspaceProject);
+            if (scanReport) {
+                Path scanReportPath = ScanUtils.generateScanReport(allIssues, project.get(), targetDir);
+                outputStream.println();
+                outputStream.println("View scan report at:");
+                outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
+            }
+
+            return;
+        }
         if (ProjectUtils.isProjectEmpty(project.get())) {
             outputStream.println(DiagnosticLog.error(DiagnosticCode.EMPTY_PACKAGE));
             return;
         }
+        executeProject(project.get());
+    }
 
-        Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project.get(), outputStream);
+    private void accumulateWorkspaceReports(WorkspaceProject workspaceProject) {
+        try {
+            Path finalReportPath;
+            String finalReportContent;
+            if (ReportFormat.SARIF.equals(format)) {
+                finalReportPath = ScanUtils.getTargetPath(workspaceProject, targetDir).getReportPath()
+                        .resolve(Constants.RESULTS_SARIF_FILE);
+                finalReportContent = convertIssuesToSarifString(allIssues, workspaceProject);
+            } else {
+                finalReportPath = ScanUtils.getTargetPath(workspaceProject, targetDir).getReportPath()
+                        .resolve(Constants.RESULTS_JSON_FILE);
+                finalReportContent = convertIssuesToJsonString(allIssues);
+            }
+            Files.writeString(finalReportPath, finalReportContent);
+            outputStream.println("View scan results at:");
+            outputStream.println("\t" + finalReportPath.toUri());
+            outputStream.println();
+        } catch (IOException e) {
+            throw new RuntimeException("Error while obtaining report path: " + e.getMessage(), e);
+        }
+    }
+
+    public void executeProject(Project project) {
+        Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, outputStream);
         if (scanTomlFile.isEmpty()) {
             return;
         }
@@ -189,7 +251,7 @@ public class ScanCmd implements BLauncherCmd {
         outputStream.println();
         outputStream.println(RUNNING_SCANS_LOG);
 
-        ProjectAnalyzer projectAnalyzer = getProjectAnalyzer(project.get(), scanTomlFile.get());
+        ProjectAnalyzer projectAnalyzer = getProjectAnalyzer(project, scanTomlFile.get());
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers;
         try {
@@ -230,9 +292,13 @@ public class ScanCmd implements BLauncherCmd {
             }
         });
 
-        scanTomlFile.get().getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id).forEach(includeRules::add);
-        scanTomlFile.get().getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id).forEach(excludeRules::add);
-        if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
+        List<String> projectIncludeRules = new ArrayList<>(includeRules);
+        List<String> projectExcludeRules = new ArrayList<>(excludeRules);
+        scanTomlFile.get().getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id)
+                .forEach(projectIncludeRules::add);
+        scanTomlFile.get().getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id)
+                .forEach(projectExcludeRules::add);
+        if (!projectIncludeRules.isEmpty() && !projectExcludeRules.isEmpty()) {
             outputStream.println(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
             return;
         }
@@ -240,32 +306,37 @@ public class ScanCmd implements BLauncherCmd {
         List<Issue> issues = projectAnalyzer.analyze(coreRules);
         issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
 
-        if (!includeRules.isEmpty()) {
-            issues.removeIf(issue -> !includeRules.contains(issue.rule().id()));
+        if (!projectIncludeRules.isEmpty()) {
+            issues.removeIf(issue -> !projectIncludeRules.contains(issue.rule().id()));
         }
-        if (!excludeRules.isEmpty()) {
-            issues.removeIf(issue -> excludeRules.contains(issue.rule().id()));
+        if (!projectExcludeRules.isEmpty()) {
+            issues.removeIf(issue -> projectExcludeRules.contains(issue.rule().id()));
         }
+
+        allIssues.addAll(issues);
 
         if (platforms.isEmpty() && !platformTriggered) {
             boolean isSarifFormat = ReportFormat.SARIF.equals(format);
-            ScanUtils.printToConsole(issues, outputStream, isSarifFormat, project.get());
-            if (project.get().kind().equals(ProjectKind.BUILD_PROJECT)) {
+            ScanUtils.printToConsole(issues, outputStream, isSarifFormat, project);
+            if (project.kind().equals(ProjectKind.BUILD_PROJECT)) {
                 Path reportPath;
                 if (isSarifFormat) {
-                    reportPath = ScanUtils.saveSarifToDirectory(issues, project.get(), targetDir);
+                    reportPath = ScanUtils.saveSarifToDirectory(issues, project, targetDir);
                 } else {
-                    reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir);
+                    reportPath = ScanUtils.saveToDirectory(issues, project, targetDir);
                 }
-                outputStream.println();
-                outputStream.println("View scan results at:");
-                outputStream.println("\t" + reportPath.toUri());
-                outputStream.println();
-                if (scanReport) {
-                    Path scanReportPath = ScanUtils.generateScanReport(issues, project.get(), targetDir);
+
+                if (project.workspaceProject().isEmpty()) {
                     outputStream.println();
-                    outputStream.println("View scan report at:");
-                    outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
+                    outputStream.println("View scan results at:");
+                    outputStream.println("\t" + reportPath.toUri());
+                    outputStream.println();
+                    if (scanReport) {
+                        Path scanReportPath = ScanUtils.generateScanReport(issues, project, targetDir);
+                        outputStream.println();
+                        outputStream.println("View scan report at:");
+                        outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
+                    }
                 }
             } else {
                 if (targetDir != null) {
@@ -315,10 +386,20 @@ public class ScanCmd implements BLauncherCmd {
 
     protected Optional<Project> getProject() {
         try {
-            if (projectPath.toFile().isDirectory()) {
-                return Optional.of(BuildProject.load(projectPath));
+            if (!ProjectPaths.isBuildProjectRoot(projectPath)
+                    && !ProjectPaths.isStandaloneBalFile(projectPath)
+                    && !ProjectPaths.isWorkspaceProjectRoot(projectPath)) {
+                outputStream.println("The specified path is not a valid Ballerina project: " + projectPath + ". Please "
+                        + "provide a valid Ballerina project path and try again.");
+                return Optional.empty();
             }
-            return Optional.of(SingleFileProject.load(projectPath));
+
+            ProjectLoadResult loadResult = ProjectLoader.load(projectPath);
+            if (loadResult.diagnostics().hasErrors()) {
+                loadResult.diagnostics().errors().forEach(outputStream::println);
+                return Optional.empty();
+            }
+            return Optional.of(loadResult.project());
         } catch (RuntimeException ex) {
             outputStream.println(ex.getMessage());
             return Optional.empty();

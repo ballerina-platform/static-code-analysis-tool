@@ -29,6 +29,7 @@ import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.tools.diagnostics.Location;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -90,8 +91,9 @@ public class ReporterImpl implements Reporter {
                 source = Source.EXTERNAL;
             }
         }
-        return new IssueImpl(location, rule, source, moduleName + FORWARD_SLASH + documentName,
-                issuesFilePath.toString());
+        boolean isWorkspaceSubProject = module.project().workspaceProject().isPresent();
+        String fileName = isWorkspaceSubProject ? moduleName + File.separator + documentName : documentName;
+        return new IssueImpl(location, rule, source, fileName, issuesFilePath.toString());
     }
 
     protected List<Issue> getIssues() {

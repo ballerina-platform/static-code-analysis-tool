@@ -19,7 +19,6 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.projects.Project;
-import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
@@ -121,17 +120,19 @@ public class ScanCmdTest extends BaseTest {
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = error(EMPTY_PACKAGE);
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        String actual = readOutput(true).trim().split("\n")[0];
+        Assert.assertEquals(actual, expected);
     }
 
     @Test(description = "test scan command with Ballerina project with single file as argument")
     void testScanCommandProjectWithArgument() throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {validBalProject.resolve("main.bal").toString()};
+        String inputPath = validBalProject.resolve("main.bal").toString();
+        String[] args = {inputPath};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String expected = "The source file '" + validBalProject.resolve("main.bal") +
-                "' belongs to a Ballerina package.";
+        String expected = "The specified path is not a valid Ballerina project: " + inputPath + ". Please "
+                + "provide a valid Ballerina project path and try again.";
         Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
     }
 
@@ -150,11 +151,12 @@ public class ScanCmdTest extends BaseTest {
     void testScanCommandSingleFileProjectWithDirectoryAsArgument() throws IOException {
         Path parentDirectory = testResources.resolve("test-resources").toAbsolutePath();
         ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {parentDirectory.resolve("valid-single-file-project").toString()};
+        String inputPath = parentDirectory.resolve("valid-single-file-project").toString();
+        String[] args = {inputPath};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String expected = "Invalid Ballerina package directory: " +
-                parentDirectory.resolve("valid-single-file-project") + ", cannot find 'Ballerina.toml' file.";
+        String expected = "The specified path is not a valid Ballerina project: " + inputPath + ". Please "
+                + "provide a valid Ballerina project path and try again.";
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -165,8 +167,8 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = "Invalid Ballerina package directory: " + validBalProject +
-                ", cannot find 'Ballerina.toml' file.";
+        String expected = "The specified path is not a valid Ballerina project: " + validBalProject + ". Please "
+                + "provide a valid Ballerina project path and try again.";
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -199,7 +201,7 @@ public class ScanCmdTest extends BaseTest {
                 validBalProject.resolve("main.bal").toString()));
         issues.add(new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
                 validBalProject.resolve("main.bal").toString()));
-        Project project = ProjectLoader.loadProject(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Path resultsFile = ScanUtils.saveToDirectory(issues, project, null);
         String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -220,7 +222,7 @@ public class ScanCmdTest extends BaseTest {
                 validBalProject.resolve("main.bal").toString()));
         issues.add(new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
                 validBalProject.resolve("main.bal").toString()));
-        Project project = ProjectLoader.loadProject(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Path resultsFile = ScanUtils.generateScanReport(issues, project, null);
         String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -232,7 +234,7 @@ public class ScanCmdTest extends BaseTest {
     void testPrintRulesToConsole() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
-        Project project = BuildProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         Assert.assertNotNull(scanTomlFile);
@@ -243,8 +245,10 @@ public class ScanCmdTest extends BaseTest {
         List<Rule> rules = CoreRule.rules();
         externalAnalyzers.values().forEach(rules::addAll);
         ScanUtils.printRulesToConsole(rules, printStream);
-        String expected = getExpectedOutput("print-rules-to-console.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        String expected = getExpectedOutput("print-rules-to-console.txt").replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString());
+        String actual = readOutput(true).trim();
+        Assert.assertEquals(actual, expected);
     }
 
     @Test(description = "test scan command with list rules flag")
@@ -257,8 +261,10 @@ public class ScanCmdTest extends BaseTest {
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = getExpectedOutput("list-rules-output.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        String expected = getExpectedOutput("list-rules-output.txt").replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString());
+        String actual = readOutput(true).trim();
+        Assert.assertEquals(actual, expected);
     }
 
     @Test(description = "test scan command with target directory flag on single file project")
@@ -350,8 +356,51 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("include-rules-issues-report.txt");
+        String expected = getExpectedOutput("include-rules-issues-report.txt").replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString().replace("\\", "\\\\"));
         Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "test scan command in workspace")
+    void testScanCommandInWorkspace() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources").resolve("workspace-project");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--include-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
+                        .resolve("scan_results.json"), StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        String expected = getExpectedOutput("workspace-issues.txt")
+                .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString()
+                        .replace("\\", "\\\\"));
+        Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "test scan command in workspace with sarif format")
+    void testScanCommandInWorkspaceWithSarif() throws IOException {
+        Path workspacePath = testResources.resolve("test-resources").resolve("workspace-project");
+        System.setProperty("user.dir", workspacePath.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--format=sarif", "--include-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+
+        Path sarifReport = workspacePath.resolve("target").resolve("report").resolve("scan_results.sarif");
+        Assert.assertTrue(Files.exists(sarifReport), "SARIF report should be created at workspace level");
+
+        String content = Files.readString(sarifReport, StandardCharsets.UTF_8)
+                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertTrue(content.contains("\"version\": \"2.1.0\""), "SARIF should have version 2.1.0");
+        Assert.assertTrue(
+                content.contains("\"bal-project-with-analyzer-configurations/main.bal\""),
+                "SARIF URI should be relative to workspace root for first sub-project");
+        Assert.assertTrue(
+                content.contains("\"bal-project-with-include-rule-configurations/main.bal\""),
+                "SARIF URI should be relative to workspace root for second sub-project");
     }
 
     @Test(description = "test scan command with exclude rules flag")
@@ -367,7 +416,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("exclude-rules-issues-report.txt");
+        String expected = getExpectedOutput("exclude-rules-issues-report.txt").replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString().replace("\\", "\\\\"));
         Assert.assertEquals(result, expected);
     }
 
@@ -381,8 +431,10 @@ public class ScanCmdTest extends BaseTest {
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = getExpectedOutput("include-exclude-rules.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        String expected = getExpectedOutput("include-exclude-rules.txt").trim().replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString());
+        String actual = readOutput(true).trim();
+        Assert.assertEquals(actual, expected);
     }
 
     @Test(description = "test scan command with include rules Scan.toml configurations")
@@ -396,7 +448,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("toml-include-rules-issues-report.txt");
+        String expected = getExpectedOutput("toml-include-rules-issues-report.txt").replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString().replace("\\", "\\\\"));
         Assert.assertEquals(result, expected);
     }
 
@@ -413,7 +466,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("toml-exclude-rules-issues-report.txt");
+        String expected = getExpectedOutput("toml-exclude-rules-issues-report.txt").replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString().replace("\\", "\\\\"));
         Assert.assertEquals(result, expected);
     }
 
@@ -427,8 +481,10 @@ public class ScanCmdTest extends BaseTest {
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = getExpectedOutput("toml-include-exclude-rules.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        String expected = getExpectedOutput("toml-include-exclude-rules.txt").replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString());
+        String actual = readOutput(true).trim();
+        Assert.assertEquals(actual, expected);
     }
 
     @Test(description = "test scan command with platform plugin configurations")
@@ -466,10 +522,12 @@ public class ScanCmdTest extends BaseTest {
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         removeFile(result);
 
-        String expected = getExpectedOutput("platform-plugin-issue-output.txt");
+        String expected = getExpectedOutput("platform-plugin-issue-output.txt").replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString().replace("\\", "\\\\"));
         Assert.assertEquals(platformIssuesOutput, expected);
 
-        expected = getExpectedOutput("platform-plugin-arguments-output.txt");
+        expected = getExpectedOutput("platform-plugin-arguments-output.txt").replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString());
         Assert.assertEquals(platformArgumentsOutput, expected);
     }
 
@@ -497,7 +555,9 @@ public class ScanCmdTest extends BaseTest {
         ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = getExpectedOutput("invalid-platform-plugin-configurations.txt");
+        String expected = getExpectedOutput("invalid-platform-plugin-configurations.txt")
+                .replace("<ABS_SOURCE_ROOT>",
+                ballerinaProject.toAbsolutePath().toString());
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 

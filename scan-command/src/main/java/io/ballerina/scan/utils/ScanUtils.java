@@ -64,12 +64,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static io.ballerina.projects.util.ProjectConstants.LOCAL_REPOSITORY_NAME;
-import static io.ballerina.projects.util.ProjectConstants.USER_DIR_PROPERTY;
 import static io.ballerina.scan.utils.Constants.ANALYZER_NAME;
 import static io.ballerina.scan.utils.Constants.ANALYZER_ORG;
 import static io.ballerina.scan.utils.Constants.ANALYZER_REPOSITORY;
@@ -161,10 +161,19 @@ public final class ScanUtils {
      * @param issues generated issues
      * @return json string array of generated issues
      */
-    private static String convertIssuesToJsonString(List<Issue> issues) {
+    public static String convertIssuesToJsonString(List<Issue> issues) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         JsonArray issuesAsJson = gson.toJsonTree(issues).getAsJsonArray();
-        return gson.toJson(issuesAsJson);
+        String json = gson.toJson(issuesAsJson);
+        if (File.separator.equals("\\")) {
+            // Gson JSON-escapes backslashes in fileName (\ -> \\), but fileName is a display field
+            // that should preserve the OS-native single backslash separator as-is.
+            Pattern p = Pattern.compile("(\"fileName\"\\s*:\\s*\")([^\"]*)(\")", Pattern.MULTILINE);
+            Matcher m = p.matcher(json);
+            json = m.replaceAll(mr -> Matcher.quoteReplacement(
+                    mr.group(1) + mr.group(2).replace("\\\\", "\\") + mr.group(3)));
+        }
+        return json;
     }
 
     /**
@@ -175,7 +184,7 @@ public final class ScanUtils {
      * @param project Ballerina project
      * @return SARIF string representation of generated issues
      */
-    private static String convertIssuesToSarifString(List<Issue> issues, Project project) {
+    public static String convertIssuesToSarifString(List<Issue> issues, Project project) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
         // Create SARIF root object
@@ -396,7 +405,7 @@ public final class ScanUtils {
      * @param directoryName target directory name
      * @return generated target directory
      */
-    private static Target getTargetPath(Project project, String directoryName) {
+    public static Target getTargetPath(Project project, String directoryName) {
         try {
             if (directoryName == null) {
                 return new Target(project.targetDir());
@@ -423,7 +432,13 @@ public final class ScanUtils {
      */
     public static Path generateScanReport(List<Issue> issues, Project project, String directoryName) {
         JsonObject scannedProject = new JsonObject();
-        scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, project.currentPackage().packageName().toString());
+        String name;
+        if (project.kind() == ProjectKind.WORKSPACE_PROJECT) {
+            name = Optional.of(project.sourceRoot().getFileName()).get().toString();
+        } else {
+            name = project.currentPackage().packageName().toString();
+        }
+        scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, name);
         Map<String, JsonObject> scanReportPathAndFile = new HashMap<>();
 
         for (Issue issue : issues) {
@@ -503,8 +518,8 @@ public final class ScanUtils {
         scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE, lineRange.startLine().line());
         scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET, lineRange.startLine()
                 .offset());
-        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE, lineRange.endLine().line());
-        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET, lineRange.endLine()
+        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE, (int) lineRange.endLine().line());
+        scanReportIssueTextRange.addProperty(SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET, (int) lineRange.endLine()
                 .offset());
 
         scanReportIssue.add(SCAN_REPORT_ISSUE_TEXT_RANGE, scanReportIssueTextRange);
@@ -563,7 +578,7 @@ public final class ScanUtils {
 
         Path targetDir = project.targetDir();
         if (ballerinaTomlDocumentContent.getTable(SCAN_TABLE).isEmpty()) {
-            Path scanTomlFilePath = Path.of(System.getProperty(USER_DIR_PROPERTY)).resolve(SCAN_FILE);
+            Path scanTomlFilePath = project.sourceRoot().resolve(SCAN_FILE);
             if (Files.exists(scanTomlFilePath)) {
                 outputStream.println("Loading scan tool configurations from " + scanTomlFilePath);
                 return loadScanFile(targetDir, scanTomlFilePath, outputStream);

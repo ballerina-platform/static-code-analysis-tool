@@ -16,8 +16,8 @@
       "ruleKind": "CODE_SMELL"
     },
     "source": "BUILT_IN",
-    "fileName": "bal_project_with_exclude_rule_configurations/main.bal",
-    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-exclude-rule-configurations\\main.bal"
+    "fileName": "main.bal",
+    "filePath": "<ABS_SOURCE_ROOT>\\main.bal"
   },
   {
     "location": {
@@ -36,8 +36,8 @@
       "ruleKind": "CODE_SMELL"
     },
     "source": "EXTERNAL",
-    "fileName": "bal_project_with_exclude_rule_configurations/main.bal",
-    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-exclude-rule-configurations\\main.bal"
+    "fileName": "main.bal",
+    "filePath": "<ABS_SOURCE_ROOT>\\main.bal"
   },
   {
     "location": {
@@ -56,7 +56,7 @@
       "ruleKind": "CODE_SMELL"
     },
     "source": "BUILT_IN",
-    "fileName": "bal_project_with_exclude_rule_configurations/main.bal",
-    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-exclude-rule-configurations\\main.bal"
+    "fileName": "main.bal",
+    "filePath": "<ABS_SOURCE_ROOT>\\main.bal"
   }
 ]

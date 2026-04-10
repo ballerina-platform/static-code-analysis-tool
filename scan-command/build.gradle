@@ -279,8 +279,33 @@ build {
 
 // Configuring tests
 tasks.test {
-    systemProperty "ballerina.home", Paths.get(System.getenv("BALLERINA_HOME")).resolve("distributions")
-            .resolve("ballerina-${ballerinaLangVersion}").toString()
+    // set ballerina home system property for java based tests
+    def balHomeOutput = ""
+    try {
+        balHomeOutput = new ByteArrayOutputStream()
+        exec {
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                // Use cmd so Windows can run the .bat reliably
+                commandLine 'cmd', '/c', 'bal.bat home'
+            } else {
+                commandLine 'sh', '-c', 'bal home'
+            }
+            standardOutput = balHomeOutput
+        }
+        systemProperty 'ballerina.home', balHomeOutput.toString().trim()
+    } catch (Exception e) {
+        println "Warning: Could not determine ballerina.home from 'bal home' command: ${e.message}" +
+                "\nOutput: " + balHomeOutput
+        def ballerinaHomeEnv = System.getenv("BALLERINA_HOME")
+        if (ballerinaHomeEnv) {
+            systemProperty 'ballerina.home', ballerinaHomeEnv.trim()
+        } else {
+            throw new GradleException(
+                "'bal home' failed and BALLERINA_HOME is not set — tests cannot run. " +
+                "Output: ${balHomeOutput}"
+            )
+        }
+    }
 
     useTestNG() {
         suites 'src/test/resources/testng.xml'
