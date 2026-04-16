@@ -44,7 +44,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -107,10 +106,13 @@ public class ScanTool {
             jsonObject.add("excludedIssues", excludedIssuesToJsonArray(result.excludedIssues()));
             return GSON.toJson(jsonObject);
 
-        } catch (RuntimeException e) {
-            throw e;
         } catch (Exception e) {
-            return "{\"activeIssues\": [], \"excludedIssues\": []}";
+            JsonObject errorObject = new JsonObject();
+            errorObject.addProperty("success", false);
+            errorObject.addProperty("error", e.getMessage());
+            errorObject.add("activeIssues", new JsonArray());
+            errorObject.add("excludedIssues", new JsonArray());
+            return GSON.toJson(errorObject);
         }
     }
 
@@ -159,7 +161,7 @@ public class ScanTool {
         } catch (IOException e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to write exclusion to Scan.toml: " + e.getMessage());
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to add exclusion: " + e.getMessage());
         }
@@ -183,7 +185,7 @@ public class ScanTool {
         } catch (IOException e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to write global exclusion to Scan.toml: " + e.getMessage());
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to add global exclusion: " + e.getMessage());
         }
@@ -208,7 +210,7 @@ public class ScanTool {
         } catch (IOException e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to remove exclusion: " + e.getMessage());
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to remove exclusion due to unexpected error: " + e.getMessage());
         }
@@ -231,7 +233,7 @@ public class ScanTool {
         } catch (IOException e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to remove global exclusion: " + e.getMessage());
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to remove global exclusion due to unexpected error: " + e.getMessage());
         }
@@ -242,36 +244,33 @@ public class ScanTool {
     // CORE SCANNING LOGIC
     // ===================================================================================
 
-    public static ScanResult runScan(Object projectObj) {
-        if (projectObj instanceof Project) {
-            Project project = (Project) projectObj;
+    private static ScanResult runScan(Project projectObj) {
+        Project project = (Project) projectObj;
 
-            PrintStream silentStream = new PrintStream(
-                    new java.io.ByteArrayOutputStream(),
-                    true,
-                    StandardCharsets.UTF_8);
+        PrintStream silentStream = new PrintStream(
+                new java.io.ByteArrayOutputStream(),
+                true,
+                StandardCharsets.UTF_8);
 
-            // Load Scan.toml configurations
-            Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, silentStream);
-            ProjectAnalyzer analyzer = new ProjectAnalyzer(project, scanToml.orElse(null));
+        // Load Scan.toml configurations
+        Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, silentStream);
+        ProjectAnalyzer analyzer = new ProjectAnalyzer(project, scanToml.orElse(null));
 
-            // Execute
-            return execute(analyzer, scanToml.orElse(null), project);
-        }
-        return new ScanResult(Collections.emptyList(), Collections.emptyList());
+        // Execute
+        return execute(analyzer, scanToml.orElse(null), project);
     }
 
-    public static ScanResult execute(ProjectAnalyzer projectAnalyzer,
-                                     ScanTomlFile scanToml, Project project) {
+    /**
+     * Executes scanning with include/exclude filters resolved from Scan.toml.
+     *
+     * @throws IllegalArgumentException when both include and exclude rule filters are configured,
+     *                                  since they are mutually exclusive.
+     */
+    private static ScanResult execute(ProjectAnalyzer projectAnalyzer,
+                                      ScanTomlFile scanToml, Project project) {
         // Gather all available Rules
         List<Rule> coreRules = CoreRule.rules();
-        Map<String, List<Rule>> externalAnalyzers = new HashMap<>();
-
-        try {
-            externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
-        } catch (RuntimeException e) {
-            // Log error if needed
-        }
+        Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
 
         // Prepare Filter Lists
         List<String> includeRules = new ArrayList<>();
@@ -288,7 +287,8 @@ public class ScanTool {
         }
 
         if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
-            return new ScanResult(Collections.emptyList(), Collections.emptyList());
+            throw new IllegalArgumentException("Invalid Scan.toml configuration: both include and exclude rule "
+                    + "filters are set. Configure only one of [rule.include] or [rule.exclude].");
         }
 
         // Run Analysis
@@ -401,11 +401,19 @@ public class ScanTool {
 
         if (issue.location() != null) {
             LineRange range = issue.location().lineRange();
-            obj.addProperty("filePath", range.fileName());
-            obj.addProperty("startLine", range.startLine().line());
-            obj.addProperty("startColumn", range.startLine().offset());
-            obj.addProperty("endLine", range.endLine().line());
-            obj.addProperty("endColumn", range.endLine().offset());
+            if (range != null) {
+                if (range.fileName() != null) {
+                    obj.addProperty("filePath", range.fileName());
+                }
+                if (range.startLine() != null) {
+                    obj.addProperty("startLine", range.startLine().line());
+                    obj.addProperty("startColumn", range.startLine().offset());
+                }
+                if (range.endLine() != null) {
+                    obj.addProperty("endLine", range.endLine().line());
+                    obj.addProperty("endColumn", range.endLine().offset());
+                }
+            }
         }
         return obj;
     }

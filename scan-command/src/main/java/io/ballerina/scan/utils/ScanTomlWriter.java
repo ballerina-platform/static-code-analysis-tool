@@ -360,14 +360,34 @@ public final class ScanTomlWriter {
             }
             sb.append("]");
         } else if (value instanceof Map) {
-            // fallback to empty
-            sb.append("{ }");
+            writeInlineTable(sb, (Map<?, ?>) value);
         } else {
             sb.append(value);
         }
     }
 
+    private static void writeInlineTable(StringBuilder sb, Map<?, ?> map) {
+        sb.append("{ ");
+        int index = 0;
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            sb.append(String.valueOf(entry.getKey())).append(" = ");
+            writeValue(sb, entry.getValue());
+            if (index < map.size() - 1) {
+                sb.append(", ");
+            }
+            index++;
+        }
+        sb.append(" }");
+    }
+
     private static String escapeTomlString(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f");
     }
 }
