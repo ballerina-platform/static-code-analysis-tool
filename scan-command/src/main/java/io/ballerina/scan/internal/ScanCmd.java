@@ -320,7 +320,8 @@ public class ScanCmd implements BLauncherCmd {
         if (!exclusions.isEmpty()) {
             issues.removeIf(issue -> {
                 if (issue.location() == null || issue.location().lineRange() == null 
-                        || issue.location().lineRange().fileName() == null) {
+                        || issue.location().lineRange().fileName() == null
+                        || issue.location().lineRange().startLine() == null) {
                     return false;
                 }
                 String issueFileName = issue.location().lineRange().fileName();

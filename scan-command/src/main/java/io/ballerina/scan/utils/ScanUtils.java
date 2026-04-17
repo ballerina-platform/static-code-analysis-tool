@@ -960,12 +960,12 @@ public final class ScanUtils {
         boolean ruleMatches = exclusion.ruleId().equals(issueRuleId);
         boolean fileMatches = false;
         try {
-            fileMatches = java.nio.file.Paths.get(issueFileName).endsWith(java.nio.file.Paths.get(exclusion.filePath()))
-                    || java.nio.file.Paths.get(exclusion.filePath()).endsWith(java.nio.file.Paths.get(issueFileName));
-        } catch (java.nio.file.InvalidPathException e) {
+            Path issuePath = Paths.get(issueFileName).normalize();
+            Path exclusionPath = Paths.get(exclusion.filePath()).normalize();
+            fileMatches = issuePath.endsWith(exclusionPath);
+        } catch (InvalidPathException e) {
             // If path parsing fails, fallback to simple string matching
-            fileMatches = issueFileName.endsWith(exclusion.filePath())
-                    || exclusion.filePath().endsWith(issueFileName);
+            fileMatches = issueFileName.endsWith(exclusion.filePath());
         }
         
         if (!ruleMatches || !fileMatches) {

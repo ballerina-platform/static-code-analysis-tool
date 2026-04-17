@@ -52,7 +52,7 @@ import java.util.Set;
 
 /**
  * {@code ScanTool} LANGUAGE SERVER ENTRY POINT
- * The core tool that executes and manage the security analysis.
+ * The core tool that executes and manages the security analysis.
  *
  * @since 0.11.1
  */
@@ -208,8 +208,11 @@ public class ScanTool {
                                          String ruleId, String symbol, String lineHash) {
         JsonObject result = new JsonObject();
         try {
-            String relativeFilePath = ScanUtils.getRelativePath(filePath, projectPathStr);
-            Path scanTomlPath = Paths.get(projectPathStr).resolve("Scan.toml");
+            Path projectPath = Paths.get(projectPathStr);
+            Project project = BuildProject.load(projectPath, BuildOptions.builder().build());
+            
+            String relativeFilePath = ScanUtils.getRelativePath(filePath, project.sourceRoot().toString());
+            Path scanTomlPath = projectPath.resolve("Scan.toml");
             ScanTomlWriter.removeExclusion(scanTomlPath, relativeFilePath, ruleId, symbol, lineHash);
 
             result.addProperty("success", true);
@@ -253,9 +256,7 @@ public class ScanTool {
     // CORE SCANNING LOGIC
     // ===================================================================================
 
-    private static ScanResult runScan(Project projectObj) {
-        Project project = (Project) projectObj;
-
+    private static ScanResult runScan(Project project) {
         PrintStream silentStream = new PrintStream(
                 new java.io.ByteArrayOutputStream(),
                 true,
@@ -263,10 +264,16 @@ public class ScanTool {
 
         // Load Scan.toml configurations
         Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, silentStream);
-        ProjectAnalyzer analyzer = new ProjectAnalyzer(project, scanToml.orElse(null));
+        
+        // If Scan.toml is malformed or missing, return a failing ScanResult
+        if (scanToml.isEmpty()) {
+            return new ScanResult(new ArrayList<>(), new ArrayList<>());
+        }
+        
+        ProjectAnalyzer analyzer = new ProjectAnalyzer(project, scanToml.get());
 
         // Execute
-        return execute(analyzer, scanToml.orElse(null), project);
+        return execute(analyzer, scanToml.get(), project);
     }
 
     /**
@@ -311,31 +318,32 @@ public class ScanTool {
         List<ExcludedIssue> excludedIssues = new ArrayList<>();
 
         for (Issue issue : issues) {
-            boolean isExcluded = false;
-            boolean isGlobalExclusion = false;
+            boolean isExcluded;
+            boolean isGlobalExclusion;
             String issueFileName = issue.location() != null && issue.location().lineRange() != null
                     ? issue.location().lineRange().fileName() : "";
             String ruleId = issue.rule() != null ? issue.rule().id() : "";
 
             String issueSymbol = "";
             String issueLineHash = "";
+            boolean isExcludedByLocal = false;
+            boolean isExcludedByGlobal = false;
 
             if (!includeRules.isEmpty() && !includeRules.contains(ruleId)) {
-                isExcluded = true;
-                isGlobalExclusion = true;
+                isExcludedByGlobal = true;
             }
 
             if (!excludeRules.isEmpty() && excludeRules.contains(ruleId)) {
-                isExcluded = true;
-                isGlobalExclusion = true;
+                isExcludedByGlobal = true;
             }
 
-            // Resolve context data if available and not globally excluded
-            if (!isExcluded && scanToml != null && project != null) {
+            // Resolve context data for local exclusions whenever possible.
+            if (scanToml != null && project != null) {
                 Set<ScanTomlFile.Exclusion> exclusions = scanToml.getExclusions();
                 if (!exclusions.isEmpty()) {
                     if (issue.location() != null && issue.location().lineRange() != null
-                            && issue.location().lineRange().fileName() != null) {
+                            && issue.location().lineRange().fileName() != null
+                            && issue.location().lineRange().startLine() != null) {
                         int issueLine = issue.location().lineRange().startLine().line();
                         issueSymbol = SymbolResolver.resolveSymbol(project, issueFileName, issueLine);
                         issueLineHash = SymbolResolver.resolveLineHash(project, issueFileName, issueLine);
@@ -343,16 +351,20 @@ public class ScanTool {
                         String finalExSymbol = issueSymbol;
                         String finalExLineHash = issueLineHash;
 
-                        isExcluded = exclusions.stream().anyMatch(exclusion ->
+                        isExcludedByLocal = exclusions.stream().anyMatch(exclusion ->
                                 ScanUtils.matchesExclusion(issueFileName, ruleId,
                                         finalExSymbol, finalExLineHash, exclusion));
                     }
                 }
             }
 
+            isExcluded = isExcludedByLocal || isExcludedByGlobal;
+            isGlobalExclusion = isExcludedByGlobal && !isExcludedByLocal;
+
             if (isExcluded) {
                 if (issueSymbol.isEmpty() && project != null && issue.location() != null
-                        && issue.location().lineRange() != null) {
+                        && issue.location().lineRange() != null
+                        && issue.location().lineRange().startLine() != null) {
                     int issueLine = issue.location().lineRange().startLine().line();
                     issueSymbol = SymbolResolver.resolveSymbol(project, issueFileName, issueLine);
                     issueLineHash = SymbolResolver.resolveLineHash(project, issueFileName, issueLine);
@@ -388,7 +400,7 @@ public class ScanTool {
             obj.addProperty("ruleId", ex.ruleId());
             obj.addProperty("symbol", ex.symbol());
             obj.addProperty("isGlobalExclusion", ex.isGlobalExclusion());
-            obj.add("IssueContext", issueToJsonObject(ex.issue()));
+            obj.add("issueContext", issueToJsonObject(ex.issue()));
             jsonArray.add(obj);
         }
         return jsonArray;
