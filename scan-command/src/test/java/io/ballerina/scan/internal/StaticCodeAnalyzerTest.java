@@ -21,7 +21,7 @@ package io.ballerina.scan.internal;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Module;
 import io.ballerina.projects.Project;
-import io.ballerina.projects.directory.SingleFileProject;
+import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
@@ -41,7 +41,7 @@ public class StaticCodeAnalyzerTest extends BaseTest {
     private final Path coreRuleBalFiles = testResources.resolve("test-resources").resolve("core-rules");
 
     Document loadDocument(String documentName) {
-        Project project = SingleFileProject.load(coreRuleBalFiles.resolve(documentName));
+        Project project = ProjectLoader.load(coreRuleBalFiles.resolve(documentName)).project();
         Module defaultModule = project.currentPackage().getDefaultModule();
         return defaultModule.document(defaultModule.documentIds().iterator().next());
     }

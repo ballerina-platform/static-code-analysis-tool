@@ -19,9 +19,7 @@
 package io.ballerina.scan.utils;
 
 import io.ballerina.projects.Project;
-import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
-import io.ballerina.projects.directory.SingleFileProject;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.Issue;
@@ -70,7 +68,7 @@ public class ScanUtilsTest extends BaseTest {
     @Test(description = "test method for saving results to file when no directory is provided")
     void testSaveToDirectory() throws IOException {
         List<Issue> issues = new ArrayList<>();
-        Project project = ProjectLoader.loadProject(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Path resultsFile = ScanUtils.saveToDirectory(issues, project, null);
         String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -81,7 +79,7 @@ public class ScanUtilsTest extends BaseTest {
     @Test(description = "test method for saving results to file when directory is provided")
     void testSaveToProvidedDirectory() throws IOException {
         List<Issue> issues = new ArrayList<>();
-        Project project = ProjectLoader.loadProject(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Path resultsFile = ScanUtils.saveToDirectory(issues, project, RESULTS_DIRECTORY);
         String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -92,7 +90,7 @@ public class ScanUtilsTest extends BaseTest {
     @Test(description = "test method for creating html analysis report from analysis results")
     void testGenerateScanReport() throws IOException {
         List<Issue> issues = new ArrayList<>();
-        Project project = ProjectLoader.loadProject(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, null);
         String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -104,7 +102,7 @@ public class ScanUtilsTest extends BaseTest {
             "test method for creating html analysis report from analysis results when directory is provided")
     void testGenerateScanReportToProvidedDirectory() throws IOException {
         List<Issue> issues = new ArrayList<>();
-        Project project = ProjectLoader.loadProject(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, RESULTS_DIRECTORY);
         String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
@@ -114,10 +112,10 @@ public class ScanUtilsTest extends BaseTest {
 
     @Test(description =
             "test method for loading configurations from a Scan.toml file in a Ballerina single file project")
-    void testloadScanTomlConfigurationsForSingleFileProject() {
+    void testLoadScanTomlConfigurationsForSingleFileProject() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("single-file-project-with-config-file").resolve("main.bal");
-        Project project = SingleFileProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -128,7 +126,7 @@ public class ScanUtilsTest extends BaseTest {
     void testloadScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
-        Project project = BuildProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -167,12 +165,13 @@ public class ScanUtilsTest extends BaseTest {
     void testloadInvalidPlatformJAR() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-platform-jar");
-        Project project = BuildProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
         Assert.assertNull(scanTomlFile);
-        String expected = getExpectedOutput("scan-toml-invalid-platform-jar.txt");
+        String expected = getExpectedOutput("scan-toml-invalid-platform-jar.txt")
+                .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString());
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -181,13 +180,15 @@ public class ScanUtilsTest extends BaseTest {
     void testloadInvalidPlatformScanTomlConfigurations() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-platform-config-file");
-        Project project = BuildProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
         Assert.assertNull(scanTomlFile);
-        String expected = getExpectedOutput("scan-toml-invalid-platform-config.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        String expected = getExpectedOutput("scan-toml-invalid-platform-config.txt")
+                .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString());
+        String actual = readOutput(true).trim();
+        Assert.assertEquals(actual, expected);
     }
 
     @Test(description =
@@ -195,7 +196,7 @@ public class ScanUtilsTest extends BaseTest {
     void testloadScanTomlConfigurationsWithInvalidBallerinaTomlConfiguration() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-file-configuration");
-        Project project = BuildProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -208,7 +209,7 @@ public class ScanUtilsTest extends BaseTest {
     void testloadExternalScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-external-config-file");
-        Project project = BuildProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -246,7 +247,7 @@ public class ScanUtilsTest extends BaseTest {
     void testloadInvalidExternalScanTomlConfigurations() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-external-config-file");
-        Project project = BuildProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -255,11 +256,12 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
-    @Test(description = "test method for loading configurations from a remote configuration file")
-    void testloadRemoteScanTomlConfigurations() {
+    @Test(enabled = false, // the remote toml location is not available due to the missing bot account
+            description = "test method for loading configurations from a remote configuration file")
+    void testLoadRemoteScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-remote-config-file");
-        Project project = BuildProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
@@ -294,10 +296,10 @@ public class ScanUtilsTest extends BaseTest {
     }
 
     @Test(description = "test method for loading configurations from an invalid remote configuration file")
-    void testloadInvalidRemoteScanTomlConfigurations() throws IOException {
+    void testLoadInvalidRemoteScanTomlConfigurations() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-remote-config-file");
-        Project project = BuildProject.load(ballerinaProject);
+        Project project = ProjectLoader.load(ballerinaProject).project();
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);

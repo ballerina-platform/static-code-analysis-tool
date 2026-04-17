@@ -20,8 +20,7 @@ package io.ballerina.scan.test;
 
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectEnvironmentBuilder;
-import io.ballerina.projects.directory.BuildProject;
-import io.ballerina.projects.directory.SingleFileProject;
+import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.environment.Environment;
 import io.ballerina.projects.environment.EnvironmentBuilder;
 import io.ballerina.scan.internal.ProjectAnalyzer;
@@ -72,11 +71,7 @@ public class TestScanCmd extends ScanCmd {
                 Collections.emptyList(),
                 Collections.emptyList(),
                 Collections.emptyList());
-        if (projectPath.toFile().isDirectory()) {
-            project = BuildProject.load(getEnvironmentBuilder(distributionPath), projectPath);
-        } else {
-            project = SingleFileProject.load(getEnvironmentBuilder(distributionPath), projectPath);
-        }
+        project = ProjectLoader.load(projectPath, getEnvironmentBuilder(distributionPath)).project();
     }
 
     @Override

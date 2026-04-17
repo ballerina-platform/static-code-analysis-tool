@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.utils;
 
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -28,8 +29,8 @@ import java.util.Properties;
  * @since 0.1.0
  */
 public class Constants {
-    static final String RESULTS_JSON_FILE = "scan_results.json";
-    static final String RESULTS_SARIF_FILE = "scan_results.sarif";
+    public static final String RESULTS_JSON_FILE = "scan_results.json";
+    public static final String RESULTS_SARIF_FILE = "scan_results.sarif";
     static final String RESULTS_HTML_FILE = "index.html";
     static final String REPORT_DATA_PLACEHOLDER = "__data__";
     static final String SCAN_REPORT_PROJECT_NAME = "projectName";

@@ -22,7 +22,7 @@ import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Module;
 import io.ballerina.projects.Project;
-import io.ballerina.projects.directory.SingleFileProject;
+import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
@@ -54,7 +54,7 @@ public class ReporterImplTest {
         ReporterImpl reporter = new ReporterImpl(Collections.singletonList(rule));
         Path validBalProject = Paths.get("src", "test", "resources", "test-resources",
                 "valid-single-file-project", "main.bal");
-        Project project = SingleFileProject.load(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
         ModulePartNode modulePartNode = document.syntaxTree().rootNode();
@@ -84,7 +84,7 @@ public class ReporterImplTest {
         ReporterImpl reporter = new ReporterImpl(rules);
         Path validBalProject = Paths.get("src", "test", "resources", "test-resources",
                 "valid-single-file-project", "main.bal");
-        Project project = SingleFileProject.load(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
         ModulePartNode modulePartNode = document.syntaxTree().rootNode();
@@ -110,7 +110,7 @@ public class ReporterImplTest {
         ReporterImpl reporter = new ReporterImpl(rules);
         Path validBalProject = Paths.get("src", "test", "resources", "test-resources",
                 "valid-single-file-project", "main.bal");
-        Project project = SingleFileProject.load(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
         ModulePartNode modulePartNode = document.syntaxTree().rootNode();
@@ -137,7 +137,7 @@ public class ReporterImplTest {
         ReporterImpl reporter = new ReporterImpl(rules);
         Path validBalProject = Paths.get("src", "test", "resources", "test-resources",
                 "valid-single-file-project", "main.bal");
-        Project project = SingleFileProject.load(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
         ModulePartNode modulePartNode = (ModulePartNode) document.syntaxTree().rootNode();
@@ -166,7 +166,7 @@ public class ReporterImplTest {
         ReporterImpl reporter = new ReporterImpl(rules);
         Path validBalProject = Paths.get("src", "test", "resources", "test-resources",
                 "valid-single-file-project", "main.bal");
-        Project project = SingleFileProject.load(validBalProject);
+        Project project = ProjectLoader.load(validBalProject).project();
         Module defaultModule = project.currentPackage().getDefaultModule();
         Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
         ModulePartNode modulePartNode = (ModulePartNode) document.syntaxTree().rootNode();
