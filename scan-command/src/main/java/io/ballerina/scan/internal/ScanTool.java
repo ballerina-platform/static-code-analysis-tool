@@ -94,7 +94,7 @@ public class ScanTool {
 
             // Apply Unsaved Changes [[ Blocked By LS ]]           
             if (isApplyUnsavedChanges && unsavedFileContent != null && !unsavedFileContent.isEmpty()) {
-                project = applyUnsavedChanges(project, unsavedFileContent);
+                project = applyUnsavedChanges(project, unsavedFileContent, isSkipTests);
             }
 
             // Run the scanner
@@ -122,7 +122,8 @@ public class ScanTool {
      * entry to the Scan.toml file.
      */
     public static String addExclusion(String projectPathStr, String filePath, int lineNumber,
-                                      String ruleId, Map<String, Boolean> buildOptionsMap) {
+                                      String ruleId, Map<String, String> unsavedFileContent,
+                                      Map<String, Boolean> buildOptionsMap) {
         JsonObject result = new JsonObject();
         try {
             Path projectPath = Paths.get(projectPathStr);
@@ -134,6 +135,8 @@ public class ScanTool {
                     .TRUE.equals(buildOptionsMap.get("sticky"));
             boolean isSkipTests = buildOptionsMap != null && Boolean
                     .TRUE.equals(buildOptionsMap.get("skipTests"));
+            boolean isApplyUnsavedChanges = buildOptionsMap != null && Boolean
+                    .TRUE.equals(buildOptionsMap.get("applyUnsavedChanges"));
 
             BuildOptions buildOptions = BuildOptions.builder()
                     .setOffline(isOffline)
@@ -143,16 +146,21 @@ public class ScanTool {
 
             Project project = BuildProject.load(projectPath, buildOptions);
 
+            if (isApplyUnsavedChanges && unsavedFileContent != null && !unsavedFileContent.isEmpty()) {
+                project = applyUnsavedChanges(project, unsavedFileContent, isSkipTests);
+            }
+
             // Resolve the enclosing symbol and line hash
             String symbol = SymbolResolver.resolveSymbol(project, filePath, lineNumber);
             String lineHash = SymbolResolver.resolveLineHash(project, filePath, lineNumber);
 
             // Write the exclusion to Scan.toml
             Path scanTomlPath = projectPath.resolve("Scan.toml");
-            ScanTomlWriter.addExclusion(scanTomlPath, filePath, ruleId, symbol, lineHash);
+            String relativeFilePath = ScanUtils.getRelativePath(filePath, project.sourceRoot().toString());
+            ScanTomlWriter.addExclusion(scanTomlPath, relativeFilePath, ruleId, symbol, lineHash);
 
             result.addProperty("success", true);
-            result.addProperty("filePath", filePath);
+            result.addProperty("filePath", relativeFilePath);
             result.addProperty("ruleId", ruleId);
             result.addProperty("symbol", symbol);
             result.addProperty("lineHash", lineHash);
@@ -200,11 +208,12 @@ public class ScanTool {
                                          String ruleId, String symbol, String lineHash) {
         JsonObject result = new JsonObject();
         try {
+            String relativeFilePath = ScanUtils.getRelativePath(filePath, projectPathStr);
             Path scanTomlPath = Paths.get(projectPathStr).resolve("Scan.toml");
-            ScanTomlWriter.removeExclusion(scanTomlPath, filePath, ruleId, symbol, lineHash);
+            ScanTomlWriter.removeExclusion(scanTomlPath, relativeFilePath, ruleId, symbol, lineHash);
 
             result.addProperty("success", true);
-            result.addProperty("filePath", filePath);
+            result.addProperty("filePath", relativeFilePath);
             result.addProperty("ruleId", ruleId);
             result.addProperty("message", "Exclusion removed successfully.");
         } catch (IOException e) {
@@ -418,7 +427,9 @@ public class ScanTool {
         return obj;
     }
 
-    private static Project applyUnsavedChanges(Project project, Map<String, String> unsavedContent) {
+    private static Project applyUnsavedChanges(Project project,
+                                                Map<String, String> unsavedContent, 
+                                                boolean isSkipTests) {
         Map<DocumentId, String> updatesToApply = new HashMap<>();
         for (Module module : project.currentPackage().modules()) {
             for (DocumentId docId : module.documentIds()) {
@@ -427,6 +438,17 @@ public class ScanTool {
                     String absPath = path.get().toAbsolutePath().normalize().toString();
                     if (unsavedContent.containsKey(absPath)) {
                         updatesToApply.put(docId, unsavedContent.get(absPath));
+                    }
+                }
+            }
+            if (!isSkipTests) {
+                for (DocumentId docId : module.testDocumentIds()) {
+                    Optional<Path> path = project.documentPath(docId);
+                    if (path.isPresent()) {
+                        String absPath = path.get().toAbsolutePath().normalize().toString();
+                        if (unsavedContent.containsKey(absPath)) {
+                            updatesToApply.put(docId, unsavedContent.get(absPath));
+                        }
                     }
                 }
             }

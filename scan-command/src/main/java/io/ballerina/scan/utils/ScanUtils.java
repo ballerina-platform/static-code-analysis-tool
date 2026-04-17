@@ -327,7 +327,7 @@ public final class ScanUtils {
      * @param sourceRoot the source root path
      * @return relative path
      */
-    private static String getRelativePath(String filePath, String sourceRoot) {
+    public static String getRelativePath(String filePath, String sourceRoot) {
         Path path = Paths.get(filePath);
         try {
             Path source = Paths.get(sourceRoot);
