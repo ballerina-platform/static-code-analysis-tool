@@ -136,56 +136,46 @@ public final class SymbolResolver {
     private static String findEnclosingSymbol(ModulePartNode modulePartNode, int line) {
         for (Node member : modulePartNode.members()) {
             if (coversLine(member, line)) {
-                String topLevelName = extractSymbolName(member);
-                String innerName = findClosestInnerNamedSymbol(member, line);
-                if (innerName != null && topLevelName != null) {
-                    return topLevelName + " -> " + innerName;
+                String topLevelName = extractSymbolName(member, true);
+                if (topLevelName == null) {
+                    return null;
                 }
-                return topLevelName;
-            }
-        }
-        return null;
-    }
 
-    private static String findClosestInnerNamedSymbol(Node node, int line) {
-        if (node instanceof io.ballerina.compiler.syntax.tree.NonTerminalNode nonTerminal) {
-            for (Node child : nonTerminal.children()) {
-                if (child != null && coversLine(child, line)) {
-                    String childName = extractLocalSymbolName(child);
-                    String deepResult = findClosestInnerNamedSymbol(child, line);
-                    
-                    if (childName != null && deepResult != null) {
-                        return childName + " -> " + deepResult;
-                    } else if (deepResult != null) {
-                        return deepResult;
-                    } else if (childName != null) {
-                        return childName;
+                StringBuilder symbolPath = new StringBuilder(topLevelName);
+                Node current = member;
+                while (current instanceof io.ballerina.compiler.syntax.tree.NonTerminalNode nonTerminal) {
+                    Node next = null;
+                    for (Node child : nonTerminal.children()) {
+                        if (child != null && coversLine(child, line)) {
+                            next = child;
+                            break;
+                        }
                     }
+
+                    if (next == null) {
+                        break;
+                    }
+
+                    String childName = extractSymbolName(next, false);
+                    if (childName != null) {
+                        symbolPath.append(" -> ").append(childName);
+                    }
+                    current = next;
                 }
+
+                return symbolPath.toString();
             }
         }
         return null;
     }
 
-    private static String extractLocalSymbolName(Node node) {
-        if (node instanceof io.ballerina.compiler.syntax.tree.FunctionDefinitionNode funcNode) {
-            return funcNode.functionName().text();
-        }
-        if (node instanceof io.ballerina.compiler.syntax.tree.MethodDeclarationNode declNode) {
-            return declNode.methodName().text();
-        }
-        if (node instanceof io.ballerina.compiler.syntax.tree.VariableDeclarationNode varNode) {
-            return varNode.typedBindingPattern().bindingPattern().toString().trim();
-        }
-        if (node instanceof io.ballerina.compiler.syntax.tree.RecordFieldNode recordNode) {
-            return recordNode.fieldName().text();
-        }
-        if (node instanceof io.ballerina.compiler.syntax.tree.RequiredParameterNode paramNode) {
-            return paramNode.paramName().map(t -> t.text()).orElse(null);
-        }
-        return null;
-    }
-
+    /**
+     * Checks if the given line is within the range covered by the node.
+     *
+     * @param node the syntax tree node
+     * @param line the 0-indexed line number
+     * @return true if the node covers the line, false otherwise
+     */
     private static boolean coversLine(Node node, int line) {
         LineRange lineRange = node.lineRange();
         LinePosition startLine = lineRange.startLine();
@@ -199,7 +189,7 @@ public final class SymbolResolver {
      * @param node the syntax tree node
      * @return the symbol name, or null if the node is not a named construct
      */
-    private static String extractSymbolName(Node node) {
+    private static String extractSymbolName(Node node, boolean isTopLevel) {
         if (node instanceof FunctionDefinitionNode functionNode) {
             return functionNode.functionName().text();
         }
@@ -217,6 +207,20 @@ public final class SymbolResolver {
             serviceNode.absoluteResourcePath().forEach(pathNode ->
                     servicePath.append(pathNode.toString().trim()));
             return servicePath.toString();
+        }
+        if (!isTopLevel) {
+            if (node instanceof io.ballerina.compiler.syntax.tree.MethodDeclarationNode declNode) {
+                return declNode.methodName().text();
+            }
+            if (node instanceof io.ballerina.compiler.syntax.tree.VariableDeclarationNode varNode) {
+                return varNode.typedBindingPattern().bindingPattern().toString().trim();
+            }
+            if (node instanceof io.ballerina.compiler.syntax.tree.RecordFieldNode recordNode) {
+                return recordNode.fieldName().text();
+            }
+            if (node instanceof io.ballerina.compiler.syntax.tree.RequiredParameterNode paramNode) {
+                return paramNode.paramName().map(t -> t.text()).orElse(null);
+            }
         }
         return null;
     }

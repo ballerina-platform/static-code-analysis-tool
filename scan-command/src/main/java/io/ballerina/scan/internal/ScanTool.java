@@ -22,10 +22,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.ballerina.projects.BuildOptions;
-import io.ballerina.projects.Document;
-import io.ballerina.projects.DocumentId;
-import io.ballerina.projects.Module;
-import io.ballerina.projects.ModuleId;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.scan.ExcludedIssue;
@@ -44,7 +40,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -91,11 +86,6 @@ public class ScanTool {
                     .build();
 
             Project project = BuildProject.load(projectPath, buildOptions);
-
-            // Apply Unsaved Changes [[ Blocked By LS ]]           
-            if (isApplyUnsavedChanges && unsavedFileContent != null && !unsavedFileContent.isEmpty()) {
-                project = applyUnsavedChanges(project, unsavedFileContent, isSkipTests);
-            }
 
             // Run the scanner
             ScanResult result = runScan(project);
@@ -145,10 +135,6 @@ public class ScanTool {
                     .build();
 
             Project project = BuildProject.load(projectPath, buildOptions);
-
-            if (isApplyUnsavedChanges && unsavedFileContent != null && !unsavedFileContent.isEmpty()) {
-                project = applyUnsavedChanges(project, unsavedFileContent, isSkipTests);
-            }
 
             // Resolve the enclosing symbol and line hash
             String symbol = SymbolResolver.resolveSymbol(project, filePath, lineNumber);
@@ -438,43 +424,4 @@ public class ScanTool {
         }
         return obj;
     }
-
-    private static Project applyUnsavedChanges(Project project,
-                                                Map<String, String> unsavedContent, 
-                                                boolean isSkipTests) {
-        Map<DocumentId, String> updatesToApply = new HashMap<>();
-        for (Module module : project.currentPackage().modules()) {
-            for (DocumentId docId : module.documentIds()) {
-                Optional<Path> path = project.documentPath(docId);
-                if (path.isPresent()) {
-                    String absPath = path.get().toAbsolutePath().normalize().toString();
-                    if (unsavedContent.containsKey(absPath)) {
-                        updatesToApply.put(docId, unsavedContent.get(absPath));
-                    }
-                }
-            }
-            if (!isSkipTests) {
-                for (DocumentId docId : module.testDocumentIds()) {
-                    Optional<Path> path = project.documentPath(docId);
-                    if (path.isPresent()) {
-                        String absPath = path.get().toAbsolutePath().normalize().toString();
-                        if (unsavedContent.containsKey(absPath)) {
-                            updatesToApply.put(docId, unsavedContent.get(absPath));
-                        }
-                    }
-                }
-            }
-        }
-        Project currentProject = project;
-        for (Map.Entry<DocumentId, String> entry : updatesToApply.entrySet()) {
-            DocumentId docId = entry.getKey();
-            String newContent = entry.getValue();
-            ModuleId modId = docId.moduleId();
-            Module currentModule = currentProject.currentPackage().module(modId);
-            Document currentDoc = currentModule.document(docId);
-            currentProject = currentDoc.modify().withContent(newContent).apply().module().project();
-        }
-        return currentProject;
-    }
-
 }
