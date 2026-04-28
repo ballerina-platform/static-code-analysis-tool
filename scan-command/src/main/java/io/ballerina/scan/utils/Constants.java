@@ -51,7 +51,7 @@ public class Constants {
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET = "endLineOffset";
     static final String SCAN_TABLE = "scan";
     static final String SCAN_FILE_FIELD = "configPath";
-    static final String SCAN_FILE = "Scan.toml";
+    public static final String SCAN_FILE = "Scan.toml";
     static final String PLATFORM_TABLE = "platform";
     static final String PLATFORM_NAME = "name";
     static final String PLATFORM_PATH = "path";
@@ -61,6 +61,13 @@ public class Constants {
     static final String ANALYZER_VERSION = "version";
     static final String ANALYZER_REPOSITORY = "repository";
     static final String RULES_TABLE = "rule";
+    static final String EXCLUSION_TABLE = "exclusion";
+    static final String EXCLUSION_FILE_PATH = "filePath";
+    static final String EXCLUSION_RULE_ID = "ruleId";
+    static final String EXCLUSION_SYMBOL = "symbol";
+    static final String EXCLUSION_LINE_HASH = "lineHash";
+    static final String EXCLUDE_KEY = "exclude";
+    public static final String MODULE_LEVEL_SYMBOL = "<module>";
     static final String JAR_PREDICATE = ".jar";
     static final String CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN = "^\\d+\\.\\d+\\.\\d+$";
     static final String RULE_ID_COLUMN = "RuleID";

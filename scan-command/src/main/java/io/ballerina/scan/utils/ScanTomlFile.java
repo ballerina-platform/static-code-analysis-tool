@@ -33,6 +33,7 @@ public class ScanTomlFile {
     private final Set<Analyzer> analyzers = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToInclude = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToExclude = new LinkedHashSet<>();
+    private final Set<Exclusion> exclusions = new LinkedHashSet<>();
 
     ScanTomlFile() {
     }
@@ -51,6 +52,10 @@ public class ScanTomlFile {
 
     void setRuleToExclude(RuleToFilter rule) {
         rulesToExclude.add(rule);
+    }
+
+    void addExclusion(Exclusion exclusion) {
+        exclusions.add(exclusion);
     }
 
     /**
@@ -90,6 +95,15 @@ public class ScanTomlFile {
     }
 
     /**
+     * Returns an unmodifiable {@link Set} of symbol-based exclusions.
+     *
+     * @return an unmodifiable set of symbol-based exclusions
+     */
+    public Set<Exclusion> getExclusions() {
+        return Collections.unmodifiableSet(exclusions);
+    }
+
+    /**
      * Represents a static code analysis platform.
      *
      * @param name      in-memory representation of platform name
@@ -118,4 +132,15 @@ public class ScanTomlFile {
      * @param id in-memory representation of the identifier of the rule to filter
      */
     public record RuleToFilter(String id) { }
+
+    /**
+     * Represents a symbol-based exclusion for suppressing a specific rule violation
+     * within a named code construct (function, class, service, etc.).
+     *
+     * @param filePath in-memory representation of the file path relative to the project root
+     * @param ruleId   in-memory representation of the fully qualified rule identifier
+     * @param symbol   in-memory representation of the enclosing symbol name
+     * @param lineHash in-memory representation of the hashed line content
+     */
+    public record Exclusion(String filePath, String ruleId, String symbol, String lineHash) { }
 }
