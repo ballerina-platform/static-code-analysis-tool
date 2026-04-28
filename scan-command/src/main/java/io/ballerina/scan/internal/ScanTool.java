@@ -28,6 +28,7 @@ import io.ballerina.scan.ExcludedIssue;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScanResult;
+import io.ballerina.scan.utils.Constants;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanTomlWriter;
 import io.ballerina.scan.utils.ScanUtils;
@@ -63,29 +64,10 @@ public class ScanTool {
      * Returns a JSON string of issues.
      */
     public static String runScan(String projectPathStr,
-                                 Map<String, String> unsavedFileContent,
                                  Map<String, Boolean> buildOptionsMap) {
         try {
             Path projectPath = Paths.get(projectPathStr);
-
-            // Extract Build Options
-            boolean isOffline = buildOptionsMap != null && Boolean
-                    .TRUE.equals(buildOptionsMap.get("offline"));
-            boolean isSticky = buildOptionsMap != null && Boolean
-                    .TRUE.equals(buildOptionsMap.get("sticky"));
-            boolean isSkipTests = buildOptionsMap != null && Boolean
-                    .TRUE.equals(buildOptionsMap.get("skipTests"));
-            boolean isApplyUnsavedChanges = buildOptionsMap != null && Boolean
-                    .TRUE.equals(buildOptionsMap.get("applyUnsavedChanges"));
-
-            // Load Project from Disk with Options
-            BuildOptions buildOptions = BuildOptions.builder()
-                    .setOffline(isOffline)
-                    .setSticky(isSticky)
-                    .setSkipTests(isSkipTests)
-                    .build();
-
-            Project project = BuildProject.load(projectPath, buildOptions);
+            Project project = loadProjectForLs(projectPath, buildOptionsMap);
 
             // Run the scanner
             ScanResult result = runScan(project);
@@ -108,40 +90,23 @@ public class ScanTool {
 
     /**
      * ENTRY POINT FOR ADDING EXCLUSIONS
-     * Resolves the AST symbol at the given line and writes a symbol-based exclusion
-     * entry to the Scan.toml file.
+    * Resolves the AST symbol at the given line and writes a symbol-based exclusion
+    * entry to the Constants.SCAN_FILE file.
      */
     public static String addExclusion(String projectPathStr, String filePath, int lineNumber,
-                                      String ruleId, Map<String, String> unsavedFileContent,
+                                      String ruleId,
                                       Map<String, Boolean> buildOptionsMap) {
         JsonObject result = new JsonObject();
         try {
             Path projectPath = Paths.get(projectPathStr);
-
-            // Extract Build Options
-            boolean isOffline = buildOptionsMap != null && Boolean
-                    .TRUE.equals(buildOptionsMap.get("offline"));
-            boolean isSticky = buildOptionsMap != null && Boolean
-                    .TRUE.equals(buildOptionsMap.get("sticky"));
-            boolean isSkipTests = buildOptionsMap != null && Boolean
-                    .TRUE.equals(buildOptionsMap.get("skipTests"));
-            boolean isApplyUnsavedChanges = buildOptionsMap != null && Boolean
-                    .TRUE.equals(buildOptionsMap.get("applyUnsavedChanges"));
-
-            BuildOptions buildOptions = BuildOptions.builder()
-                    .setOffline(isOffline)
-                    .setSticky(isSticky)
-                    .setSkipTests(isSkipTests)
-                    .build();
-
-            Project project = BuildProject.load(projectPath, buildOptions);
+            Project project = loadProjectForLs(projectPath, buildOptionsMap);
 
             // Resolve the enclosing symbol and line hash
             String symbol = SymbolResolver.resolveSymbol(project, filePath, lineNumber);
             String lineHash = SymbolResolver.resolveLineHash(project, filePath, lineNumber);
 
-            // Write the exclusion to Scan.toml
-            Path scanTomlPath = projectPath.resolve("Scan.toml");
+            // Write the exclusion to Constants.SCAN_FILE
+            Path scanTomlPath = projectPath.resolve(Constants.SCAN_FILE);
             String relativeFilePath = ScanUtils.getRelativePath(filePath, project.sourceRoot().toString());
             ScanTomlWriter.addExclusion(scanTomlPath, relativeFilePath, ruleId, symbol, lineHash);
 
@@ -154,7 +119,8 @@ public class ScanTool {
                     + "' in file '" + filePath + "' for rule '" + ruleId + "'");
         } catch (IOException e) {
             result.addProperty("success", false);
-            result.addProperty("error", "Failed to write exclusion to Scan.toml: " + e.getMessage());
+                result.addProperty("error", "Failed to write exclusion to " + Constants.SCAN_FILE + ": "
+                    + e.getMessage());
         } catch (Exception e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to add exclusion: " + e.getMessage());
@@ -163,14 +129,14 @@ public class ScanTool {
     }
 
     /**
-     * ENTRY POINT FOR ADDING GLOBAL EXCLUSIONS
-     * Adds a rule ID to the global `[rule]` section in Scan.toml.
+    * ENTRY POINT FOR ADDING GLOBAL EXCLUSIONS
+    * Adds a rule ID to the global `[rule]` section in Constants.SCAN_FILE.
      */
     public static String addGlobalExclusion(String projectPathStr, String ruleId) {
         JsonObject result = new JsonObject();
         try {
             Path projectPath = Paths.get(projectPathStr);
-            Path scanTomlPath = projectPath.resolve("Scan.toml");
+            Path scanTomlPath = projectPath.resolve(Constants.SCAN_FILE);
             ScanTomlWriter.addGlobalExclusion(scanTomlPath, ruleId);
 
             result.addProperty("success", true);
@@ -178,7 +144,8 @@ public class ScanTool {
             result.addProperty("message", "Global exclusion added successfully for rule '" + ruleId + "'");
         } catch (IOException e) {
             result.addProperty("success", false);
-            result.addProperty("error", "Failed to write global exclusion to Scan.toml: " + e.getMessage());
+                result.addProperty("error", "Failed to write global exclusion to " + Constants.SCAN_FILE + ": "
+                    + e.getMessage());
         } catch (Exception e) {
             result.addProperty("success", false);
             result.addProperty("error", "Failed to add global exclusion: " + e.getMessage());
@@ -187,8 +154,8 @@ public class ScanTool {
     }
 
     /**
-     * ENTRY POINT FOR REMOVING EXCLUSIONS
-     * Removes a symbol-based exclusion entry from the Scan.toml file.
+    * ENTRY POINT FOR REMOVING EXCLUSIONS
+    * Removes a symbol-based exclusion entry from the Constants.SCAN_FILE file.
      */
     public static String removeExclusion(String projectPathStr, String filePath,
                                          String ruleId, String symbol, String lineHash) {
@@ -198,7 +165,7 @@ public class ScanTool {
             Project project = BuildProject.load(projectPath, BuildOptions.builder().build());
             
             String relativeFilePath = ScanUtils.getRelativePath(filePath, project.sourceRoot().toString());
-            Path scanTomlPath = projectPath.resolve("Scan.toml");
+            Path scanTomlPath = projectPath.resolve(Constants.SCAN_FILE);
             ScanTomlWriter.removeExclusion(scanTomlPath, relativeFilePath, ruleId, symbol, lineHash);
 
             result.addProperty("success", true);
@@ -216,13 +183,13 @@ public class ScanTool {
     }
 
     /**
-     * ENTRY POINT FOR REMOVING GLOBAL EXCLUSIONS
-     * Removes a rule ID from the global `[rule]` section in Scan.toml.
+    * ENTRY POINT FOR REMOVING GLOBAL EXCLUSIONS
+    * Removes a rule ID from the global `[rule]` section in Constants.SCAN_FILE.
      */
     public static String removeGlobalExclusion(String projectPathStr, String ruleId) {
         JsonObject result = new JsonObject();
         try {
-            Path scanTomlPath = Paths.get(projectPathStr).resolve("Scan.toml");
+            Path scanTomlPath = Paths.get(projectPathStr).resolve(Constants.SCAN_FILE);
             ScanTomlWriter.removeGlobalExclusion(scanTomlPath, ruleId);
 
             result.addProperty("success", true);
@@ -242,13 +209,28 @@ public class ScanTool {
     // CORE SCANNING LOGIC
     // ===================================================================================
 
+    private static Project loadProjectForLs(Path projectPath, Map<String, Boolean> buildOptionsMap) {
+        boolean isOffline = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("offline"));
+        boolean isSticky = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("sticky"));
+        boolean isSkipTests = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("skipTests"));
+
+        BuildOptions buildOptions = BuildOptions.builder()
+                .setOffline(isOffline)
+                .setSticky(isSticky)
+                .setSkipTests(isSkipTests)
+                .build();
+
+        return BuildProject.load(projectPath, buildOptions);
+    }
+
     private static ScanResult runScan(Project project) {
+        java.io.ByteArrayOutputStream diagnosticBuffer = new java.io.ByteArrayOutputStream();
         PrintStream silentStream = new PrintStream(
-                new java.io.ByteArrayOutputStream(),
+                diagnosticBuffer,
                 true,
                 StandardCharsets.UTF_8);
 
-        // Load Scan.toml configurations
+        // Load Constants.SCAN_FILE configurations
         Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, silentStream);
         
         // If Scan.toml is malformed or missing, return a failing ScanResult
@@ -263,7 +245,7 @@ public class ScanTool {
     }
 
     /**
-     * Executes scanning with include/exclude filters resolved from Scan.toml.
+    * Executes scanning with include/exclude filters resolved from Constants.SCAN_FILE.
      *
      * @throws IllegalArgumentException when both include and exclude rule filters are configured,
      *                                  since they are mutually exclusive.
@@ -289,7 +271,8 @@ public class ScanTool {
         }
 
         if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
-            throw new IllegalArgumentException("Invalid Scan.toml configuration: both include and exclude rule "
+                throw new IllegalArgumentException("Invalid " + Constants.SCAN_FILE
+                    + " configuration: both include and exclude rule "
                     + "filters are set. Configure only one of [rule.include] or [rule.exclude].");
         }
 
@@ -324,23 +307,21 @@ public class ScanTool {
             }
 
             // Resolve context data for local exclusions whenever possible.
-            if (scanToml != null && project != null) {
-                Set<ScanTomlFile.Exclusion> exclusions = scanToml.getExclusions();
-                if (!exclusions.isEmpty()) {
-                    if (issue.location() != null && issue.location().lineRange() != null
-                            && issue.location().lineRange().fileName() != null
-                            && issue.location().lineRange().startLine() != null) {
-                        int issueLine = issue.location().lineRange().startLine().line();
-                        issueSymbol = SymbolResolver.resolveSymbol(project, issueFileName, issueLine);
-                        issueLineHash = SymbolResolver.resolveLineHash(project, issueFileName, issueLine);
+            Set<ScanTomlFile.Exclusion> exclusions = scanToml.getExclusions();
+            if (!exclusions.isEmpty()) {
+                if (issue.location() != null && issue.location().lineRange() != null
+                        && issue.location().lineRange().fileName() != null
+                        && issue.location().lineRange().startLine() != null) {
+                    int issueLine = issue.location().lineRange().startLine().line();
+                    issueSymbol = SymbolResolver.resolveSymbol(project, issueFileName, issueLine);
+                    issueLineHash = SymbolResolver.resolveLineHash(project, issueFileName, issueLine);
 
-                        String finalExSymbol = issueSymbol;
-                        String finalExLineHash = issueLineHash;
+                    String finalExSymbol = issueSymbol;
+                    String finalExLineHash = issueLineHash;
 
-                        isExcludedByLocal = exclusions.stream().anyMatch(exclusion ->
-                                ScanUtils.matchesExclusion(issueFileName, ruleId,
-                                        finalExSymbol, finalExLineHash, exclusion));
-                    }
+                    isExcludedByLocal = exclusions.stream().anyMatch(exclusion ->
+                            ScanUtils.matchesExclusion(issueFileName, ruleId,
+                                    finalExSymbol, finalExLineHash, exclusion));
                 }
             }
 
@@ -348,7 +329,7 @@ public class ScanTool {
             isGlobalExclusion = isExcludedByGlobal && !isExcludedByLocal;
 
             if (isExcluded) {
-                if (issueSymbol.isEmpty() && project != null && issue.location() != null
+                if (issueSymbol.isEmpty() && issue.location() != null
                         && issue.location().lineRange() != null
                         && issue.location().lineRange().startLine() != null) {
                     int issueLine = issue.location().lineRange().startLine().line();

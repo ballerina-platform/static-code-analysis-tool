@@ -97,7 +97,13 @@ public final class SymbolResolver {
      * @return the optional document matching the file path
      */
     private static Optional<Document> findDocument(Project project, String filePath) {
-        Path targetPath = Path.of(filePath).normalize();
+        Path targetPath;
+        try {
+            targetPath = Path.of(filePath).normalize();
+        } catch (java.nio.file.InvalidPathException e) {
+            // Invalid path characters; cannot match any document
+            return Optional.empty();
+        }
 
         for (Module module : project.currentPackage().modules()) {
             // Main

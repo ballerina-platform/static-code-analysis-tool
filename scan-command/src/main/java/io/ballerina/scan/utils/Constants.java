@@ -51,7 +51,7 @@ public class Constants {
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET = "endLineOffset";
     static final String SCAN_TABLE = "scan";
     static final String SCAN_FILE_FIELD = "configPath";
-    static final String SCAN_FILE = "Scan.toml";
+    public static final String SCAN_FILE = "Scan.toml";
     static final String PLATFORM_TABLE = "platform";
     static final String PLATFORM_NAME = "name";
     static final String PLATFORM_PATH = "path";
