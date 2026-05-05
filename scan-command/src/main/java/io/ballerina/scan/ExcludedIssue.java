@@ -27,17 +27,13 @@ public class ExcludedIssue {
     private final Issue issue;
     private final String ruleId;
     private final String filePath;
-    private final String symbol;
-    private final String lineHash;
     private final boolean isGlobalExclusion;
 
-    public ExcludedIssue(Issue issue, String ruleId, String filePath, String symbol, String lineHash,
+    public ExcludedIssue(Issue issue, String ruleId, String filePath,
                          boolean isGlobalExclusion) {
         this.issue = issue;
         this.ruleId = ruleId;
         this.filePath = filePath;
-        this.symbol = symbol;
-        this.lineHash = lineHash;
         this.isGlobalExclusion = isGlobalExclusion;
     }
 
@@ -66,24 +62,6 @@ public class ExcludedIssue {
      */
     public String filePath() {
         return filePath;
-    }
-
-    /**
-     * Returns the enclosing symbol name where the issue was found.
-     *
-     * @return symbol name
-     */
-    public String symbol() {
-        return symbol;
-    }
-
-    /**
-     * Returns the hash of the line content where the issue was found.
-     *
-     * @return line hash
-     */
-    public String lineHash() {
-        return lineHash;
     }
 
     /**

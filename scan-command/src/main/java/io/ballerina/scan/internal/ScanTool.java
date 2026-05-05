@@ -70,6 +70,7 @@ public class ScanTool {
 
             // Convert to JSON
             JsonObject jsonObject = new JsonObject();
+            jsonObject.addProperty("success", true);
             jsonObject.add("activeIssues", issuesToJsonArray(result.activeIssues()));
             jsonObject.add("excludedIssues", excludedIssuesToJsonArray(result.excludedIssues()));
             return GSON.toJson(jsonObject);
@@ -91,17 +92,25 @@ public class ScanTool {
      */
     public static String addGlobalExclusion(String projectPathStr, String ruleId) {
         JsonObject result = new JsonObject();
+        // Validate and normalize ruleId
+        String normalizedRuleId = ruleId == null ? "" : ruleId.trim();
+        if (normalizedRuleId.isEmpty()) {
+            result.addProperty("success", false);
+            result.addProperty("error", "Invalid ruleId: must be a non-empty string");
+            return GSON.toJson(result);
+        }
+
         try {
             Path projectPath = Paths.get(projectPathStr);
             Path scanTomlPath = projectPath.resolve(Constants.SCAN_FILE);
-            ScanTomlWriter.addGlobalExclusion(scanTomlPath, ruleId);
+            ScanTomlWriter.addGlobalExclusion(scanTomlPath, normalizedRuleId);
 
             result.addProperty("success", true);
-            result.addProperty("ruleId", ruleId);
-            result.addProperty("message", "Global exclusion added successfully for rule '" + ruleId + "'");
+            result.addProperty("ruleId", normalizedRuleId);
+            result.addProperty("message", "Global exclusion added successfully for rule '" + normalizedRuleId + "'");
         } catch (IOException e) {
             result.addProperty("success", false);
-                result.addProperty("error", "Failed to write global exclusion to " + Constants.SCAN_FILE + ": "
+            result.addProperty("error", "Failed to write global exclusion to " + Constants.SCAN_FILE + ": "
                     + e.getMessage());
         } catch (Exception e) {
             result.addProperty("success", false);
@@ -117,12 +126,20 @@ public class ScanTool {
      */
     public static String removeGlobalExclusion(String projectPathStr, String ruleId) {
         JsonObject result = new JsonObject();
+        // Validate and normalize ruleId
+        String normalizedRuleId = ruleId == null ? "" : ruleId.trim();
+        if (normalizedRuleId.isEmpty()) {
+            result.addProperty("success", false);
+            result.addProperty("error", "Invalid ruleId: must be a non-empty string");
+            return GSON.toJson(result);
+        }
+
         try {
             Path scanTomlPath = Paths.get(projectPathStr).resolve(Constants.SCAN_FILE);
-            ScanTomlWriter.removeGlobalExclusion(scanTomlPath, ruleId);
+            ScanTomlWriter.removeGlobalExclusion(scanTomlPath, normalizedRuleId);
 
             result.addProperty("success", true);
-            result.addProperty("ruleId", ruleId);
+            result.addProperty("ruleId", normalizedRuleId);
             result.addProperty("message", "Global exclusion removed successfully.");
         } catch (IOException e) {
             result.addProperty("success", false);
@@ -211,7 +228,6 @@ public class ScanTool {
 
         for (Issue issue : issues) {
             boolean isExcluded;
-            boolean isGlobalExclusion;
             String issueFileName = issue.location() != null && issue.location().lineRange() != null
                     ? issue.location().lineRange().fileName() : "";
             String ruleId = issue.rule() != null ? issue.rule().id() : "";
@@ -227,11 +243,9 @@ public class ScanTool {
             }
 
             isExcluded = isExcludedByGlobal;
-            isGlobalExclusion = isExcludedByGlobal;
 
             if (isExcluded) {
-                excludedIssues.add(new ExcludedIssue(issue, ruleId, issueFileName,
-                        "", "", true));
+                excludedIssues.add(new ExcludedIssue(issue, ruleId, issueFileName, true));
             } else {
                 activeIssues.add(issue);
             }
@@ -257,9 +271,7 @@ public class ScanTool {
         for (ExcludedIssue ex : excludedIssues) {
             JsonObject obj = new JsonObject();
             obj.addProperty("filePath", ex.filePath());
-            obj.addProperty("lineHash", ex.lineHash());
             obj.addProperty("ruleId", ex.ruleId());
-            obj.addProperty("symbol", ex.symbol());
             obj.addProperty("isGlobalExclusion", ex.isGlobalExclusion());
             obj.add("issueContext", issueToJsonObject(ex.issue()));
             jsonArray.add(obj);
