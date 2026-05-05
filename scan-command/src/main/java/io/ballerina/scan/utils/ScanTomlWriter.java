@@ -29,87 +29,16 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 
 /**
  * {@code ScanTomlWriter} provides utilities for creating and modifying Scan.toml files,
- * specifically for adding symbol-based and global exclusion entries.
+ * specifically for managing global rule exclusion entries.
  *
  * @since 0.11.1
  */
 public final class ScanTomlWriter {
 
     private ScanTomlWriter() {
-    }
-
-    /**
-     * Adds a symbol-based exclusion entry to the Scan.toml file at the given path.
-     * If the file does not exist, it will be created. Duplicate entries are not added.
-     *
-     * @param scanTomlPath the path to the Scan.toml file
-     * @param filePath     the relative file path for the exclusion
-     * @param ruleId       the fully qualified rule identifier
-     * @param symbol       the enclosing symbol name
-     * @param lineHash     the hashed line content
-     * @throws IOException if an I/O error occurs while reading or writing the file
-     */
-    public static void addExclusion(Path scanTomlPath, String filePath, String ruleId, String symbol, String lineHash)
-            throws IOException {
-        modifyAndWrite(scanTomlPath, tomlMap -> {
-            List<Map<String, Object>> exclusions = getOrCreateTableArray(tomlMap, Constants.EXCLUSION_TABLE);
-
-            // Check for duplicate entry
-            for (Map<String, Object> ex : exclusions) {
-                if (Objects.equals(ex.get(Constants.EXCLUSION_FILE_PATH), filePath) &&
-                        Objects.equals(ex.get(Constants.EXCLUSION_RULE_ID), ruleId) &&
-                        Objects.equals(ex.get(Constants.EXCLUSION_SYMBOL), symbol) &&
-                        Objects.equals(ex.get(Constants.EXCLUSION_LINE_HASH), lineHash)) {
-                    return;
-                }
-            }
-
-            Map<String, Object> newExclusion = new LinkedHashMap<>();
-            newExclusion.put(Constants.EXCLUSION_FILE_PATH, filePath);
-            newExclusion.put(Constants.EXCLUSION_RULE_ID, ruleId);
-            newExclusion.put(Constants.EXCLUSION_SYMBOL, symbol);
-            newExclusion.put(Constants.EXCLUSION_LINE_HASH, lineHash);
-            exclusions.add(newExclusion);
-        });
-    }
-
-    /**
-     * Adds multiple symbol-based exclusion entries to the Scan.toml file.
-     *
-     * @param scanTomlPath the path to the Scan.toml file
-     * @param exclusions   the set of exclusions to add
-     * @throws IOException if an I/O error occurs
-     */
-    public static void addExclusions(Path scanTomlPath, Set<ScanTomlFile.Exclusion> exclusions) throws IOException {
-        modifyAndWrite(scanTomlPath, tomlMap -> {
-            List<Map<String, Object>> exclusionList = getOrCreateTableArray(tomlMap, Constants.EXCLUSION_TABLE);
-
-            for (ScanTomlFile.Exclusion exclusion : exclusions) {
-                boolean duplicate = false;
-                for (Map<String, Object> ex : exclusionList) {
-                    if (Objects.equals(ex.get(Constants.EXCLUSION_FILE_PATH), exclusion.filePath()) &&
-                            Objects.equals(ex.get(Constants.EXCLUSION_RULE_ID), exclusion.ruleId()) &&
-                            Objects.equals(ex.get(Constants.EXCLUSION_SYMBOL), exclusion.symbol()) &&
-                            Objects.equals(ex.get(Constants.EXCLUSION_LINE_HASH), exclusion.lineHash())) {
-                        duplicate = true;
-                        break;
-                    }
-                }
-                if (!duplicate) {
-                    Map<String, Object> newExclusion = new LinkedHashMap<>();
-                    newExclusion.put(Constants.EXCLUSION_FILE_PATH, exclusion.filePath());
-                    newExclusion.put(Constants.EXCLUSION_RULE_ID, exclusion.ruleId());
-                    newExclusion.put(Constants.EXCLUSION_SYMBOL, exclusion.symbol());
-                    newExclusion.put(Constants.EXCLUSION_LINE_HASH, exclusion.lineHash());
-                    exclusionList.add(newExclusion);
-                }
-            }
-        });
     }
 
     /**
@@ -126,39 +55,6 @@ public final class ScanTomlWriter {
 
             if (!excludeList.contains(ruleId)) {
                 excludeList.add(ruleId);
-            }
-        });
-    }
-
-    /**
-     * Removes a symbol-based exclusion entry from the Scan.toml file.
-     *
-     * @param scanTomlPath the path to the Scan.toml file
-     * @param filePath     the relative file path for the exclusion
-     * @param ruleId       the fully qualified rule identifier
-     * @param symbol       the enclosing symbol name
-     * @param lineHash     the hashed line content
-     * @throws IOException if an I/O error occurs
-     */
-    public static void removeExclusion(Path scanTomlPath, String filePath, String ruleId, String symbol, 
-            String lineHash)
-            throws IOException {
-        modifyAndWrite(scanTomlPath, tomlMap -> {
-            if (tomlMap.containsKey(Constants.EXCLUSION_TABLE) && 
-                    tomlMap.get(Constants.EXCLUSION_TABLE) instanceof List) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> exclusions = 
-                        (List<Map<String, Object>>) tomlMap.get(Constants.EXCLUSION_TABLE);
-                exclusions.removeIf(ex ->
-                        Objects.equals(ex.get(Constants.EXCLUSION_FILE_PATH), filePath) &&
-                        Objects.equals(ex.get(Constants.EXCLUSION_RULE_ID), ruleId) &&
-                        Objects.equals(ex.get(Constants.EXCLUSION_SYMBOL), symbol) &&
-                        Objects.equals(ex.get(Constants.EXCLUSION_LINE_HASH), lineHash)
-                );
-                
-                if (exclusions.isEmpty()) {
-                    tomlMap.remove(Constants.EXCLUSION_TABLE);
-                }
             }
         });
     }
@@ -241,16 +137,6 @@ public final class ScanTomlWriter {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> getOrCreateTableArray(Map<String, Object> map, String key) {
-        if (map.containsKey(key) && map.get(key) instanceof List) {
-            return (List<Map<String, Object>>) map.get(key);
-        }
-        List<Map<String, Object>> list = new ArrayList<>();
-        map.put(key, list);
-        return list;
-    }
-
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> getOrCreateTable(Map<String, Object> map, String key) {
         if (map.containsKey(key) && map.get(key) instanceof Map) {
             return (Map<String, Object>) map.get(key);
@@ -275,7 +161,7 @@ public final class ScanTomlWriter {
     private static String generateTomlString(Map<String, Object> tomlMap) {
         StringBuilder sb = new StringBuilder();
 
-        // Prioritize writing in standard order: platform, analyzer, rule, exclusion
+        // Prioritize writing in standard order: platform, analyzer, rule
         writeTableArray(sb, tomlMap, Constants.PLATFORM_TABLE);
         writeTableArray(sb, tomlMap, Constants.ANALYZER_TABLE);
 
@@ -287,8 +173,7 @@ public final class ScanTomlWriter {
         for (Map.Entry<String, Object> entry : tomlMap.entrySet()) {
             String k = entry.getKey();
             if (k.equals(Constants.PLATFORM_TABLE) || k.equals(Constants.ANALYZER_TABLE) 
-                    || k.equals(Constants.RULES_TABLE)
-                    || k.equals(Constants.EXCLUSION_TABLE)) {
+                    || k.equals(Constants.RULES_TABLE)) {
                 continue;
             }
 
@@ -304,7 +189,6 @@ public final class ScanTomlWriter {
             }
         }
 
-        writeTableArray(sb, tomlMap, Constants.EXCLUSION_TABLE);
 
         String result = sb.toString().trim();
         return result.isEmpty() ? "" : result + "\n";

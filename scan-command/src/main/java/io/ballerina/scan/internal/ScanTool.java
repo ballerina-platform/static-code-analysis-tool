@@ -32,7 +32,6 @@ import io.ballerina.scan.utils.Constants;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanTomlWriter;
 import io.ballerina.scan.utils.ScanUtils;
-import io.ballerina.scan.utils.SymbolResolver;
 import io.ballerina.tools.text.LineRange;
 
 import java.io.IOException;
@@ -44,7 +43,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * {@code ScanTool} LANGUAGE SERVER ENTRY POINT
@@ -88,45 +86,6 @@ public class ScanTool {
         }
     }
 
-    /**
-     * ENTRY POINT FOR ADDING EXCLUSIONS
-    * Resolves the AST symbol at the given line and writes a symbol-based exclusion
-    * entry to the Constants.SCAN_FILE file.
-     */
-    public static String addExclusion(String projectPathStr, String filePath, int lineNumber,
-                                      String ruleId,
-                                      Map<String, Boolean> buildOptionsMap) {
-        JsonObject result = new JsonObject();
-        try {
-            Path projectPath = Paths.get(projectPathStr);
-            Project project = loadProjectForLs(projectPath, buildOptionsMap);
-
-            // Resolve the enclosing symbol and line hash
-            String symbol = SymbolResolver.resolveSymbol(project, filePath, lineNumber);
-            String lineHash = SymbolResolver.resolveLineHash(project, filePath, lineNumber);
-
-            // Write the exclusion to Constants.SCAN_FILE
-            Path scanTomlPath = projectPath.resolve(Constants.SCAN_FILE);
-            String relativeFilePath = ScanUtils.getRelativePath(filePath, project.sourceRoot().toString());
-            ScanTomlWriter.addExclusion(scanTomlPath, relativeFilePath, ruleId, symbol, lineHash);
-
-            result.addProperty("success", true);
-            result.addProperty("filePath", relativeFilePath);
-            result.addProperty("ruleId", ruleId);
-            result.addProperty("symbol", symbol);
-            result.addProperty("lineHash", lineHash);
-            result.addProperty("message", "Exclusion added successfully for symbol '" + symbol
-                    + "' in file '" + filePath + "' for rule '" + ruleId + "'");
-        } catch (IOException e) {
-            result.addProperty("success", false);
-                result.addProperty("error", "Failed to write exclusion to " + Constants.SCAN_FILE + ": "
-                    + e.getMessage());
-        } catch (Exception e) {
-            result.addProperty("success", false);
-            result.addProperty("error", "Failed to add exclusion: " + e.getMessage());
-        }
-        return GSON.toJson(result);
-    }
 
     /**
     * ENTRY POINT FOR ADDING GLOBAL EXCLUSIONS
@@ -153,34 +112,6 @@ public class ScanTool {
         return GSON.toJson(result);
     }
 
-    /**
-    * ENTRY POINT FOR REMOVING EXCLUSIONS
-    * Removes a symbol-based exclusion entry from the Constants.SCAN_FILE file.
-     */
-    public static String removeExclusion(String projectPathStr, String filePath,
-                                         String ruleId, String symbol, String lineHash) {
-        JsonObject result = new JsonObject();
-        try {
-            Path projectPath = Paths.get(projectPathStr);
-            Project project = BuildProject.load(projectPath, BuildOptions.builder().build());
-            
-            String relativeFilePath = ScanUtils.getRelativePath(filePath, project.sourceRoot().toString());
-            Path scanTomlPath = projectPath.resolve(Constants.SCAN_FILE);
-            ScanTomlWriter.removeExclusion(scanTomlPath, relativeFilePath, ruleId, symbol, lineHash);
-
-            result.addProperty("success", true);
-            result.addProperty("filePath", relativeFilePath);
-            result.addProperty("ruleId", ruleId);
-            result.addProperty("message", "Exclusion removed successfully.");
-        } catch (IOException e) {
-            result.addProperty("success", false);
-            result.addProperty("error", "Failed to remove exclusion: " + e.getMessage());
-        } catch (Exception e) {
-            result.addProperty("success", false);
-            result.addProperty("error", "Failed to remove exclusion due to unexpected error: " + e.getMessage());
-        }
-        return GSON.toJson(result);
-    }
 
     /**
     * ENTRY POINT FOR REMOVING GLOBAL EXCLUSIONS
@@ -293,9 +224,6 @@ public class ScanTool {
                     ? issue.location().lineRange().fileName() : "";
             String ruleId = issue.rule() != null ? issue.rule().id() : "";
 
-            String issueSymbol = "";
-            String issueLineHash = "";
-            boolean isExcludedByLocal = false;
             boolean isExcludedByGlobal = false;
 
             if (!includeRules.isEmpty() && !includeRules.contains(ruleId)) {
@@ -306,38 +234,12 @@ public class ScanTool {
                 isExcludedByGlobal = true;
             }
 
-            // Resolve context data for local exclusions whenever possible.
-            Set<ScanTomlFile.Exclusion> exclusions = scanToml.getExclusions();
-            if (!exclusions.isEmpty()) {
-                if (issue.location() != null && issue.location().lineRange() != null
-                        && issue.location().lineRange().fileName() != null
-                        && issue.location().lineRange().startLine() != null) {
-                    int issueLine = issue.location().lineRange().startLine().line();
-                    issueSymbol = SymbolResolver.resolveSymbol(project, issueFileName, issueLine);
-                    issueLineHash = SymbolResolver.resolveLineHash(project, issueFileName, issueLine);
-
-                    String finalExSymbol = issueSymbol;
-                    String finalExLineHash = issueLineHash;
-
-                    isExcludedByLocal = exclusions.stream().anyMatch(exclusion ->
-                            ScanUtils.matchesExclusion(issueFileName, ruleId,
-                                    finalExSymbol, finalExLineHash, exclusion));
-                }
-            }
-
-            isExcluded = isExcludedByLocal || isExcludedByGlobal;
-            isGlobalExclusion = isExcludedByGlobal && !isExcludedByLocal;
+            isExcluded = isExcludedByGlobal;
+            isGlobalExclusion = isExcludedByGlobal;
 
             if (isExcluded) {
-                if (issueSymbol.isEmpty() && issue.location() != null
-                        && issue.location().lineRange() != null
-                        && issue.location().lineRange().startLine() != null) {
-                    int issueLine = issue.location().lineRange().startLine().line();
-                    issueSymbol = SymbolResolver.resolveSymbol(project, issueFileName, issueLine);
-                    issueLineHash = SymbolResolver.resolveLineHash(project, issueFileName, issueLine);
-                }
-                excludedIssues.add(new ExcludedIssue(issue, ruleId, issueFileName, 
-                        issueSymbol, issueLineHash, isGlobalExclusion));
+                excludedIssues.add(new ExcludedIssue(issue, ruleId, issueFileName,
+                        "", "", true));
             } else {
                 activeIssues.add(issue);
             }
