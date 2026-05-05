@@ -18,6 +18,8 @@
 
 package io.ballerina.scan;
 
+import java.util.Objects;
+
 /**
  * Represents a security issue that has been excluded from the results.
  *
@@ -31,9 +33,9 @@ public class ExcludedIssue {
 
     public ExcludedIssue(Issue issue, String ruleId, String filePath,
                          boolean isGlobalExclusion) {
-        this.issue = issue;
-        this.ruleId = ruleId;
-        this.filePath = filePath;
+        this.issue = Objects.requireNonNull(issue, "issue must not be null");
+        this.ruleId = Objects.requireNonNull(ruleId, "ruleId must not be null");
+        this.filePath = Objects.requireNonNull(filePath, "filePath must not be null");
         this.isGlobalExclusion = isGlobalExclusion;
     }
 
