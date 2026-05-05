@@ -35,8 +35,6 @@ import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.text.LineRange;
 
 import java.io.IOException;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -154,19 +152,13 @@ public class ScanTool {
         return BuildProject.load(projectPath, buildOptions);
     }
 
-    private static ScanResult runScan(Project project) {
-        java.io.ByteArrayOutputStream diagnosticBuffer = new java.io.ByteArrayOutputStream();
-        PrintStream silentStream = new PrintStream(
-                diagnosticBuffer,
-                true,
-                StandardCharsets.UTF_8);
-
+    private static ScanResult runScan(Project project) throws IOException {
         // Load Constants.SCAN_FILE configurations
-        Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, silentStream);
+        Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, System.err);
         
-        // If Scan.toml is malformed or missing, return a failing ScanResult
+        // If Scan.toml is malformed or missing, throw exception
         if (scanToml.isEmpty()) {
-            return new ScanResult(new ArrayList<>(), new ArrayList<>());
+            throw new IOException("Failed to load Scan.toml: configuration file is missing or malformed.");
         }
         
         ProjectAnalyzer analyzer = new ProjectAnalyzer(project, scanToml.get());
