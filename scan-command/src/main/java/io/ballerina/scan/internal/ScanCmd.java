@@ -313,7 +313,6 @@ public class ScanCmd implements BLauncherCmd {
             issues.removeIf(issue -> projectExcludeRules.contains(issue.rule().id()));
         }
 
-
         allIssues.addAll(issues);
 
         if (platforms.isEmpty() && !platformTriggered) {
