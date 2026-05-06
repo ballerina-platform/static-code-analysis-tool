@@ -48,16 +48,15 @@ import java.util.Optional;
  *
  * @since 0.11.1
  */
-public class ScanTool {
+public class ScanLanguageServerTool {
     private static final Gson GSON = new Gson();
 
-    // ===================================================================================
-    // PUBLIC LS ENTRY POINTS
-    // ===================================================================================
-
     /**
-     * ENTRY POINT TO RUN A SCAN
-     * Returns a JSON string of issues.
+        * Runs a scan for the given project path.
+        *
+        * @param projectPathStr project path
+        * @param buildOptionsMap build options
+        * @return scan result as JSON
      */
     public static String runScan(String projectPathStr,
                                  Map<String, Boolean> buildOptionsMap) {
@@ -87,17 +86,18 @@ public class ScanTool {
 
 
     /**
-    * ENTRY POINT FOR ADDING GLOBAL EXCLUSIONS
-    * Adds a rule ID to the global `[rule]` section in Constants.SCAN_FILE.
+     * Adds a rule ID to the global {@code [rule]} section in {@link Constants#SCAN_FILE}.
+     *
+     * @param projectPathStr project path
+     * @param ruleId rule identifier
+     * @return operation result as JSON
      */
     public static String addGlobalExclusion(String projectPathStr, String ruleId) {
-        JsonObject result = new JsonObject();
         // Validate and normalize ruleId
         String normalizedRuleId = ruleId == null ? "" : ruleId.trim();
         if (normalizedRuleId.isEmpty()) {
-            result.addProperty("success", false);
-            result.addProperty("error", "Invalid ruleId: must be a non-empty string");
-            return GSON.toJson(result);
+            return GSON.toJson(new ScanMutationResponse(false, null,
+                    "Invalid ruleId: must be a non-empty string"));
         }
 
         try {
@@ -105,50 +105,46 @@ public class ScanTool {
             Path scanTomlPath = projectPath.resolve(Constants.SCAN_FILE);
             ScanTomlWriter.addGlobalExclusion(scanTomlPath, normalizedRuleId);
 
-            result.addProperty("success", true);
-            result.addProperty("ruleId", normalizedRuleId);
-            result.addProperty("message", "Global exclusion added successfully for rule '" + normalizedRuleId + "'");
+            return GSON.toJson(new ScanMutationResponse(true, normalizedRuleId,
+                    "Global exclusion added successfully for rule '" + normalizedRuleId + "'"));
         } catch (IOException e) {
-            result.addProperty("success", false);
-            result.addProperty("error", "Failed to write global exclusion to " + Constants.SCAN_FILE + ": "
-                    + e.getMessage());
+            return GSON.toJson(new ScanMutationResponse(false, null,
+                    "Failed to write global exclusion to " + Constants.SCAN_FILE + ": " + e.getMessage()));
         } catch (Exception e) {
-            result.addProperty("success", false);
-            result.addProperty("error", "Failed to add global exclusion: " + e.getMessage());
+            return GSON.toJson(new ScanMutationResponse(false, null,
+                    "Failed to add global exclusion: " + e.getMessage()));
         }
-        return GSON.toJson(result);
     }
 
 
     /**
-    * ENTRY POINT FOR REMOVING GLOBAL EXCLUSIONS
-    * Removes a rule ID from the global `[rule]` section in Constants.SCAN_FILE.
+     * Removes a rule ID from the global {@code [rule]} section in {@link Constants#SCAN_FILE}.
+     *
+     * @param projectPathStr project path
+     * @param ruleId rule identifier
+     * @return operation result as JSON
      */
     public static String removeGlobalExclusion(String projectPathStr, String ruleId) {
-        JsonObject result = new JsonObject();
         // Validate and normalize ruleId
         String normalizedRuleId = ruleId == null ? "" : ruleId.trim();
         if (normalizedRuleId.isEmpty()) {
-            result.addProperty("success", false);
-            result.addProperty("error", "Invalid ruleId: must be a non-empty string");
-            return GSON.toJson(result);
+            return GSON.toJson(new ScanMutationResponse(false, null,
+                    "Invalid ruleId: must be a non-empty string"));
         }
 
         try {
             Path scanTomlPath = Paths.get(projectPathStr).resolve(Constants.SCAN_FILE);
             ScanTomlWriter.removeGlobalExclusion(scanTomlPath, normalizedRuleId);
 
-            result.addProperty("success", true);
-            result.addProperty("ruleId", normalizedRuleId);
-            result.addProperty("message", "Global exclusion removed successfully.");
+            return GSON.toJson(new ScanMutationResponse(true, normalizedRuleId,
+                    "Global exclusion removed successfully."));
         } catch (IOException e) {
-            result.addProperty("success", false);
-            result.addProperty("error", "Failed to remove global exclusion: " + e.getMessage());
+            return GSON.toJson(new ScanMutationResponse(false, null,
+                    "Failed to remove global exclusion: " + e.getMessage()));
         } catch (Exception e) {
-            result.addProperty("success", false);
-            result.addProperty("error", "Failed to remove global exclusion due to unexpected error: " + e.getMessage());
+            return GSON.toJson(new ScanMutationResponse(false, null,
+                    "Failed to remove global exclusion due to unexpected error: " + e.getMessage()));
         }
-        return GSON.toJson(result);
     }
 
     // ===================================================================================
@@ -311,4 +307,6 @@ public class ScanTool {
         }
         return obj;
     }
+
+    private record ScanMutationResponse(boolean success, String ruleId, String message) { }
 }
