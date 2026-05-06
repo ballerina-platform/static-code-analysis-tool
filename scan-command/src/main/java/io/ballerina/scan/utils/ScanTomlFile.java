@@ -90,7 +90,6 @@ public class ScanTomlFile {
         return Collections.unmodifiableSet(rulesToExclude);
     }
 
-
     /**
      * Represents a static code analysis platform.
      *
