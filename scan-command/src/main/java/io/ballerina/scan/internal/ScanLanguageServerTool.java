@@ -52,11 +52,11 @@ public class ScanLanguageServerTool {
     private static final Gson GSON = new Gson();
 
     /**
-        * Runs a scan for the given project path.
-        *
-        * @param projectPathStr project path
-        * @param buildOptionsMap build options
-        * @return scan result as JSON
+     * Runs a scan for the given project path.
+     *
+     * @param projectPathStr project path
+     * @param buildOptionsMap build options
+     * @return scan result as JSON
      */
     public static String runScan(String projectPathStr,
                                  Map<String, Boolean> buildOptionsMap) {
