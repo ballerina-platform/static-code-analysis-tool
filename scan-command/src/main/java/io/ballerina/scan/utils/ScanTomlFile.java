@@ -52,7 +52,7 @@ public class ScanTomlFile {
     void setRuleToExclude(RuleToFilter rule) {
         rulesToExclude.add(rule);
     }
-  
+
 
     /**
      * Returns an unmodifiable {@link Set} of platforms.

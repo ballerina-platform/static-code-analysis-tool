@@ -77,7 +77,8 @@ public class ScanLanguageServerTool {
         } catch (Exception e) {
             JsonObject errorObject = new JsonObject();
             errorObject.addProperty("success", false);
-            errorObject.addProperty("error", e.getMessage());
+            String errorMsg = e.getMessage();
+            errorObject.addProperty("error", errorMsg != null && !errorMsg.trim().isEmpty() ? errorMsg : e.toString());
             errorObject.add("activeIssues", new JsonArray());
             errorObject.add("excludedIssues", new JsonArray());
             return GSON.toJson(errorObject);
@@ -168,16 +169,18 @@ public class ScanLanguageServerTool {
     private static ScanResult runScan(Project project) throws IOException {
         // Load Constants.SCAN_FILE configurations
         Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, System.err);
-        
-        // If Scan.toml is malformed or missing, throw exception
+
+        // An empty result indicates an invalid Scan.toml configuration, not a missing file.
         if (scanToml.isEmpty()) {
-            throw new IOException("Failed to load Scan.toml: configuration file is missing or malformed.");
+            throw new IOException("Failed to load Scan.toml: invalid configuration. " +
+                    "Check for malformed content, missing required 'scan.configPath', " +
+                    "or failures while loading referenced configuration.");
         }
-        
+
         ProjectAnalyzer analyzer = new ProjectAnalyzer(project, scanToml.get());
 
         // Execute
-        return execute(analyzer, scanToml.get(), project);
+        return execute(analyzer, scanToml.get());
     }
 
     /**
@@ -187,7 +190,7 @@ public class ScanLanguageServerTool {
      *                                  since they are mutually exclusive.
      */
     private static ScanResult execute(ProjectAnalyzer projectAnalyzer,
-                                      ScanTomlFile scanToml, Project project) {
+                                      ScanTomlFile scanToml) {
         // Gather all available Rules
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
@@ -207,7 +210,7 @@ public class ScanLanguageServerTool {
         }
 
         if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
-                throw new IllegalArgumentException("Invalid " + Constants.SCAN_FILE
+            throw new IllegalArgumentException("Invalid " + Constants.SCAN_FILE
                     + " configuration: both include and exclude rule "
                     + "filters are set. Configure only one of [rule.include] or [rule.exclude].");
         }
@@ -280,12 +283,13 @@ public class ScanLanguageServerTool {
         if (issue.rule() != null) {
             obj.addProperty("ruleId", issue.rule().id());
             obj.addProperty("message", issue.rule().description());
-            obj.addProperty("severity", issue.rule().kind() != null ? issue.rule().kind().toString() : "WARNING");
-            obj.addProperty("ruleKind", issue.rule().kind() != null ? issue.rule().kind().name() : "UNKNOWN");
+            String ruleKind = issue.rule().kind() != null ? issue.rule().kind().name() : "UNKNOWN";
+            obj.addProperty("severity", issue.rule().kind() != null ? issue.rule().kind().toString() : "MEDIUM");
+            obj.addProperty("ruleKind", ruleKind);
         } else {
             obj.addProperty("ruleId", "UNKNOWN");
             obj.addProperty("message", "Unknown Issue Rule");
-            obj.addProperty("severity", "WARNING");
+            obj.addProperty("severity", "MEDIUM");
             obj.addProperty("ruleKind", "UNKNOWN");
         }
 

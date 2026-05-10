@@ -25,7 +25,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +92,7 @@ public final class ScanTomlWriter {
     }
 
     private static void modifyAndWrite(Path scanTomlPath, Modifier modifier) throws IOException {
-        Map<String, Object> tomlMap = new HashMap<>();
+        Map<String, Object> tomlMap = new LinkedHashMap<>();
         if (Files.exists(scanTomlPath)) {
             String content = Files.readString(scanTomlPath, StandardCharsets.UTF_8).trim();
             if (!content.isEmpty()) {
@@ -102,20 +101,25 @@ public final class ScanTomlWriter {
             }
         }
 
+        String originalTomlContent = generateTomlString(tomlMap);
         modifier.modify(tomlMap);
+        String newTomlContent = generateTomlString(tomlMap);
+
+        if (originalTomlContent.equals(newTomlContent)) {
+            return;
+        }
 
         Path parentDir = scanTomlPath.getParent();
         if (parentDir != null) {
             Files.createDirectories(parentDir);
         }
 
-        String newTomlContent = generateTomlString(tomlMap);
         Files.writeString(scanTomlPath, newTomlContent, StandardCharsets.UTF_8);
     }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> deepMutableCopy(Map<String, Object> map) {
-        Map<String, Object> copy = new HashMap<>();
+        Map<String, Object> copy = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : map.entrySet()) {
             copy.put(entry.getKey(), makeMutable(entry.getValue()));
         }
@@ -172,7 +176,7 @@ public final class ScanTomlWriter {
         // Write any other keys that might exist (to prevent data loss)
         for (Map.Entry<String, Object> entry : tomlMap.entrySet()) {
             String k = entry.getKey();
-            if (k.equals(Constants.PLATFORM_TABLE) || k.equals(Constants.ANALYZER_TABLE) 
+            if (k.equals(Constants.PLATFORM_TABLE) || k.equals(Constants.ANALYZER_TABLE)
                     || k.equals(Constants.RULES_TABLE)) {
                 continue;
             }
