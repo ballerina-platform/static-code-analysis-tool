@@ -23,7 +23,11 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.ballerina.projects.BuildOptions;
 import io.ballerina.projects.Project;
+import io.ballerina.projects.ProjectKind;
+import io.ballerina.projects.ProjectLoadResult;
 import io.ballerina.projects.directory.BuildProject;
+import io.ballerina.projects.directory.ProjectLoader;
+import io.ballerina.projects.directory.WorkspaceProject;
 import io.ballerina.scan.ExcludedIssue;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
@@ -163,7 +167,18 @@ public class ScanLanguageServerTool {
                 .setSkipTests(isSkipTests)
                 .build();
 
-        return BuildProject.load(projectPath, buildOptions);
+        ProjectLoadResult loadResult = ProjectLoader.load(projectPath, buildOptions);
+        Project project = loadResult.project();
+
+        if (project.kind() == ProjectKind.WORKSPACE_PROJECT) {
+            WorkspaceProject workspaceProject = (WorkspaceProject) project;
+            for (BuildProject bp : workspaceProject.projects()) {
+                if (bp.sourceRoot().equals(projectPath)) {
+                    return bp;
+                }
+            }
+        }
+        return project;
     }
 
     private static ScanResult runScan(Project project) throws IOException {
