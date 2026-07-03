@@ -22,12 +22,14 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.ballerina.projects.BuildOptions;
+import io.ballerina.projects.DependencyGraph;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.ProjectLoadResult;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.directory.WorkspaceProject;
+import io.ballerina.projects.util.ProjectPaths;
 import io.ballerina.scan.ExcludedIssue;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
@@ -42,6 +44,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,11 +74,31 @@ public class ScanLanguageServerTool {
             // Run the scanner
             ScanResult result = runScan(project);
 
+            // Check dependent workspace packages for issues
+            boolean dependentPackageIssuesFound;
+            try {
+                dependentPackageIssuesFound = hasDependentPackageIssues(project, projectPath, buildOptionsMap);
+            } catch (Throwable e) {
+                String errorMsg;
+                if (e.getCause() != null) {
+                    errorMsg = e.getCause().getClass().getName() + ": " + e.getCause().getMessage();
+                } else {
+                    errorMsg = e.getClass().getName() + ": " + e.getMessage();
+                }
+                JsonObject errorObject = new JsonObject();
+                errorObject.addProperty("success", false);
+                errorObject.addProperty("error", "Dependent Package Scan Error: " + errorMsg);
+                errorObject.add("activeIssues", new JsonArray());
+                errorObject.add("excludedIssues", new JsonArray());
+                return GSON.toJson(errorObject);
+            }
+
             // Convert to JSON
             JsonObject jsonObject = new JsonObject();
             jsonObject.addProperty("success", true);
             jsonObject.add("activeIssues", issuesToJsonArray(result.activeIssues()));
             jsonObject.add("excludedIssues", excludedIssuesToJsonArray(result.excludedIssues()));
+            jsonObject.addProperty("dependentPackageIssuesFound", dependentPackageIssuesFound);
             return GSON.toJson(jsonObject);
 
         } catch (Exception e) {
@@ -178,7 +201,71 @@ public class ScanLanguageServerTool {
                 }
             }
         }
+
+        // If the loaded project is a BuildProject without workspace context, try to find the
+        // workspace root and load it to get proper workspace resolution
+        Optional<Path> wsRoot = ProjectPaths.workspaceRoot(projectPath);
+        if (wsRoot.isPresent()) {
+            ProjectLoadResult wsResult = ProjectLoader.load(wsRoot.get(), buildOptions);
+            if (wsResult.project().kind() == ProjectKind.WORKSPACE_PROJECT) {
+                WorkspaceProject workspaceProject = (WorkspaceProject) wsResult.project();
+                for (BuildProject bp : workspaceProject.projects()) {
+                    if (bp.sourceRoot().equals(projectPath)) {
+                        return bp;
+                    }
+                }
+            }
+        }
         return project;
+    }
+
+    private static boolean hasDependentPackageIssues(Project project, Path projectPath,
+                                                     Map<String, Boolean> buildOptionsMap) throws IOException {
+        // Try to get workspace from the project first
+        Optional<WorkspaceProject> wsOpt = project.workspaceProject();
+
+        // If not available, try to find workspace from the path
+        if (wsOpt.isEmpty()) {
+            Optional<Path> wsRoot = ProjectPaths.workspaceRoot(projectPath);
+            if (wsRoot.isPresent()) {
+                boolean isOffline = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("offline"));
+                boolean isSticky = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("sticky"));
+                boolean isSkipTests = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("skipTests"));
+                BuildOptions wsBuildOptions = BuildOptions.builder()
+                        .setOffline(isOffline)
+                        .setSticky(isSticky)
+                        .setSkipTests(isSkipTests)
+                        .build();
+                ProjectLoadResult wsResult = ProjectLoader.load(wsRoot.get(), wsBuildOptions);
+                if (wsResult.project().kind() == ProjectKind.WORKSPACE_PROJECT) {
+                    WorkspaceProject wsProject = (WorkspaceProject) wsResult.project();
+                    for (BuildProject bp : wsProject.projects()) {
+                        if (bp.sourceRoot().equals(projectPath)) {
+                            project = bp;
+                            wsOpt = Optional.of(wsProject);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (wsOpt.isEmpty()) {
+            return false;
+        }
+        WorkspaceProject workspaceProject = wsOpt.get();
+        if (workspaceProject.projects().size() <= 1) {
+            return false;
+        }
+        DependencyGraph<BuildProject> depGraph = workspaceProject.getResolution().dependencyGraph();
+        Collection<BuildProject> dependencies = depGraph.getAllDependencies((BuildProject) project);
+        for (BuildProject bp : dependencies) {
+            ScanResult depResult = runScan(bp);
+            if (!depResult.activeIssues().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ScanResult runScan(Project project) throws IOException {
