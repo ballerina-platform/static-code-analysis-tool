@@ -53,6 +53,7 @@ public class ScanTomlFile {
         rulesToExclude.add(rule);
     }
 
+
     /**
      * Returns an unmodifiable {@link Set} of platforms.
      *
@@ -118,4 +119,5 @@ public class ScanTomlFile {
      * @param id in-memory representation of the identifier of the rule to filter
      */
     public record RuleToFilter(String id) { }
+
 }

@@ -331,7 +331,7 @@ public final class ScanUtils {
      * @param sourceRoot the source root path
      * @return relative path
      */
-    private static String getRelativePath(String filePath, String sourceRoot) {
+    public static String getRelativePath(String filePath, String sourceRoot) {
         Path path = Paths.get(filePath);
         try {
             Path source = Paths.get(sourceRoot);
@@ -781,6 +781,7 @@ public final class ScanUtils {
         };
     }
 
+
     /**
      * Returns the {@link Optional<String>} path of the downloaded remote JAR file.
      *
@@ -902,4 +903,5 @@ public final class ScanUtils {
         }
         return new AbstractMap.SimpleEntry<>(priorities.size(), false);
     }
+
 }
