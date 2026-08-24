@@ -66,7 +66,8 @@ import static io.ballerina.scan.internal.CoreRule.NON_CONFIGURABLE_SECRET;
 import static io.ballerina.scan.internal.SensitiveParameterTracker.FUNCTIONS_WITH_SENSITIVE_PARAMETERS;
 
 public class SecretChecker extends NodeVisitor {
-    private static final Pattern SECRET_WORDS = Pattern.compile(buildSecretKeywordPattern());
+    private static final Pattern SECRET_WORDS = Pattern.compile(buildSecretKeywordPattern(),
+            Pattern.CASE_INSENSITIVE);
     private static final Pattern URL_PREFIX = Pattern.compile("^\\w{1,8}://");
     private static final Pattern NON_EMPTY_URL_CREDENTIAL = Pattern.compile("(?<user>[^\\s:]*+):(?<password>\\S++)");
     private static final String PLACE_HOLDER_STRING = "xyz";
@@ -74,9 +75,7 @@ public class SecretChecker extends NodeVisitor {
     private static String buildSecretKeywordPattern() {
         String[] baseKeywords = {
                 "password", "passwd", "pwd", "passphrase", 
-                "secret", "clientSecret", "key", 
-                "apiKey", "apiSecret", "apiToken",
-                "token", "authToken", "accessToken"
+                "secret", "auth", "apiKey", "token"
         };
 
         StringBuilder patternBuilder = new StringBuilder();
@@ -86,23 +85,18 @@ public class SecretChecker extends NodeVisitor {
             }
             String keyword = baseKeywords[i];
             patternBuilder.append(keyword);
-            patternBuilder.append("|").append(toUpperCase(keyword));
             patternBuilder.append("|").append(toSnakeCase(keyword));
-            patternBuilder.append("|").append(toSnakeCaseUpper(keyword));
+            patternBuilder.append("|").append(toKebabCase(keyword));
         }
         return patternBuilder.toString();
-    }
-
-    private static String toUpperCase(String keyword) {
-        return keyword.toUpperCase(Locale.ENGLISH);
     }
 
     private static String toSnakeCase(String keyword) {
         return keyword.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase(Locale.ENGLISH);
     }
 
-    private static String toSnakeCaseUpper(String keyword) {
-        return toSnakeCase(keyword).toUpperCase(Locale.ENGLISH);
+    private static String toKebabCase(String keyword) {
+        return keyword.replaceAll("([a-z])([A-Z])", "$1-$2").toLowerCase(Locale.ENGLISH);
     }
 
     private final Document document;
