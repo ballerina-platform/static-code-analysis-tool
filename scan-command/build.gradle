@@ -309,7 +309,6 @@ tasks.test {
 
     useTestNG() {
         suites 'src/test/resources/testng.xml'
-        testLogging.showStandardStreams = true
     }
 }
 
