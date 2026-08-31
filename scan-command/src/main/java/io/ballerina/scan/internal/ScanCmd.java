@@ -181,6 +181,12 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
+        if (listRules && !isBallerinaProjectPath()) {
+            allRules.addAll(CoreRule.rules());
+            ScanUtils.printRulesToConsole(allRules, outputStream);
+            return;
+        }
+
         Optional<Project> project = getProject();
         if (project.isEmpty()) {
             return;
@@ -386,9 +392,7 @@ public class ScanCmd implements BLauncherCmd {
 
     protected Optional<Project> getProject() {
         try {
-            if (!ProjectPaths.isBuildProjectRoot(projectPath)
-                    && !ProjectPaths.isStandaloneBalFile(projectPath)
-                    && !ProjectPaths.isWorkspaceProjectRoot(projectPath)) {
+            if (!isBallerinaProjectPath()) {
                 outputStream.println("The specified path is not a valid Ballerina project: " + projectPath + ". Please "
                         + "provide a valid Ballerina project path and try again.");
                 return Optional.empty();
@@ -403,6 +407,16 @@ public class ScanCmd implements BLauncherCmd {
         } catch (RuntimeException ex) {
             outputStream.println(ex.getMessage());
             return Optional.empty();
+        }
+    }
+
+    private boolean isBallerinaProjectPath() {
+        try {
+            return ProjectPaths.isBuildProjectRoot(projectPath)
+                    || ProjectPaths.isStandaloneBalFile(projectPath)
+                    || ProjectPaths.isWorkspaceProjectRoot(projectPath);
+        } catch (RuntimeException ex) {
+            return false;
         }
     }
 

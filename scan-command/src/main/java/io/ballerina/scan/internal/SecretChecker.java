@@ -312,6 +312,7 @@ public class SecretChecker extends NodeVisitor {
         switch (expressionNode.kind()) {
             case STRING_LITERAL -> reportHardCodedSecret(expressionNode);
             case SIMPLE_NAME_REFERENCE -> validateSimpleNameReference(expressionNode);
+            case REQUIRED_EXPRESSION -> { }
             default -> reportNonConfigurableSecret(expressionNode);
         }
     }

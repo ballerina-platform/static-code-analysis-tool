@@ -152,4 +152,12 @@ public class Rule014Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.remove(0), documentName, new Location(24, 50, 24, 58),
                 NON_CONFIGURABLE_SECRET.rule());
     }
+
+    @Test
+    void testConfigurableSecretsAreNotReported() {
+        String documentName = "rule014_configurable_secrets.bal";
+        List<Issue> issues = analyze(documentName,
+                List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()));
+        Assert.assertEquals(issues, List.of());
+    }
 }

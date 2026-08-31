@@ -267,6 +267,30 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(actual, expected);
     }
 
+    @Test(description = "test scan command with list rules flag outside a Ballerina project")
+    void testScanCommandWithListRulesFlagOutsideBallerinaProject() throws IOException {
+        Path nonProjectPath = testResources.resolve("test-resources").toAbsolutePath();
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {nonProjectPath.toString(), "--list-rules"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        String expected = getExpectedOutput("core-rules-output.txt");
+        Assert.assertEquals(readOutput(true).trim(), expected);
+    }
+
+    @Test(description = "test scan command with list rules flag when the current directory is not a Ballerina project")
+    void testScanCommandWithListRulesFlagWithoutArgumentOutsideBallerinaProject() throws IOException {
+        Path nonProjectPath = testResources.resolve("test-resources").toAbsolutePath();
+        System.setProperty("user.dir", nonProjectPath.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--list-rules"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String expected = getExpectedOutput("core-rules-output.txt");
+        Assert.assertEquals(readOutput(true).trim(), expected);
+    }
+
     @Test(description = "test scan command with target directory flag on single file project")
     void testScanCommandWithTargetDirFlagOnSingleFileProject() throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream);

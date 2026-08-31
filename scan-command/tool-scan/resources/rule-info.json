@@ -204,6 +204,42 @@
     "quickfix": "unknown"
   },
   {
+    "title": "Hard-coded secrets are security-sensitive",
+    "type": "VULNERABILITY",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "secrets",
+      "credentials"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:13",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
+    "title": "Non configurable secrets are security-sensitive",
+    "type": "VULNERABILITY",
+    "status": "ready",
+    "remediation": {
+      "func": "Constant\/Issue",
+      "constantCost": "5min"
+    },
+    "tags": [
+      "secrets",
+      "configurable"
+    ],
+    "defaultSeverity": "Major",
+    "ruleSpecification": "N/A",
+    "sqKey": "ballerina:14",
+    "scope": "All",
+    "quickfix": "unknown"
+  },
+  {
     "title": "Avoid using publicly writable directories for file operations without proper access controls",
     "type": "VULNERABILITY",
     "status": "ready",
