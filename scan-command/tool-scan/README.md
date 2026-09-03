@@ -462,6 +462,95 @@ public function main() {
 }
 ```
 
+### ballerina:13 - Hard-coded secrets are security-sensitive
+
+Credentials written directly into the source code are visible to everyone who can read the code and pose a security vulnerability with every copy of the repository. These secrets include credentials defined directly in the source code and credentials included in URLs.
+
+#### Noncompliant Code Example
+
+```ballerina
+const API_KEY = "xxxx-xxxx-xxxx-xxxx-xxxx";
+
+public function main() {
+   string password = "secret";
+   string apiKey = API_KEY;
+   string url = "http://admin:secret@localhost:9090";
+   connect("admin", "secret");
+}
+
+function connect(string username, string password) {
+}
+```
+
+#### Compliant Solution
+
+Declare the secret as a `configurable` variable and supply the value at runtime through `Config.toml`, an environment
+variable, or a command line argument, so that it never appears in the source.
+
+```ballerina
+configurable string username = ?;
+configurable string password = ?;
+configurable string apiKey = ?;
+
+public function main() {
+   string url = "http://localhost:9090";
+   connect(username, password);
+}
+
+function connect(string username, string password) {
+}
+```
+
+### ballerina:14 - Non configurable secrets are security-sensitive
+
+A secret that is not declared as `configurable` is fixed at build time. Even when the value does not appear as a
+literal at the point of use, the package still has to be edited and rebuilt in order to rotate the credential or to
+run the same package against a different environment.
+
+#### Noncompliant Code Example
+
+```ballerina
+string defaultPassword = "";
+
+type Credential record {|
+   string username;
+   string password;
+|};
+
+public function main() {
+   Credential credential = {username: "admin", password: defaultPassword};
+   connect("admin", readPassword());
+}
+
+function readPassword() returns string => "";
+
+function connect(string username, string password) {
+}
+```
+
+#### Compliant Solution
+
+Declare the secret as a `configurable` variable so that its value can be provided per environment without changing
+the source.
+
+```ballerina
+configurable string username = ?;
+configurable string password = ?;
+
+type Credential record {|
+   string username;
+   string password;
+|};
+
+public function main() {
+   Credential credential = {username, password};
+   connect(username, password);
+}
+
+function connect(string username, string password) {
+}
+```
+
 ### ballerina/file:1 - Avoid using publicly writable directories for file operations without proper access controls
 
 Operating systems often have global directories with write access granted to any user.

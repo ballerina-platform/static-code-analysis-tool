@@ -10,6 +10,6 @@ module io.ballerina.scan {
     requires org.apache.commons.io;
 
     exports io.ballerina.scan;
-    exports io.ballerina.scan.internal to io.ballerina.scan.test;
-    exports io.ballerina.scan.utils to io.ballerina.scan.test;
+    exports io.ballerina.scan.internal;
+    exports io.ballerina.scan.utils;
 }

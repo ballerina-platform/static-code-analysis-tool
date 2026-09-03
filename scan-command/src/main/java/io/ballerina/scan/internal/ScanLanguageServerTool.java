@@ -181,12 +181,10 @@ public class ScanLanguageServerTool {
 
     private static Project loadProjectForLs(Path projectPath, Map<String, Boolean> buildOptionsMap) {
         boolean isOffline = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("offline"));
-        boolean isSticky = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("sticky"));
         boolean isSkipTests = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("skipTests"));
 
         BuildOptions buildOptions = BuildOptions.builder()
                 .setOffline(isOffline)
-                .setSticky(isSticky)
                 .setSkipTests(isSkipTests)
                 .build();
 
@@ -229,11 +227,9 @@ public class ScanLanguageServerTool {
             Optional<Path> wsRoot = ProjectPaths.workspaceRoot(projectPath);
             if (wsRoot.isPresent()) {
                 boolean isOffline = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("offline"));
-                boolean isSticky = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("sticky"));
                 boolean isSkipTests = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("skipTests"));
                 BuildOptions wsBuildOptions = BuildOptions.builder()
                         .setOffline(isOffline)
-                        .setSticky(isSticky)
                         .setSkipTests(isSkipTests)
                         .build();
                 ProjectLoadResult wsResult = ProjectLoader.load(wsRoot.get(), wsBuildOptions);

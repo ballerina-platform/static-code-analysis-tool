@@ -31,6 +31,8 @@ import io.ballerina.tools.text.LineRange;
 import org.testng.Assert;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 
 /**
  * Static code analyzer test.
@@ -38,16 +40,32 @@ import java.nio.file.Path;
  * @since 0.1.0
  */
 public class StaticCodeAnalyzerTest extends BaseTest {
-    private final Path coreRuleBalFiles = testResources.resolve("test-resources").resolve("core-rules");
+    static List<Issue> analyze(String documentName, List<Rule> rules) {
+        Module defaultModule = getModule(documentName);
+        Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
+        ScannerContextImpl scannerContext = new ScannerContextImpl(rules);
+        SensitiveParameterTracker sensitiveParameterTracker = new SensitiveParameterTracker(document.syntaxTree(),
+                scannerContext, defaultModule.getCompilation().getSemanticModel());
+        sensitiveParameterTracker.scan();
+        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document,
+                scannerContext, document.module().getCompilation().getSemanticModel());
+        staticCodeAnalyzer.analyze();
+        return scannerContext.getReporter().getIssues();
+    }
 
-    Document loadDocument(String documentName) {
-        Project project = ProjectLoader.load(coreRuleBalFiles.resolve(documentName)).project();
-        Module defaultModule = project.currentPackage().getDefaultModule();
+    static Document loadDocument(String documentName) {
+        Module defaultModule = getModule(documentName);
         return defaultModule.document(defaultModule.documentIds().iterator().next());
     }
 
-    void assertIssue(Issue issue, String documentName, int startLine, int startOffset, int endLine, int endOffset,
-                     String ruleId, int numericId, String description, RuleKind ruleKind) {
+    private static Module getModule(String documentName) {
+        Path coreRuleBalFiles = Paths.get("src", "test", "resources").resolve("test-resources").resolve("core-rules");
+        Project project = ProjectLoader.load(coreRuleBalFiles.resolve(documentName)).project();
+        return project.currentPackage().getDefaultModule();
+    }
+
+    static void assertIssue(Issue issue, String documentName, int startLine, int startOffset, int endLine, 
+                    int endOffset, String ruleId, int numericId, String description, RuleKind ruleKind) {
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
         LineRange location = issue.location().lineRange();
         Assert.assertEquals(location.fileName(), documentName);
@@ -60,5 +78,12 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         Assert.assertEquals(rule.numericId(), numericId);
         Assert.assertEquals(rule.description(), description);
         Assert.assertEquals(rule.kind(), ruleKind);
+    }
+
+    static void assertIssue(Issue issue, String documentName, Location expectedLocation, Rule expectedRule) {
+        Assert.assertEquals(issue.source(), Source.BUILT_IN);
+        assertIssue(issue, documentName, expectedLocation.statLine(), expectedLocation.startOffset(),
+                expectedLocation.endLine(), expectedLocation.endOffset(), expectedRule.id(),
+                expectedRule.numericId(), expectedRule.description(), expectedRule.kind());
     }
 }

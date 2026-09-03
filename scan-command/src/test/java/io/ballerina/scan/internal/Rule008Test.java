@@ -37,7 +37,7 @@ public class Rule008Test extends StaticCodeAnalyzerTest {
 
     @Test(description = "test always false evaluates")
     void testFalseEvaluates() {
-        String documentName = "rule_008_always_false.bal";
+        String documentName = "rule008_always_false.bal";
         Document document = loadDocument(documentName);
         ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(
                 CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE.rule()));

@@ -267,6 +267,30 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(actual, expected);
     }
 
+    @Test(description = "test scan command with list rules flag outside a Ballerina project")
+    void testScanCommandWithListRulesFlagOutsideBallerinaProject() throws IOException {
+        Path nonProjectPath = testResources.resolve("test-resources").toAbsolutePath();
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {nonProjectPath.toString(), "--list-rules"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        String expected = getExpectedOutput("core-rules-output.txt");
+        Assert.assertEquals(readOutput(true).trim(), expected);
+    }
+
+    @Test(description = "test scan command with list rules flag when the current directory is not a Ballerina project")
+    void testScanCommandWithListRulesFlagWithoutArgumentOutsideBallerinaProject() throws IOException {
+        Path nonProjectPath = testResources.resolve("test-resources").toAbsolutePath();
+        System.setProperty("user.dir", nonProjectPath.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--list-rules"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String expected = getExpectedOutput("core-rules-output.txt");
+        Assert.assertEquals(readOutput(true).trim(), expected);
+    }
+
     @Test(description = "test scan command with target directory flag on single file project")
     void testScanCommandWithTargetDirFlagOnSingleFileProject() throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream);
@@ -563,6 +587,21 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with valid json format flag")
     void testScanCommandWithValidJsonFormatFlag() throws IOException {
+        System.setProperty("user.dir", validBalProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--format=json"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+
+        System.setProperty("user.dir", userDir);
+        String expected = "Running Scans";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        Path jsonReport = validBalProject.resolve("target").resolve("report").resolve("scan_results.json");
+        Assert.assertTrue(Files.exists(jsonReport), "JSON report file should be created");
+    }
+
+    @Test(description = "test scan command with valid ballerina format flag")
+    void testScanCommandWithValidBallerinaFormatFlag() throws IOException {
         System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"--format=ballerina"};

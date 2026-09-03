@@ -37,7 +37,7 @@ public class Rule007Test extends StaticCodeAnalyzerTest {
 
     @Test(description = "test always true evaluates")
     void testTrueEvaluates() {
-        String documentName = "rule_007_always_true.bal";
+        String documentName = "rule007_always_true.bal";
         Document document = loadDocument(documentName);
         ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(
                 CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE.rule()));

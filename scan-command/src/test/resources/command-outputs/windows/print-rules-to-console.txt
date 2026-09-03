@@ -13,6 +13,8 @@ Loading scan tool configurations from <ABS_SOURCE_ROOT>\Scan.toml
 	ballerina:10                                     | CODE_SMELL    | This variable is assigned to itself
 	ballerina:11                                     | CODE_SMELL    | Unused class private fields
 	ballerina:12                                     | CODE_SMELL    | Invalid range expression
+	ballerina:13                                     | VULNERABILITY | Hard-coded secrets are security-sensitive
+	ballerina:14                                     | VULNERABILITY | Non configurable secrets are security-sensitive
 	ballerina/example_module_static_code_analyzer:1  | CODE_SMELL    | rule 1
 	ballerina/example_module_static_code_analyzer:2  | BUG           | rule 2
 	ballerina/example_module_static_code_analyzer:3  | VULNERABILITY | rule 3
