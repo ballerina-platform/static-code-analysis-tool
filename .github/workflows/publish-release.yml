@@ -20,7 +20,7 @@ jobs:
           java-version: '21.0.6'
 
       - name: Set Up Ballerina
-        uses: ballerina-platform/setup-ballerina@v1.1.0
+        uses: ballerina-platform/setup-ballerina@v1.1.4
         with:
           version: 2201.13.2
 
