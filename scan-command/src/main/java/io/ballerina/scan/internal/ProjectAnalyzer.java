@@ -24,6 +24,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.projects.CompilerPluginCache;
+import io.ballerina.projects.DiagnosticResult;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentConfig;
 import io.ballerina.projects.DocumentId;
@@ -44,6 +45,7 @@ import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
+import io.ballerina.tools.diagnostics.Diagnostic;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -98,6 +100,13 @@ public class ProjectAnalyzer {
         do {
             pluginImportsDocumentName = String.format("%s-%s.bal", IMPORT_GENERATOR_FILE, UUID.randomUUID());
         } while (defaultModuleFiles.contains(pluginImportsDocumentName));
+    }
+
+    List<Diagnostic> getCompilationErrors() {
+        DiagnosticResult diagnosticResult = project.currentPackage().getCompilation().diagnosticResult();
+        return diagnosticResult.errors().stream()
+                .filter(diagnostic -> !diagnostic.location().lineRange().fileName().equals(pluginImportsDocumentName))
+                .toList();
     }
 
     List<Issue> analyze(List<Rule> inbuiltRules) {

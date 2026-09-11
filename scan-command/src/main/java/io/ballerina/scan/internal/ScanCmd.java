@@ -39,6 +39,7 @@ import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
+import io.ballerina.tools.diagnostics.Diagnostic;
 import picocli.CommandLine;
 
 import java.io.BufferedReader;
@@ -220,6 +221,18 @@ public class ScanCmd implements BLauncherCmd {
         executeProject(project.get());
     }
 
+    private boolean hasCompilationErrors(ProjectAnalyzer projectAnalyzer) {
+        List<Diagnostic> compilationErrors = projectAnalyzer.getCompilationErrors();
+        if (compilationErrors.isEmpty()) {
+            return false;
+        }
+        outputStream.println();
+        compilationErrors.forEach(outputStream::println);
+        outputStream.println();
+        outputStream.println(DiagnosticLog.error(DiagnosticCode.COMPILATION_CONTAINS_ERRORS));
+        return true;
+    }
+
     private void accumulateWorkspaceReports(WorkspaceProject workspaceProject) {
         try {
             Path finalReportPath;
@@ -305,6 +318,10 @@ public class ScanCmd implements BLauncherCmd {
 
         List<Issue> issues = projectAnalyzer.analyze(coreRules);
         issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
+
+        if (hasCompilationErrors(projectAnalyzer)) {
+            return;
+        }
 
         if (!projectIncludeRules.isEmpty()) {
             issues.removeIf(issue -> !projectIncludeRules.contains(issue.rule().id()));
