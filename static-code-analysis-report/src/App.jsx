@@ -1,10 +1,10 @@
 import Header from "./components/Header";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Box } from "@mui/material";
 import MainView from "./components/MainView";
 import SingleFileView from "./components/SingleFileView";
 import useHashRoute from "./useHashRoute";
-import { getFileKey } from "./issueMeta";
+import { EMPTY_FILTERS, getFileKey } from "./issueMeta";
 
 // Get the static analysis data from the Populated DOM
 function readScanData() {
@@ -20,6 +20,8 @@ function readScanData() {
 function App() {
   const analysisResults = useMemo(readScanData, [])
   const { route, openFile, openMain, selectIssue } = useHashRoute()
+  // Shared by both views so filters picked on the overview still apply after opening a file.
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
 
   const requestedFile = route.view === "file"
     ? analysisResults.scannedFiles?.find((scannedFile) => getFileKey(scannedFile) === route.fileKey)
@@ -42,11 +44,15 @@ function App() {
             selectedIssue={route.issueIndex}
             onBack={openMain}
             onSelectIssue={(issueIndex) => selectIssue(route.fileKey, issueIndex)}
+            filters={filters}
+            onFiltersChange={setFilters}
           /> :
           <MainView
             analyzedFiles={analysisResults.scannedFiles}
             onOpenFile={(file) => openFile(getFileKey(file))}
             missingFile={route.view === "file" ? route.fileKey : null}
+            filters={filters}
+            onFiltersChange={setFilters}
           />
         }
       </Box>

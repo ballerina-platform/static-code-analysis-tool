@@ -13,14 +13,24 @@ import SingleFileTable from "./SingleFileTable"
 import SingleFileContent from "./SingleFileContent"
 import { RULE_KINDS, RULE_KIND_ORDER, countByKind } from "../issueMeta"
 
-function SingleFileView({ requestedFile, selectedIssue, onBack, onSelectIssue }) {
+function SingleFileView({ requestedFile, selectedIssue, onBack, onSelectIssue, filters, onFiltersChange }) {
     const issues = requestedFile.issues ?? []
     const validSelection = selectedIssue !== null && selectedIssue < issues.length ? selectedIssue : null
     // Bumped on every "Show in code" request so repeating it for the same issue scrolls again.
     const [codeFocus, setCodeFocus] = useState({ issueIndex: null, nonce: 0 })
 
+    // Same idea in the other direction: every click on a code highlight asks the table to reveal that row,
+    // even when it's already the selected issue (code -> issue -> "Show in code" -> same highlight again).
+    // Seeded with the issue from the URL so a deep link scrolls to its row on load.
+    const [tableFocus, setTableFocus] = useState(() => ({ issueIndex: validSelection, nonce: 0 }))
+
     const showInCode = (issueIndex) => {
         setCodeFocus((prev) => ({ issueIndex, nonce: prev.nonce + 1 }))
+    }
+
+    const showInTable = (issueIndex) => {
+        onSelectIssue(issueIndex)
+        setTableFocus((prev) => ({ issueIndex, nonce: prev.nonce + 1 }))
     }
 
     return (
@@ -31,13 +41,17 @@ function SingleFileView({ requestedFile, selectedIssue, onBack, onSelectIssue })
                 fileContent={requestedFile.fileContent ?? ""}
                 selectedIssue={validSelection}
                 focusRequest={codeFocus}
-                onSelectIssue={(issueIndex) => onSelectIssue(issueIndex)}
+                onSelectIssue={showInTable}
             />
             <SingleFileTable
                 issues={issues}
                 selectedIssue={validSelection}
                 onSelectIssue={(issueIndex) => onSelectIssue(issueIndex === validSelection ? null : issueIndex)}
+                fileName={requestedFile.fileName}
                 onShowInCode={showInCode}
+                focusRequest={tableFocus}
+                filters={filters}
+                onFiltersChange={onFiltersChange}
             />
         </Box>
     )

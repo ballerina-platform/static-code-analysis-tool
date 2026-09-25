@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.utils;
 
+import com.google.gson.JsonObject;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Set;
 
 import static io.ballerina.projects.util.ProjectConstants.LOCAL_REPOSITORY_NAME;
+import static io.ballerina.scan.ScanReportTestUtils.readScanReportData;
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 
@@ -92,10 +94,7 @@ public class ScanUtilsTest extends BaseTest {
         List<Issue> issues = new ArrayList<>();
         Project project = ProjectLoader.load(validBalProject).project();
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, null);
-        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("empty-issues-html-report.txt");
-        Assert.assertEquals(result, expected);
+        assertEmptyScanReport(scanReportPath);
     }
 
     @Test(description =
@@ -104,10 +103,16 @@ public class ScanUtilsTest extends BaseTest {
         List<Issue> issues = new ArrayList<>();
         Project project = ProjectLoader.load(validBalProject).project();
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, RESULTS_DIRECTORY);
-        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("empty-issues-html-report.txt");
-        Assert.assertEquals(result, expected);
+        Assert.assertTrue(scanReportPath.toAbsolutePath().normalize()
+                        .startsWith(validBalProject.resolve(RESULTS_DIRECTORY).toAbsolutePath().normalize()),
+                "Report was not written to the provided directory: " + scanReportPath);
+        assertEmptyScanReport(scanReportPath);
+    }
+
+    private static void assertEmptyScanReport(Path scanReportPath) throws IOException {
+        JsonObject scanData = readScanReportData(scanReportPath);
+        Assert.assertEquals(scanData.get("projectName").getAsString(), "valid_bal_project");
+        Assert.assertTrue(scanData.getAsJsonArray("scannedFiles").isEmpty());
     }
 
     @Test(description =

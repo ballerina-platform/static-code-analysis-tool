@@ -2,33 +2,42 @@ import { Alert, Box, Typography } from "@mui/material";
 import InfoCards from "./InfoCards";
 import MainTable from "./MainTable";
 import { useMemo } from "react";
-import { countByKind } from "../issueMeta";
+import { countActiveFilters, countByKind, matchesFilters } from "../issueMeta";
 
 function retrieveAllStats(analyzedFiles) {
-    const kindCounts = { CODE_SMELL: 0, BUG: 0, VULNERABILITY: 0 }
-    const fileRecords = (analyzedFiles ?? []).map((analyzedFile) => {
-        const counts = countByKind(analyzedFile.issues)
-        Object.keys(kindCounts).forEach((kind) => { kindCounts[kind] += counts[kind] })
-        return {
+    const files = analyzedFiles ?? []
+    return {
+        filesScanned: files.length,
+        kindCounts: countByKind(files.flatMap((analyzedFile) => analyzedFile.issues ?? [])),
+    }
+}
+
+// Per-file counts only include issues matching the filters; with filters active, files with no
+// matching issue drop out so the table lists exactly the files worth opening.
+function buildFileRecords(analyzedFiles, filters) {
+    const filtering = countActiveFilters(filters) > 0
+    return (analyzedFiles ?? []).flatMap((analyzedFile) => {
+        const matching = (analyzedFile.issues ?? []).filter((issue) => matchesFilters(issue, filters))
+        if (filtering && matching.length === 0) {
+            return []
+        }
+        const counts = countByKind(matching)
+        return [{
             file: analyzedFile,
             fileName: analyzedFile.fileName,
             filePath: analyzedFile.filePath,
             codeSmells: counts.CODE_SMELL,
             bugs: counts.BUG,
             vulnerabilities: counts.VULNERABILITY,
-            totalIssues: analyzedFile.issues?.length ?? 0,
-        }
+            totalIssues: matching.length,
+        }]
     })
-
-    return {
-        filesScanned: fileRecords.length,
-        kindCounts,
-        fileRecords,
-    }
 }
 
-function MainView({ analyzedFiles, onOpenFile, missingFile }) {
+function MainView({ analyzedFiles, onOpenFile, missingFile, filters, onFiltersChange }) {
     const statistics = useMemo(() => retrieveAllStats(analyzedFiles), [analyzedFiles])
+    const allIssues = useMemo(() => (analyzedFiles ?? []).flatMap((file) => file.issues ?? []), [analyzedFiles])
+    const fileRecords = useMemo(() => buildFileRecords(analyzedFiles, filters), [analyzedFiles, filters])
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -42,7 +51,11 @@ function MainView({ analyzedFiles, onOpenFile, missingFile }) {
                 <ScanReportUnavailableView /> :
                 <MainTable
                     onOpenFile={onOpenFile}
-                    fileRecords={statistics.fileRecords}
+                    fileRecords={fileRecords}
+                    allIssues={allIssues}
+                    kindCounts={statistics.kindCounts}
+                    filters={filters}
+                    onFiltersChange={onFiltersChange}
                 />
             }
         </Box>

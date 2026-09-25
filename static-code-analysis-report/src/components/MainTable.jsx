@@ -1,15 +1,21 @@
-import { ChevronRight, DescriptionOutlined } from '@mui/icons-material';
+import { ChevronRight, DescriptionOutlined, FilterAltOutlined } from '@mui/icons-material';
 import {
     Typography,
     alpha
 } from '@mui/material';
 import Box from '@mui/material/Box';
+import { useMemo } from 'react';
 import {
     DataGrid,
+    GridToolbarColumnsButton,
     GridToolbarContainer,
+    GridToolbarDensitySelector,
+    GridToolbarExport,
+    GridToolbarFilterButton,
     GridToolbarQuickFilter
 } from '@mui/x-data-grid';
-import { RULE_KINDS } from '../issueMeta';
+import { ClearFiltersButton, IssueFilterFields, KindFilterChips, SearchField } from './IssueFilters';
+import { RULE_KINDS, countActiveFilters } from '../issueMeta';
 
 const kindHeader = (kind) => () => {
     const { Icon, plural, color } = RULE_KINDS[kind];
@@ -48,10 +54,12 @@ const countColumn = (field, kind) => ({
     align: "center",
 })
 
-const columns = [
+const buildColumns = (filtering) => [
     {
         field: 'fileName',
+        headerName: 'File',
         renderHeader: () => <strong>File</strong>,
+        valueGetter: (value, row) => row.filePath ?? value,
         minWidth: 260,
         flex: 2.5,
         renderCell: ({ row }) => {
@@ -78,7 +86,8 @@ const columns = [
     {
         field: 'totalIssues',
         type: 'number',
-        renderHeader: () => <strong>Total</strong>,
+        headerName: filtering ? 'Matching' : 'Total',
+        renderHeader: () => <strong>{filtering ? "Matching" : "Total"}</strong>,
         minWidth: 110,
         flex: 0.8,
         headerAlign: "center",
@@ -90,21 +99,82 @@ const columns = [
         headerName: '',
         sortable: false,
         filterable: false,
+        hideable: false,
+        disableExport: true,
         width: 56,
         align: "center",
         renderCell: () => <ChevronRight sx={{ color: "text.secondary" }} />,
     },
 ];
 
-const TableToolbar = () => (
-    <GridToolbarContainer sx={{ padding: "0.75rem 1rem", justifyContent: "space-between", gap: "0.5rem" }}>
-        <Typography variant="h5" fontWeight="bold">Files with issues</Typography>
+const TableToolbar = ({ filtering }) => (
+    <GridToolbarContainer sx={{
+        padding: "0.5rem 1rem",
+        justifyContent: "space-between",
+        gap: "0.5rem",
+        // Match the toolbar buttons in the single file view's issue table.
+        "& .MuiButton-root": { textTransform: "none", fontWeight: 600, borderRadius: "0.5rem" },
+    }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.25rem" }}>
+            <Typography variant="h5" fontWeight="bold" sx={{ marginRight: "0.75rem" }}>
+                {filtering ? "Files with matching issues" : "Files with issues"}
+            </Typography>
+            <GridToolbarColumnsButton />
+            <GridToolbarFilterButton />
+            <GridToolbarDensitySelector />
+            <GridToolbarExport csvOptions={{ fileName: "scan-report-files" }} />
+        </Box>
         <GridToolbarQuickFilter debounceMs={200} placeholder="Search files…" />
     </GridToolbarContainer>
 )
 
-function MainTable({ onOpenFile, fileRecords }) {
-    const rows = fileRecords.map((record, fileID) => ({ id: fileID, ...record }))
+// Narrows the file list down to files containing issues that match; the same filters are kept when
+// a file is opened, so its issue table starts out showing just those issues.
+const IssueFilterPanel = ({ allIssues, kindCounts, filters, onFiltersChange }) => (
+    <Box sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        padding: "0.75rem 1rem",
+        bgcolor: "var(--page-background)",
+        borderBottom: "1px solid var(--surface-border)",
+    }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <FilterAltOutlined fontSize="small" color="primary" />
+                <Typography variant="h6" fontWeight="bold">Filter by issue</Typography>
+            </Box>
+            <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
+                <KindFilterChips
+                    counts={kindCounts}
+                    selected={filters.kinds}
+                    onChange={(kinds) => onFiltersChange({ ...filters, kinds })}
+                />
+                <SearchField
+                    placeholder="Search issues…"
+                    value={filters.search}
+                    onChange={(search) => onFiltersChange({ ...filters, search })}
+                />
+            </Box>
+        </Box>
+        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+                <IssueFilterFields
+                    issues={allIssues}
+                    filters={filters}
+                    onChange={onFiltersChange}
+                    fields={["tags", "cwes", "owasp", "severities", "rules"]}
+                />
+            </Box>
+            <ClearFiltersButton filters={filters} onChange={onFiltersChange} />
+        </Box>
+    </Box>
+)
+
+function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, onFiltersChange }) {
+    const filtering = countActiveFilters(filters) > 0
+    const rows = fileRecords.map((record) => ({ id: record.filePath ?? record.fileName, ...record }))
+    const columns = useMemo(() => buildColumns(filtering), [filtering])
 
     return (
         <Box sx={{
@@ -113,6 +183,12 @@ function MainTable({ onOpenFile, fileRecords }) {
             border: "1px solid var(--primary-color)",
             overflow: "hidden",
         }}>
+            <IssueFilterPanel
+                allIssues={allIssues}
+                kindCounts={kindCounts}
+                filters={filters}
+                onFiltersChange={onFiltersChange}
+            />
             <DataGrid
                 sx={{
                     border: "none",
@@ -138,8 +214,14 @@ function MainTable({ onOpenFile, fileRecords }) {
                 }}
                 pageSizeOptions={[10, 25, 50, 100]}
                 slots={{
-                    toolbar: TableToolbar
+                    toolbar: TableToolbar,
+                    noRowsOverlay: () => (
+                        <Box sx={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "text.secondary" }}>
+                            {filtering ? "No files have issues matching the current filters." : "No files."}
+                        </Box>
+                    ),
                 }}
+                slotProps={{ toolbar: { filtering } }}
                 disableColumnMenu={true}
                 disableRowSelectionOnClick
                 autoHeight

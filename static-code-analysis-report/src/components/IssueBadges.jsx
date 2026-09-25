@@ -1,4 +1,4 @@
-import { Box, Chip, Link, Tooltip, Typography, alpha } from "@mui/material";
+import { Box, Chip, Tooltip, Typography, alpha } from "@mui/material";
 import {
     RULE_KINDS,
     SEVERITIES,
@@ -93,7 +93,7 @@ export const CweChips = ({ issue, limit, linked = true }) => {
     );
 };
 
-export const OwaspChips = ({ issue, limit, showTitles = false }) => {
+export const OwaspChips = ({ issue, limit, showTitles = false, linked = true }) => {
     const entries = getOwaspEntries(issue);
     if (entries.length === 0) {
         return <Typography variant="body2" color="text.disabled">—</Typography>;
@@ -101,12 +101,15 @@ export const OwaspChips = ({ issue, limit, showTitles = false }) => {
     const shown = limit ? entries.slice(0, limit) : entries;
     return (
         <Box sx={{ display: "flex", flexWrap: limit ? "nowrap" : "wrap", gap: "4px" }}>
-            {shown.map(({ code, title }) => (
+            {shown.map(({ code, title, url }) => (
                 <Tooltip key={code} title={title ?? ""} disableHoverListener={showTitles || !title}>
                     <Chip
                         size="small"
                         label={showTitles && title ? `${code} · ${title}` : code}
-                        sx={{ ...standardChipSx, cursor: "default" }}
+                        sx={linked ? standardChipSx : { ...standardChipSx, cursor: "default" }}
+                        {...(linked
+                            ? { component: "a", href: url, target: "_blank", rel: "noopener noreferrer", clickable: true, onClick: stopPropagation }
+                            : {})}
                     />
                 </Tooltip>
             ))}
@@ -151,7 +154,7 @@ export const IssueSummaryCard = ({ issue, onSelect }) => {
                 <SummaryRow label="Kind"><KindChip issue={issue} /></SummaryRow>
                 <SummaryRow label="Severity"><SeverityChip issue={issue} /></SummaryRow>
                 <SummaryRow label="CWE"><CweChips issue={issue} linked={false} /></SummaryRow>
-                <SummaryRow label="OWASP"><OwaspChips issue={issue} /></SummaryRow>
+                <SummaryRow label="OWASP"><OwaspChips issue={issue} linked={false} /></SummaryRow>
             </Box>
             {onSelect && (
                 <Typography variant="caption" sx={{ display: "block", marginTop: "8px", color: "primary.main", fontWeight: 600 }}>
@@ -161,9 +164,3 @@ export const IssueSummaryCard = ({ issue, onSelect }) => {
         </Box>
     );
 };
-
-export const ExternalLink = ({ href, children }) => (
-    <Link href={href} target="_blank" rel="noopener noreferrer" underline="hover" onClick={stopPropagation}>
-        {children}
-    </Link>
-);
