@@ -1,8 +1,11 @@
 :root {
   --primary-color: #20b6b0;
   --secondary-color: #ff7300;
+  --page-background: #f7f9fa;
+  --surface-border: #e3e8eb;
 }
 
 body {
   margin: 0;
+  background-color: var(--page-background);
 }

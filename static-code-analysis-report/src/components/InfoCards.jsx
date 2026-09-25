@@ -1,125 +1,63 @@
-import {
-    AssignmentOutlined,
-    BugReportOutlined,
-    CodeOffOutlined,
-    LockOpenOutlined
-} from "@mui/icons-material"
+import { AssignmentOutlined } from "@mui/icons-material"
 import {
     Box,
     Card,
-    IconButton,
     Typography
 } from "@mui/material"
+import { RULE_KINDS, RULE_KIND_ORDER } from "../issueMeta"
+
+const StatCard = ({ value, label, color, Icon }) => (
+    <Card elevation={0} sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: "1rem",
+        padding: "1rem 1.25rem",
+        bgcolor: color,
+        color: "#ffffff",
+        borderRadius: "0.75rem",
+        boxShadow: "0 2px 10px rgba(0, 0, 0, 0.08)",
+    }}>
+        <Box sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "3.5rem",
+            height: "3.5rem",
+            borderRadius: "0.75rem",
+            bgcolor: "rgba(255, 255, 255, 0.18)",
+            flexShrink: 0,
+        }}>
+            <Icon sx={{ fontSize: "2.2rem", color: "#ffffff" }} />
+        </Box>
+        <Box>
+            <Typography variant="h2" fontWeight="bold" lineHeight={1.1}>{value}</Typography>
+            <Typography variant="h5" sx={{ opacity: 0.92 }}>{label}</Typography>
+        </Box>
+    </Card>
+)
 
 function InfoCards({ statistics }) {
     return (
         <Box sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: "0.5rem",
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
+            gap: "1rem",
         }}>
-            <Card sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                padding: "0.5rem",
-                bgcolor: "#2C2C2C",
-                width: "15rem",
-                height: "100%",
-                color: "#ffffff",
-                borderRadius: "0.5rem"
-            }}>
-                <IconButton disabled sx={{ flex: "0.5" }}>
-                    <AssignmentOutlined color="white" sx={{ fontSize: "4rem" }} />
-                </IconButton>
-                <Box sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    flex: "1"
-                }}>
-                    <Typography variant="h2">{statistics.filesScanned}</Typography>
-                    <Typography variant="h5">Total files scanned</Typography>
-                </Box>
-            </Card>
-            <Card sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                padding: "0.5rem",
-                bgcolor: "#33B4AF",
-                width: "15rem",
-                height: "100%",
-                color: "#ffffff",
-                borderRadius: "0.5rem"
-            }}>
-                <IconButton disabled sx={{ flex: "0.5" }}>
-                    <CodeOffOutlined color="white" sx={{ fontSize: "4rem" }} />
-                </IconButton>
-                <Box sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    flex: "1"
-                }}>
-                    <Typography variant="h2">{statistics.totalCodeSmells}</Typography>
-                    <Typography variant="h5">Code Smells</Typography>
-                </Box>
-            </Card>
-            <Card sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                padding: "0.5rem",
-                bgcolor: "#FEAC39",
-                width: "15rem",
-                height: "100%",
-                color: "#ffffff",
-                borderRadius: "0.5rem"
-            }}>
-                <IconButton disabled sx={{ flex: "0.5" }}>
-                    <BugReportOutlined color="white" sx={{ fontSize: "4rem" }} />
-                </IconButton>
-                <Box sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    flex: "1"
-                }}>
-                    <Typography variant="h2">{statistics.totalBugs}</Typography>
-                    <Typography variant="h5">Bugs</Typography>
-                </Box>
-            </Card>
-            <Card sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                padding: "0.5rem",
-                bgcolor: "#F74B5A",
-                width: "15rem",
-                height: "100%",
-                color: "#ffffff",
-                borderRadius: "0.5rem"
-            }}>
-                <IconButton disabled sx={{ flex: "0.5" }}>
-                    <LockOpenOutlined color="white" sx={{ fontSize: "4rem" }} />
-                </IconButton>
-                <Box sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    flex: "1"
-                }}>
-                    <Typography variant="h2">{statistics.totalVulnerabilities}</Typography>
-                    <Typography variant="h5">Vulnerabilities</Typography>
-                </Box>
-            </Card>
+            <StatCard
+                value={statistics.filesScanned}
+                label="Total files scanned"
+                color="#2C2C2C"
+                Icon={AssignmentOutlined}
+            />
+            {RULE_KIND_ORDER.map((kind) => (
+                <StatCard
+                    key={kind}
+                    value={statistics.kindCounts[kind]}
+                    label={RULE_KINDS[kind].plural}
+                    color={RULE_KINDS[kind].color}
+                    Icon={RULE_KINDS[kind].Icon}
+                />
+            ))}
         </Box>
     )
 }

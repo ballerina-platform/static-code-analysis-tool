@@ -1,102 +1,48 @@
-import { Box, Typography } from "@mui/material";
+import { Alert, Box, Typography } from "@mui/material";
 import InfoCards from "./InfoCards";
 import MainTable from "./MainTable";
-import { useEffect, useState } from "react";
-
-function retrieveSingleFileStats(analyzedFile) {
-    let codeSmells = 0
-    let bugs = 0
-    let vulnerabilities = 0
-
-    if (analyzedFile?.issues.length !== 0) {
-        analyzedFile.issues.forEach((issue) => {
-            switch (issue.issueSeverity) {
-                case "CODE_SMELL":
-                    codeSmells += 1
-                    break
-                case "BUG":
-                    bugs += 1
-                    break
-                case "VULNERABILITY":
-                    vulnerabilities += 1
-                    break
-                default:
-                    break
-            }
-        })
-    }
-
-    const singleFileRecord = {
-        fileName: analyzedFile.fileName,
-        codeSmells: codeSmells,
-        bugs: bugs,
-        vulnerabilities: vulnerabilities
-    }
-
-    return singleFileRecord
-}
+import { useMemo } from "react";
+import { countByKind } from "../issueMeta";
 
 function retrieveAllStats(analyzedFiles) {
-    let filesScanned = 0
-    let totalCodeSmells = 0
-    let totalBugs = 0
-    let totalVulnerabilities = 0
-    let singleFileRecords = []
-
-    analyzedFiles?.forEach((analyzedFile) => {
-        filesScanned += 1;
-        const singleFileRecord = retrieveSingleFileStats(analyzedFile)
-        singleFileRecords.push(singleFileRecord)
-        totalCodeSmells += singleFileRecord.codeSmells
-        totalBugs += singleFileRecord.bugs
-        totalVulnerabilities += singleFileRecord.vulnerabilities
+    const kindCounts = { CODE_SMELL: 0, BUG: 0, VULNERABILITY: 0 }
+    const fileRecords = (analyzedFiles ?? []).map((analyzedFile) => {
+        const counts = countByKind(analyzedFile.issues)
+        Object.keys(kindCounts).forEach((kind) => { kindCounts[kind] += counts[kind] })
+        return {
+            file: analyzedFile,
+            fileName: analyzedFile.fileName,
+            filePath: analyzedFile.filePath,
+            codeSmells: counts.CODE_SMELL,
+            bugs: counts.BUG,
+            vulnerabilities: counts.VULNERABILITY,
+            totalIssues: analyzedFile.issues?.length ?? 0,
+        }
     })
 
     return {
-        filesScanned: filesScanned,
-        totalCodeSmells: totalCodeSmells,
-        totalBugs: totalBugs,
-        totalVulnerabilities: totalVulnerabilities,
-        singleFileRecords: singleFileRecords
+        filesScanned: fileRecords.length,
+        kindCounts,
+        fileRecords,
     }
 }
 
-function MainView({ toggleSingleFileView, analyzedFiles }) {
-    const [statistics, setStatistics] = useState({
-        filesScanned: 0,
-        totalCodeSmells: 0,
-        totalBugs: 0,
-        totalVulnerabilities: 0
-    })
-
-    const [fileRecords, setFileRecords] = useState([])
-
-    useEffect(() => {
-        if (analyzedFiles?.length !== 0) {
-            const newStats = retrieveAllStats(analyzedFiles)
-
-            setStatistics({
-                filesScanned: newStats.filesScanned,
-                totalCodeSmells: newStats.totalCodeSmells,
-                totalBugs: newStats.totalBugs,
-                totalVulnerabilities: newStats.totalVulnerabilities
-            })
-
-            setFileRecords(newStats.singleFileRecords)
-        }
-    }, [analyzedFiles])
+function MainView({ analyzedFiles, onOpenFile, missingFile }) {
+    const statistics = useMemo(() => retrieveAllStats(analyzedFiles), [analyzedFiles])
 
     return (
-        <Box sx={{
-            marginTop: "1rem",
-        }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {missingFile &&
+                <Alert severity="warning" variant="outlined" sx={{ bgcolor: "#ffffff" }}>
+                    The file <strong>{missingFile}</strong> isn't part of this report. Showing the overview instead.
+                </Alert>
+            }
             <InfoCards statistics={statistics} />
             {analyzedFiles === undefined || analyzedFiles.length === 0 ?
                 <ScanReportUnavailableView /> :
-
                 <MainTable
-                    toggleSingleFileView={toggleSingleFileView}
-                    fileRecords={fileRecords}
+                    onOpenFile={onOpenFile}
+                    fileRecords={statistics.fileRecords}
                 />
             }
         </Box>
@@ -110,8 +56,12 @@ const ScanReportUnavailableView = () => {
             flexDirection: "column",
             justifyContent: "center",
             alignItems: "center",
-            marginTop: "1rem",
-            gap: "0.5rem"
+            padding: "3rem 1rem",
+            gap: "0.5rem",
+            bgcolor: "#ffffff",
+            borderRadius: "0.75rem",
+            border: "1px dashed var(--primary-color)",
+            textAlign: "center",
         }}>
             <Typography
                 variant="h3"

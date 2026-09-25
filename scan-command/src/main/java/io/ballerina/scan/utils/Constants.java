@@ -40,7 +40,16 @@ public class Constants {
     static final String SCAN_REPORT_ZIP_FILE = "report.zip";
     static final String SCAN_REPORT_ISSUES = "issues";
     static final String SCAN_REPORT_ISSUE_RULE_ID = "ruleID";
-    static final String SCAN_REPORT_ISSUE_SEVERITY = "issueSeverity";
+    static final String SCAN_REPORT_ISSUE_NAME = "name";
+    static final String SCAN_REPORT_ISSUE_KIND = "ruleKind";
+    static final String SCAN_REPORT_ISSUE_SEVERITY = "severity";
+    static final String SCAN_REPORT_ISSUE_DETAILS = "details";
+    static final String SCAN_REPORT_ISSUE_HELP_URI = "helpUri";
+    static final String SCAN_REPORT_ISSUE_TAGS = "tags";
+    static final String SCAN_REPORT_ISSUE_CWE = "cwe";
+    static final String SCAN_REPORT_ISSUE_OWASP = "owasp";
+    static final String SCAN_REPORT_ISSUE_OWASP_YEAR = "year";
+    static final String SCAN_REPORT_ISSUE_OWASP_CATEGORIES = "categories";
     static final String SCAN_REPORT_ISSUE_TYPE = "issueType";
     static final String SCAN_REPORT_ISSUE_MESSAGE = "message";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE = "textRange";
