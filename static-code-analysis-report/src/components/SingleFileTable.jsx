@@ -145,8 +145,11 @@ const downloadCsv = (issues, fileName) => {
     const link = document.createElement("a");
     link.href = url;
     link.download = `${fileName ?? "issues"}-issues.csv`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    // Revoking synchronously can cancel the download in some browsers before it starts.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
 };
 
 const isInViewport = (element) => {
@@ -432,7 +435,7 @@ const IssueRow = ({ issue, columns, cellPadding, expanded, onToggle, onShowInCod
                 sx={{
                     cursor: "pointer",
                     scrollMarginTop: "90px",
-                    bgcolor: expanded ? alpha("#20b6b0", 0.07) : "inherit",
+                    bgcolor: expanded ? alpha(kindColor, 0.07) : "inherit",
                     "& > td": { borderBottom: expanded ? "none" : undefined, paddingTop: cellPadding, paddingBottom: cellPadding },
                     "& > td:first-of-type": { boxShadow: `inset 3px 0 0 ${expanded ? kindColor : "transparent"}` },
                 }}
@@ -449,7 +452,7 @@ const IssueRow = ({ issue, columns, cellPadding, expanded, onToggle, onShowInCod
                     <TableCell key={id} sx={cellSx}>{render(issue)}</TableCell>
                 ))}
             </TableRow>
-            <TableRow sx={{ bgcolor: alpha("#20b6b0", 0.07) }}>
+            <TableRow sx={{ bgcolor: alpha(kindColor, 0.07) }}>
                 <TableCell colSpan={columns.length + 1} sx={{
                     padding: 0,
                     borderBottom: expanded ? undefined : "none",
