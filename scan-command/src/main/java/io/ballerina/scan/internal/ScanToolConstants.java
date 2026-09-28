@@ -32,12 +32,11 @@ public class ScanToolConstants {
     static final String USE_IMPORT_AS_UNDERSCORE = " as _;";
     static final String IMPORT_GENERATOR_FILE = "scan_file";
     static final String RULES_FILE = "rules.json";
+    static final String CORE_RULES_DIRECTORY = "core-rules/";
     static final String RULE_KIND = "kind";
-    static final String BUG = "BUG";
-    static final String VULNERABILITY = "VULNERABILITY";
-    static final String CODE_SMELL = "CODE_SMELL";
     static final String RULE_ID = "id";
     static final String RULE_DESCRIPTION = "description";
+    static final String RULE_SEVERITY = "severity";
     static final String RUNNING_SCANS_LOG = "Running Scans";
 
     public static final String SCANNER_CONTEXT = "ScannerContext";

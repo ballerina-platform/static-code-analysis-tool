@@ -33,6 +33,7 @@ import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
+import io.ballerina.compiler.syntax.tree.ExternalFunctionBodyNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
 import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionExpressionNode;
@@ -311,7 +312,9 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
-        checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
+        if (!(functionDefinitionNode.functionBody() instanceof ExternalFunctionBodyNode)) {
+            checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
+        }
         String functionName = functionDefinitionNode.functionName().text();
         if (!functionName.equals(MAIN_FUNCTION) && !functionName.equals(INIT_FUNCTION)) {
             checkNonIsolatedPublicFunction(functionDefinitionNode);

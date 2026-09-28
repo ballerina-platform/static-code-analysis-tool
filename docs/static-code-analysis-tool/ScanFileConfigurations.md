@@ -35,14 +35,15 @@ Users can configure platform plugins in a `Scan.toml` file by specifying the plu
 ```toml
 [[platform]]
 name = "sonarqube"
-path = "path/to/sonar_platform_plugin"
+path = "path/to/sonar_platform_plugin.jar"
 ```
 
-If the `path` is not specified, the scan tool will attempt to download the Platform Plugins developed by the Ballerina team.
+Both `name` and `path` are required. A platform entry without a `path` is ignored. The `path` can be a local file path (resolved relative to the current working directory) or a URL, in which case the scan tool downloads the plugin JAR.
 
 ```toml
 [[platform]]
 name = "sonarqube"
+path = "https://example.com/sonar_platform_plugin.jar"
 ```
 
 Users can also provide additional arguments to the platform plugin by specifying them in the `Scan.toml` file.
@@ -50,7 +51,7 @@ Users can also provide additional arguments to the platform plugin by specifying
 ```toml
 [[platform]]
 name = "sonarqube"
-path = "path/to/sonar_platform_plugin"
+path = "path/to/sonar_platform_plugin.jar"
 sonarProjectPropertiesPath = "sonar-project.properties"
 ```
 
@@ -81,13 +82,13 @@ Users can specify the rules to filter out specific issues during an analysis by 
 Define the rules to include in the analysis:
 
 ```toml
-[rules]
+[rule]
 include = ["ballerina:101", "ballerina/io:101"]
 ```
 
 Define the rules to exclude in the analysis:
 
 ```toml
-[rules]
+[rule]
 exclude = ["ballerina:101", "ballerina/io:101"]
 ```

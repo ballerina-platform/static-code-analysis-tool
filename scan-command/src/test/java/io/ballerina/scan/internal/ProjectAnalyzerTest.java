@@ -81,7 +81,7 @@ public class ProjectAnalyzerTest extends BaseTest {
         Rule rule = issue.rule();
         Assert.assertEquals(rule.id(), "ballerina:1");
         Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), "Avoid checkpanic");
+        Assert.assertEquals(rule.name(), "Avoid checkpanic");
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
     }
 

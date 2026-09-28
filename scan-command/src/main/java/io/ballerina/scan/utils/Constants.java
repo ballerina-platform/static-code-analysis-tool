@@ -18,7 +18,6 @@
 
 package io.ballerina.scan.utils;
 
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -67,6 +66,7 @@ public class Constants {
     static final String CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN = "^\\d+\\.\\d+\\.\\d+$";
     static final String RULE_ID_COLUMN = "RuleID";
     static final String RULE_KIND_COLUMN = "Rule Kind";
+    static final String RULE_SEVERITY_COLUMN = "Severity";
     static final String RULE_DESCRIPTION_COLUMN = "Rule Description";
     static final String[] RULE_PRIORITY_LIST = {"ballerina", "ballerinax", "wso2"};
     public static final String MAIN_FUNCTION = "main";
@@ -77,7 +77,6 @@ public class Constants {
     public static final String SARIF_TOOL_NAME = "Ballerina Scan Tool";
     public static final String SARIF_TOOL_ORGANIZATION = "WSO2";
     public static final String SARIF_TOOL_VERSION = getAppVersion();
-    public static final String SARIF_TOOL_URI = "https://central.ballerina.io/ballerina/tool_scan/";
 
     private static String getAppVersion() {
         try (InputStream input = Constants.class.getClassLoader().getResourceAsStream("version.properties")) {

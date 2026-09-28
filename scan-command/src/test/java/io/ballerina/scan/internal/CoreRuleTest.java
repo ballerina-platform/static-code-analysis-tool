@@ -20,8 +20,12 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.Severity;
+import io.ballerina.scan.Standards;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import java.util.List;
 
 /**
  * Core static code analysis rules tests.
@@ -52,13 +56,34 @@ public class CoreRuleTest {
         Assert.assertEquals(CoreRule.rules().size(), 14);
     }
 
+    @Test(description = "test that every core rule carries its rich metadata")
+    void testAllRulesHaveRichMetadata() {
+        for (Rule rule : CoreRule.rules()) {
+            Assert.assertNotNull(rule.name(), "name should be populated for " + rule.id());
+            Assert.assertNotNull(rule.description(), "description should be populated for " + rule.id());
+            Assert.assertNotEquals(rule.description(), rule.name(),
+                    "description should be a genuine short description, not just repeat name, for " + rule.id());
+            Assert.assertNotNull(rule.details(), "details should be populated for " + rule.id());
+            Assert.assertNotNull(rule.helpUri(), "helpUri should be populated for " + rule.id());
+            Assert.assertNotNull(rule.severity(), "severity should be populated for " + rule.id());
+        }
+    }
+
     @Test(description = "test checkpanic rule")
     void testCheckpanicRule() {
         Rule rule = CoreRule.AVOID_CHECKPANIC.rule();
         Assert.assertEquals(rule.id(), "ballerina:1");
         Assert.assertEquals(rule.numericId(), 1);
-        Assert.assertEquals(rule.description(), AVOID_CHECKPANIC);
+        Assert.assertEquals(rule.name(), AVOID_CHECKPANIC);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
+        Assert.assertEquals(rule.tags(), List.of("error-handling"));
+        Standards standards = rule.standards();
+        Assert.assertNotNull(standards);
+        Assert.assertEquals(standards.cwe(), List.of(248, 636));
+        Assert.assertEquals(standards.owasp().size(), 1);
+        Assert.assertEquals(standards.owasp().get(0).year(), 2025);
+        Assert.assertEquals(standards.owasp().get(0).categories(), List.of(10));
     }
 
     @Test(description = "test unused function parameters test")
@@ -66,8 +91,13 @@ public class CoreRuleTest {
         Rule rule = CoreRule.UNUSED_FUNCTION_PARAMETER.rule();
         Assert.assertEquals(rule.id(), "ballerina:2");
         Assert.assertEquals(rule.numericId(), 2);
-        Assert.assertEquals(rule.description(), UNUSED_FUNCTION_PARAMETER);
+        Assert.assertEquals(rule.name(), UNUSED_FUNCTION_PARAMETER);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
+        Assert.assertEquals(rule.tags(), List.of("unused"));
+        Standards standards = rule.standards();
+        Assert.assertNotNull(standards);
+        Assert.assertEquals(standards.cwe(), List.of(561));
     }
 
     @Test(description = "test unused class fields rule")
@@ -75,16 +105,18 @@ public class CoreRuleTest {
         Rule rule = CoreRule.UNUSED_PRIVATE_CLASS_FIELD.rule();
         Assert.assertEquals(rule.id(), "ballerina:11");
         Assert.assertEquals(rule.numericId(), 11);
-        Assert.assertEquals(rule.description(), "Unused class private fields");
+        Assert.assertEquals(rule.name(), "Unused class private fields");
     }
-    
+
     @Test(description = "test always true evaluates")
     void testTrueEvaluates() {
         Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE.rule();
         Assert.assertEquals(rule.id(), "ballerina:7");
         Assert.assertEquals(rule.numericId(), 7);
-        Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATES_TO_TRUE);
+        Assert.assertEquals(rule.name(), OPERATION_ALWAYS_EVALUATES_TO_TRUE);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
+        Assert.assertEquals(rule.standards().cwe(), List.of(571));
     }
 
     @Test(description = "test always false evaluates")
@@ -92,8 +124,10 @@ public class CoreRuleTest {
         Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE.rule();
         Assert.assertEquals(rule.id(), "ballerina:8");
         Assert.assertEquals(rule.numericId(), 8);
-        Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATES_TO_FALSE);
+        Assert.assertEquals(rule.name(), OPERATION_ALWAYS_EVALUATES_TO_FALSE);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
+        Assert.assertEquals(rule.standards().cwe(), List.of(570));
     }
 
     @Test(description = "test evaluate to the same value")
@@ -101,8 +135,9 @@ public class CoreRuleTest {
         Rule rule = CoreRule.OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE.rule();
         Assert.assertEquals(rule.id(), "ballerina:9");
         Assert.assertEquals(rule.numericId(), 9);
-        Assert.assertEquals(rule.description(), OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE);
+        Assert.assertEquals(rule.name(), OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
     }
 
     @Test(description = "test self assignment")
@@ -110,7 +145,9 @@ public class CoreRuleTest {
         Rule rule = CoreRule.SELF_ASSIGNMENT.rule();
         Assert.assertEquals(rule.id(), "ballerina:10");
         Assert.assertEquals(rule.numericId(), 10);
-        Assert.assertEquals(rule.description(), SELF_ASSIGNMENT);
+        Assert.assertEquals(rule.name(), SELF_ASSIGNMENT);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
+        Assert.assertEquals(rule.standards().cwe(), List.of(1164));
     }
 
     @Test(description = "test non isolated public functions")
@@ -118,8 +155,9 @@ public class CoreRuleTest {
         Rule rule = CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT.rule();
         Assert.assertEquals(rule.id(), "ballerina:3");
         Assert.assertEquals(rule.numericId(), 3);
-        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT);
+        Assert.assertEquals(rule.name(), PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
     }
 
     @Test(description = "test non isolated public methods")
@@ -127,8 +165,9 @@ public class CoreRuleTest {
         Rule rule = CoreRule.PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT.rule();
         Assert.assertEquals(rule.id(), "ballerina:4");
         Assert.assertEquals(rule.numericId(), 4);
-        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT);
+        Assert.assertEquals(rule.name(), PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
     }
 
     @Test(description = "test non isolated public classes")
@@ -136,8 +175,9 @@ public class CoreRuleTest {
         Rule rule = CoreRule.PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT.rule();
         Assert.assertEquals(rule.id(), "ballerina:5");
         Assert.assertEquals(rule.numericId(), 5);
-        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT);
+        Assert.assertEquals(rule.name(), PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
     }
 
     @Test(description = "test non isolated public objects")
@@ -145,8 +185,9 @@ public class CoreRuleTest {
         Rule rule = CoreRule.PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT.rule();
         Assert.assertEquals(rule.id(), "ballerina:6");
         Assert.assertEquals(rule.numericId(), 6);
-        Assert.assertEquals(rule.description(), PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
+        Assert.assertEquals(rule.name(), PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
         Assert.assertEquals(rule.kind(), RuleKind.CODE_SMELL);
+        Assert.assertEquals(rule.severity(), Severity.LOW);
     }
 
     @Test(description = "test hard coded secret")
@@ -154,8 +195,14 @@ public class CoreRuleTest {
         Rule rule = CoreRule.HARD_CODED_SECRET.rule();
         Assert.assertEquals(rule.id(), "ballerina:13");
         Assert.assertEquals(rule.numericId(), 13);
-        Assert.assertEquals(rule.description(), HARD_CODED_SECRET);
+        Assert.assertEquals(rule.name(), HARD_CODED_SECRET);
         Assert.assertEquals(rule.kind(), RuleKind.VULNERABILITY);
+        Assert.assertEquals(rule.severity(), Severity.HIGH);
+        Assert.assertEquals(rule.tags(), List.of("security", "secrets", "credentials"));
+        Standards standards = rule.standards();
+        Assert.assertEquals(standards.cwe(), List.of(798, 259));
+        Assert.assertEquals(standards.owasp().get(0).year(), 2025);
+        Assert.assertEquals(standards.owasp().get(0).categories(), List.of(7));
     }
 
     @Test(description = "test non configurable coded secret")
@@ -163,7 +210,13 @@ public class CoreRuleTest {
         Rule rule = CoreRule.NON_CONFIGURABLE_SECRET.rule();
         Assert.assertEquals(rule.id(), "ballerina:14");
         Assert.assertEquals(rule.numericId(), 14);
-        Assert.assertEquals(rule.description(), NON_CONFIGURABLE_SECRET);
+        Assert.assertEquals(rule.name(), NON_CONFIGURABLE_SECRET);
         Assert.assertEquals(rule.kind(), RuleKind.VULNERABILITY);
+        Assert.assertEquals(rule.severity(), Severity.MEDIUM);
+        Assert.assertEquals(rule.tags(), List.of("security", "secrets", "configurable"));
+        Standards standards = rule.standards();
+        Assert.assertEquals(standards.cwe(), List.of(798));
+        Assert.assertEquals(standards.owasp().get(0).year(), 2025);
+        Assert.assertEquals(standards.owasp().get(0).categories(), List.of(7));
     }
 }

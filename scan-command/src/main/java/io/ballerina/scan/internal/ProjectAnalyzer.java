@@ -39,6 +39,7 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.ScannerContext;
+import io.ballerina.scan.Severity;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
@@ -65,17 +66,15 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static io.ballerina.projects.util.ProjectConstants.IMPORT_PREFIX;
-import static io.ballerina.scan.internal.ScanToolConstants.BUG;
-import static io.ballerina.scan.internal.ScanToolConstants.CODE_SMELL;
 import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
 import static io.ballerina.scan.internal.ScanToolConstants.IMPORT_GENERATOR_FILE;
 import static io.ballerina.scan.internal.ScanToolConstants.RULES_FILE;
 import static io.ballerina.scan.internal.ScanToolConstants.RULE_DESCRIPTION;
 import static io.ballerina.scan.internal.ScanToolConstants.RULE_ID;
 import static io.ballerina.scan.internal.ScanToolConstants.RULE_KIND;
+import static io.ballerina.scan.internal.ScanToolConstants.RULE_SEVERITY;
 import static io.ballerina.scan.internal.ScanToolConstants.SCANNER_CONTEXT;
 import static io.ballerina.scan.internal.ScanToolConstants.USE_IMPORT_AS_UNDERSCORE;
-import static io.ballerina.scan.internal.ScanToolConstants.VULNERABILITY;
 
 /**
  * Represents the project analyzer used for analyzing projects.
@@ -228,9 +227,13 @@ public class ProjectAnalyzer {
         JsonArray ruleArray = getRuleJsonArray(pluginName, ruleFileContent);
         for (JsonElement rule : ruleArray) {
             JsonObject ruleObject = getRuleObject(pluginName, rule);
-            RuleKind ruleKind = getRuleKind(pluginName, ruleObject.get(RULE_KIND).getAsString());
-            Rule inMemoryRule = RuleFactory.createRule(ruleObject.get(RULE_ID).getAsInt(),
-                    ruleObject.get(RULE_DESCRIPTION).getAsString(), ruleKind, org, name);
+            getRuleKind(pluginName, ruleObject.get(RULE_KIND).getAsString());
+            JsonElement severity = ruleObject.get(RULE_SEVERITY);
+            if (severity != null && !severity.isJsonNull()) {
+                getSeverity(pluginName, severity.isJsonPrimitive() ? severity.getAsString() : severity.toString());
+            }
+            CoreRuleDefinition definition = gson.fromJson(ruleObject, CoreRuleDefinition.class);
+            Rule inMemoryRule = RuleFactory.createRule(definition.toRuleBuilder(), org, name);
             rules.add(inMemoryRule);
         }
         return rules;
@@ -264,20 +267,20 @@ public class ProjectAnalyzer {
     }
 
     private RuleKind getRuleKind(String pluginName, String kind) {
-        switch (kind) {
-            case BUG -> {
-                return RuleKind.BUG;
-            }
-            case VULNERABILITY -> {
-                return RuleKind.VULNERABILITY;
-            }
-            case CODE_SMELL -> {
-                return RuleKind.CODE_SMELL;
-            }
-            default -> {
-                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_KIND,
-                        pluginName, Arrays.toString(RuleKind.values()), kind));
-            }
+        try {
+            return RuleKind.valueOf(kind);
+        } catch (IllegalArgumentException ex) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_KIND,
+                    pluginName, Arrays.toString(RuleKind.values()), kind));
+        }
+    }
+
+    private Severity getSeverity(String pluginName, String severity) {
+        try {
+            return Severity.valueOf(severity);
+        } catch (IllegalArgumentException ex) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INVALID_JSON_FORMAT_RULE_SEVERITY,
+                    pluginName, Arrays.toString(Severity.values()), severity));
         }
     }
 

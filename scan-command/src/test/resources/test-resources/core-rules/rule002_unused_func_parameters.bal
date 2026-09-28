@@ -15,6 +15,7 @@
 // under the License.
 
 import ballerina/http;
+import ballerina/jballerina.java;
 
 type TestObjType object {
     function t(int a, int a2) returns int;
@@ -89,3 +90,8 @@ function testIncludedParams2(*IncludedRecord includedRecordParam) {
     _ = includedRecordParam;
     return;
 }
+
+// no warning: external functions have no body to reference their parameters in
+isolated function externHasKey(string key) returns boolean = @java:Method {
+    'class: "io.ballerina.stdlib.cache.nativeimpl.Cache"
+} external;

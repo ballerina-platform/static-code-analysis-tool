@@ -12,7 +12,28 @@
     "rule": {
       "id": "ballerina:1",
       "numericId": 1,
-      "description": "Avoid checkpanic",
+      "name": "Avoid checkpanic",
+      "description": "Using `checkpanic` lets an unhandled error panic and crash the program instead of being handled.",
+      "details": "The `checkpanic` expression causes the program to panic and terminate abruptly when the checked expression evaluates to an error, instead of allowing the error to be handled. Prefer `check` with explicit error handling so callers can recover instead of crashing.",
+      "helpUri": "https://ballerina.io/learn/scan-rules/#avoid-checkpanic",
+      "severity": "LOW",
+      "tags": [
+        "error-handling"
+      ],
+      "standards": {
+        "cwe": [
+          248,
+          636
+        ],
+        "owasp": [
+          {
+            "year": 2025,
+            "categories": [
+              10
+            ]
+          }
+        ]
+      },
       "ruleKind": "CODE_SMELL"
     },
     "source": "BUILT_IN",

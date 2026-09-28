@@ -24,7 +24,9 @@ OPTIONS
                 Specify the format of the report. Default is json.
 
         --list-rules
-                List all available rules.
+                List the rules available to the project, along with their kind and severity.
+                Only works inside a Ballerina project, and lists only the core rules and the
+                rules contributed by the project's dependencies.
 
         --include-rules=<rule1, ...>
                 Run analysis for a specific set of rules.
@@ -56,7 +58,7 @@ EXAMPLES
         Run analysis and generate report in SARIF format.
                 $ bal scan --format=sarif
 
-        View all available rules.
+        View the rules available to the current package.
                 $ bal scan --list-rules
 
         Run analysis for a specific rule.

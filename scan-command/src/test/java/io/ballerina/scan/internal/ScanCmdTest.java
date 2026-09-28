@@ -267,17 +267,6 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(actual, expected);
     }
 
-    @Test(description = "test scan command with list rules flag outside a Ballerina project")
-    void testScanCommandWithListRulesFlagOutsideBallerinaProject() throws IOException {
-        Path nonProjectPath = testResources.resolve("test-resources").toAbsolutePath();
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {nonProjectPath.toString(), "--list-rules"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-        String expected = getExpectedOutput("core-rules-output.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
-    }
-
     @Test(description = "test scan command with list rules flag when the current directory is not a Ballerina project")
     void testScanCommandWithListRulesFlagWithoutArgumentOutsideBallerinaProject() throws IOException {
         Path nonProjectPath = testResources.resolve("test-resources").toAbsolutePath();
@@ -287,7 +276,8 @@ public class ScanCmdTest extends BaseTest {
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = getExpectedOutput("core-rules-output.txt");
+        String expected = "The specified path is not a valid Ballerina project: " + nonProjectPath + ". Please "
+                + "provide a valid Ballerina project path and try again.";
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
@@ -425,6 +415,18 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertTrue(
                 content.contains("\"bal-project-with-include-rule-configurations/main.bal\""),
                 "SARIF URI should be relative to workspace root for second sub-project");
+        Assert.assertTrue(content.contains("\"fullDescription\""), "SARIF rule should have a fullDescription");
+        Assert.assertTrue(content.contains("\"ruleKind\": \"CODE_SMELL\""),
+                "SARIF rule properties should include ruleKind");
+        Assert.assertTrue(content.contains("\"tags\""), "SARIF rule properties should include tags");
+        Assert.assertTrue(content.contains("\"external/cwe/cwe-248\""), "SARIF rule properties.tags should " +
+                "include a CWE tag generated from standards");
+        Assert.assertTrue(content.contains("\"external/owasp/owasp-a10-2025\""), "SARIF rule properties.tags " +
+                "should include an OWASP tag generated from standards");
+        Assert.assertFalse(content.contains("\"enabled\""), "SARIF defaultConfiguration should no longer " +
+                "include enabled");
+        Assert.assertTrue(content.contains("\"ruleIndex\": 0"), "SARIF result should include ruleIndex");
+        Assert.assertTrue(content.contains("\"snippet\""), "SARIF region should include a source snippet");
     }
 
     @Test(description = "test scan command with exclude rules flag")

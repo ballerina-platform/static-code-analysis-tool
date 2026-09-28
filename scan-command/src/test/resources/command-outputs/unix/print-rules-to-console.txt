@@ -1,27 +1,27 @@
 Loading scan tool configurations from <ABS_SOURCE_ROOT>/Scan.toml
-	RuleID                                           | Rule Kind     | Rule Description                                 
-	---------------------------------------------------------------------------------------------------------------------
-	ballerina:1                                      | CODE_SMELL    | Avoid checkpanic
-	ballerina:2                                      | CODE_SMELL    | Unused function parameter
-	ballerina:3                                      | CODE_SMELL    | Non isolated public function
-	ballerina:4                                      | CODE_SMELL    | Non isolated public method
-	ballerina:5                                      | CODE_SMELL    | Non isolated public class
-	ballerina:6                                      | CODE_SMELL    | Non isolated public object
-	ballerina:7                                      | CODE_SMELL    | This operation always evaluates to true
-	ballerina:8                                      | CODE_SMELL    | This operation always evaluates to false
-	ballerina:9                                      | CODE_SMELL    | This operation always evaluates to the same value
-	ballerina:10                                     | CODE_SMELL    | This variable is assigned to itself
-	ballerina:11                                     | CODE_SMELL    | Unused class private fields
-	ballerina:12                                     | CODE_SMELL    | Invalid range expression
-	ballerina:13                                     | VULNERABILITY | Hard-coded secrets are security-sensitive
-	ballerina:14                                     | VULNERABILITY | Non configurable secrets are security-sensitive
-	ballerina/example_module_static_code_analyzer:1  | CODE_SMELL    | rule 1
-	ballerina/example_module_static_code_analyzer:2  | BUG           | rule 2
-	ballerina/example_module_static_code_analyzer:3  | VULNERABILITY | rule 3
-	ballerinax/example_module_static_code_analyzer:1 | CODE_SMELL    | rule 1
-	ballerinax/example_module_static_code_analyzer:2 | BUG           | rule 2
-	ballerinax/example_module_static_code_analyzer:3 | VULNERABILITY | rule 3
-	exampleOrg/example_module_static_code_analyzer:1 | CODE_SMELL    | rule 1
-	exampleOrg/example_module_static_code_analyzer:2 | BUG           | rule 2
-	exampleOrg/example_module_static_code_analyzer:3 | VULNERABILITY | rule 3
+	RuleID                                           | Rule Kind     | Severity | Rule Description                                 
+	--------------------------------------------------------------------------------------------------------------------------------
+	ballerina:1                                      | CODE_SMELL    | LOW      | Avoid checkpanic
+	ballerina:2                                      | CODE_SMELL    | LOW      | Unused function parameter
+	ballerina:3                                      | CODE_SMELL    | LOW      | Non isolated public function
+	ballerina:4                                      | CODE_SMELL    | LOW      | Non isolated public method
+	ballerina:5                                      | CODE_SMELL    | LOW      | Non isolated public class
+	ballerina:6                                      | CODE_SMELL    | LOW      | Non isolated public object
+	ballerina:7                                      | CODE_SMELL    | LOW      | This operation always evaluates to true
+	ballerina:8                                      | CODE_SMELL    | LOW      | This operation always evaluates to false
+	ballerina:9                                      | CODE_SMELL    | LOW      | This operation always evaluates to the same value
+	ballerina:10                                     | CODE_SMELL    | LOW      | This variable is assigned to itself
+	ballerina:11                                     | CODE_SMELL    | LOW      | Unused class private fields
+	ballerina:12                                     | CODE_SMELL    | LOW      | Invalid range expression
+	ballerina:13                                     | VULNERABILITY | HIGH     | Hard-coded secrets are security-sensitive
+	ballerina:14                                     | VULNERABILITY | MEDIUM   | Non configurable secrets are security-sensitive
+	ballerina/example_module_static_code_analyzer:1  | CODE_SMELL    | -        | rule 1
+	ballerina/example_module_static_code_analyzer:2  | BUG           | -        | rule 2
+	ballerina/example_module_static_code_analyzer:3  | VULNERABILITY | -        | rule 3
+	ballerinax/example_module_static_code_analyzer:1 | CODE_SMELL    | -        | rule 1
+	ballerinax/example_module_static_code_analyzer:2 | BUG           | -        | rule 2
+	ballerinax/example_module_static_code_analyzer:3 | VULNERABILITY | -        | rule 3
+	exampleOrg/example_module_static_code_analyzer:1 | CODE_SMELL    | -        | rule 1
+	exampleOrg/example_module_static_code_analyzer:2 | BUG           | -        | rule 2
+	exampleOrg/example_module_static_code_analyzer:3 | VULNERABILITY | -        | rule 3
 	

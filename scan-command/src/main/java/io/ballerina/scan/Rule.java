@@ -18,6 +18,8 @@
 
 package io.ballerina.scan;
 
+import java.util.List;
+
 /**
  * {@code Rule} represents a static code analysis rule.
  *
@@ -51,4 +53,60 @@ public interface Rule {
      * @return rule kind of the rule
      */
     RuleKind kind();
+
+    /**
+     * Returns the human-readable name of the rule. Defaults to {@link #description()} when not
+     * overridden.
+     *
+     * @return name of the rule
+     */
+    default String name() {
+        return description();
+    }
+
+    /**
+     * Returns the full/long description of the rule. Defaults to {@link #description()} when not
+     * overridden.
+     *
+     * @return full description of the rule
+     */
+    default String details() {
+        return description();
+    }
+
+    /**
+     * Returns a URI pointing to further documentation on the rule, or {@code null} when unavailable.
+     *
+     * @return help URI of the rule, or {@code null}
+     */
+    default String helpUri() {
+        return null;
+    }
+
+    /**
+     * Returns the severity of the rule, or {@code null} when unavailable.
+     *
+     * @return {@link Severity} of the rule, or {@code null}
+     */
+    default Severity severity() {
+        return null;
+    }
+
+    /**
+     * Returns the tags associated with the rule (e.g. category references).
+     *
+     * @return tags of the rule, or an empty list when unavailable
+     */
+    default List<String> tags() {
+        return List.of();
+    }
+
+    /**
+     * Returns the structured CWE/OWASP coverage of the rule, or {@code null} when unavailable.
+     *
+     * @return {@link Standards} of the rule, or {@code null}
+     */
+    default Standards standards() {
+        return null;
+    }
 }

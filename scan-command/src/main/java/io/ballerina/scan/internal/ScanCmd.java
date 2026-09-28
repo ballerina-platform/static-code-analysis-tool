@@ -181,12 +181,6 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        if (listRules && !isBallerinaProjectPath()) {
-            allRules.addAll(CoreRule.rules());
-            ScanUtils.printRulesToConsole(allRules, outputStream);
-            return;
-        }
-
         Optional<Project> project = getProject();
         if (project.isEmpty()) {
             return;

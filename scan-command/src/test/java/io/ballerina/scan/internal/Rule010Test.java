@@ -20,11 +20,17 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.projects.Document;
+import io.ballerina.projects.Module;
+import io.ballerina.projects.Project;
+import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.utils.ScanUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 /**
@@ -114,5 +120,37 @@ public class Rule010Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(32), documentName, 72, 4, 72, 23, "ballerina:10", 10,
                 SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
 
+    }
+
+    @Test(description = "test that a self-assignment on a reserved-keyword identifier written with the ' "
+            + "escape (e.g. 'default) is reported with the identifier preserved literally - not HTML-escaped "
+            + "(e.g. as \\u0027default) - in the JSON and SARIF snippet output")
+    void testSnippetPreservesReservedKeywordIdentifier() {
+        String documentName = "rule010_reserved_keyword_self_assignment.bal";
+        Path documentPath = Paths.get("src", "test", "resources").resolve("test-resources").resolve("core-rules")
+                .resolve(documentName);
+        Project project = ProjectLoader.load(documentPath).project();
+        Module defaultModule = project.currentPackage().getDefaultModule();
+        Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
+
+        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.SELF_ASSIGNMENT.rule()));
+        SemanticModel semanticModel = document.module().getCompilation().getSemanticModel();
+        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext, semanticModel);
+        staticCodeAnalyzer.analyze();
+        List<Issue> issues = scannerContext.getReporter().getIssues();
+
+        Assert.assertEquals(issues.size(), 1);
+        assertIssue(issues.get(0), documentName, 2, 4, 2, 24, "ballerina:10", 10,
+                SELF_ASSIGNMENT, RuleKind.CODE_SMELL);
+
+        String expectedSnippet = "'default = 'default;";
+
+        String json = ScanUtils.convertIssuesToJsonString(issues);
+        Assert.assertTrue(json.contains("\"snippet\": \"" + expectedSnippet + "\""),
+                "expected an unescaped reserved-keyword snippet in JSON output, got: " + json);
+
+        String sarif = ScanUtils.convertIssuesToSarifString(issues, project);
+        Assert.assertTrue(sarif.contains("\"text\": \"" + expectedSnippet + "\""),
+                "expected an unescaped reserved-keyword snippet in SARIF output, got: " + sarif);
     }
 }

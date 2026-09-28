@@ -64,8 +64,8 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         return project.currentPackage().getDefaultModule();
     }
 
-    static void assertIssue(Issue issue, String documentName, int startLine, int startOffset, int endLine, 
-                    int endOffset, String ruleId, int numericId, String description, RuleKind ruleKind) {
+    static void assertIssue(Issue issue, String documentName, int startLine, int startOffset, int endLine,
+                    int endOffset, String ruleId, int numericId, String name, RuleKind ruleKind) {
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
         LineRange location = issue.location().lineRange();
         Assert.assertEquals(location.fileName(), documentName);
@@ -76,7 +76,7 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         Rule rule = issue.rule();
         Assert.assertEquals(rule.id(), ruleId);
         Assert.assertEquals(rule.numericId(), numericId);
-        Assert.assertEquals(rule.description(), description);
+        Assert.assertEquals(rule.name(), name);
         Assert.assertEquals(rule.kind(), ruleKind);
     }
 
@@ -84,6 +84,6 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         Assert.assertEquals(issue.source(), Source.BUILT_IN);
         assertIssue(issue, documentName, expectedLocation.statLine(), expectedLocation.startOffset(),
                 expectedLocation.endLine(), expectedLocation.endOffset(), expectedRule.id(),
-                expectedRule.numericId(), expectedRule.description(), expectedRule.kind());
+                expectedRule.numericId(), expectedRule.name(), expectedRule.kind());
     }
 }

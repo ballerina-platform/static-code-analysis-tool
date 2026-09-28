@@ -18,55 +18,53 @@
 
 package io.ballerina.scan.internal;
 
+import com.google.gson.Gson;
 import io.ballerina.scan.Rule;
-import io.ballerina.scan.RuleKind;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static io.ballerina.scan.internal.ScanToolConstants.CORE_RULES_DIRECTORY;
+import static io.ballerina.scan.internal.ScanToolConstants.RULES_FILE;
 
 /**
- * {@code CoreRule} contains the core static code analysis rules.
+ * {@code CoreRule} identifies the core static code analysis rules. The rich metadata for each rule
+ * (full description, tags, severity, CWE/OWASP references, etc.) is authored once in the bundled
+ * {@code core-rules/rules.json} resource file, loaded a single time, and looked up here by numeric
+ * id - so the metadata can be reviewed/updated without touching this wiring.
  *
  * @since 0.1.0
  * */
 enum CoreRule {
 
-    AVOID_CHECKPANIC(RuleFactory.createRule(1, "Avoid checkpanic", RuleKind.CODE_SMELL)),
-    UNUSED_FUNCTION_PARAMETER(RuleFactory.createRule(2,
-            "Unused function parameter", RuleKind.CODE_SMELL)),
-    PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT(RuleFactory.createRule(3,
-            "Non isolated public function", RuleKind.CODE_SMELL)),
-    PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT(RuleFactory.createRule(4,
-            "Non isolated public method", RuleKind.CODE_SMELL)),
-    PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT(RuleFactory.createRule(5,
-            "Non isolated public class", RuleKind.CODE_SMELL)),
-    PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT(RuleFactory.createRule(6,
-            "Non isolated public object", RuleKind.CODE_SMELL)),
-    OPERATION_ALWAYS_EVALUATES_TO_TRUE(RuleFactory.createRule(7,
-            "This operation always evaluates to true", RuleKind.CODE_SMELL)),
-    OPERATION_ALWAYS_EVALUATES_TO_FALSE(RuleFactory.createRule(8,
-            "This operation always evaluates to false", RuleKind.CODE_SMELL)),
-    OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE(RuleFactory.createRule(9,
-            "This operation always evaluates to the same value", RuleKind.CODE_SMELL)),
-    SELF_ASSIGNMENT(RuleFactory.createRule(10,
-            "This variable is assigned to itself", RuleKind.CODE_SMELL)),
-    UNUSED_PRIVATE_CLASS_FIELD(RuleFactory.createRule(11,
-            "Unused class private fields", RuleKind.CODE_SMELL)),
-    INVALID_RANGE_EXPRESSION(RuleFactory.createRule(12, 
-            "Invalid range expression", RuleKind.CODE_SMELL)),
-    HARD_CODED_SECRET(RuleFactory.createRule(13, 
-            "Hard-coded secrets are security-sensitive", RuleKind.VULNERABILITY)),
-    NON_CONFIGURABLE_SECRET(RuleFactory.createRule(14, 
-            "Non configurable secrets are security-sensitive", RuleKind.VULNERABILITY));
+    AVOID_CHECKPANIC(1),
+    UNUSED_FUNCTION_PARAMETER(2),
+    PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT(3),
+    PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT(4),
+    PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT(5),
+    PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT(6),
+    OPERATION_ALWAYS_EVALUATES_TO_TRUE(7),
+    OPERATION_ALWAYS_EVALUATES_TO_FALSE(8),
+    OPERATION_ALWAYS_EVALUATES_TO_SELF_VALUE(9),
+    SELF_ASSIGNMENT(10),
+    UNUSED_PRIVATE_CLASS_FIELD(11),
+    INVALID_RANGE_EXPRESSION(12),
+    HARD_CODED_SECRET(13),
+    NON_CONFIGURABLE_SECRET(14);
 
-    private final Rule rule;
+    private final int numericId;
 
-    CoreRule(Rule rule) {
-        this.rule = rule;
+    CoreRule(int numericId) {
+        this.numericId = numericId;
     }
 
     Rule rule() {
-        return rule;
+        return CoreRulesEngine.getRule(numericId);
     }
 
     static List<Rule> rules() {
@@ -75,5 +73,40 @@ enum CoreRule {
             coreRules.add(coreRule.rule());
         }
         return coreRules;
+    }
+
+    private static final class CoreRulesEngine {
+
+        private static final Map<Integer, Rule> RULES_BY_ID = loadRules();
+
+        private static Rule getRule(int numericId) {
+            Rule rule = RULES_BY_ID.get(numericId);
+            if (rule == null) {
+                throw new IllegalStateException("Missing core rule metadata for id: " + numericId);
+            }
+            return rule;
+        }
+
+        private static Map<Integer, Rule> loadRules() {
+            String resourcePath = CORE_RULES_DIRECTORY + RULES_FILE;
+            try (InputStream input = CoreRulesEngine.class.getClassLoader().getResourceAsStream(resourcePath)) {
+                if (input == null) {
+                    throw new IllegalStateException("Missing core rules metadata resource: " + resourcePath);
+                }
+                String content = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+                CoreRuleDefinition[] definitions = new Gson().fromJson(content, CoreRuleDefinition[].class);
+                Map<Integer, Rule> rulesById = new HashMap<>();
+                for (CoreRuleDefinition definition : definitions) {
+                    Rule rule = RuleFactory.createCoreRule(definition.toRuleBuilder());
+                    rulesById.put(rule.numericId(), rule);
+                }
+                return rulesById;
+            } catch (IOException ex) {
+                throw new IllegalStateException("Failed to load core rules metadata: " + resourcePath, ex);
+            }
+        }
+
+        private CoreRulesEngine() {
+        }
     }
 }

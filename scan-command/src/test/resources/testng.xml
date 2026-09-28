@@ -30,6 +30,7 @@ under the License.
             <class name="io.ballerina.scan.internal.IssueImplTest"/>
             <class name="io.ballerina.scan.internal.ReporterImplTest"/>
             <class name="io.ballerina.scan.internal.CoreRuleTest"/>
+            <class name="io.ballerina.scan.internal.CoreRuleOutputTest"/>
             <class name="io.ballerina.scan.internal.Rule001Test"/>
             <class name="io.ballerina.scan.internal.Rule002Test"/>
             <class name="io.ballerina.scan.internal.Rule003And004Test"/>
@@ -43,6 +44,7 @@ under the License.
             <class name="io.ballerina.scan.internal.Rule013Test"/>
             <class name="io.ballerina.scan.internal.Rule014Test"/>
             <class name="io.ballerina.scan.internal.ProjectAnalyzerTest"/>
+            <class name="io.ballerina.scan.internal.RegionConversionTest"/>
             <class name="io.ballerina.scan.utils.ScanUtilsTest"/>
             <class name="io.ballerina.scan.utils.ScanTomlWriterTest"/>
             <class name="io.ballerina.scan.utils.DiagnosticLogTest"/>

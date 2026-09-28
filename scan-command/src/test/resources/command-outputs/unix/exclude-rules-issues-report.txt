@@ -7,12 +7,14 @@
       "startColumn": 0,
       "endColumn": 1,
       "startOffset": 648,
-      "length": 134
+      "length": 134,
+      "snippet": "function getResult() returns int|error => 1;\n\npublic function main() {\n    // Non-compliant\n    int result = checkpanic getResult();\n}"
     },
     "rule": {
       "id": "ballerina/example_module_static_code_analyzer:1",
       "numericId": 1,
       "description": "rule 1",
+      "tags": [],
       "ruleKind": "CODE_SMELL"
     },
     "source": "BUILT_IN",
@@ -27,12 +29,14 @@
       "startColumn": 0,
       "endColumn": 1,
       "startOffset": 648,
-      "length": 134
+      "length": 134,
+      "snippet": "function getResult() returns int|error => 1;\n\npublic function main() {\n    // Non-compliant\n    int result = checkpanic getResult();\n}"
     },
     "rule": {
       "id": "exampleOrg/example_module_static_code_analyzer:1",
       "numericId": 1,
       "description": "rule 1",
+      "tags": [],
       "ruleKind": "CODE_SMELL"
     },
     "source": "EXTERNAL",
@@ -47,12 +51,14 @@
       "startColumn": 0,
       "endColumn": 1,
       "startOffset": 648,
-      "length": 134
+      "length": 134,
+      "snippet": "function getResult() returns int|error => 1;\n\npublic function main() {\n    // Non-compliant\n    int result = checkpanic getResult();\n}"
     },
     "rule": {
       "id": "ballerinax/example_module_static_code_analyzer:1",
       "numericId": 1,
       "description": "rule 1",
+      "tags": [],
       "ruleKind": "CODE_SMELL"
     },
     "source": "BUILT_IN",

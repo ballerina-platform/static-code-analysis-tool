@@ -17,3 +17,9 @@ build/
 
 #Ignore all .deb files
 *.deb
+
+# VS Code
+.vscode/
+
+# Claude AI
+.claude/

@@ -380,7 +380,7 @@ public class ScanLanguageServerTool {
         JsonObject obj = new JsonObject();
         if (issue.rule() != null) {
             obj.addProperty("ruleId", issue.rule().id());
-            obj.addProperty("message", issue.rule().description());
+            obj.addProperty("message", issue.rule().name());
             String ruleKind = issue.rule().kind() != null ? issue.rule().kind().name() : "UNKNOWN";
             obj.addProperty("severity", issue.rule().kind() != null ? issue.rule().kind().toString() : "MEDIUM");
             obj.addProperty("ruleKind", ruleKind);

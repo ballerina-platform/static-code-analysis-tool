@@ -21,6 +21,8 @@ package io.ballerina.scan.internal;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 
+import java.util.function.IntFunction;
+
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_RULE_PREFIX;
 import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
 
@@ -30,6 +32,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
  * @since 0.1.0
  * */
 class RuleFactory {
+
     /**
      * Returns a core static code analysis {@link Rule} instance.
      *
@@ -40,7 +43,12 @@ class RuleFactory {
      * @return a core static code analysis rule instance
      */
     static Rule createRule(int numericId, String description, RuleKind ruleKind) {
-        return new RuleImpl(BALLERINA_RULE_PREFIX + numericId, numericId, description, ruleKind);
+        return RuleImpl.builder()
+                .id(coreRuleId(numericId))
+                .numericId(numericId)
+                .description(description)
+                .ruleKind(ruleKind)
+                .build();
     }
 
     /**
@@ -55,9 +63,55 @@ class RuleFactory {
      * @return an external static code analysis rule instance
      */
     static Rule createRule(int numericId, String description, RuleKind ruleKind, String org, String name) {
-        String reportedSource = org + FORWARD_SLASH + name;
-        return new RuleImpl(reportedSource + ":" + numericId, numericId, description,
-                ruleKind);
+        return RuleImpl.builder()
+                .id(externalRuleId(org, name, numericId))
+                .numericId(numericId)
+                .description(description)
+                .ruleKind(ruleKind)
+                .build();
+    }
+
+    /**
+     * Returns a fully populated core static code analysis {@link Rule} instance, built from the
+     * rich rule metadata bundled for built-in Ballerina rules.
+     *
+     * @param builder the rich metadata describing the core rule, staged in a {@link RuleImpl.Builder}
+     * @return a core static code analysis rule instance carrying the full rule metadata
+     */
+    static Rule createCoreRule(RuleImpl.Builder builder) {
+        return finalizeRule(builder, RuleFactory::coreRuleId);
+    }
+
+    /**
+     * Returns a fully populated external static code analysis {@link Rule} instance, built from the
+     * rich rule metadata a compiler plugin authored in its {@code rules.json} (see
+     * {@link CoreRuleDefinition}, whose JSON shape is reused for external rules too).
+     *
+     * @param builder the rich metadata describing the external rule, staged in a {@link RuleImpl.Builder}
+     * @param org     Ballerina package organisation name of the compiler plugin
+     * @param name    Ballerina package name of the compiler plugin
+     * @return an external static code analysis rule instance carrying the full rule metadata
+     */
+    static Rule createRule(RuleImpl.Builder builder, String org, String name) {
+        return finalizeRule(builder, numericId -> externalRuleId(org, name, numericId));
+    }
+
+    /**
+     * Builds the staged rule from {@code builder}, then resolves its fully qualified id (via
+     * {@code idResolver}, applied to the staged rule's own numeric id). The helpUri is taken as
+     * authored in the rule metadata and left {@code null} when absent.
+     */
+    private static Rule finalizeRule(RuleImpl.Builder builder, IntFunction<String> idResolver) {
+        RuleImpl staged = builder.build();
+        return staged.withId(idResolver.apply(staged.numericId()));
+    }
+
+    private static String coreRuleId(int numericId) {
+        return BALLERINA_RULE_PREFIX + numericId;
+    }
+
+    private static String externalRuleId(String org, String name, int numericId) {
+        return org + FORWARD_SLASH + name + ":" + numericId;
     }
 
     private RuleFactory() {
