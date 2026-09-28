@@ -1,102 +1,61 @@
-import { Box, Typography } from "@mui/material";
+import { Alert, Box, Typography } from "@mui/material";
 import InfoCards from "./InfoCards";
 import MainTable from "./MainTable";
-import { useEffect, useState } from "react";
-
-function retrieveSingleFileStats(analyzedFile) {
-    let codeSmells = 0
-    let bugs = 0
-    let vulnerabilities = 0
-
-    if (analyzedFile?.issues.length !== 0) {
-        analyzedFile.issues.forEach((issue) => {
-            switch (issue.issueSeverity) {
-                case "CODE_SMELL":
-                    codeSmells += 1
-                    break
-                case "BUG":
-                    bugs += 1
-                    break
-                case "VULNERABILITY":
-                    vulnerabilities += 1
-                    break
-                default:
-                    break
-            }
-        })
-    }
-
-    const singleFileRecord = {
-        fileName: analyzedFile.fileName,
-        codeSmells: codeSmells,
-        bugs: bugs,
-        vulnerabilities: vulnerabilities
-    }
-
-    return singleFileRecord
-}
+import { useMemo } from "react";
+import { countActiveFilters, countByKind, matchesFilters } from "../issueMeta";
 
 function retrieveAllStats(analyzedFiles) {
-    let filesScanned = 0
-    let totalCodeSmells = 0
-    let totalBugs = 0
-    let totalVulnerabilities = 0
-    let singleFileRecords = []
-
-    analyzedFiles?.forEach((analyzedFile) => {
-        filesScanned += 1;
-        const singleFileRecord = retrieveSingleFileStats(analyzedFile)
-        singleFileRecords.push(singleFileRecord)
-        totalCodeSmells += singleFileRecord.codeSmells
-        totalBugs += singleFileRecord.bugs
-        totalVulnerabilities += singleFileRecord.vulnerabilities
-    })
-
+    const files = analyzedFiles ?? []
     return {
-        filesScanned: filesScanned,
-        totalCodeSmells: totalCodeSmells,
-        totalBugs: totalBugs,
-        totalVulnerabilities: totalVulnerabilities,
-        singleFileRecords: singleFileRecords
+        filesScanned: files.length,
+        kindCounts: countByKind(files.flatMap((analyzedFile) => analyzedFile.issues ?? [])),
     }
 }
 
-function MainView({ toggleSingleFileView, analyzedFiles }) {
-    const [statistics, setStatistics] = useState({
-        filesScanned: 0,
-        totalCodeSmells: 0,
-        totalBugs: 0,
-        totalVulnerabilities: 0
-    })
-
-    const [fileRecords, setFileRecords] = useState([])
-
-    useEffect(() => {
-        if (analyzedFiles?.length !== 0) {
-            const newStats = retrieveAllStats(analyzedFiles)
-
-            setStatistics({
-                filesScanned: newStats.filesScanned,
-                totalCodeSmells: newStats.totalCodeSmells,
-                totalBugs: newStats.totalBugs,
-                totalVulnerabilities: newStats.totalVulnerabilities
-            })
-
-            setFileRecords(newStats.singleFileRecords)
+// Per-file counts only include issues matching the filters; with filters active, files with no
+// matching issue drop out so the table lists exactly the files worth opening.
+function buildFileRecords(analyzedFiles, filters) {
+    const filtering = countActiveFilters(filters) > 0
+    return (analyzedFiles ?? []).flatMap((analyzedFile) => {
+        const matching = (analyzedFile.issues ?? []).filter((issue) => matchesFilters(issue, filters))
+        if (filtering && matching.length === 0) {
+            return []
         }
-    }, [analyzedFiles])
+        const counts = countByKind(matching)
+        return [{
+            file: analyzedFile,
+            fileName: analyzedFile.fileName,
+            filePath: analyzedFile.filePath,
+            codeSmells: counts.CODE_SMELL,
+            bugs: counts.BUG,
+            vulnerabilities: counts.VULNERABILITY,
+            totalIssues: matching.length,
+        }]
+    })
+}
+
+function MainView({ analyzedFiles, onOpenFile, missingFile, filters, onFiltersChange }) {
+    const statistics = useMemo(() => retrieveAllStats(analyzedFiles), [analyzedFiles])
+    const allIssues = useMemo(() => (analyzedFiles ?? []).flatMap((file) => file.issues ?? []), [analyzedFiles])
+    const fileRecords = useMemo(() => buildFileRecords(analyzedFiles, filters), [analyzedFiles, filters])
 
     return (
-        <Box sx={{
-            marginTop: "1rem",
-        }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {missingFile &&
+                <Alert severity="warning" variant="outlined" sx={{ bgcolor: "#ffffff" }}>
+                    The file <strong>{missingFile}</strong> isn't part of this report. Showing the overview instead.
+                </Alert>
+            }
             <InfoCards statistics={statistics} />
             {analyzedFiles === undefined || analyzedFiles.length === 0 ?
                 <ScanReportUnavailableView /> :
-
                 <MainTable
-                    toggleSingleFileView={toggleSingleFileView}
+                    onOpenFile={onOpenFile}
                     fileRecords={fileRecords}
+                    allIssues={allIssues}
+                    kindCounts={statistics.kindCounts}
+                    filters={filters}
+                    onFiltersChange={onFiltersChange}
                 />
             }
         </Box>
@@ -110,8 +69,12 @@ const ScanReportUnavailableView = () => {
             flexDirection: "column",
             justifyContent: "center",
             alignItems: "center",
-            marginTop: "1rem",
-            gap: "0.5rem"
+            padding: "3rem 1rem",
+            gap: "0.5rem",
+            bgcolor: "#ffffff",
+            borderRadius: "0.75rem",
+            border: "1px dashed var(--primary-color)",
+            textAlign: "center",
         }}>
             <Typography
                 variant="h3"

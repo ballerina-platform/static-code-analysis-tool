@@ -18,15 +18,21 @@
 
 package io.ballerina.scan.internal;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.Issue;
+import io.ballerina.scan.OwaspCoverage;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.Severity;
 import io.ballerina.scan.Source;
+import io.ballerina.scan.Standards;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanUtils;
 import org.testng.Assert;
@@ -44,7 +50,9 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import static io.ballerina.scan.ScanReportTestUtils.readScanReportData;
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
@@ -63,6 +71,9 @@ public class ScanCmdTest extends BaseTest {
             .resolve("valid-bal-project");
 
     private static final String RESULTS_DIRECTORY = "results";
+    // Serialized as startLine 16, startLineOffset 17, endLine 23, endLineOffset 1.
+    private static final BLangDiagnosticLocation REPORT_ISSUE_LOCATION = new BLangDiagnosticLocation("main.bal",
+            16, 23, 17, 1, 748, 4);
 
     @AfterTest
     void cleanup() {
@@ -211,25 +222,206 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(result, expected);
     }
 
-    @Test(description =
-            "test scan command with method for creating html analysis report when analysis issues are present")
-    void testScanCommandGenerateScanReportMethodWhenIssuePresent() throws IOException {
+    @Test(description = "test html analysis report carries every rule metadata field the report UI renders")
+    void testScanReportWithFullRuleMetadata() throws IOException {
+        Rule coreRule = RuleFactory.createCoreRule(RuleImpl.builder()
+                .numericId(101)
+                .name("Avoid SQL injection")
+                .description("User input reaches a SQL query")
+                .details("Untrusted input is concatenated into a SQL query.\nUse parameterized queries instead.")
+                .helpUri("https://ballerina.io/learn/scan-rules/#sql-injection")
+                .ruleKind(RuleKind.VULNERABILITY)
+                .severity(Severity.BLOCKER)
+                .tags(List.of("security", "sql"))
+                .standards(new Standards(List.of(89, 20), List.of(
+                        new OwaspCoverage(2025, List.of(5)),
+                        new OwaspCoverage(2021, List.of(3, 4))))));
+        Rule externalRule = RuleFactory.createRule(RuleImpl.builder()
+                .numericId(7)
+                .name("Unused variable")
+                .description("Variable is never read")
+                .details("Remove the variable or use it.")
+                .helpUri("https://example.org/rules/7")
+                .ruleKind(RuleKind.CODE_SMELL)
+                .severity(Severity.LOW)
+                .tags(List.of("maintainability"))
+                .standards(new Standards(List.of(563), List.of())), "exampleOrg", "exampleName");
+
+        JsonArray reportIssues = generateSingleFileReportIssues(List.of(
+                new IssueImpl(REPORT_ISSUE_LOCATION, coreRule, Source.BUILT_IN, "main.bal", mainBalPath()),
+                new IssueImpl(REPORT_ISSUE_LOCATION, externalRule, Source.EXTERNAL, "main.bal", mainBalPath())));
+        Assert.assertEquals(reportIssues.size(), 2);
+
+        JsonObject coreIssue = reportIssues.get(0).getAsJsonObject();
+        Assert.assertEquals(coreIssue.keySet(), Set.of("ruleID", "name", "ruleKind", "severity", "issueType",
+                "message", "details", "helpUri", "tags", "cwe", "owasp", "textRange"));
+        Assert.assertEquals(coreIssue.get("ruleID").getAsString(), "ballerina:101");
+        Assert.assertEquals(coreIssue.get("name").getAsString(), "Avoid SQL injection");
+        Assert.assertEquals(coreIssue.get("ruleKind").getAsString(), "VULNERABILITY");
+        Assert.assertEquals(coreIssue.get("severity").getAsString(), "BLOCKER");
+        Assert.assertEquals(coreIssue.get("issueType").getAsString(), "BUILT_IN");
+        Assert.assertEquals(coreIssue.get("message").getAsString(), "User input reaches a SQL query");
+        Assert.assertEquals(coreIssue.get("details").getAsString(),
+                "Untrusted input is concatenated into a SQL query.\nUse parameterized queries instead.");
+        Assert.assertEquals(coreIssue.get("helpUri").getAsString(),
+                "https://ballerina.io/learn/scan-rules/#sql-injection");
+        Assert.assertEquals(toStrings(coreIssue.getAsJsonArray("tags")), List.of("security", "sql"));
+        Assert.assertEquals(toInts(coreIssue.getAsJsonArray("cwe")), List.of(89, 20));
+        JsonArray owasp = coreIssue.getAsJsonArray("owasp");
+        Assert.assertEquals(owasp.size(), 2);
+        assertOwaspCoverage(owasp.get(0).getAsJsonObject(), 2025, List.of(5));
+        assertOwaspCoverage(owasp.get(1).getAsJsonObject(), 2021, List.of(3, 4));
+        assertTextRange(coreIssue);
+
+        JsonObject externalIssue = reportIssues.get(1).getAsJsonObject();
+        Assert.assertEquals(externalIssue.get("ruleID").getAsString(), "exampleOrg/exampleName:7");
+        Assert.assertEquals(externalIssue.get("name").getAsString(), "Unused variable");
+        Assert.assertEquals(externalIssue.get("ruleKind").getAsString(), "CODE_SMELL");
+        Assert.assertEquals(externalIssue.get("severity").getAsString(), "LOW");
+        Assert.assertEquals(externalIssue.get("issueType").getAsString(), "EXTERNAL");
+        Assert.assertEquals(externalIssue.get("message").getAsString(), "Variable is never read");
+        Assert.assertEquals(externalIssue.get("details").getAsString(), "Remove the variable or use it.");
+        Assert.assertEquals(externalIssue.get("helpUri").getAsString(), "https://example.org/rules/7");
+        Assert.assertEquals(toStrings(externalIssue.getAsJsonArray("tags")), List.of("maintainability"));
+        Assert.assertEquals(toInts(externalIssue.getAsJsonArray("cwe")), List.of(563));
+        // An empty OWASP list is left out rather than written as [].
+        Assert.assertFalse(externalIssue.has("owasp"), "Empty OWASP coverage should be omitted");
+        assertTextRange(externalIssue);
+    }
+
+    @Test(description = "test html analysis report omits rule metadata fields the rule does not define")
+    void testScanReportWithMinimalRuleMetadata() throws IOException {
         Rule coreRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
         Rule externalRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG, "exampleOrg",
                 "exampleName");
-        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 16, 23,
-                17, 1, 748, 4);
-        List<Issue> issues = new ArrayList<>();
-        issues.add(new IssueImpl(location, coreRule, Source.BUILT_IN, "main.bal",
-                validBalProject.resolve("main.bal").toString()));
-        issues.add(new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
-                validBalProject.resolve("main.bal").toString()));
+
+        JsonArray reportIssues = generateSingleFileReportIssues(List.of(
+                new IssueImpl(REPORT_ISSUE_LOCATION, coreRule, Source.BUILT_IN, "main.bal", mainBalPath()),
+                new IssueImpl(REPORT_ISSUE_LOCATION, externalRule, Source.EXTERNAL, "main.bal", mainBalPath())));
+        Assert.assertEquals(reportIssues.size(), 2);
+
+        List<String> expectedRuleIds = List.of("ballerina:101", "exampleOrg/exampleName:101");
+        List<String> expectedIssueTypes = List.of("BUILT_IN", "EXTERNAL");
+        for (int i = 0; i < reportIssues.size(); i++) {
+            JsonObject issue = reportIssues.get(i).getAsJsonObject();
+            // No severity, help URI, tags or standards, and details/name fall back to the description, so
+            // only the always-present fields may appear.
+            Assert.assertEquals(issue.keySet(),
+                    Set.of("ruleID", "name", "ruleKind", "issueType", "message", "textRange"));
+            Assert.assertEquals(issue.get("ruleID").getAsString(), expectedRuleIds.get(i));
+            Assert.assertEquals(issue.get("issueType").getAsString(), expectedIssueTypes.get(i));
+            Assert.assertEquals(issue.get("name").getAsString(), "rule 101");
+            Assert.assertEquals(issue.get("message").getAsString(), "rule 101");
+            Assert.assertEquals(issue.get("ruleKind").getAsString(), "BUG");
+            assertTextRange(issue);
+        }
+    }
+
+    @Test(description = "test html analysis report leaves out details that just repeat the description")
+    void testScanReportOmitsDetailsSameAsDescription() throws IOException {
+        Rule rule = RuleFactory.createCoreRule(RuleImpl.builder()
+                .numericId(102)
+                .name("Function too long")
+                .description("Function exceeds the allowed length")
+                .details("Function exceeds the allowed length")
+                .ruleKind(RuleKind.CODE_SMELL)
+                .severity(Severity.MEDIUM)
+                .tags(List.of())
+                .standards(new Standards(List.of(), List.of())));
+
+        JsonArray reportIssues = generateSingleFileReportIssues(List.of(
+                new IssueImpl(REPORT_ISSUE_LOCATION, rule, Source.BUILT_IN, "main.bal", mainBalPath())));
+        Assert.assertEquals(reportIssues.size(), 1);
+
+        JsonObject issue = reportIssues.get(0).getAsJsonObject();
+        Assert.assertEquals(issue.keySet(),
+                Set.of("ruleID", "name", "ruleKind", "severity", "issueType", "message", "textRange"));
+        Assert.assertEquals(issue.get("name").getAsString(), "Function too long");
+        Assert.assertEquals(issue.get("message").getAsString(), "Function exceeds the allowed length");
+        Assert.assertEquals(issue.get("severity").getAsString(), "MEDIUM");
+    }
+
+    @Test(description = "test html analysis report groups issues under the file they were reported in")
+    void testScanReportGroupsIssuesByFile() throws IOException {
+        Rule rule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
+        Path otherFile = testResources.resolve("test-resources").resolve("bal-project-with-config-file")
+                .resolve("main.bal");
+        BLangDiagnosticLocation otherLocation = new BLangDiagnosticLocation("main.bal", 1, 1, 0, 5, 0, 5);
+        List<Issue> issues = List.of(
+                new IssueImpl(REPORT_ISSUE_LOCATION, rule, Source.BUILT_IN, "main.bal", mainBalPath()),
+                new IssueImpl(otherLocation, rule, Source.BUILT_IN, "main.bal", otherFile.toString()),
+                new IssueImpl(REPORT_ISSUE_LOCATION, rule, Source.BUILT_IN, "main.bal", mainBalPath()));
         Project project = ProjectLoader.load(validBalProject).project();
-        Path resultsFile = ScanUtils.generateScanReport(issues, project, null);
-        String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("issues-html-report.txt");
-        Assert.assertEquals(result, expected);
+        JsonObject scanData = readScanReportData(ScanUtils.generateScanReport(issues, project, null));
+
+        JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
+        Assert.assertEquals(scannedFiles.size(), 2);
+        JsonObject mainFile = findScannedFile(scannedFiles, validBalProject.resolve("main.bal"));
+        JsonObject secondFile = findScannedFile(scannedFiles, otherFile);
+        Assert.assertEquals(mainFile.getAsJsonArray("issues").size(), 2);
+        Assert.assertEquals(secondFile.getAsJsonArray("issues").size(), 1);
+        Assert.assertEquals(secondFile.get("fileContent").getAsString(),
+                Files.readString(otherFile, StandardCharsets.UTF_8));
+        JsonObject secondRange = secondFile.getAsJsonArray("issues").get(0).getAsJsonObject()
+                .getAsJsonObject("textRange");
+        Assert.assertEquals(secondRange.get("startLine").getAsInt(), 1);
+        Assert.assertEquals(secondRange.get("startLineOffset").getAsInt(), 0);
+        Assert.assertEquals(secondRange.get("endLine").getAsInt(), 1);
+        Assert.assertEquals(secondRange.get("endLineOffset").getAsInt(), 5);
+    }
+
+    private String mainBalPath() {
+        return validBalProject.resolve("main.bal").toString();
+    }
+
+    // Generates a report for issues that are all in valid-bal-project/main.bal, checks the project and file
+    // entries, and returns that file's issues.
+    private JsonArray generateSingleFileReportIssues(List<Issue> issues) throws IOException {
+        Project project = ProjectLoader.load(validBalProject).project();
+        JsonObject scanData = readScanReportData(ScanUtils.generateScanReport(issues, project, null));
+        Assert.assertEquals(scanData.get("projectName").getAsString(), "valid_bal_project");
+
+        JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
+        Assert.assertEquals(scannedFiles.size(), 1);
+        Path mainBal = validBalProject.resolve("main.bal");
+        JsonObject scannedFile = findScannedFile(scannedFiles, mainBal);
+        Assert.assertEquals(scannedFile.get("fileName").getAsString(), "main.bal");
+        Assert.assertEquals(scannedFile.get("fileContent").getAsString(),
+                Files.readString(mainBal, StandardCharsets.UTF_8));
+        return scannedFile.getAsJsonArray("issues");
+    }
+
+    // Compares as normalized paths so the check doesn't depend on the OS path separator.
+    private static JsonObject findScannedFile(JsonArray scannedFiles, Path filePath) {
+        Path expected = filePath.toAbsolutePath().normalize();
+        return scannedFiles.asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .filter(file -> Path.of(file.get("filePath").getAsString()).toAbsolutePath().normalize()
+                        .equals(expected))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Report has no entry for " + expected));
+    }
+
+    private static void assertTextRange(JsonObject issue) {
+        JsonObject textRange = issue.getAsJsonObject("textRange");
+        Assert.assertEquals(textRange.keySet(), Set.of("startLine", "startLineOffset", "endLine", "endLineOffset"));
+        Assert.assertEquals(textRange.get("startLine").getAsInt(), 16);
+        Assert.assertEquals(textRange.get("startLineOffset").getAsInt(), 17);
+        Assert.assertEquals(textRange.get("endLine").getAsInt(), 23);
+        Assert.assertEquals(textRange.get("endLineOffset").getAsInt(), 1);
+    }
+
+    private static void assertOwaspCoverage(JsonObject coverage, int year, List<Integer> categories) {
+        Assert.assertEquals(coverage.get("year").getAsInt(), year);
+        Assert.assertEquals(toInts(coverage.getAsJsonArray("categories")), categories);
+    }
+
+    private static List<String> toStrings(JsonArray array) {
+        return array.asList().stream().map(JsonElement::getAsString).toList();
+    }
+
+    private static List<Integer> toInts(JsonArray array) {
+        return array.asList().stream().map(JsonElement::getAsInt).toList();
     }
 
     @Test(description = "test method for printing static code analysis rules to the console")

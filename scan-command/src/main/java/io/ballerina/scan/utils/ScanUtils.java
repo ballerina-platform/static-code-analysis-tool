@@ -28,6 +28,7 @@ import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.TomlDocument;
 import io.ballerina.projects.internal.model.Target;
 import io.ballerina.scan.Issue;
+import io.ballerina.scan.OwaspCoverage;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Severity;
@@ -103,9 +104,18 @@ import static io.ballerina.scan.utils.Constants.SCAN_FILE_FIELD;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_CONTENT;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_NAME;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_PATH;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_CWE;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_DETAILS;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_HELP_URI;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_KIND;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_MESSAGE;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_NAME;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_OWASP;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_OWASP_CATEGORIES;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_OWASP_YEAR;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_RULE_ID;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_SEVERITY;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TAGS;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET;
@@ -578,11 +588,29 @@ public final class ScanUtils {
      * @return json object representation of the static code analysis issue
      */
     private static JsonObject getJsonIssue(IssueImpl issueImpl) {
+        Rule rule = issueImpl.rule();
         JsonObject scanReportIssue = new JsonObject();
-        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_RULE_ID, issueImpl.rule().id());
-        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_SEVERITY, issueImpl.rule().kind().toString());
+        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_RULE_ID, rule.id());
+        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_NAME, rule.name());
+        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_KIND, rule.kind().toString());
+        if (rule.severity() != null) {
+            scanReportIssue.addProperty(SCAN_REPORT_ISSUE_SEVERITY, rule.severity().toString());
+        }
         scanReportIssue.addProperty(SCAN_REPORT_ISSUE_TYPE, issueImpl.source().toString());
-        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_MESSAGE, issueImpl.rule().description());
+        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_MESSAGE, rule.description());
+        // details() falls back to description(), so only emit it when it's actually distinct.
+        if (rule.details() != null && !rule.details().equals(rule.description())) {
+            scanReportIssue.addProperty(SCAN_REPORT_ISSUE_DETAILS, rule.details());
+        }
+        if (rule.helpUri() != null) {
+            scanReportIssue.addProperty(SCAN_REPORT_ISSUE_HELP_URI, rule.helpUri());
+        }
+        if (rule.tags() != null && !rule.tags().isEmpty()) {
+            JsonArray tags = new JsonArray();
+            rule.tags().forEach(tags::add);
+            scanReportIssue.add(SCAN_REPORT_ISSUE_TAGS, tags);
+        }
+        addStandards(scanReportIssue, rule.standards());
 
         JsonObject scanReportIssueTextRange = new JsonObject();
         LineRange lineRange = issueImpl.location().lineRange();
@@ -595,6 +623,35 @@ public final class ScanUtils {
 
         scanReportIssue.add(SCAN_REPORT_ISSUE_TEXT_RANGE, scanReportIssueTextRange);
         return scanReportIssue;
+    }
+
+    /**
+     * Adds the CWE and OWASP coverage of a rule to its scan report issue, omitting whichever is empty.
+     *
+     * @param scanReportIssue the scan report issue to add the coverage to
+     * @param standards       the standards coverage of the rule, or {@code null}
+     */
+    private static void addStandards(JsonObject scanReportIssue, Standards standards) {
+        if (standards == null) {
+            return;
+        }
+        if (!standards.cwe().isEmpty()) {
+            JsonArray cwe = new JsonArray();
+            standards.cwe().forEach(cwe::add);
+            scanReportIssue.add(SCAN_REPORT_ISSUE_CWE, cwe);
+        }
+        if (!standards.owasp().isEmpty()) {
+            JsonArray owasp = new JsonArray();
+            for (OwaspCoverage coverage : standards.owasp()) {
+                JsonObject coverageObject = new JsonObject();
+                coverageObject.addProperty(SCAN_REPORT_ISSUE_OWASP_YEAR, coverage.year());
+                JsonArray categories = new JsonArray();
+                coverage.categories().forEach(categories::add);
+                coverageObject.add(SCAN_REPORT_ISSUE_OWASP_CATEGORIES, categories);
+                owasp.add(coverageObject);
+            }
+            scanReportIssue.add(SCAN_REPORT_ISSUE_OWASP, owasp);
+        }
     }
 
     /**
