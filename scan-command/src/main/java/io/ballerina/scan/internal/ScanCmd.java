@@ -321,10 +321,11 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        List<Issue> issues = projectAnalyzer.analyze(coreRules);
-        issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
-
+        List<Issue> externalIssues = projectAnalyzer.runExternalAnalyzers(externalAnalyzers);
         failOnCompilationErrors(projectAnalyzer);
+
+        List<Issue> issues = projectAnalyzer.analyze(coreRules);
+        issues.addAll(externalIssues);
 
         if (!projectIncludeRules.isEmpty()) {
             issues.removeIf(issue -> !projectIncludeRules.contains(issue.rule().id()));
