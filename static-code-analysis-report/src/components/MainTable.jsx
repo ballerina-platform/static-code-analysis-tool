@@ -1,21 +1,41 @@
-import { ChevronRight, DescriptionOutlined, FilterAltOutlined } from '@mui/icons-material';
 import {
+    ChevronRight,
+    DensityMediumOutlined,
+    DescriptionOutlined,
+    FileDownloadOutlined,
+    FilterAltOutlined,
+    FilterListOutlined,
+    ViewColumnOutlined
+} from '@mui/icons-material';
+import {
+    Badge,
+    Button,
+    Checkbox,
+    Collapse,
+    ListItemIcon,
+    ListItemText,
+    Menu,
+    MenuItem,
+    Tooltip,
     Typography,
     alpha
 } from '@mui/material';
 import Box from '@mui/material/Box';
-import { useMemo } from 'react';
-import {
-    DataGrid,
-    GridToolbarColumnsButton,
-    GridToolbarContainer,
-    GridToolbarDensitySelector,
-    GridToolbarExport,
-    GridToolbarFilterButton,
-    GridToolbarQuickFilter
-} from '@mui/x-data-grid';
+import { useMemo, useState } from 'react';
+import { DataGrid, useGridApiRef } from '@mui/x-data-grid';
 import { ClearFiltersButton, IssueFilterFields, KindFilterChips, SearchField } from './IssueFilters';
 import { RULE_KINDS, countActiveFilters } from '../issueMeta';
+
+// Filters that live in the collapsible panel; kinds and search sit in the header.
+const PANEL_FILTER_KEYS = ["severities", "rules", "tags", "cwes", "owasp"];
+
+const DENSITIES = {
+    compact: "Compact",
+    standard: "Standard",
+    comfortable: "Comfortable",
+};
+
+const toolbarButtonSx = { textTransform: "none", fontWeight: 600, borderRadius: "0.5rem", color: "text.secondary" };
 
 const kindHeader = (kind) => () => {
     const { Icon, plural, color } = RULE_KINDS[kind];
@@ -46,6 +66,7 @@ const kindCount = (kind) => ({ value }) => (
 const countColumn = (field, kind) => ({
     field,
     type: 'number',
+    headerName: RULE_KINDS[kind].plural,
     renderHeader: kindHeader(kind),
     renderCell: kindCount(kind),
     minWidth: 150,
@@ -107,74 +128,27 @@ const buildColumns = (filtering) => [
     },
 ];
 
-const TableToolbar = ({ filtering }) => (
-    <GridToolbarContainer sx={{
-        padding: "0.5rem 1rem",
-        justifyContent: "space-between",
-        gap: "0.5rem",
-        // Match the toolbar buttons in the single file view's issue table.
-        "& .MuiButton-root": { textTransform: "none", fontWeight: 600, borderRadius: "0.5rem" },
-    }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.25rem" }}>
-            <Typography variant="h5" fontWeight="bold" sx={{ marginRight: "0.75rem" }}>
-                {filtering ? "Files with matching issues" : "Files with issues"}
-            </Typography>
-            <GridToolbarColumnsButton />
-            <GridToolbarFilterButton />
-            <GridToolbarDensitySelector />
-            <GridToolbarExport csvOptions={{ fileName: "scan-report-files" }} />
-        </Box>
-        <GridToolbarQuickFilter debounceMs={200} placeholder="Search files…" />
-    </GridToolbarContainer>
-)
-
 // Narrows the file list down to files containing issues that match; the same filters are kept when
-// a file is opened, so its issue table starts out showing just those issues.
-const IssueFilterPanel = ({ allIssues, kindCounts, filters, onFiltersChange }) => (
-    <Box sx={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.75rem",
-        padding: "0.75rem 1rem",
-        bgcolor: "var(--page-background)",
-        borderBottom: "1px solid var(--surface-border)",
-    }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <FilterAltOutlined fontSize="small" color="primary" />
-                <Typography variant="h6" fontWeight="bold">Filter by issue</Typography>
-            </Box>
-            <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
-                <KindFilterChips
-                    counts={kindCounts}
-                    selected={filters.kinds}
-                    onChange={(kinds) => onFiltersChange({ ...filters, kinds })}
-                />
-                <SearchField
-                    placeholder="Search issues…"
-                    value={filters.search}
-                    onChange={(search) => onFiltersChange({ ...filters, search })}
-                />
-            </Box>
-        </Box>
-        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-                <IssueFilterFields
-                    issues={allIssues}
-                    filters={filters}
-                    onChange={onFiltersChange}
-                    fields={["tags", "cwes", "owasp", "severities", "rules"]}
-                />
-            </Box>
-            <ClearFiltersButton filters={filters} onChange={onFiltersChange} />
-        </Box>
-    </Box>
-)
-
+// a file is opened, so its issue table starts out showing just those issues. The toolbar mirrors the
+// single file view's issue table, driving the grid through its API instead of the grid's own toolbar.
 function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, onFiltersChange }) {
     const filtering = countActiveFilters(filters) > 0
     const rows = fileRecords.map((record) => ({ id: record.filePath ?? record.fileName, ...record }))
     const columns = useMemo(() => buildColumns(filtering), [filtering])
+    const hideableColumns = columns.filter(({ hideable }) => hideable !== false)
+    const apiRef = useGridApiRef()
+    const [filtersOpen, setFiltersOpen] = useState(() => countActiveFilters(filters, PANEL_FILTER_KEYS) > 0)
+    const [columnVisibility, setColumnVisibility] = useState({})
+    const [density, setDensity] = useState("standard")
+    const [columnsMenu, setColumnsMenu] = useState(null)
+    const [densityMenu, setDensityMenu] = useState(null)
+
+    const panelFilterCount = countActiveFilters({ ...filters, search: "" }, PANEL_FILTER_KEYS)
+    const visibleColumnCount = hideableColumns.filter(({ field }) => columnVisibility[field] !== false).length
+
+    const toggleColumn = (field) => {
+        setColumnVisibility((prev) => ({ ...prev, [field]: prev[field] === false }))
+    }
 
     return (
         <Box sx={{
@@ -183,13 +157,109 @@ function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, on
             border: "1px solid var(--primary-color)",
             overflow: "hidden",
         }}>
-            <IssueFilterPanel
-                allIssues={allIssues}
-                kindCounts={kindCounts}
-                filters={filters}
-                onFiltersChange={onFiltersChange}
-            />
+            <Box sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "0.75rem",
+                padding: "0.75rem 1rem",
+                borderBottom: "1px solid var(--surface-border)",
+            }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <FilterAltOutlined fontSize="small" color="primary" />
+                    <Typography variant="h5" fontWeight="bold">Filter by issue</Typography>
+                </Box>
+                <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
+                    <KindFilterChips
+                        counts={kindCounts}
+                        selected={filters.kinds}
+                        onChange={(kinds) => onFiltersChange({ ...filters, kinds })}
+                    />
+                    <SearchField
+                        placeholder="Search issues…"
+                        value={filters.search}
+                        onChange={(search) => onFiltersChange({ ...filters, search })}
+                    />
+                </Box>
+            </Box>
+
+            <Box sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "0.25rem",
+                padding: "0.25rem 0.75rem",
+                borderBottom: "1px solid var(--surface-border)",
+            }}>
+                <Button
+                    size="small"
+                    startIcon={<Badge color="primary" variant="dot" invisible={panelFilterCount === 0}><FilterListOutlined /></Badge>}
+                    onClick={() => setFiltersOpen((open) => !open)}
+                    aria-expanded={filtersOpen}
+                    sx={{ ...toolbarButtonSx, color: filtersOpen || panelFilterCount ? "primary.main" : "text.secondary" }}
+                >
+                    Filters{panelFilterCount > 0 ? ` (${panelFilterCount})` : ""}
+                </Button>
+                <Button size="small" startIcon={<ViewColumnOutlined />} onClick={(e) => setColumnsMenu(e.currentTarget)} sx={toolbarButtonSx}>
+                    Columns
+                </Button>
+                <Button size="small" startIcon={<DensityMediumOutlined />} onClick={(e) => setDensityMenu(e.currentTarget)} sx={toolbarButtonSx}>
+                    Density
+                </Button>
+                <Tooltip title="Download the files currently listed as CSV">
+                    <Button
+                        size="small"
+                        startIcon={<FileDownloadOutlined />}
+                        onClick={() => apiRef.current.exportDataAsCsv({ fileName: "scan-report-files" })}
+                        sx={toolbarButtonSx}
+                    >
+                        Export
+                    </Button>
+                </Tooltip>
+                <Box sx={{ flex: 1 }} />
+                <ClearFiltersButton filters={filters} onChange={onFiltersChange} />
+
+                <Menu anchorEl={columnsMenu} open={Boolean(columnsMenu)} onClose={() => setColumnsMenu(null)}>
+                    {hideableColumns.map(({ field, headerName }) => {
+                        const visible = columnVisibility[field] !== false
+                        return (
+                            <MenuItem key={field} dense onClick={() => toggleColumn(field)}
+                                // Keep at least one column so the grid never collapses to just the open arrow.
+                                disabled={visible && visibleColumnCount === 1}>
+                                <ListItemIcon>
+                                    <Checkbox size="small" checked={visible} sx={{ padding: 0 }} />
+                                </ListItemIcon>
+                                <ListItemText>{headerName}</ListItemText>
+                            </MenuItem>
+                        )
+                    })}
+                </Menu>
+                <Menu anchorEl={densityMenu} open={Boolean(densityMenu)} onClose={() => setDensityMenu(null)}>
+                    {Object.entries(DENSITIES).map(([key, label]) => (
+                        <MenuItem key={key} dense selected={density === key} onClick={() => { setDensity(key); setDensityMenu(null); }}>
+                            {label}
+                        </MenuItem>
+                    ))}
+                </Menu>
+            </Box>
+
+            <Collapse in={filtersOpen} timeout="auto">
+                <Box sx={{ padding: "0.75rem 1rem", bgcolor: "var(--page-background)", borderBottom: "1px solid var(--surface-border)" }}>
+                    <IssueFilterFields
+                        issues={allIssues}
+                        filters={filters}
+                        onChange={onFiltersChange}
+                        fields={PANEL_FILTER_KEYS}
+                    />
+                </Box>
+            </Collapse>
+
             <DataGrid
+                apiRef={apiRef}
+                density={density}
+                columnVisibilityModel={columnVisibility}
+                onColumnVisibilityModelChange={setColumnVisibility}
                 sx={{
                     border: "none",
                     "& .MuiDataGrid-columnHeaders": { bgcolor: "var(--page-background)" },
@@ -214,15 +284,14 @@ function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, on
                 }}
                 pageSizeOptions={[10, 25, 50, 100]}
                 slots={{
-                    toolbar: TableToolbar,
                     noRowsOverlay: () => (
                         <Box sx={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "text.secondary" }}>
                             {filtering ? "No files have issues matching the current filters." : "No files."}
                         </Box>
                     ),
                 }}
-                slotProps={{ toolbar: { filtering } }}
                 disableColumnMenu={true}
+                disableColumnFilter
                 disableRowSelectionOnClick
                 autoHeight
                 onRowClick={({ row }) => onOpenFile(row.file)}
