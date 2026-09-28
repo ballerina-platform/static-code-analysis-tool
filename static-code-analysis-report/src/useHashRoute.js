@@ -22,8 +22,10 @@ function parseHash(hash) {
     };
 }
 
-export const buildFileHash = (fileKey, issueIndex = null) =>
-    `#/file/${encodeURIComponent(fileKey)}${issueIndex !== null ? `/issue/${issueIndex}` : ""}`;
+export const buildFileHash = (fileKey, issueIndex = null) => {
+    const issueSuffix = issueIndex === null ? "" : "/issue/" + issueIndex;
+    return `#/file/${encodeURIComponent(fileKey)}${issueSuffix}`;
+};
 
 function useHashRoute() {
     const [route, setRoute] = useState(() => parseHash(window.location.hash));

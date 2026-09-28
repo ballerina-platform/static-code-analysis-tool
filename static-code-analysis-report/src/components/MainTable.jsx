@@ -37,6 +37,12 @@ const DENSITIES = {
 
 const toolbarButtonSx = { textTransform: "none", fontWeight: 600, borderRadius: "0.5rem", color: "text.secondary" };
 
+const NoRowsOverlay = ({ filtering }) => (
+    <Box sx={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "text.secondary" }}>
+        {filtering ? "No files have issues matching the current filters." : "No files."}
+    </Box>
+)
+
 const kindHeader = (kind) => () => {
     const { Icon, plural, color } = RULE_KINDS[kind];
     return (
@@ -283,13 +289,8 @@ function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, on
                     },
                 }}
                 pageSizeOptions={[10, 25, 50, 100]}
-                slots={{
-                    noRowsOverlay: () => (
-                        <Box sx={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "text.secondary" }}>
-                            {filtering ? "No files have issues matching the current filters." : "No files."}
-                        </Box>
-                    ),
-                }}
+                slots={{ noRowsOverlay: NoRowsOverlay }}
+                slotProps={{ noRowsOverlay: { filtering } }}
                 disableColumnMenu={true}
                 disableColumnFilter
                 disableRowSelectionOnClick

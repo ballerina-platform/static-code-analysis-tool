@@ -134,7 +134,7 @@ const COLUMNS = [
 
 const csvEscape = (value) => {
     const text = String(value ?? "");
-    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
 const downloadCsv = (issues, fileName) => {
@@ -411,7 +411,7 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
                 page={currentPage}
                 onPageChange={(_, newPage) => setPage(newPage)}
                 rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                onRowsPerPageChange={(e) => { setRowsPerPage(Number.parseInt(e.target.value, 10)); setPage(0); }}
                 rowsPerPageOptions={[10, 25, 50, { label: "All", value: -1 }]}
                 sx={{ borderTop: "1px solid var(--surface-border)" }}
             />

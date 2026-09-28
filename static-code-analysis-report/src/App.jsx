@@ -28,10 +28,15 @@ function App() {
     : undefined
 
   useEffect(() => {
-    document.title = requestedFile
-      ? `${requestedFile.fileName} · ${analysisResults.projectName ?? "Scan Report"}`
-      : `${analysisResults.projectName ? `${analysisResults.projectName} · ` : ""}Ballerina Scan Report`
-  }, [requestedFile, analysisResults.projectName])
+    const { projectName } = analysisResults
+    if (requestedFile) {
+      document.title = `${requestedFile.fileName} · ${projectName ?? "Scan Report"}`
+    } else if (projectName) {
+      document.title = `${projectName} · Ballerina Scan Report`
+    } else {
+      document.title = "Ballerina Scan Report"
+    }
+  }, [requestedFile, analysisResults])
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "var(--page-background)" }}>

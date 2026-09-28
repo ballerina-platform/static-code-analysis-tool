@@ -112,7 +112,7 @@ function SingleFileContent({ issues, fileContent, selectedIssue, focusRequest, o
 // exact issue span within the line is colored while still supporting multi-line and overlapping issues.
 const getLineSegments = (line, relevantRanges, lineNumber) => {
     if (line.length === 0) {
-        return [{ text: " ", ranges: relevantRanges }];
+        return [{ start: 0, text: " ", ranges: relevantRanges }];
     }
 
     const coverage = Array.from({ length: line.length }, () => []);
@@ -130,7 +130,7 @@ const getLineSegments = (line, relevantRanges, lineNumber) => {
     let segmentStart = 0;
     for (let i = 1; i <= line.length; i++) {
         if (i === line.length || coverageKey(coverage[i]) !== coverageKey(coverage[segmentStart])) {
-            segments.push({ text: line.slice(segmentStart, i), ranges: coverage[segmentStart] });
+            segments.push({ start: segmentStart, text: line.slice(segmentStart, i), ranges: coverage[segmentStart] });
             segmentStart = i;
         }
     }
@@ -175,9 +175,9 @@ const CodeLine = ({ line, lineNumber, issueRanges, selectedIssue, onSelectIssue,
                 {lineNumber}
             </Box>
             <Box component="pre" sx={{ margin: 0, padding: "0 1.25rem 0 1rem", whiteSpace: "pre" }}>
-                {segments.map((segment, i) => segment.ranges.length === 0
-                    ? <span key={i}>{segment.text}</span>
-                    : <IssueSegment key={i} segment={segment} selectedIssue={selectedIssue} onSelectIssue={onSelectIssue} />
+                {segments.map((segment) => segment.ranges.length === 0
+                    ? <span key={segment.start}>{segment.text}</span>
+                    : <IssueSegment key={segment.start} segment={segment} selectedIssue={selectedIssue} onSelectIssue={onSelectIssue} />
                 )}
             </Box>
         </Box>
