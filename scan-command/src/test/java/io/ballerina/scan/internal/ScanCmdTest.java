@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.internal;
 
+import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
@@ -692,12 +693,15 @@ public class ScanCmdTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-compilation-errors");
         System.setProperty("user.dir", ballerinaProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        scanCmd.execute();
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+        BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
         System.setProperty("user.dir", userDir);
-        String output = readOutput(true).trim();
-        Assert.assertTrue(output.contains(error(COMPILATION_CONTAINS_ERRORS)),
-                "Output should report that compilation contains errors");
+        String output = readOutput(true);
+        Assert.assertTrue(output.contains("ERROR [main.bal:(18:17,18:33)] incompatible types: expected 'int', " +
+                        "found 'string'"),
+                "Compilation errors should be reported in the same format as the Ballerina compiler");
+        Assert.assertEquals(exception.getMessages(), List.of("error: " + error(COMPILATION_CONTAINS_ERRORS)),
+                "Scan should fail with a launcher exception reporting that compilation contains errors");
         Path jsonReport = ballerinaProject.resolve("target").resolve("report").resolve("scan_results.json");
         Assert.assertFalse(Files.exists(jsonReport),
                 "No scan report should be generated when compilation contains errors");
