@@ -19,6 +19,7 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.cli.BLauncherCmd;
+import io.ballerina.cli.launcher.LauncherUtils;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.ProjectLoadResult;
@@ -39,6 +40,7 @@ import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
+import io.ballerina.tools.diagnostics.Diagnostic;
 import picocli.CommandLine;
 
 import java.io.BufferedReader;
@@ -75,6 +77,7 @@ import static io.ballerina.scan.utils.ScanUtils.convertIssuesToSarifString;
 @CommandLine.Command(name = SCAN_COMMAND, description = "Perform static code analysis for Ballerina packages")
 public class ScanCmd implements BLauncherCmd {
     private final PrintStream outputStream;
+    private final PrintStream errorStream;
 
     @CommandLine.Parameters(arity = "0..1")
     private final Path projectPath;
@@ -121,8 +124,13 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     ScanCmd(PrintStream outputStream) {
+        this(outputStream, System.err);
+    }
+
+    ScanCmd(PrintStream outputStream, PrintStream errorStream) {
         this.projectPath = Paths.get(System.getProperty(ProjectConstants.USER_DIR));
         this.outputStream = outputStream;
+        this.errorStream = errorStream;
         this.allIssues = new ArrayList<>();
     }
 
@@ -140,6 +148,7 @@ public class ScanCmd implements BLauncherCmd {
             List<String> platforms) {
         this.projectPath = projectPath;
         this.outputStream = outputStream;
+        this.errorStream = System.err;
         this.helpFlag = helpFlag;
         this.platformTriggered = platformTriggered;
         this.targetDir = targetDir;
@@ -218,6 +227,15 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
         executeProject(project.get());
+    }
+
+    private void failOnCompilationErrors(ProjectAnalyzer projectAnalyzer) {
+        List<Diagnostic> compilationErrors = projectAnalyzer.getCompilationErrors();
+        if (compilationErrors.isEmpty()) {
+            return;
+        }
+        compilationErrors.forEach(errorStream::println);
+        throw LauncherUtils.createLauncherException(DiagnosticLog.error(DiagnosticCode.COMPILATION_CONTAINS_ERRORS));
     }
 
     private void accumulateWorkspaceReports(WorkspaceProject workspaceProject) {
@@ -303,8 +321,11 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
+        List<Issue> externalIssues = projectAnalyzer.runExternalAnalyzers(externalAnalyzers);
+        failOnCompilationErrors(projectAnalyzer);
+
         List<Issue> issues = projectAnalyzer.analyze(coreRules);
-        issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
+        issues.addAll(externalIssues);
 
         if (!projectIncludeRules.isEmpty()) {
             issues.removeIf(issue -> !projectIncludeRules.contains(issue.rule().id()));

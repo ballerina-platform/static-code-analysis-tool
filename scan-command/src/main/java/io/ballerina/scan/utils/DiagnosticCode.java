@@ -42,7 +42,8 @@ public enum DiagnosticCode {
     ATTEMPT_TO_INCLUDE_AND_EXCLUDE("STATIC_ANALYSIS_ERROR_016", "attempt.to.include.and.exclude"),
     INVALID_FORMAT("STATIC_ANALYSIS_ERROR_017", "invalid.format"),
     FAILED_TO_LOAD_VERSION_PROPERTIES("STATIC_ANALYSIS_ERROR_018", "failed.to.load.version.properties"),
-    INVALID_JSON_FORMAT_RULE_SEVERITY("STATIC_ANALYSIS_ERROR_019", "invalid.json.format.rule.severity"),
+    COMPILATION_CONTAINS_ERRORS("STATIC_ANALYSIS_ERROR_019", "compilation.contains.errors"),
+    INVALID_JSON_FORMAT_RULE_SEVERITY("STATIC_ANALYSIS_ERROR_020", "invalid.json.format.rule.severity"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported");
 

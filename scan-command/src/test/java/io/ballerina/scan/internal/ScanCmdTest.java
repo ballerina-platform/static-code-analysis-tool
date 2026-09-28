@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.internal;
 
+import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
@@ -48,6 +49,7 @@ import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
+import static io.ballerina.scan.utils.DiagnosticCode.COMPILATION_CONTAINS_ERRORS;
 import static io.ballerina.scan.utils.DiagnosticCode.EMPTY_PACKAGE;
 import static io.ballerina.scan.utils.DiagnosticLog.error;
 
@@ -684,6 +686,25 @@ public class ScanCmdTest extends BaseTest {
                 .resolve("scan_results.sarif");
         Assert.assertTrue(Files.exists(sarifReport), "SARIF report file should be created in custom directory");
         removeFile(validBalProject.resolve("custom-results"));
+    }
+
+    @Test(description = "test scan command with a project containing compilation errors")
+    void testScanCommandWithCompilationErrors() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-compilation-errors");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+        BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+        System.setProperty("user.dir", userDir);
+        String output = readOutput(true);
+        Assert.assertTrue(output.contains("ERROR [main.bal:(18:17,18:33)] incompatible types: expected 'int', " +
+                        "found 'string'"),
+                "Compilation errors should be reported in the same format as the Ballerina compiler");
+        Assert.assertEquals(exception.getMessages(), List.of("error: " + error(COMPILATION_CONTAINS_ERRORS)),
+                "Scan should fail with a launcher exception reporting that compilation contains errors");
+        Path jsonReport = ballerinaProject.resolve("target").resolve("report").resolve("scan_results.json");
+        Assert.assertFalse(Files.exists(jsonReport),
+                "No scan report should be generated when compilation contains errors");
     }
 
     @Test(description = "test scan command default format behavior")

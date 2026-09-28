@@ -32,6 +32,7 @@ import io.ballerina.scan.Source;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
+import io.ballerina.tools.diagnostics.Diagnostic;
 import io.ballerina.tools.text.LineRange;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -215,5 +216,34 @@ public class ProjectAnalyzerTest extends BaseTest {
         Assert.assertNull(externalAnalyzers);
         String expected = getExpectedOutput("invalid-json-rule-kind.txt");
         Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "Test getting compilation errors for a project without compilation errors")
+    void testGetCompilationErrorsWhenProjectHasNoErrors() throws IOException {
+        Project validProject = ProjectLoader.load(testResources.resolve("test-resources")
+                .resolve("valid-bal-project")).project();
+        System.setProperty("user.dir", validProject.sourceRoot().toString());
+        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(validProject, printStream)
+                .orElse(null);
+        Assert.assertNotNull(scanTomlFile);
+        System.setProperty("user.dir", userDir);
+        projectAnalyzer = new ProjectAnalyzer(validProject, scanTomlFile);
+        List<Diagnostic> compilationErrors = projectAnalyzer.getCompilationErrors();
+        Assert.assertTrue(compilationErrors.isEmpty());
+    }
+
+    @Test(description = "Test getting compilation errors for a project with compilation errors")
+    void testGetCompilationErrorsWhenProjectHasErrors() throws IOException {
+        Project invalidProject = ProjectLoader.load(testResources.resolve("test-resources")
+                .resolve("bal-project-with-compilation-errors")).project();
+        System.setProperty("user.dir", invalidProject.sourceRoot().toString());
+        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(invalidProject, printStream)
+                .orElse(null);
+        Assert.assertNotNull(scanTomlFile);
+        System.setProperty("user.dir", userDir);
+        projectAnalyzer = new ProjectAnalyzer(invalidProject, scanTomlFile);
+        List<Diagnostic> compilationErrors = projectAnalyzer.getCompilationErrors();
+        Assert.assertEquals(compilationErrors.size(), 1);
+        Assert.assertEquals(compilationErrors.get(0).location().lineRange().fileName(), "main.bal");
     }
 }
