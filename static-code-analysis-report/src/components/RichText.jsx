@@ -2,7 +2,6 @@ import { Box, Typography } from "@mui/material";
 import { Fragment } from "react";
 import { tokenizeLines } from "../highlighter";
 
-const OPENING_FENCE = /^(`{3,})(.*)$/;
 const LANGUAGE = /^[\w-]*$/;
 const INLINE_CODE = /`[^`\n]+`/g;
 const HIGHLIGHTED_LANGS = new Set(["", "ballerina", "bal"]);
@@ -16,11 +15,24 @@ const inlineCodeSx = {
     border: "1px solid var(--surface-border)",
 };
 
-const isClosingFence = (line, fence) => line.startsWith(fence) && /^`*\s*$/.test(line.slice(fence.length));
+const MIN_FENCE_LENGTH = 3;
 
-const findClosingFence = (lines, from, fence) => {
+const countLeadingBackticks = (line) => {
+    let count = 0;
+    while (count < line.length && line[count] === "`") {
+        count++;
+    }
+    return count;
+};
+
+const isClosingFence = (line, fenceLength) => {
+    const count = countLeadingBackticks(line);
+    return count >= fenceLength && line.slice(count).trim() === "";
+};
+
+const findClosingFence = (lines, from, fenceLength) => {
     for (let index = from; index < lines.length; index++) {
-        if (isClosingFence(lines[index], fence)) {
+        if (isClosingFence(lines[index], fenceLength)) {
             return index;
         }
     }
@@ -43,10 +55,10 @@ const splitBlocks = (text) => {
     };
     let index = 0;
     while (index < lines.length) {
-        const opener = OPENING_FENCE.exec(lines[index]);
-        const lang = opener?.[2].trim();
-        const closeAt = opener && LANGUAGE.test(lang)
-            ? findClosingFence(lines, index + 1, opener[1])
+        const fenceLength = countLeadingBackticks(lines[index]);
+        const lang = lines[index].slice(fenceLength).trim();
+        const closeAt = fenceLength >= MIN_FENCE_LENGTH && LANGUAGE.test(lang)
+            ? findClosingFence(lines, index + 1, fenceLength)
             : -1;
         if (closeAt === -1) {
             if (prose.length === 0) {

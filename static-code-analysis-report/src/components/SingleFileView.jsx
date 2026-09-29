@@ -65,9 +65,10 @@ const pathCrumbs = (file, pkg, workspace) => {
     const inPackage = workspace && pkg?.path && relativePath.startsWith(`${pkg.path}/`)
     const segments = inPackage ? relativePath.slice(pkg.path.length + 1).split("/") : relativePath.split("/")
     const crumbs = inPackage ? [{ name: pkg.name, path: pkg.path }] : []
+    let path = inPackage ? pkg.path : ""
     segments.forEach((segment) => {
-        const parent = crumbs[crumbs.length - 1]?.path
-        crumbs.push({ name: segment, path: parent ? `${parent}/${segment}` : segment })
+        path = path ? `${path}/${segment}` : segment
+        crumbs.push({ name: segment, path })
     })
     return crumbs
 }
