@@ -32,7 +32,9 @@ public class Constants {
     public static final String RESULTS_SARIF_FILE = "scan_results.sarif";
     static final String RESULTS_HTML_FILE = "index.html";
     static final String REPORT_DATA_PLACEHOLDER = "__data__";
+    public static final String IMPORT_GENERATOR_FILE = "scan_file";
     static final String SCAN_REPORT_PROJECT_NAME = "projectName";
+    static final String SCAN_REPORT_PROJECT_VERSION = "projectVersion";
     static final String SCAN_REPORT_FILE_NAME = "fileName";
     static final String SCAN_REPORT_FILE_PATH = "filePath";
     static final String SCAN_REPORT_FILE_CONTENT = "fileContent";

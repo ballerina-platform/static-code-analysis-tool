@@ -6,7 +6,7 @@ import {
 import { FolderOutlined } from "@mui/icons-material";
 import BallerinaLogo from "../resources/Ballerina-Logo";
 
-function Header({ projectName, onHome }) {
+function Header({ projectName, projectVersion, onHome }) {
     return (
         <Box component="header" sx={{
             position: "sticky",
@@ -54,6 +54,11 @@ function Header({ projectName, onHome }) {
                         <Typography variant="h5" fontWeight="bold">
                             {projectName}
                         </Typography>
+                        {projectVersion &&
+                            <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                                v{projectVersion}
+                            </Typography>
+                        }
                     </Box>
                 }
             </Box>

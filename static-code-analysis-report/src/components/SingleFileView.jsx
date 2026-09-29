@@ -1,10 +1,8 @@
-import { ArrowBack, DescriptionOutlined } from "@mui/icons-material"
+import { DescriptionOutlined } from "@mui/icons-material"
 import {
     Box,
     Breadcrumbs,
-    IconButton,
     Link,
-    Tooltip,
     Typography,
     alpha
 } from "@mui/material"
@@ -61,28 +59,12 @@ const FileHeader = ({ file, issues, onBack }) => {
     const counts = countByKind(issues)
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <Tooltip title="Back to all files">
-                    <IconButton
-                        onClick={onBack}
-                        size="small"
-                        aria-label="Back to all files"
-                        sx={{
-                            border: "1px solid var(--surface-border)",
-                            bgcolor: "#ffffff",
-                            "&:hover": { bgcolor: alpha("#20b6b0", 0.08), borderColor: "var(--primary-color)" },
-                        }}
-                    >
-                        <ArrowBack fontSize="small" color="primary" />
-                    </IconButton>
-                </Tooltip>
-                <Breadcrumbs aria-label="breadcrumb" sx={{ fontSize: "14px" }}>
-                    <Link component="button" underline="hover" color="primary" onClick={onBack} sx={{ fontWeight: 600, fontSize: "14px" }}>
-                        All files
-                    </Link>
-                    <Typography color="text.primary" fontSize="14px">{file.fileName}</Typography>
-                </Breadcrumbs>
-            </Box>
+            <Breadcrumbs aria-label="breadcrumb" sx={{ fontSize: "14px" }}>
+                <Link component="button" underline="hover" color="primary" onClick={onBack} sx={{ fontWeight: 600, fontSize: "14px" }}>
+                    All files
+                </Link>
+                <Typography color="text.primary" fontSize="14px">{file.fileName}</Typography>
+            </Breadcrumbs>
 
             <Box sx={{
                 display: "flex",

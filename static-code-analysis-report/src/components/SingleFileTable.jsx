@@ -389,7 +389,7 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
                         {pageIssues.length === 0 &&
                             <TableRow>
                                 <TableCell colSpan={columnCount} align="center" sx={{ padding: "2rem", color: "text.secondary" }}>
-                                    No issues match the current filters.
+                                    {issues.length === 0 ? "No issues found in this file." : "No issues match the current filters."}
                                 </TableCell>
                             </TableRow>
                         }

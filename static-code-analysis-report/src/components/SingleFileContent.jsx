@@ -3,6 +3,7 @@ import { CodeOutlined, TouchAppOutlined } from "@mui/icons-material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IssueSummaryCard } from "./IssueBadges";
 import { RULE_KINDS, getLineRange, getRuleKind } from "../issueMeta";
+import { tokenizeLines } from "../highlighter";
 
 // Used when an issue carries an unknown rule kind.
 const FALLBACK_HIGHLIGHT_COLOR = "#F74B5A";
@@ -34,7 +35,8 @@ function SingleFileContent({ issues, fileContent, selectedIssue, focusRequest, o
         }];
     }), [issues]);
 
-    const lines = useMemo(() => fileContent.split("\n"), [fileContent]);
+    const lines = useMemo(() => fileContent.split(/\r?\n/), [fileContent]);
+    const tokenLines = useMemo(() => tokenizeLines(fileContent, lines), [fileContent, lines]);
     const lineRefs = useRef({});
     const [flashLine, setFlashLine] = useState(null);
 
@@ -93,6 +95,7 @@ function SingleFileContent({ issues, fileContent, selectedIssue, focusRequest, o
                             <CodeLine
                                 key={index}
                                 line={line}
+                                lineTokens={tokenLines[index] ?? []}
                                 lineNumber={lineNumber}
                                 issueRanges={issueRanges}
                                 selectedIssue={selectedIssue}
@@ -139,7 +142,32 @@ const getLineSegments = (line, relevantRanges, lineNumber) => {
 
 const bySpan = (a, b) => a.span - b.span;
 
-const CodeLine = ({ line, lineNumber, issueRanges, selectedIssue, onSelectIssue, flashNonce, lineRef }) => {
+// Shiki's FontStyle bit flags.
+const ITALIC = 1;
+const BOLD = 2;
+const UNDERLINE = 4;
+
+const tokenStyle = ({ color, fontStyle = 0 }) => ({
+    color,
+    fontStyle: fontStyle & ITALIC ? "italic" : undefined,
+    fontWeight: fontStyle & BOLD ? "bold" : undefined,
+    textDecoration: fontStyle & UNDERLINE ? "underline" : undefined,
+});
+
+// Renders the syntax-highlighted part of a line that falls within a segment's column range.
+const renderTokens = (lineTokens, start, text) => {
+    const end = start + text.length;
+    const pieces = lineTokens.flatMap((token) => {
+        const from = Math.max(start, token.start);
+        const to = Math.min(end, token.start + token.content.length);
+        return from < to
+            ? [<span key={from} style={tokenStyle(token)}>{token.content.slice(from - token.start, to - token.start)}</span>]
+            : [];
+    });
+    return pieces.length > 0 ? pieces : text;
+};
+
+const CodeLine = ({ line, lineTokens, lineNumber, issueRanges, selectedIssue, onSelectIssue, flashNonce, lineRef }) => {
     const relevantRanges = issueRanges.filter(
         ({ startLine, endLine }) => lineNumber >= startLine && lineNumber <= endLine);
     const segments = getLineSegments(line, relevantRanges, lineNumber);
@@ -176,15 +204,15 @@ const CodeLine = ({ line, lineNumber, issueRanges, selectedIssue, onSelectIssue,
             </Box>
             <Box component="pre" sx={{ margin: 0, padding: "0 1.25rem 0 1rem", whiteSpace: "pre" }}>
                 {segments.map((segment) => segment.ranges.length === 0
-                    ? <span key={segment.start}>{segment.text}</span>
-                    : <IssueSegment key={segment.start} segment={segment} selectedIssue={selectedIssue} onSelectIssue={onSelectIssue} />
+                    ? <span key={segment.start}>{renderTokens(lineTokens, segment.start, segment.text)}</span>
+                    : <IssueSegment key={segment.start} segment={segment} lineTokens={lineTokens} selectedIssue={selectedIssue} onSelectIssue={onSelectIssue} />
                 )}
             </Box>
         </Box>
     );
 };
 
-const IssueSegment = ({ segment, selectedIssue, onSelectIssue }) => {
+const IssueSegment = ({ segment, lineTokens, selectedIssue, onSelectIssue }) => {
     const [open, setOpen] = useState(false);
     const ranges = [...segment.ranges].sort(bySpan);
     const selected = ranges.find(({ index }) => index === selectedIssue);
@@ -250,7 +278,7 @@ const IssueSegment = ({ segment, selectedIssue, onSelectIssue }) => {
                     "&:hover": { bgcolor: alpha(primary.color, 0.45) },
                 }}
             >
-                {segment.text}
+                {renderTokens(lineTokens, segment.start, segment.text)}
             </Box>
         </Tooltip>
     );

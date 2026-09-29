@@ -23,10 +23,16 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.ballerina.projects.BallerinaToml;
+import io.ballerina.projects.Document;
+import io.ballerina.projects.Module;
+import io.ballerina.projects.ModuleId;
+import io.ballerina.projects.Package;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.TomlDocument;
+import io.ballerina.projects.directory.WorkspaceProject;
 import io.ballerina.projects.internal.model.Target;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.OwaspCoverage;
 import io.ballerina.scan.Rule;
@@ -63,6 +69,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -70,6 +77,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -80,6 +88,7 @@ import static io.ballerina.scan.utils.Constants.ANALYZER_REPOSITORY;
 import static io.ballerina.scan.utils.Constants.ANALYZER_TABLE;
 import static io.ballerina.scan.utils.Constants.ANALYZER_VERSION;
 import static io.ballerina.scan.utils.Constants.CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN;
+import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
 import static io.ballerina.scan.utils.Constants.JAR_PREDICATE;
 import static io.ballerina.scan.utils.Constants.PLATFORM_NAME;
 import static io.ballerina.scan.utils.Constants.PLATFORM_PATH;
@@ -124,6 +133,7 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_STA
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TYPE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_NAME;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_VERSION;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SCANNED_FILES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ZIP_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_TABLE;
@@ -519,37 +529,23 @@ public final class ScanUtils {
             name = project.currentPackage().packageName().toString();
         }
         scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, name);
-        Map<String, JsonObject> scanReportPathAndFile = new HashMap<>();
+        if (project.kind() == ProjectKind.BUILD_PROJECT) {
+            scannedProject.addProperty(SCAN_REPORT_PROJECT_VERSION,
+                    project.currentPackage().packageVersion().toString());
+        }
 
+        Map<String, JsonObject> scanReportPathAndFile = new LinkedHashMap<>();
+        for (Document document : getAnalyzedDocuments(project)) {
+            Path documentPath = document.module().project().documentPath(document.documentId())
+                    .orElse(Path.of(document.name()));
+            scanReportPathAndFile.put(toReportFileKey(documentPath.toString()),
+                    createScanReportFile(getReportFileName(document), documentPath.toString()));
+        }
         for (Issue issue : issues) {
             IssueImpl issueImpl = (IssueImpl) issue;
-            String filePath = issueImpl.filePath();
-
-            if (scanReportPathAndFile.containsKey(filePath)) {
-                JsonObject scanReportFile = scanReportPathAndFile.get(filePath);
-                JsonArray issuesArray = scanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES);
-                JsonObject issueObject = getJsonIssue(issueImpl);
-                issuesArray.add(issueObject);
-                scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
-                scanReportPathAndFile.put(filePath, scanReportFile);
-            } else {
-                JsonObject scanReportFile = new JsonObject();
-                scanReportFile.addProperty(SCAN_REPORT_FILE_NAME, issueImpl.fileName());
-                scanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
-                String fileContent;
-                try {
-                    fileContent = Files.readString(Path.of(filePath));
-                } catch (IOException ex) {
-                    throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_BALLERINA_FILE,
-                            ex.getMessage()));
-                }
-                scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
-                JsonArray issuesArray = new JsonArray();
-                JsonObject issueObject = getJsonIssue(issueImpl);
-                issuesArray.add(issueObject);
-                scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
-                scanReportPathAndFile.put(filePath, scanReportFile);
-            }
+            JsonObject scanReportFile = scanReportPathAndFile.computeIfAbsent(toReportFileKey(issueImpl.filePath()),
+                    key -> createScanReportFile(issueImpl.fileName(), issueImpl.filePath()));
+            scanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES).add(getJsonIssue(issueImpl));
         }
 
         JsonArray scannedFiles = new JsonArray();
@@ -577,6 +573,65 @@ public final class ScanUtils {
                     ex.getMessage()));
         }
         return htmlFile.toPath();
+    }
+
+    /**
+     * Returns the name used to identify a document in scan results. Documents of workspace
+     * packages are prefixed with their module name so that files across packages stay distinct.
+     *
+     * @param document Ballerina document
+     * @return name of the document as shown in scan results
+     */
+    public static String getReportFileName(Document document) {
+        Module module = document.module();
+        return module.project().workspaceProject().isPresent()
+                ? module.moduleName().toString() + File.separator + document.name()
+                : document.name();
+    }
+
+    private static List<Document> getAnalyzedDocuments(Project project) {
+        List<Project> packageProjects = new ArrayList<>();
+        if (project instanceof WorkspaceProject workspaceProject) {
+            workspaceProject.getResolution().dependencyGraph().toTopologicallySortedList().stream()
+                    .filter(buildProject -> !ProjectUtils.isProjectEmpty(buildProject))
+                    .forEach(packageProjects::add);
+        } else {
+            packageProjects.add(project);
+        }
+
+        List<Document> documents = new ArrayList<>();
+        for (Project packageProject : packageProjects) {
+            Package currentPackage = packageProject.currentPackage();
+            for (ModuleId moduleId : currentPackage.moduleIds()) {
+                Module module = currentPackage.module(moduleId);
+                Stream.concat(module.documentIds().stream(), module.testDocumentIds().stream())
+                        .map(module::document)
+                        // Skip the in-memory document the analyzer adds to import external analyzer plugins
+                        .filter(document -> !document.name().startsWith(IMPORT_GENERATOR_FILE))
+                        .forEach(documents::add);
+            }
+        }
+        return documents;
+    }
+
+    private static String toReportFileKey(String filePath) {
+        return Path.of(filePath).toAbsolutePath().normalize().toString();
+    }
+
+    private static JsonObject createScanReportFile(String fileName, String filePath) {
+        JsonObject scanReportFile = new JsonObject();
+        scanReportFile.addProperty(SCAN_REPORT_FILE_NAME, fileName);
+        scanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
+        String fileContent;
+        try {
+            fileContent = Files.readString(Path.of(filePath));
+        } catch (IOException ex) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_BALLERINA_FILE,
+                    ex.getMessage()));
+        }
+        scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
+        scanReportFile.add(SCAN_REPORT_ISSUES, new JsonArray());
+        return scanReportFile;
     }
 
     /**

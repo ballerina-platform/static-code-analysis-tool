@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.utils;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
@@ -109,10 +110,18 @@ public class ScanUtilsTest extends BaseTest {
         assertEmptyScanReport(scanReportPath);
     }
 
-    private static void assertEmptyScanReport(Path scanReportPath) throws IOException {
+    // Files are listed even when they have no issues, so a clean project still shows every analyzed file.
+    private void assertEmptyScanReport(Path scanReportPath) throws IOException {
         JsonObject scanData = readScanReportData(scanReportPath);
         Assert.assertEquals(scanData.get("projectName").getAsString(), "valid_bal_project");
-        Assert.assertTrue(scanData.getAsJsonArray("scannedFiles").isEmpty());
+        Assert.assertEquals(scanData.get("projectVersion").getAsString(), "0.1.0");
+        JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
+        Assert.assertEquals(scannedFiles.size(), 1);
+        JsonObject scannedFile = scannedFiles.get(0).getAsJsonObject();
+        Assert.assertEquals(scannedFile.get("fileName").getAsString(), "main.bal");
+        Assert.assertEquals(scannedFile.get("fileContent").getAsString(),
+                Files.readString(validBalProject.resolve("main.bal"), StandardCharsets.UTF_8));
+        Assert.assertTrue(scannedFile.getAsJsonArray("issues").isEmpty());
     }
 
     @Test(description =

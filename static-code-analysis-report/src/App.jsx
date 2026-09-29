@@ -28,11 +28,12 @@ function App() {
     : undefined
 
   useEffect(() => {
-    const { projectName } = analysisResults
+    const { projectName, projectVersion } = analysisResults
     if (requestedFile) {
       document.title = `${requestedFile.fileName} · ${projectName ?? "Scan Report"}`
     } else if (projectName) {
-      document.title = `${projectName} · Ballerina Scan Report`
+      const project = projectVersion ? `${projectName} v${projectVersion}` : projectName
+      document.title = `${project} · Ballerina Scan Report`
     } else {
       document.title = "Ballerina Scan Report"
     }
@@ -40,7 +41,11 @@ function App() {
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "var(--page-background)" }}>
-      <Header projectName={analysisResults.projectName} onHome={openMain} />
+      <Header
+        projectName={analysisResults.projectName}
+        projectVersion={analysisResults.projectVersion}
+        onHome={openMain}
+      />
       <Box component="main" sx={{ maxWidth: "1280px", margin: "0 auto", padding: { xs: "1rem", md: "1.5rem 2rem 3rem" } }}>
         {requestedFile ?
           <SingleFileView
