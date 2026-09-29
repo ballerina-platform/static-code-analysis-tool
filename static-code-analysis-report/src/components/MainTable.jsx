@@ -133,7 +133,8 @@ const NodeLabel = ({ node, depth, expanded, listMode }) => {
     }
 
     const isPackage = node.type === "package";
-    const Icon = isPackage ? Inventory2Outlined : expanded ? FolderOpenOutlined : FolderOutlined;
+    const folderIcon = expanded ? FolderOpenOutlined : FolderOutlined;
+    const Icon = isPackage ? Inventory2Outlined : folderIcon;
     return (
         <Box sx={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0, ...indent }}>
             <KeyboardArrowRight fontSize="small" sx={{

@@ -2,11 +2,10 @@ import { Box, Typography } from "@mui/material";
 import { Fragment } from "react";
 import { tokenizeLines } from "../highlighter";
 
-// Fences open and close at the start of a line; the closer repeats the opener's backticks (or more)
-// and may only be followed by whitespace. Groups: 1 = opener, 2 = language, 3 = code.
-const FENCE = /^(`{3,})[^\S\r\n]*([\w-]*)[^\S\r\n]*\r?\n(?:([\s\S]*?)\r?\n)?\1`*[^\S\r\n]*$/gm;
-const INLINE_CODE = /`([^`\n]+)`/g;
-const HIGHLIGHTED_LANGS = ["", "ballerina", "bal"];
+const OPENING_FENCE = /^(`{3,})(.*)$/;
+const LANGUAGE = /^[\w-]*$/;
+const INLINE_CODE = /`[^`\n]+`/g;
+const HIGHLIGHTED_LANGS = new Set(["", "ballerina", "bal"]);
 
 const inlineCodeSx = {
     fontFamily: "consolas, 'Courier New', monospace",
@@ -17,34 +16,81 @@ const inlineCodeSx = {
     border: "1px solid var(--surface-border)",
 };
 
-// Splits rule text into prose and ``` fenced code blocks.
-const splitBlocks = (text) => {
-    const blocks = [];
-    let last = 0;
-    for (const match of text.matchAll(FENCE)) {
-        if (match.index > last) {
-            blocks.push({ type: "text", value: text.slice(last, match.index) });
+const isClosingFence = (line, fence) => line.startsWith(fence) && /^`*\s*$/.test(line.slice(fence.length));
+
+const findClosingFence = (lines, from, fence) => {
+    for (let index = from; index < lines.length; index++) {
+        if (isClosingFence(lines[index], fence)) {
+            return index;
         }
-        blocks.push({ type: "code", lang: match[2].toLowerCase(), value: match[3] ?? "" });
-        last = match.index + match[0].length;
     }
-    if (last < text.length) {
-        blocks.push({ type: "text", value: text.slice(last) });
+    return -1;
+};
+
+// Splits rule text into prose and ``` fenced code blocks, scanning line by line so it stays linear. A fence
+// opens and closes at the start of a line; the closer repeats the opener's backticks (or more) and may only
+// be followed by whitespace. Each block keeps the line it starts on, which serves as a stable React key.
+const splitBlocks = (text) => {
+    const lines = text.split(/\r?\n/);
+    const blocks = [];
+    let prose = [];
+    let proseStart = 0;
+    const flushProse = () => {
+        if (prose.length > 0) {
+            blocks.push({ type: "text", start: proseStart, value: prose.join("\n") });
+            prose = [];
+        }
+    };
+    let index = 0;
+    while (index < lines.length) {
+        const opener = OPENING_FENCE.exec(lines[index]);
+        const lang = opener?.[2].trim();
+        const closeAt = opener && LANGUAGE.test(lang)
+            ? findClosingFence(lines, index + 1, opener[1])
+            : -1;
+        if (closeAt === -1) {
+            if (prose.length === 0) {
+                proseStart = index;
+            }
+            prose.push(lines[index]);
+            index += 1;
+        } else {
+            flushProse();
+            blocks.push({ type: "code", start: index, lang: lang.toLowerCase(), value: lines.slice(index + 1, closeAt).join("\n") });
+            index = closeAt + 1;
+        }
     }
+    flushProse();
     return blocks;
 };
 
-const InlineText = ({ value }) => value.split(INLINE_CODE).map((part, index) =>
-    // split() with a capture group puts the code spans at odd indexes.
-    index % 2 === 1
-        ? <Box key={index} component="code" sx={inlineCodeSx}>{part}</Box>
-        : <Fragment key={index}>{part}</Fragment>);
+const InlineText = ({ value }) => {
+    const parts = [];
+    let last = 0;
+    for (const match of value.matchAll(INLINE_CODE)) {
+        if (match.index > last) {
+            parts.push(<Fragment key={last}>{value.slice(last, match.index)}</Fragment>);
+        }
+        parts.push(<Box key={match.index} component="code" sx={inlineCodeSx}>{match[0].slice(1, -1)}</Box>);
+        last = match.index + match[0].length;
+    }
+    if (last < value.length) {
+        parts.push(<Fragment key={last}>{value.slice(last)}</Fragment>);
+    }
+    return parts;
+};
 
 const CodeBlock = ({ lang, value }) => {
-    const lines = value.split(/\r?\n/);
-    const tokenLines = HIGHLIGHTED_LANGS.includes(lang)
+    const lines = value.split("\n");
+    const tokenLines = HIGHLIGHTED_LANGS.has(lang)
         ? tokenizeLines(value, lines)
         : lines.map((line) => [{ start: 0, content: line }]);
+    // Character offset of each line, used as its key.
+    const lineOffsets = [];
+    lines.reduce((offset, line) => {
+        lineOffsets.push(offset);
+        return offset + line.length + 1;
+    }, 0);
     return (
         <Box component="pre" sx={{
             margin: 0,
@@ -58,9 +104,9 @@ const CodeBlock = ({ lang, value }) => {
             borderRadius: "0.5rem",
         }}>
             {tokenLines.map((tokens, lineIndex) => (
-                <div key={lineIndex}>
-                    {tokens.length === 0 ? " " : tokens.map((token, index) => (
-                        <span key={index} style={{ color: token.color }}>{token.content}</span>
+                <div key={lineOffsets[lineIndex]}>
+                    {tokens.length === 0 ? " " : tokens.map((token) => (
+                        <span key={token.start} style={{ color: token.color }}>{token.content}</span>
                     ))}
                 </div>
             ))}
@@ -72,10 +118,10 @@ const CodeBlock = ({ lang, value }) => {
 function RichText({ text, variant = "body2", color = "text.primary" }) {
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {splitBlocks(text).map((block, index) => block.type === "code"
-                ? <CodeBlock key={index} lang={block.lang} value={block.value} />
+            {splitBlocks(text).map((block) => block.type === "code"
+                ? <CodeBlock key={block.start} lang={block.lang} value={block.value} />
                 : block.value.trim() &&
-                    <Typography key={index} variant={variant} color={color} component="div" sx={{ whiteSpace: "pre-line" }}>
+                    <Typography key={block.start} variant={variant} color={color} component="div" sx={{ whiteSpace: "pre-line" }}>
                         <InlineText value={block.value.trim()} />
                     </Typography>
             )}

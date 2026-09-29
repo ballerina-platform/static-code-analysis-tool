@@ -59,12 +59,17 @@ function SingleFileView({ requestedFile, project, selectedIssue, onBack, onSelec
 }
 
 // In a workspace the package's folder is shown as the package itself, so the trail reads project / package / path.
+// Each crumb carries its path so far, which keys it.
 const pathCrumbs = (file, pkg, workspace) => {
     const relativePath = getRelativePath(file)
-    if (workspace && pkg?.path && relativePath.startsWith(`${pkg.path}/`)) {
-        return [pkg.name, ...relativePath.slice(pkg.path.length + 1).split("/")]
-    }
-    return relativePath.split("/")
+    const inPackage = workspace && pkg?.path && relativePath.startsWith(`${pkg.path}/`)
+    const segments = inPackage ? relativePath.slice(pkg.path.length + 1).split("/") : relativePath.split("/")
+    const crumbs = inPackage ? [{ name: pkg.name, path: pkg.path }] : []
+    segments.forEach((segment) => {
+        const parent = crumbs[crumbs.length - 1]?.path
+        crumbs.push({ name: segment, path: parent ? `${parent}/${segment}` : segment })
+    })
+    return crumbs
 }
 
 const FileHeader = ({ file, project, issues, onBack }) => {
@@ -95,10 +100,10 @@ const FileHeader = ({ file, project, issues, onBack }) => {
                         {project?.projectName ?? "All files"}
                     </Link>
                     {crumbs.map((crumb, index) => (
-                        <Typography key={index} fontSize="14px"
+                        <Typography key={crumb.path} fontSize="14px"
                             color={index === crumbs.length - 1 ? "text.primary" : "text.secondary"}
                             fontWeight={index === crumbs.length - 1 ? 600 : 400}>
-                            {crumb}
+                            {crumb.name}
                         </Typography>
                     ))}
                 </Breadcrumbs>
