@@ -258,7 +258,7 @@ const IssueSegment = ({ segment, lineTokens, selectedIssue, onSelectIssue }) => 
                         </Typography>
                     }
                     {ranges.map((range) => (
-                        <IssueSummaryCard key={range.index} issue={range.issue} onSelect={() => select(range.index)} />
+                        <IssueSummaryCard key={range.index} issue={range.issue} />
                     ))}
                 </Box>
             }

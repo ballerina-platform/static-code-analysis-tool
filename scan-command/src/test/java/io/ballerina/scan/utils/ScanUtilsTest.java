@@ -115,10 +115,20 @@ public class ScanUtilsTest extends BaseTest {
         JsonObject scanData = readScanReportData(scanReportPath);
         Assert.assertEquals(scanData.get("projectName").getAsString(), "valid_bal_project");
         Assert.assertEquals(scanData.get("projectVersion").getAsString(), "0.1.0");
+        Assert.assertEquals(scanData.get("projectKind").getAsString(), "BUILD_PROJECT");
+        JsonArray packages = scanData.getAsJsonArray("packages");
+        Assert.assertEquals(packages.size(), 1);
+        JsonObject scannedPackage = packages.get(0).getAsJsonObject();
+        Assert.assertEquals(scannedPackage.get("org").getAsString(), "ballerina");
+        Assert.assertEquals(scannedPackage.get("name").getAsString(), "valid_bal_project");
+        Assert.assertEquals(scannedPackage.get("version").getAsString(), "0.1.0");
+        Assert.assertEquals(scannedPackage.get("path").getAsString(), "");
         JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
         Assert.assertEquals(scannedFiles.size(), 1);
         JsonObject scannedFile = scannedFiles.get(0).getAsJsonObject();
         Assert.assertEquals(scannedFile.get("fileName").getAsString(), "main.bal");
+        Assert.assertEquals(scannedFile.get("relativePath").getAsString(), "main.bal");
+        Assert.assertEquals(scannedFile.get("packageName").getAsString(), "valid_bal_project");
         Assert.assertEquals(scannedFile.get("fileContent").getAsString(),
                 Files.readString(validBalProject.resolve("main.bal"), StandardCharsets.UTF_8));
         Assert.assertTrue(scannedFile.getAsJsonArray("issues").isEmpty());

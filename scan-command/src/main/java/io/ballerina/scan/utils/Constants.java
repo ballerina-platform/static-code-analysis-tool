@@ -35,9 +35,17 @@ public class Constants {
     public static final String IMPORT_GENERATOR_FILE = "scan_file";
     static final String SCAN_REPORT_PROJECT_NAME = "projectName";
     static final String SCAN_REPORT_PROJECT_VERSION = "projectVersion";
+    static final String SCAN_REPORT_PROJECT_KIND = "projectKind";
+    static final String SCAN_REPORT_PACKAGES = "packages";
+    static final String SCAN_REPORT_PACKAGE_ORG = "org";
+    static final String SCAN_REPORT_PACKAGE_NAME = "name";
+    static final String SCAN_REPORT_PACKAGE_VERSION = "version";
+    static final String SCAN_REPORT_PACKAGE_PATH = "path";
     static final String SCAN_REPORT_FILE_NAME = "fileName";
     static final String SCAN_REPORT_FILE_PATH = "filePath";
     static final String SCAN_REPORT_FILE_CONTENT = "fileContent";
+    static final String SCAN_REPORT_FILE_RELATIVE_PATH = "relativePath";
+    static final String SCAN_REPORT_FILE_PACKAGE = "packageName";
     static final String SCAN_REPORT_SCANNED_FILES = "scannedFiles";
     static final String SCAN_REPORT_ZIP_FILE = "report.zip";
     static final String SCAN_REPORT_ISSUES = "issues";

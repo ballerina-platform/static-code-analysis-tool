@@ -112,7 +112,9 @@ import static io.ballerina.scan.utils.Constants.SCAN_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_FILE_FIELD;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_CONTENT;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_NAME;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_PACKAGE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_PATH;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_RELATIVE_PATH;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_CWE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_DETAILS;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_HELP_URI;
@@ -132,6 +134,12 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_STA
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TYPE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUES;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PACKAGES;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PACKAGE_NAME;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PACKAGE_ORG;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PACKAGE_PATH;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PACKAGE_VERSION;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_KIND;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_NAME;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_VERSION;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SCANNED_FILES;
@@ -529,18 +537,39 @@ public final class ScanUtils {
             name = project.currentPackage().packageName().toString();
         }
         scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, name);
+        scannedProject.addProperty(SCAN_REPORT_PROJECT_KIND, project.kind().name());
         if (project.kind() == ProjectKind.BUILD_PROJECT) {
             scannedProject.addProperty(SCAN_REPORT_PROJECT_VERSION,
                     project.currentPackage().packageVersion().toString());
         }
 
+        Path reportRoot = project.sourceRoot().toAbsolutePath().normalize();
+        JsonArray scannedPackages = new JsonArray();
         Map<String, JsonObject> scanReportPathAndFile = new LinkedHashMap<>();
-        for (Document document : getAnalyzedDocuments(project)) {
-            Path documentPath = document.module().project().documentPath(document.documentId())
-                    .orElse(Path.of(document.name()));
-            scanReportPathAndFile.put(toReportFileKey(documentPath.toString()),
-                    createScanReportFile(getReportFileName(document), documentPath.toString()));
+        for (Package analyzedPackage : getAnalyzedPackages(project)) {
+            String packageName = analyzedPackage.packageName().toString();
+            JsonObject scannedPackage = new JsonObject();
+            scannedPackage.addProperty(SCAN_REPORT_PACKAGE_ORG, analyzedPackage.packageOrg().toString());
+            scannedPackage.addProperty(SCAN_REPORT_PACKAGE_NAME, packageName);
+            scannedPackage.addProperty(SCAN_REPORT_PACKAGE_VERSION, analyzedPackage.packageVersion().toString());
+            scannedPackage.addProperty(SCAN_REPORT_PACKAGE_PATH,
+                    toRelativePath(reportRoot, analyzedPackage.project().sourceRoot()));
+            scannedPackages.add(scannedPackage);
+
+            for (Document document : getAnalyzedDocuments(analyzedPackage)) {
+                Path documentPath = document.module().project().documentPath(document.documentId())
+                        .orElse(Path.of(document.name()));
+                JsonObject scanReportFile = createScanReportFile(getReportFileName(document),
+                        documentPath.toString());
+                String relativePath = toRelativePath(reportRoot, documentPath);
+                if (relativePath != null) {
+                    scanReportFile.addProperty(SCAN_REPORT_FILE_RELATIVE_PATH, relativePath);
+                }
+                scanReportFile.addProperty(SCAN_REPORT_FILE_PACKAGE, packageName);
+                scanReportPathAndFile.put(toReportFileKey(documentPath.toString()), scanReportFile);
+            }
         }
+        scannedProject.add(SCAN_REPORT_PACKAGES, scannedPackages);
         for (Issue issue : issues) {
             IssueImpl issueImpl = (IssueImpl) issue;
             JsonObject scanReportFile = scanReportPathAndFile.computeIfAbsent(toReportFileKey(issueImpl.filePath()),
@@ -589,29 +618,38 @@ public final class ScanUtils {
                 : document.name();
     }
 
-    private static List<Document> getAnalyzedDocuments(Project project) {
-        List<Project> packageProjects = new ArrayList<>();
+    private static List<Package> getAnalyzedPackages(Project project) {
         if (project instanceof WorkspaceProject workspaceProject) {
-            workspaceProject.getResolution().dependencyGraph().toTopologicallySortedList().stream()
+            return workspaceProject.getResolution().dependencyGraph().toTopologicallySortedList().stream()
                     .filter(buildProject -> !ProjectUtils.isProjectEmpty(buildProject))
-                    .forEach(packageProjects::add);
-        } else {
-            packageProjects.add(project);
+                    .map(Project::currentPackage)
+                    .toList();
         }
+        return List.of(project.currentPackage());
+    }
 
+    private static List<Document> getAnalyzedDocuments(Package analyzedPackage) {
         List<Document> documents = new ArrayList<>();
-        for (Project packageProject : packageProjects) {
-            Package currentPackage = packageProject.currentPackage();
-            for (ModuleId moduleId : currentPackage.moduleIds()) {
-                Module module = currentPackage.module(moduleId);
-                Stream.concat(module.documentIds().stream(), module.testDocumentIds().stream())
-                        .map(module::document)
-                        // Skip the in-memory document the analyzer adds to import external analyzer plugins
-                        .filter(document -> !document.name().startsWith(IMPORT_GENERATOR_FILE))
-                        .forEach(documents::add);
-            }
+        for (ModuleId moduleId : analyzedPackage.moduleIds()) {
+            Module module = analyzedPackage.module(moduleId);
+            Stream.concat(module.documentIds().stream(), module.testDocumentIds().stream())
+                    .map(module::document)
+                    // Skip the in-memory document the analyzer adds to import external analyzer plugins
+                    .filter(document -> !document.name().startsWith(IMPORT_GENERATOR_FILE))
+                    .forEach(documents::add);
         }
         return documents;
+    }
+
+    // Uses forward slashes regardless of OS so the report can split paths into folders; null when outside root.
+    private static String toRelativePath(Path root, Path path) {
+        Path relativePath = root.relativize(path.toAbsolutePath().normalize());
+        if (relativePath.startsWith("..")) {
+            return null;
+        }
+        List<String> segments = new ArrayList<>();
+        relativePath.forEach(segment -> segments.add(segment.toString()));
+        return String.join("/", segments);
     }
 
     private static String toReportFileKey(String filePath) {
