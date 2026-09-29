@@ -61,11 +61,13 @@ function finalize(node, isRoot = false) {
     let children = [...node.children.values()].map((child) => finalize(child));
     let { id, name } = node;
     // Compact single-folder chains (modules/util) like most code browsers, but never merge into a package.
-    while (!isRoot && node.type === "folder" && children.length === 1 && children[0].type === "folder") {
-        const [only] = children;
-        id = only.id;
-        name = `${name}/${only.name}`;
-        children = only.children;
+    if (!isRoot && node.type === "folder") {
+        while (children.length === 1 && children[0].type === "folder") {
+            const [only] = children;
+            id = only.id;
+            name = `${name}/${only.name}`;
+            children = only.children;
+        }
     }
     const counts = emptyCounts();
     children.forEach((child) => COUNT_FIELDS.forEach((field) => { counts[field] += child.counts[field]; }));

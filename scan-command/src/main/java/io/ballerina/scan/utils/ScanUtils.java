@@ -557,8 +557,12 @@ public final class ScanUtils {
             scannedPackages.add(scannedPackage);
 
             for (Document document : getAnalyzedDocuments(analyzedPackage)) {
-                Path documentPath = document.module().project().documentPath(document.documentId())
-                        .orElse(Path.of(document.name()));
+                // Documents that exist only in memory have no file to show; issues in them still get an entry below.
+                Optional<Path> optionalDocumentPath = document.module().project().documentPath(document.documentId());
+                if (optionalDocumentPath.isEmpty()) {
+                    continue;
+                }
+                Path documentPath = optionalDocumentPath.get();
                 JsonObject scanReportFile = createScanReportFile(getReportFileName(document),
                         documentPath.toString());
                 String relativePath = toRelativePath(reportRoot, documentPath);

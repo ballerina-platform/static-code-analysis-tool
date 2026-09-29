@@ -2,7 +2,9 @@ import { Box, Typography } from "@mui/material";
 import { Fragment } from "react";
 import { tokenizeLines } from "../highlighter";
 
-const FENCE = /```([\w-]*)[^\S\r\n]*\r?\n?([\s\S]*?)```/g;
+// Fences open and close at the start of a line; the closer repeats the opener's backticks (or more)
+// and may only be followed by whitespace. Groups: 1 = opener, 2 = language, 3 = code.
+const FENCE = /^(`{3,})[^\S\r\n]*([\w-]*)[^\S\r\n]*\r?\n(?:([\s\S]*?)\r?\n)?\1`*[^\S\r\n]*$/gm;
 const INLINE_CODE = /`([^`\n]+)`/g;
 const HIGHLIGHTED_LANGS = ["", "ballerina", "bal"];
 
@@ -23,7 +25,7 @@ const splitBlocks = (text) => {
         if (match.index > last) {
             blocks.push({ type: "text", value: text.slice(last, match.index) });
         }
-        blocks.push({ type: "code", lang: match[1].toLowerCase(), value: match[2].replace(/\r?\n$/, "") });
+        blocks.push({ type: "code", lang: match[2].toLowerCase(), value: match[3] ?? "" });
         last = match.index + match[0].length;
     }
     if (last < text.length) {
