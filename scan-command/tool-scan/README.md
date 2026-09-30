@@ -97,25 +97,69 @@ Running `bal scan` reports each finding as a JSON issue with its location and fu
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 20,
-      "endLine": 20,
-      "startColumn": 17,
-      "endColumn": 39,
-      "snippet": "checkpanic getResult()"
+      "startLine": 22,
+      "endLine": 22,
+      "startColumn": 16,
+      "endColumn": 43,
+      "startOffset": 875,
+      "length": 27,
+      "snippet": "checkpanic parseCount(\"12\")"
     },
     "rule": {
       "id": "ballerina:1",
+      "numericId": 1,
       "name": "Avoid checkpanic",
       "description": "Using `checkpanic` lets an unhandled error panic and crash the program instead of being handled.",
+      "details": "The `checkpanic` expression causes the program to panic and terminate abruptly when the checked expression evaluates to an error, instead of allowing the error to be handled. Prefer `check` with explicit error handling so callers can recover instead of crashing.",
       "helpUri": "https://ballerina.io/learn/scan-rules/#avoid-checkpanic",
       "severity": "LOW",
+      "tags": [
+        "error-handling"
+      ],
+      "standards": {
+        "cwe": [
+          248,
+          636
+        ],
+        "owasp": [
+          {
+            "year": 2025,
+            "categories": [
+              10
+            ]
+          }
+        ]
+      },
       "ruleKind": "CODE_SMELL"
     },
     "source": "BUILT_IN",
-    "fileName": "main.bal"
+    "fileName": "main.bal",
+    "filePath": "/home/user/bal-scan-demo/main.bal"
   }
 ]
 ```
+
+## Scan report
+
+To generate a detailed HTML report of the analysis results, use the `--scan-report` option:
+
+```bash
+bal scan --scan-report
+```
+
+This produces an HTML report and the scan results in JSON format inside the `target/report` directory (or the directory given via `--target-dir`). The report is only generated for Ballerina projects, not for standalone Ballerina files. When scanning a single package, it is also not generated if results are reported to a platform, whether via `--platforms` or a platform declared in `Scan.toml`. Workspace scans still generate the report even when results are also reported to a platform.
+
+The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. You can filter, search, and export the list of files.
+
+![scan-report-summary-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-summary-view.png)
+
+To investigate further, click on a file name to open the file view. This view shows the source of the file and highlights the exact lines where problems were detected. Hover over a highlight to see a summary of the issue, or click it to see the full details.
+
+![scan-report-file-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-file-view.png)
+
+The issues found in the file are listed in a table with the line, rule ID, name, kind, severity, CWE, and OWASP Top 10 category of each issue. Expand an issue to see its description and the full rule details, such as its location, source, and tags. From there, you can jump to the issue in the source using **Show in code**, or open the rule's documentation using **Rule documentation**.
+
+![scan-report-issue-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-issue-view.png)
 
 ## Configuration
 
