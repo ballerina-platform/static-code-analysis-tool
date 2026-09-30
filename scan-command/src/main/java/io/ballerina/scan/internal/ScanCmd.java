@@ -59,10 +59,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.Set;
 
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
@@ -117,6 +119,7 @@ public class ScanCmd implements BLauncherCmd {
     private List<String> platforms = new ArrayList<>();
 
     private final List<Rule> allRules = new ArrayList<>();
+    private final Set<String> allRuleIds = new HashSet<>();
     private final List<Issue> allIssues;
 
     public ScanCmd() {
@@ -209,6 +212,10 @@ public class ScanCmd implements BLauncherCmd {
                 executeProject(buildProject);
             }
             if (listRules) {
+                if (!allRules.isEmpty()) {
+                    outputStream.println();
+                    ScanUtils.printRulesToConsole(allRules, outputStream);
+                }
                 return;
             }
             outputStream.println();
@@ -279,10 +286,12 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        allRules.addAll(coreRules);
-        externalAnalyzers.values().forEach(allRules::addAll);
+        addRules(coreRules);
+        externalAnalyzers.values().forEach(this::addRules);
         if (listRules) {
-            ScanUtils.printRulesToConsole(allRules, outputStream);
+            if (project.workspaceProject().isEmpty()) {
+                ScanUtils.printRulesToConsole(allRules, outputStream);
+            }
             return;
         }
 
@@ -446,6 +455,14 @@ public class ScanCmd implements BLauncherCmd {
      */
     public List<Rule> getAllRules() {
         return Collections.unmodifiableList(allRules);
+    }
+
+    private void addRules(List<Rule> rules) {
+        for (Rule rule : rules) {
+            if (allRuleIds.add(rule.id())) {
+                allRules.add(rule);
+            }
+        }
     }
 
     private URLClassLoader loadPlatformPlugins(List<String> jarPaths) {
