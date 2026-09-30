@@ -117,6 +117,28 @@ Running `bal scan` reports each finding as a JSON issue with its location and fu
 ]
 ```
 
+## Scan report
+
+To generate a detailed HTML report of the analysis results, use the `--scan-report` option:
+
+```bash
+bal scan --scan-report
+```
+
+This produces an HTML report and the scan results in JSON format inside the `target/report` directory (or the directory given via `--target-dir`). The report is only generated for Ballerina projects, not for standalone Ballerina files. It is also not generated when results are reported to a platform, whether via `--platforms` or a platform declared in `Scan.toml`.
+
+The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. You can filter, search, and export the list of files.
+
+![scan-report-summary-view](images/scan-tool-html-report-summary-view.png)
+
+To investigate further, click on a file name to open the file view. This view shows the source of the file and highlights the exact lines where problems were detected. Hover over a highlight to see a summary of the issue, or click it to see the full details.
+
+![scan-report-file-view](images/scan-tool-html-report-file-view.png)
+
+The issues found in the file are listed in a table with the line, rule ID, name, kind, severity, CWE, and OWASP Top 10 category of each issue. Expand an issue to see its description and the full rule details, such as its location, source, and tags. From there, you can jump to the issue in the source using **Show in code**, or open the rule's documentation using **Rule documentation**.
+
+![scan-report-issue-view](images/scan-tool-html-report-issue-view.png)
+
 ## Configuration
 
 Rule filters, platform plugins, and static code analyzer plugins can also be configured in a `Scan.toml` file (only for Ballerina projects). The tool picks up a `Scan.toml` in the package root, or the file (local path or URL) specified in `Ballerina.toml`:
