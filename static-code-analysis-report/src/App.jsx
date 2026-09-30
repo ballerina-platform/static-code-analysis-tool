@@ -5,6 +5,7 @@ import MainView from "./components/MainView";
 import SingleFileView from "./components/SingleFileView";
 import useHashRoute from "./useHashRoute";
 import { EMPTY_FILTERS, getFileKey } from "./issueMeta";
+import { PROJECT_KINDS, getBaseName } from "./projectTree";
 
 // Get the static analysis data from the Populated DOM
 function readScanData() {
@@ -28,11 +29,12 @@ function App() {
     : undefined
 
   useEffect(() => {
-    const { projectName } = analysisResults
+    const { projectName, projectVersion } = analysisResults
     if (requestedFile) {
-      document.title = `${requestedFile.fileName} · ${projectName ?? "Scan Report"}`
+      document.title = `${getBaseName(requestedFile)} · ${projectName ?? "Scan Report"}`
     } else if (projectName) {
-      document.title = `${projectName} · Ballerina Scan Report`
+      const project = projectVersion ? `${projectName} v${projectVersion}` : projectName
+      document.title = `${project} · Ballerina Scan Report`
     } else {
       document.title = "Ballerina Scan Report"
     }
@@ -40,12 +42,19 @@ function App() {
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "var(--page-background)" }}>
-      <Header projectName={analysisResults.projectName} onHome={openMain} />
+      <Header
+        projectName={analysisResults.projectName}
+        projectVersion={analysisResults.projectVersion}
+        projectKind={analysisResults.projectKind}
+        packageCount={analysisResults.packages?.length ?? 0}
+        onHome={openMain}
+      />
       <Box component="main" sx={{ maxWidth: "1280px", margin: "0 auto", padding: { xs: "1rem", md: "1.5rem 2rem 3rem" } }}>
         {requestedFile ?
           <SingleFileView
             key={route.fileKey}
             requestedFile={requestedFile}
+            project={analysisResults}
             selectedIssue={route.issueIndex}
             onBack={openMain}
             onSelectIssue={(issueIndex) => selectIssue(route.fileKey, issueIndex)}
@@ -54,6 +63,8 @@ function App() {
           /> :
           <MainView
             analyzedFiles={analysisResults.scannedFiles}
+            packages={analysisResults.packages}
+            workspace={analysisResults.projectKind === PROJECT_KINDS.WORKSPACE}
             onOpenFile={(file) => openFile(getFileKey(file))}
             missingFile={route.view === "file" ? route.fileKey : null}
             filters={filters}

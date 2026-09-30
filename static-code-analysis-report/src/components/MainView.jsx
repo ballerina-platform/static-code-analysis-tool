@@ -34,7 +34,7 @@ function buildFileRecords(analyzedFiles, filters) {
     })
 }
 
-function MainView({ analyzedFiles, onOpenFile, missingFile, filters, onFiltersChange }) {
+function MainView({ analyzedFiles, packages, workspace, onOpenFile, missingFile, filters, onFiltersChange }) {
     const statistics = useMemo(() => retrieveAllStats(analyzedFiles), [analyzedFiles])
     const allIssues = useMemo(() => (analyzedFiles ?? []).flatMap((file) => file.issues ?? []), [analyzedFiles])
     const fileRecords = useMemo(() => buildFileRecords(analyzedFiles, filters), [analyzedFiles, filters])
@@ -56,6 +56,8 @@ function MainView({ analyzedFiles, onOpenFile, missingFile, filters, onFiltersCh
                     kindCounts={statistics.kindCounts}
                     filters={filters}
                     onFiltersChange={onFiltersChange}
+                    packages={packages}
+                    workspace={workspace}
                 />
             }
         </Box>

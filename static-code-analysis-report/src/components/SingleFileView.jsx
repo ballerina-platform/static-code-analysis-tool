@@ -1,4 +1,4 @@
-import { ArrowBack, DescriptionOutlined } from "@mui/icons-material"
+import { DescriptionOutlined, HomeOutlined, Inventory2Outlined, WorkspacesOutlined } from "@mui/icons-material"
 import {
     Box,
     Breadcrumbs,
@@ -12,8 +12,9 @@ import { useState } from "react"
 import SingleFileTable from "./SingleFileTable"
 import SingleFileContent from "./SingleFileContent"
 import { RULE_KINDS, RULE_KIND_ORDER, countByKind } from "../issueMeta"
+import { PROJECT_KINDS, findPackage, getBaseName, getRelativePath, packageLabel } from "../projectTree"
 
-function SingleFileView({ requestedFile, selectedIssue, onBack, onSelectIssue, filters, onFiltersChange }) {
+function SingleFileView({ requestedFile, project, selectedIssue, onBack, onSelectIssue, filters, onFiltersChange }) {
     const issues = requestedFile.issues ?? []
     const validSelection = selectedIssue !== null && selectedIssue < issues.length ? selectedIssue : null
     // Bumped on every "Show in code" request so repeating it for the same issue scrolls again.
@@ -35,7 +36,7 @@ function SingleFileView({ requestedFile, selectedIssue, onBack, onSelectIssue, f
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <FileHeader file={requestedFile} issues={issues} onBack={onBack} />
+            <FileHeader file={requestedFile} project={project} issues={issues} onBack={onBack} />
             <SingleFileContent
                 issues={issues}
                 fileContent={requestedFile.fileContent ?? ""}
@@ -47,7 +48,7 @@ function SingleFileView({ requestedFile, selectedIssue, onBack, onSelectIssue, f
                 issues={issues}
                 selectedIssue={validSelection}
                 onSelectIssue={(issueIndex) => onSelectIssue(issueIndex === validSelection ? null : issueIndex)}
-                fileName={requestedFile.fileName}
+                fileName={getBaseName(requestedFile)}
                 onShowInCode={showInCode}
                 focusRequest={tableFocus}
                 filters={filters}
@@ -57,30 +58,55 @@ function SingleFileView({ requestedFile, selectedIssue, onBack, onSelectIssue, f
     )
 }
 
-const FileHeader = ({ file, issues, onBack }) => {
+// In a workspace the package's folder is shown as the package itself, so the trail reads project / package / path.
+// Each crumb carries its path so far, which keys it.
+const pathCrumbs = (file, pkg, workspace) => {
+    const relativePath = getRelativePath(file)
+    const inPackage = workspace && pkg?.path && relativePath.startsWith(`${pkg.path}/`)
+    const segments = inPackage ? relativePath.slice(pkg.path.length + 1).split("/") : relativePath.split("/")
+    const crumbs = inPackage ? [{ name: pkg.name, path: pkg.path }] : []
+    let path = inPackage ? pkg.path : ""
+    segments.forEach((segment) => {
+        path = path ? `${path}/${segment}` : segment
+        crumbs.push({ name: segment, path })
+    })
+    return crumbs
+}
+
+const FileHeader = ({ file, project, issues, onBack }) => {
     const counts = countByKind(issues)
+    const workspace = project?.projectKind === PROJECT_KINDS.WORKSPACE
+    const pkg = findPackage(project?.packages, file)
+    const crumbs = pathCrumbs(file, pkg, workspace)
+    const relativePath = getRelativePath(file)
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <Tooltip title="Back to all files">
+            <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem" }}>
+                <Tooltip title="Home">
                     <IconButton
                         onClick={onBack}
                         size="small"
-                        aria-label="Back to all files"
+                        aria-label="Home"
                         sx={{
                             border: "1px solid var(--surface-border)",
                             bgcolor: "#ffffff",
                             "&:hover": { bgcolor: alpha("#20b6b0", 0.08), borderColor: "var(--primary-color)" },
                         }}
                     >
-                        <ArrowBack fontSize="small" color="primary" />
+                        <HomeOutlined fontSize="small" color="primary" />
                     </IconButton>
                 </Tooltip>
                 <Breadcrumbs aria-label="breadcrumb" sx={{ fontSize: "14px" }}>
                     <Link component="button" underline="hover" color="primary" onClick={onBack} sx={{ fontWeight: 600, fontSize: "14px" }}>
-                        All files
+                        {project?.projectName ?? "All files"}
                     </Link>
-                    <Typography color="text.primary" fontSize="14px">{file.fileName}</Typography>
+                    {crumbs.map((crumb, index) => (
+                        <Typography key={crumb.path} fontSize="14px"
+                            color={index === crumbs.length - 1 ? "text.primary" : "text.secondary"}
+                            fontWeight={index === crumbs.length - 1 ? 600 : 400}>
+                            {crumb.name}
+                        </Typography>
+                    ))}
                 </Breadcrumbs>
             </Box>
 
@@ -105,13 +131,14 @@ const FileHeader = ({ file, issues, onBack }) => {
                         <DescriptionOutlined color="primary" />
                     </Box>
                     <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="h4" fontWeight="bold" noWrap>{file.fileName}</Typography>
-                        {file.filePath && file.filePath !== file.fileName &&
+                        <Typography variant="h4" fontWeight="bold" noWrap>{getBaseName(file)}</Typography>
+                        {relativePath !== getBaseName(file) &&
                             <Typography variant="body2" color="text.secondary" noWrap title={file.filePath}
                                 sx={{ fontFamily: "consolas, monospace" }}>
-                                {file.filePath}
+                                {relativePath}
                             </Typography>
                         }
+                        {pkg && <PackageInfo pkg={pkg} workspaceName={workspace ? project.projectName : null} />}
                     </Box>
                 </Box>
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -138,5 +165,33 @@ const FileHeader = ({ file, issues, onBack }) => {
         </Box>
     )
 }
+
+const infoChipSx = {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.35rem",
+    padding: "0.1rem 0.6rem",
+    borderRadius: "999px",
+    border: "1px solid var(--surface-border)",
+    bgcolor: "var(--page-background)",
+}
+
+const PackageInfo = ({ pkg, workspaceName }) => (
+    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.4rem", marginTop: "0.4rem" }}>
+        <Box sx={infoChipSx}>
+            <Inventory2Outlined sx={{ fontSize: "15px" }} color="primary" />
+            <Typography variant="caption" color="text.secondary">Package</Typography>
+            <Typography variant="caption" fontWeight={700}>{packageLabel(pkg)}</Typography>
+            {pkg.version && <Typography variant="caption" fontWeight={600} color="text.secondary">v{pkg.version}</Typography>}
+        </Box>
+        {workspaceName &&
+            <Box sx={infoChipSx}>
+                <WorkspacesOutlined sx={{ fontSize: "15px" }} color="primary" />
+                <Typography variant="caption" color="text.secondary">Workspace</Typography>
+                <Typography variant="caption" fontWeight={700}>{workspaceName}</Typography>
+            </Box>
+        }
+    </Box>
+)
 
 export default SingleFileView

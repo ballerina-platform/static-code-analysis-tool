@@ -69,7 +69,6 @@ import java.util.stream.Collectors;
 
 import static io.ballerina.projects.util.ProjectConstants.IMPORT_PREFIX;
 import static io.ballerina.scan.internal.ScanToolConstants.FORWARD_SLASH;
-import static io.ballerina.scan.internal.ScanToolConstants.IMPORT_GENERATOR_FILE;
 import static io.ballerina.scan.internal.ScanToolConstants.RULES_FILE;
 import static io.ballerina.scan.internal.ScanToolConstants.RULE_DESCRIPTION;
 import static io.ballerina.scan.internal.ScanToolConstants.RULE_ID;
@@ -77,6 +76,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.RULE_KIND;
 import static io.ballerina.scan.internal.ScanToolConstants.RULE_SEVERITY;
 import static io.ballerina.scan.internal.ScanToolConstants.SCANNER_CONTEXT;
 import static io.ballerina.scan.internal.ScanToolConstants.USE_IMPORT_AS_UNDERSCORE;
+import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
 
 /**
  * Represents the project analyzer used for analyzing projects.

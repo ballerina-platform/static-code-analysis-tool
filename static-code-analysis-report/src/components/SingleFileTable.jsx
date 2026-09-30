@@ -34,6 +34,7 @@ import {
 } from '@mui/material';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { CweChips, KindChip, OwaspChips, SeverityChip } from './IssueBadges';
+import RichText from './RichText';
 import { ClearFiltersButton, IssueFilterFields, KindFilterChips, SearchField } from './IssueFilters';
 import {
     EMPTY_FILTERS,
@@ -389,7 +390,7 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
                         {pageIssues.length === 0 &&
                             <TableRow>
                                 <TableCell colSpan={columnCount} align="center" sx={{ padding: "2rem", color: "text.secondary" }}>
-                                    No issues match the current filters.
+                                    {issues.length === 0 ? "No issues found in this file." : "No issues match the current filters."}
                                 </TableCell>
                             </TableRow>
                         }
@@ -488,9 +489,9 @@ const IssueDetails = ({ issue, onShowInCode }) => {
         }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <DetailField label="Details">
-                    <Typography variant="body2" sx={{ whiteSpace: "pre-line", color: description ? "text.primary" : "text.secondary" }}>
-                        {description ?? "No further details are provided for this rule."}
-                    </Typography>
+                    {description
+                        ? <RichText text={description} />
+                        : <Typography variant="body2" color="text.secondary">No further details are provided for this rule.</Typography>}
                 </DetailField>
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
                     <Button

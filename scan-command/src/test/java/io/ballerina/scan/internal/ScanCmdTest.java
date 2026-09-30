@@ -42,12 +42,14 @@ import org.testng.annotations.Test;
 import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
 import picocli.CommandLine;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -357,6 +359,8 @@ public class ScanCmdTest extends BaseTest {
         JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
         Assert.assertEquals(scannedFiles.size(), 2);
         JsonObject mainFile = findScannedFile(scannedFiles, validBalProject.resolve("main.bal"));
+        // Project documents come first in analysis order; files only known through issues follow.
+        Assert.assertEquals(scannedFiles.get(0).getAsJsonObject(), mainFile);
         JsonObject secondFile = findScannedFile(scannedFiles, otherFile);
         Assert.assertEquals(mainFile.getAsJsonArray("issues").size(), 2);
         Assert.assertEquals(secondFile.getAsJsonArray("issues").size(), 1);
@@ -368,6 +372,46 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(secondRange.get("startLineOffset").getAsInt(), 0);
         Assert.assertEquals(secondRange.get("endLine").getAsInt(), 1);
         Assert.assertEquals(secondRange.get("endLineOffset").getAsInt(), 5);
+    }
+
+    @Test(description = "test html analysis report lists every analyzed workspace file, including files without "
+            + "issues, and skips the document generated to import external analyzers")
+    void testScanReportInWorkspaceListsAllAnalyzedFiles() throws IOException {
+        Path workspacePath = testResources.resolve("test-resources").resolve("workspace-project");
+        System.setProperty("user.dir", workspacePath.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {"--scan-report", "--include-rules=ballerina:1"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+
+        JsonObject scanData = readScanReportData(workspacePath.resolve("target").resolve("report")
+                .resolve("index.html"));
+        Assert.assertEquals(scanData.get("projectName").getAsString(), "workspace-project");
+        Assert.assertFalse(scanData.has("projectVersion"), "A workspace has no single version to show");
+        Assert.assertEquals(scanData.get("projectKind").getAsString(), "WORKSPACE_PROJECT");
+        List<String> packages = scanData.getAsJsonArray("packages").asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .map(pkg -> pkg.get("name").getAsString() + "@" + pkg.get("version").getAsString() + ":"
+                        + pkg.get("path").getAsString())
+                .sorted()
+                .toList();
+        Assert.assertEquals(packages, List.of(
+                "bal_project_with_analyzer_configurations@0.1.0:bal-project-with-analyzer-configurations",
+                "bal_project_with_include_rule_configurations@0.1.0:bal-project-with-include-rule-configurations"));
+        List<JsonObject> scannedFiles = scanData.getAsJsonArray("scannedFiles").asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .sorted(Comparator.comparing(file -> file.get("relativePath").getAsString()))
+                .toList();
+        Assert.assertEquals(scannedFiles.stream().map(file -> file.get("fileName").getAsString()).toList(), List.of(
+                "bal_project_with_analyzer_configurations" + File.separator + "main.bal",
+                "bal_project_with_include_rule_configurations" + File.separator + "main.bal"));
+        // Relative paths always use forward slashes so the report can build its folder tree on any OS.
+        Assert.assertEquals(scannedFiles.stream().map(file -> file.get("relativePath").getAsString()).toList(),
+                List.of("bal-project-with-analyzer-configurations/main.bal",
+                        "bal-project-with-include-rule-configurations/main.bal"));
+        Assert.assertEquals(scannedFiles.stream().map(file -> file.get("packageName").getAsString()).toList(),
+                List.of("bal_project_with_analyzer_configurations", "bal_project_with_include_rule_configurations"));
     }
 
     private String mainBalPath() {

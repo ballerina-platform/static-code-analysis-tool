@@ -4,13 +4,13 @@ import {
     SEVERITIES,
     cweLabel,
     cweUrl,
-    formatLocation,
     getCweList,
     getOwaspEntries,
     getRuleKind,
     getRuleName,
     getSeverity,
 } from "../issueMeta";
+import RichText from "./RichText";
 
 const chipBase = {
     height: 24,
@@ -122,45 +122,27 @@ export const OwaspChips = ({ issue, limit, showTitles = false, linked = true }) 
     );
 };
 
-const SummaryRow = ({ label, children }) => (
-    <Box sx={{ display: "grid", gridTemplateColumns: "72px 1fr", alignItems: "center", gap: "8px" }}>
-        <Typography variant="caption" color="text.secondary" fontWeight={600}>{label}</Typography>
-        <Box>{children}</Box>
-    </Box>
-);
-
-// Compact card shown when hovering an issue highlight in the code view.
-export const IssueSummaryCard = ({ issue, onSelect }) => {
+// Compact card shown when hovering an issue highlight in the code view; clicking the highlight opens the details.
+export const IssueSummaryCard = ({ issue }) => {
     const kind = RULE_KINDS[getRuleKind(issue)];
     return (
-        <Box
-            onClick={onSelect}
-            sx={{
-                padding: "10px 12px",
-                borderLeft: `3px solid ${kind?.color ?? "var(--primary-color)"}`,
-                borderRadius: "4px",
-                cursor: onSelect ? "pointer" : "default",
-                transition: "background-color 120ms",
-                "&:hover": onSelect ? { bgcolor: "#f5f7f8" } : undefined,
-            }}
-        >
+        <Box sx={{
+            padding: "10px 12px",
+            borderLeft: `3px solid ${kind?.color ?? "var(--primary-color)"}`,
+            borderRadius: "4px",
+        }}>
             <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.3 }}>
                 {getRuleName(issue)}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "consolas, monospace" }}>
-                {issue.ruleID} · {formatLocation(issue)}
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px" }}>
-                <SummaryRow label="Kind"><KindChip issue={issue} /></SummaryRow>
-                <SummaryRow label="Severity"><SeverityChip issue={issue} /></SummaryRow>
-                <SummaryRow label="CWE"><CweChips issue={issue} linked={false} /></SummaryRow>
-                <SummaryRow label="OWASP"><OwaspChips issue={issue} linked={false} /></SummaryRow>
+            {issue.message && issue.message !== getRuleName(issue) &&
+                <Box sx={{ marginTop: "4px" }}>
+                    <RichText text={issue.message} variant="caption" color="text.secondary" />
+                </Box>
+            }
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
+                <KindChip issue={issue} />
+                <SeverityChip issue={issue} />
             </Box>
-            {onSelect && (
-                <Typography variant="caption" sx={{ display: "block", marginTop: "8px", color: "primary.main", fontWeight: 600 }}>
-                    Click to view full details ↓
-                </Typography>
-            )}
         </Box>
     );
 };
