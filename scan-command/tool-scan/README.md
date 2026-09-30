@@ -1,5 +1,3 @@
-# Ballerina Scan Tool
-
 ## Overview
 
 Static Code Analysis (SCA) uses tools to examine code without executing it. It is used for identifying potential issues like bugs, vulnerabilities, and code smells early, improving software quality, maintainability, and security. Ballerina supports SCA using the Ballerina scan tool.
@@ -10,9 +8,7 @@ The scan tool compiles and performs static code analysis, prints results to the 
 
 Each issue reported by the tool is backed by a **rule**. Every rule has a `severity` (`BLOCKER`, `HIGH`, `MEDIUM`, `LOW`, or `INFO`) that indicates how important it is to act on it, and where applicable, is mapped to its relevant CWE and OWASP Top 10 coverage. See [Severity levels](#severity-levels) and [Rules](#rules) below for details.
 
-## Commands
-
-### `bal scan`
+## Command
 
 **Synopsis:**
 
