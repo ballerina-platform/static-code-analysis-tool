@@ -75,7 +75,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -206,16 +205,7 @@ public final class ScanUtils {
             }
         }
 
-        String json = gson.toJson(issuesAsJson);
-        if (File.separator.equals("\\")) {
-            // Gson JSON-escapes backslashes in fileName (\ -> \\), but fileName is a display field
-            // that should preserve the OS-native single backslash separator as-is.
-            Pattern p = Pattern.compile("(\"fileName\"\\s*:\\s*\")([^\"]*)(\")", Pattern.MULTILINE);
-            Matcher m = p.matcher(json);
-            json = m.replaceAll(mr -> Matcher.quoteReplacement(
-                    mr.group(1) + mr.group(2).replace("\\\\", "\\") + mr.group(3)));
-        }
-        return json;
+        return gson.toJson(issuesAsJson);
     }
 
     /**
@@ -618,7 +608,7 @@ public final class ScanUtils {
     public static String getReportFileName(Document document) {
         Module module = document.module();
         return module.project().workspaceProject().isPresent()
-                ? module.moduleName().toString() + File.separator + document.name()
+                ? module.moduleName().toString() + "/" + document.name()
                 : document.name();
     }
 

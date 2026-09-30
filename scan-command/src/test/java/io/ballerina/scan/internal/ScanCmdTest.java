@@ -42,7 +42,6 @@ import org.testng.annotations.Test;
 import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
 import picocli.CommandLine;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -404,8 +403,8 @@ public class ScanCmdTest extends BaseTest {
                 .sorted(Comparator.comparing(file -> file.get("relativePath").getAsString()))
                 .toList();
         Assert.assertEquals(scannedFiles.stream().map(file -> file.get("fileName").getAsString()).toList(), List.of(
-                "bal_project_with_analyzer_configurations" + File.separator + "main.bal",
-                "bal_project_with_include_rule_configurations" + File.separator + "main.bal"));
+                "bal_project_with_analyzer_configurations/main.bal",
+                "bal_project_with_include_rule_configurations/main.bal"));
         // Relative paths always use forward slashes so the report can build its folder tree on any OS.
         Assert.assertEquals(scannedFiles.stream().map(file -> file.get("relativePath").getAsString()).toList(),
                 List.of("bal-project-with-analyzer-configurations/main.bal",
