@@ -59,11 +59,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.Set;
 
+import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG;
+import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_WORKSPACE_DEPENDENCIES_LOG;
+import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_WORKSPACE_SCAN_RULES_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 import static io.ballerina.scan.utils.ScanUtils.convertIssuesToJsonString;
@@ -117,7 +122,9 @@ public class ScanCmd implements BLauncherCmd {
     private List<String> platforms = new ArrayList<>();
 
     private final List<Rule> allRules = new ArrayList<>();
+    private final Set<String> allRuleIds = new HashSet<>();
     private final List<Issue> allIssues;
+    private boolean scanningWorkspace;
 
     public ScanCmd() {
         this(System.out);
@@ -197,7 +204,8 @@ public class ScanCmd implements BLauncherCmd {
 
         if (project.get().kind() == ProjectKind.WORKSPACE_PROJECT) {
             outputStream.println();
-            outputStream.println("Resolving workspace dependencies");
+            outputStream.println(listRules ? RESOLVING_WORKSPACE_SCAN_RULES_LOG : RESOLVING_WORKSPACE_DEPENDENCIES_LOG);
+            scanningWorkspace = true;
             WorkspaceProject workspaceProject = (WorkspaceProject) project.get();
             List<BuildProject> topologicallySortedList =
                     workspaceProject.getResolution().dependencyGraph().toTopologicallySortedList();
@@ -209,6 +217,10 @@ public class ScanCmd implements BLauncherCmd {
                 executeProject(buildProject);
             }
             if (listRules) {
+                if (!allRules.isEmpty()) {
+                    outputStream.println();
+                    ScanUtils.printRulesToConsole(allRules, outputStream);
+                }
                 return;
             }
             outputStream.println();
@@ -266,8 +278,17 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        outputStream.println();
-        outputStream.println(RUNNING_SCANS_LOG);
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && !listRules) {
+            printUnsupportedSingleFileFlagWarnings();
+        }
+
+        if (!listRules) {
+            outputStream.println();
+            outputStream.println(RUNNING_SCANS_LOG);
+        } else if (project.kind() == ProjectKind.BUILD_PROJECT && !scanningWorkspace) {
+            outputStream.println();
+            outputStream.println(RESOLVING_PACKAGE_SCAN_RULES_LOG);
+        }
 
         ProjectAnalyzer projectAnalyzer = getProjectAnalyzer(project, scanTomlFile.get());
         List<Rule> coreRules = CoreRule.rules();
@@ -279,10 +300,15 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        allRules.addAll(coreRules);
-        externalAnalyzers.values().forEach(allRules::addAll);
+        addRules(coreRules);
+        externalAnalyzers.values().forEach(this::addRules);
         if (listRules) {
-            ScanUtils.printRulesToConsole(allRules, outputStream);
+            if (!scanningWorkspace) {
+                if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT) {
+                    outputStream.println();
+                }
+                ScanUtils.printRulesToConsole(allRules, outputStream);
+            }
             return;
         }
 
@@ -359,16 +385,6 @@ public class ScanCmd implements BLauncherCmd {
                         outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
                     }
                 }
-            } else {
-                if (targetDir != null) {
-                    outputStream.println();
-                    outputStream.println(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
-                }
-
-                if (scanReport) {
-                    outputStream.println();
-                    outputStream.println(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
-                }
             }
         }
 
@@ -384,6 +400,18 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println("The specified platform '" + remainingPlatform + "' is not available.");
             outputStream.println("Please ensure that the required platform plugin path is specified in 'Scan.toml'.");
         });
+    }
+
+    private void printUnsupportedSingleFileFlagWarnings() {
+        if (targetDir != null) {
+            outputStream.println();
+            outputStream.println(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
+        }
+
+        if (scanReport) {
+            outputStream.println();
+            outputStream.println(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
+        }
     }
 
     private StringBuilder helpMessage() {
@@ -408,6 +436,13 @@ public class ScanCmd implements BLauncherCmd {
     protected Optional<Project> getProject() {
         try {
             if (!isBallerinaProjectPath()) {
+                Optional<Path> packageRoot = getEnclosingPackageRoot();
+                if (packageRoot.isPresent()) {
+                    outputStream.println("The specified file belongs to a Ballerina package: " + projectPath
+                            + ". Scanning individual files within a package is not supported. Please provide the "
+                            + "package root path (" + packageRoot.get() + ") and try again.");
+                    return Optional.empty();
+                }
                 outputStream.println("The specified path is not a valid Ballerina project: " + projectPath + ". Please "
                         + "provide a valid Ballerina project path and try again.");
                 return Optional.empty();
@@ -435,6 +470,18 @@ public class ScanCmd implements BLauncherCmd {
         }
     }
 
+    private Optional<Path> getEnclosingPackageRoot() {
+        try {
+            if (!Files.isRegularFile(projectPath)
+                    || !projectPath.toString().endsWith(ProjectConstants.BLANG_SOURCE_EXT)) {
+                return Optional.empty();
+            }
+            return Optional.of(ProjectPaths.packageRoot(projectPath.toAbsolutePath().normalize()));
+        } catch (RuntimeException ex) {
+            return Optional.empty();
+        }
+    }
+
     protected ProjectAnalyzer getProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
         return new ProjectAnalyzer(project, scanTomlFile);
     }
@@ -446,6 +493,14 @@ public class ScanCmd implements BLauncherCmd {
      */
     public List<Rule> getAllRules() {
         return Collections.unmodifiableList(allRules);
+    }
+
+    private void addRules(List<Rule> rules) {
+        for (Rule rule : rules) {
+            if (allRuleIds.add(rule.id())) {
+                allRules.add(rule);
+            }
+        }
     }
 
     private URLClassLoader loadPlatformPlugins(List<String> jarPaths) {

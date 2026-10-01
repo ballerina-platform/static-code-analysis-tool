@@ -38,7 +38,7 @@
       "ruleKind": "CODE_SMELL"
     },
     "source": "BUILT_IN",
-    "fileName": "bal_project_with_analyzer_configurations\main.bal",
+    "fileName": "bal_project_with_analyzer_configurations/main.bal",
     "filePath": "<ABS_SOURCE_ROOT>\\bal-project-with-analyzer-configurations\\main.bal"
   },
   {
@@ -80,7 +80,7 @@
       "ruleKind": "CODE_SMELL"
     },
     "source": "BUILT_IN",
-    "fileName": "bal_project_with_include_rule_configurations\main.bal",
+    "fileName": "bal_project_with_include_rule_configurations/main.bal",
     "filePath": "<ABS_SOURCE_ROOT>\\bal-project-with-include-rule-configurations\\main.bal"
   }
 ]

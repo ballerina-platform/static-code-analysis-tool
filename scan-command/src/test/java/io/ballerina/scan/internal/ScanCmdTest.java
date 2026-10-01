@@ -42,7 +42,6 @@ import org.testng.annotations.Test;
 import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
 import picocli.CommandLine;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -146,8 +145,24 @@ public class ScanCmdTest extends BaseTest {
         String[] args = {inputPath};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String expected = "The specified path is not a valid Ballerina project: " + inputPath + ". Please "
-                + "provide a valid Ballerina project path and try again.";
+        String expected = "The specified file belongs to a Ballerina package: " + inputPath + ". Scanning "
+                + "individual files within a package is not supported. Please provide the package root path ("
+                + validBalProject.toAbsolutePath().normalize() + ") and try again.";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+    }
+
+    @Test(description = "test scan command with a file of a workspace package as argument")
+    void testScanCommandWorkspacePackageFileArgument() throws IOException {
+        Path projectRoot = testResources.resolve("test-resources").resolve("workspace-project")
+                .resolve("bal-project-with-analyzer-configurations");
+        String inputPath = projectRoot.resolve("main.bal").toString();
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {inputPath};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        String expected = "The specified file belongs to a Ballerina package: " + inputPath + ". Scanning "
+                + "individual files within a package is not supported. Please provide the package root path ("
+                + projectRoot.toAbsolutePath().normalize() + ") and try again.";
         Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
     }
 
@@ -404,8 +419,8 @@ public class ScanCmdTest extends BaseTest {
                 .sorted(Comparator.comparing(file -> file.get("relativePath").getAsString()))
                 .toList();
         Assert.assertEquals(scannedFiles.stream().map(file -> file.get("fileName").getAsString()).toList(), List.of(
-                "bal_project_with_analyzer_configurations" + File.separator + "main.bal",
-                "bal_project_with_include_rule_configurations" + File.separator + "main.bal"));
+                "bal_project_with_analyzer_configurations/main.bal",
+                "bal_project_with_include_rule_configurations/main.bal"));
         // Relative paths always use forward slashes so the report can build its folder tree on any OS.
         Assert.assertEquals(scannedFiles.stream().map(file -> file.get("relativePath").getAsString()).toList(),
                 List.of("bal-project-with-analyzer-configurations/main.bal",

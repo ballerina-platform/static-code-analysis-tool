@@ -141,7 +141,7 @@ export const IssueSummaryCard = ({ issue }) => {
             }
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
                 <KindChip issue={issue} />
-                <SeverityChip issue={issue} />
+                {getSeverity(issue) && <SeverityChip issue={issue} />}
             </Box>
         </Box>
     );
