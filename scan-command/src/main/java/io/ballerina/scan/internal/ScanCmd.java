@@ -273,6 +273,10 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && !listRules) {
+            printUnsupportedSingleFileFlagWarnings();
+        }
+
         outputStream.println();
         outputStream.println(RUNNING_SCANS_LOG);
 
@@ -368,16 +372,6 @@ public class ScanCmd implements BLauncherCmd {
                         outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
                     }
                 }
-            } else {
-                if (targetDir != null) {
-                    outputStream.println();
-                    outputStream.println(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
-                }
-
-                if (scanReport) {
-                    outputStream.println();
-                    outputStream.println(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
-                }
             }
         }
 
@@ -393,6 +387,18 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println("The specified platform '" + remainingPlatform + "' is not available.");
             outputStream.println("Please ensure that the required platform plugin path is specified in 'Scan.toml'.");
         });
+    }
+
+    private void printUnsupportedSingleFileFlagWarnings() {
+        if (targetDir != null) {
+            outputStream.println();
+            outputStream.println(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
+        }
+
+        if (scanReport) {
+            outputStream.println();
+            outputStream.println(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
+        }
     }
 
     private StringBuilder helpMessage() {

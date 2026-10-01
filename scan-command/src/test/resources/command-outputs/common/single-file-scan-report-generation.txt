@@ -1,5 +1,5 @@
+generating scan reports is not supported with single bal files, ignoring the flag and continuing the scans
+
 Running Scans
 
 []
-
-generating scan reports is not supported with single bal files, ignoring the flag and continuing the scans
