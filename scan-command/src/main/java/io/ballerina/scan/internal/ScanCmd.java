@@ -66,6 +66,9 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 
+import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG;
+import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_WORKSPACE_DEPENDENCIES_LOG;
+import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_WORKSPACE_SCAN_RULES_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 import static io.ballerina.scan.utils.ScanUtils.convertIssuesToJsonString;
@@ -200,7 +203,7 @@ public class ScanCmd implements BLauncherCmd {
 
         if (project.get().kind() == ProjectKind.WORKSPACE_PROJECT) {
             outputStream.println();
-            outputStream.println("Resolving workspace dependencies");
+            outputStream.println(listRules ? RESOLVING_WORKSPACE_SCAN_RULES_LOG : RESOLVING_WORKSPACE_DEPENDENCIES_LOG);
             WorkspaceProject workspaceProject = (WorkspaceProject) project.get();
             List<BuildProject> topologicallySortedList =
                     workspaceProject.getResolution().dependencyGraph().toTopologicallySortedList();
@@ -277,8 +280,13 @@ public class ScanCmd implements BLauncherCmd {
             printUnsupportedSingleFileFlagWarnings();
         }
 
-        outputStream.println();
-        outputStream.println(RUNNING_SCANS_LOG);
+        if (!listRules) {
+            outputStream.println();
+            outputStream.println(RUNNING_SCANS_LOG);
+        } else if (project.kind() == ProjectKind.BUILD_PROJECT && project.workspaceProject().isEmpty()) {
+            outputStream.println();
+            outputStream.println(RESOLVING_PACKAGE_SCAN_RULES_LOG);
+        }
 
         ProjectAnalyzer projectAnalyzer = getProjectAnalyzer(project, scanTomlFile.get());
         List<Rule> coreRules = CoreRule.rules();
@@ -294,6 +302,9 @@ public class ScanCmd implements BLauncherCmd {
         externalAnalyzers.values().forEach(this::addRules);
         if (listRules) {
             if (project.workspaceProject().isEmpty()) {
+                if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT) {
+                    outputStream.println();
+                }
                 ScanUtils.printRulesToConsole(allRules, outputStream);
             }
             return;
