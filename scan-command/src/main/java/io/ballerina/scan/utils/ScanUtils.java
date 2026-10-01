@@ -272,7 +272,7 @@ public final class ScanUtils {
             result.addProperty("level", resolveSarifLevel(rule));
 
             JsonObject message = new JsonObject();
-            message.addProperty("text", rule.name());
+            message.addProperty("text", rule.details() != null ? rule.details() : rule.name());
             result.add("message", message);
 
             // Create locations array

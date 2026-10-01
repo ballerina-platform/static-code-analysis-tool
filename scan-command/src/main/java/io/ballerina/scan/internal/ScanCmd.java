@@ -124,6 +124,7 @@ public class ScanCmd implements BLauncherCmd {
     private final List<Rule> allRules = new ArrayList<>();
     private final Set<String> allRuleIds = new HashSet<>();
     private final List<Issue> allIssues;
+    private boolean scanningWorkspace;
 
     public ScanCmd() {
         this(System.out);
@@ -204,6 +205,7 @@ public class ScanCmd implements BLauncherCmd {
         if (project.get().kind() == ProjectKind.WORKSPACE_PROJECT) {
             outputStream.println();
             outputStream.println(listRules ? RESOLVING_WORKSPACE_SCAN_RULES_LOG : RESOLVING_WORKSPACE_DEPENDENCIES_LOG);
+            scanningWorkspace = true;
             WorkspaceProject workspaceProject = (WorkspaceProject) project.get();
             List<BuildProject> topologicallySortedList =
                     workspaceProject.getResolution().dependencyGraph().toTopologicallySortedList();
@@ -283,7 +285,7 @@ public class ScanCmd implements BLauncherCmd {
         if (!listRules) {
             outputStream.println();
             outputStream.println(RUNNING_SCANS_LOG);
-        } else if (project.kind() == ProjectKind.BUILD_PROJECT && project.workspaceProject().isEmpty()) {
+        } else if (project.kind() == ProjectKind.BUILD_PROJECT && !scanningWorkspace) {
             outputStream.println();
             outputStream.println(RESOLVING_PACKAGE_SCAN_RULES_LOG);
         }
@@ -301,7 +303,7 @@ public class ScanCmd implements BLauncherCmd {
         addRules(coreRules);
         externalAnalyzers.values().forEach(this::addRules);
         if (listRules) {
-            if (project.workspaceProject().isEmpty()) {
+            if (!scanningWorkspace) {
                 if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT) {
                     outputStream.println();
                 }
