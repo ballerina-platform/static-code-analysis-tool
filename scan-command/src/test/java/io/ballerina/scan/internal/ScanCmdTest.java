@@ -145,8 +145,24 @@ public class ScanCmdTest extends BaseTest {
         String[] args = {inputPath};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String expected = "The specified path is not a valid Ballerina project: " + inputPath + ". Please "
-                + "provide a valid Ballerina project path and try again.";
+        String expected = "The specified file belongs to a Ballerina package: " + inputPath + ". Scanning "
+                + "individual files within a package is not supported. Please provide the package root path ("
+                + validBalProject.toAbsolutePath().normalize() + ") and try again.";
+        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+    }
+
+    @Test(description = "test scan command with a file of a workspace package as argument")
+    void testScanCommandWorkspacePackageFileArgument() throws IOException {
+        Path projectRoot = testResources.resolve("test-resources").resolve("workspace-project")
+                .resolve("bal-project-with-analyzer-configurations");
+        String inputPath = projectRoot.resolve("main.bal").toString();
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        String[] args = {inputPath};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        String expected = "The specified file belongs to a Ballerina package: " + inputPath + ". Scanning "
+                + "individual files within a package is not supported. Please provide the package root path ("
+                + projectRoot.toAbsolutePath().normalize() + ") and try again.";
         Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
     }
 

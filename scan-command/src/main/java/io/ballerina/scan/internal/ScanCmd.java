@@ -417,6 +417,13 @@ public class ScanCmd implements BLauncherCmd {
     protected Optional<Project> getProject() {
         try {
             if (!isBallerinaProjectPath()) {
+                Optional<Path> packageRoot = getEnclosingPackageRoot();
+                if (packageRoot.isPresent()) {
+                    outputStream.println("The specified file belongs to a Ballerina package: " + projectPath
+                            + ". Scanning individual files within a package is not supported. Please provide the "
+                            + "package root path (" + packageRoot.get() + ") and try again.");
+                    return Optional.empty();
+                }
                 outputStream.println("The specified path is not a valid Ballerina project: " + projectPath + ". Please "
                         + "provide a valid Ballerina project path and try again.");
                 return Optional.empty();
@@ -441,6 +448,18 @@ public class ScanCmd implements BLauncherCmd {
                     || ProjectPaths.isWorkspaceProjectRoot(projectPath);
         } catch (RuntimeException ex) {
             return false;
+        }
+    }
+
+    private Optional<Path> getEnclosingPackageRoot() {
+        try {
+            if (!Files.isRegularFile(projectPath)
+                    || !projectPath.toString().endsWith(ProjectConstants.BLANG_SOURCE_EXT)) {
+                return Optional.empty();
+            }
+            return Optional.of(ProjectPaths.packageRoot(projectPath.toAbsolutePath().normalize()));
+        } catch (RuntimeException ex) {
+            return Optional.empty();
         }
     }
 
