@@ -111,7 +111,7 @@ Running `bal scan` reports each finding as a JSON issue with its location and fu
       "name": "Avoid checkpanic",
       "description": "Using `checkpanic` lets an unhandled error panic and crash the program instead of being handled.",
       "details": "The `checkpanic` expression causes the program to panic and terminate abruptly when the checked expression evaluates to an error, instead of allowing the error to be handled. Prefer `check` with explicit error handling so callers can recover instead of crashing.",
-      "helpUri": "https://ballerina.io/learn/scan-rules/#avoid-checkpanic",
+      "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-1",
       "severity": "LOW",
       "tags": [
         "error-handling"
@@ -212,20 +212,20 @@ The language-level rules below are defined within this tool.
 
 | Rule ID | Name | Kind | Severity | Description |
 |---------|------|------|----------|-------------|
-| `ballerina:1` | [Avoid checkpanic](https://ballerina.io/learn/scan-rules/#avoid-checkpanic) | Code Smell | Low | Using `checkpanic` lets an unhandled error panic and crash the program instead of being handled. |
-| `ballerina:2` | [Unused function parameter](https://ballerina.io/learn/scan-rules/#unused-function-parameter) | Code Smell | Low | A function parameter is declared but never used within the function body. |
-| `ballerina:3` | [Non isolated public function](https://ballerina.io/learn/scan-rules/#non-isolated-public-function) | Code Smell | Low | A public function is not marked `isolated`, so it cannot be safely called from concurrently executing code. |
-| `ballerina:4` | [Non isolated public method](https://ballerina.io/learn/scan-rules/#non-isolated-public-method) | Code Smell | Low | A public method is not marked `isolated`, so it cannot be safely called from concurrently executing code. |
-| `ballerina:5` | [Non isolated public class](https://ballerina.io/learn/scan-rules/#non-isolated-public-class) | Code Smell | Low | A public class is not marked isolated, so its instances cannot be safely shared across concurrently executing code. |
-| `ballerina:6` | [Non isolated public object](https://ballerina.io/learn/scan-rules/#non-isolated-public-object) | Code Smell | Low | A public object is not marked isolated, so its instances cannot be safely shared across concurrently executing code. |
-| `ballerina:7` | [This operation always evaluates to true](https://ballerina.io/learn/scan-rules/#this-operation-always-evaluates-to-true) | Code Smell | Low | An operation always evaluates to `true` regardless of its operands' runtime values. |
-| `ballerina:8` | [This operation always evaluates to false](https://ballerina.io/learn/scan-rules/#this-operation-always-evaluates-to-false) | Code Smell | Low | An operation always evaluates to `false` regardless of its operands' runtime values. |
-| `ballerina:9` | [This operation always evaluates to the same value](https://ballerina.io/learn/scan-rules/#this-operation-always-evaluates-to-the-same-value) | Code Smell | Low | An operation always reduces to one of its own operands, making the operation itself redundant. |
-| `ballerina:10` | [This variable is assigned to itself](https://ballerina.io/learn/scan-rules/#this-variable-is-assigned-to-itself) | Code Smell | Low | A variable is assigned to itself, which has no effect and usually signals a mistake. |
-| `ballerina:11` | [Unused class private fields](https://ballerina.io/learn/scan-rules/#unused-class-private-fields) | Code Smell | Low | A private class field is declared but never used. |
-| `ballerina:12` | [Invalid range expression](https://ballerina.io/learn/scan-rules/#invalid-range-expression) | Code Smell | Low | A range expression's bounds never produce any elements, making it dead code. |
-| `ballerina:13` | [Hard-coded secrets are security-sensitive](https://ballerina.io/learn/scan-rules/#hard-coded-secrets-are-security-sensitive) | Vulnerability | High | A secret such as a password, API key, or token is embedded as a literal value in source code. |
-| `ballerina:14` | [Non configurable secrets are security-sensitive](https://ballerina.io/learn/scan-rules/#non-configurable-secrets-are-security-sensitive) | Vulnerability | Medium | A secret is assigned a fixed value instead of being exposed as a configurable one. |
+| `ballerina:1` | [Avoid checkpanic](https://ballerina.io/learn/scan-rules/#ballerina-1) | Code Smell | Low | Using `checkpanic` lets an unhandled error panic and crash the program instead of being handled. |
+| `ballerina:2` | [Unused function parameter](https://ballerina.io/learn/scan-rules/#ballerina-2) | Code Smell | Low | A function parameter is declared but never used within the function body. |
+| `ballerina:3` | [Non isolated public function](https://ballerina.io/learn/scan-rules/#ballerina-3) | Code Smell | Low | A public function is not marked `isolated`, so it cannot be safely called from concurrently executing code. |
+| `ballerina:4` | [Non isolated public method](https://ballerina.io/learn/scan-rules/#ballerina-4) | Code Smell | Low | A public method is not marked `isolated`, so it cannot be safely called from concurrently executing code. |
+| `ballerina:5` | [Non isolated public class](https://ballerina.io/learn/scan-rules/#ballerina-5) | Code Smell | Low | A public class is not marked isolated, so its instances cannot be safely shared across concurrently executing code. |
+| `ballerina:6` | [Non isolated public object](https://ballerina.io/learn/scan-rules/#ballerina-6) | Code Smell | Low | A public object is not marked isolated, so its instances cannot be safely shared across concurrently executing code. |
+| `ballerina:7` | [This operation always evaluates to true](https://ballerina.io/learn/scan-rules/#ballerina-7) | Code Smell | Low | An operation always evaluates to `true` regardless of its operands' runtime values. |
+| `ballerina:8` | [This operation always evaluates to false](https://ballerina.io/learn/scan-rules/#ballerina-8) | Code Smell | Low | An operation always evaluates to `false` regardless of its operands' runtime values. |
+| `ballerina:9` | [This operation always evaluates to the same value](https://ballerina.io/learn/scan-rules/#ballerina-9) | Code Smell | Low | An operation always reduces to one of its own operands, making the operation itself redundant. |
+| `ballerina:10` | [This variable is assigned to itself](https://ballerina.io/learn/scan-rules/#ballerina-10) | Code Smell | Low | A variable is assigned to itself, which has no effect and usually signals a mistake. |
+| `ballerina:11` | [Unused class private fields](https://ballerina.io/learn/scan-rules/#ballerina-11) | Code Smell | Low | A private class field is declared but never used. |
+| `ballerina:12` | [Invalid range expression](https://ballerina.io/learn/scan-rules/#ballerina-12) | Code Smell | Low | A range expression's bounds never produce any elements, making it dead code. |
+| `ballerina:13` | [Hard-coded secrets are security-sensitive](https://ballerina.io/learn/scan-rules/#ballerina-13) | Vulnerability | High | A secret such as a password, API key, or token is embedded as a literal value in source code. |
+| `ballerina:14` | [Non configurable secrets are security-sensitive](https://ballerina.io/learn/scan-rules/#ballerina-14) | Vulnerability | Medium | A secret is assigned a fixed value instead of being exposed as a configurable one. |
 
 ### Library tools
 
