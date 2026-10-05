@@ -10,7 +10,7 @@ jobs:
     name: Build on Ubuntu with tests
     runs-on: ubuntu-latest
     concurrency:
-      group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}-ubuntu
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-ubuntu
       cancel-in-progress: true
 
     steps:
@@ -50,7 +50,7 @@ jobs:
     name: Build on Windows with tests
     runs-on: windows-latest
     concurrency:
-      group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}-windows
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-windows
       cancel-in-progress: true
 
     steps:
