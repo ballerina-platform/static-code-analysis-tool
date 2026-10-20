@@ -37,6 +37,18 @@ OPTIONS
         --platforms=<platformName1, ...>
                 Define platform(s) to report results. The user can define more than one platform.
 
+        --ignore-suppressions
+                Disregard @scan:Suppress annotations and report every issue, to audit the unsuppressed
+                results. Rule inclusion and exclusion still apply.
+
+        --require-suppression-reason
+                Fail the scan when a @scan:Suppress annotation does not give a reason. Equivalent to
+                'requireReason = true' in the [suppression] table of Scan.toml.
+
+        --require-suppression-rule-id
+                Fail the scan when a @scan:Suppress annotation does not name the rules it suppresses.
+                Equivalent to 'requireRuleId = true' in the [suppression] table of Scan.toml.
+
 EXAMPLES
         Run analysis against all Ballerina documents in the current package, print results to the
         console, and save results in JSON file format in the target directory.
@@ -78,3 +90,9 @@ EXAMPLES
 
         Run analysis and report to multiple platforms
                 $ bal scan --platforms="sonarqube, semgrep, codeql"
+
+        Run analysis reporting every issue, including those suppressed with @scan:Suppress.
+                $ bal scan --ignore-suppressions
+
+        Run analysis and fail if any @scan:Suppress annotation lacks a reason.
+                $ bal scan --require-suppression-reason

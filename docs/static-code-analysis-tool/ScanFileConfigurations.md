@@ -6,6 +6,7 @@
 - [Configuration for Platform Plugins](#configuration-for-platform-plugins)
 - [Configuration for Static Code Analyzer Plugins](#configuration-for-static-code-analyzer-plugins)
 - [Configuration for Static Code Analyzer Rules](#configuration-for-static-code-analyzer-rules)
+- [Configuration for Suppressions](#configuration-for-suppressions)
 - [References](#references)
 
 # Overview
@@ -92,3 +93,18 @@ Define the rules to exclude in the analysis:
 [rule]
 exclude = ["ballerina:101", "ballerina/io:101"]
 ```
+
+# Configuration for Suppressions
+
+Issues can be accepted in the source with the `@scan:Suppress` annotation from the `ballerina/scan` package. By default, a suppression may omit both its reason and its rule list. Users can require either of them by defining the `[suppression]` table in a `Scan.toml` file:
+
+```toml
+[suppression]
+requireReason = true
+requireRuleId = true
+```
+
+- `requireReason` - Fail the scan when a suppression does not give a reason. Same as `--require-suppression-reason`.
+- `requireRuleId` - Fail the scan when a suppression does not name the rules it suppresses. Same as `--require-suppression-rule-id`.
+
+Both default to `false`. A suppression that does not meet a requirement still suppresses its issue; the scan fails and reports the suppression's location.

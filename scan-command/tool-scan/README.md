@@ -29,6 +29,9 @@ All options are optional. Rule filters and platforms can also be configured in a
 | `--include-rules=<rule1, ...>` | Run analysis for a specific set of rules. By default, all available rules are included. |
 | `--exclude-rules=<rule1, ...>` | Exclude analysis for a specific set of rules. By default, no rules are excluded. |
 | `--platforms=<platformName1, ...>` | Define platform(s) to report results to. More than one platform can be defined. By default, results are not reported to any platform. |
+| `--ignore-suppressions` | Disregard `@scan:Suppress` annotations and report every issue, to audit the unsuppressed results. Rule inclusion and exclusion still apply. See [Suppressing issues](#suppressing-issues). |
+| `--require-suppression-reason` | Fail the scan when a `@scan:Suppress` annotation does not give a reason. Same as `requireReason = true` in `Scan.toml`. |
+| `--require-suppression-rule-id` | Fail the scan when a `@scan:Suppress` annotation does not name the rules it suppresses. Same as `requireRuleId = true` in `Scan.toml`. |
 
 ## Examples
 
@@ -73,6 +76,12 @@ bal scan --platforms=sonarqube
 
 # Run analysis and report to multiple platforms.
 bal scan --platforms="sonarqube, semgrep, codeql"
+
+# Run analysis reporting every issue, including those suppressed with @scan:Suppress.
+bal scan --ignore-suppressions
+
+# Run analysis and fail if any @scan:Suppress annotation lacks a reason.
+bal scan --require-suppression-reason
 ```
 
 ### Example output
@@ -182,6 +191,11 @@ include = ["ballerina:1", "ballerina/io:101"]
 [[platform]]
 name = "sonarqube"
 path = "path/to/sonar_platform_plugin.jar"
+
+# Requirements for @scan:Suppress annotations (same as --require-suppression-reason and --require-suppression-rule-id)
+[suppression]
+requireReason = true
+requireRuleId = true
 ```
 
 Rules specified in `Scan.toml` are combined with those passed via `--include-rules` and `--exclude-rules`. Including and excluding rules at the same time is not allowed.
@@ -189,6 +203,25 @@ Rules specified in `Scan.toml` are combined with those passed via `--include-rul
 Each `[[platform]]` entry requires both a `name` and a `path`. The `path` must point to the platform plugin JAR, either as a local file path (resolved relative to the current working directory) or as a URL to download it from. A platform declared in `Scan.toml` is reported to automatically, and `--platforms` can only reference platforms declared there. When results are reported to a platform, they are not printed to the console or saved to the target directory.
 
 See [Scan file configurations](https://github.com/ballerina-platform/static-code-analysis-tool/blob/main/docs/static-code-analysis-tool/ScanFileConfigurations.md) for all available options.
+
+## Suppressing issues
+
+An individual issue can be accepted in the source with the `@scan:Suppress` annotation from the `ballerina/scan` package. Unlike excluding a rule, which turns it off for the whole project, a suppression applies only to the construct it is attached to and records why the issue is accepted:
+
+```ballerina
+import ballerina/scan;
+
+@scan:Suppress {rules: ["ballerina/crypto:2"], reason: "Legacy hash kept for the migration window, SEC-1042"}
+string hashed = check crypto:hashBcrypt(password, 4);
+```
+
+- **Placement.** The annotation applies to issues reported within the construct it is attached to: a variable or constant declaration, a function, method or resource, a parameter, a field, a type, a class or a service. A suppression on a service, class or object type does not reach issues inside its members. An issue in a statement that is not a declaration can be suppressed by turning the statement into one, for example `var _ = check f();` instead of `check f();`.
+- **Fields.** Both fields are optional. Without `rules`, every issue in the construct is suppressed; without `reason`, the issue is suppressed without a justification. The annotation can be attached more than once to give each rule its own reason.
+- **Rule ID validation.** The compiler plugin of `ballerina/scan` reports an unknown or malformed rule ID as a compile error, checking it against the core rules and the rules of the package's dependencies.
+- **Results.** Suppressed issues are not printed to the console, included in the HTML report, or sent to platforms, and the console prints a summary such as `3 issue(s), 2 suppressed`. They remain in the saved JSON and SARIF reports with a `suppressions` entry of kind `inSource` carrying the reason, so every accepted issue stays reviewable.
+- **Unmatched suppressions.** A suppression that matches no issue is reported as a warning, for example when the issue was fixed or the rule is excluded.
+- **Requirements.** A project can require every suppression to give a reason or name its rules, with `requireReason` and `requireRuleId` in the `[suppression]` table of `Scan.toml`, or with the matching command-line options. A suppression that does not meet a requirement still applies, but the scan fails.
+- **Audit.** `--ignore-suppressions` reports every issue as though no suppression existed.
 
 ## Rules
 

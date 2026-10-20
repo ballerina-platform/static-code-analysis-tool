@@ -23,17 +23,32 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Represents the response of a security scan, containing both active and excluded issues.
+ * Represents the response of a security scan, containing active, excluded and suppressed issues.
  *
  * @since 0.11.1
  */
 public class ScanResult {
     private final List<Issue> activeIssues;
     private final List<ExcludedIssue> excludedIssues;
+    private final List<SuppressedIssue> suppressedIssues;
 
     public ScanResult(List<Issue> activeIssues, List<ExcludedIssue> excludedIssues) {
+        this(activeIssues, excludedIssues, List.of());
+    }
+
+    /**
+     * Creates a scan result that also carries the issues accepted by in-source suppressions.
+     *
+     * @param activeIssues     issues that are neither excluded nor suppressed
+     * @param excludedIssues   issues excluded by rule selection
+     * @param suppressedIssues issues accepted by {@code @scan:Suppress} annotations
+     * @since 0.13.0
+     */
+    public ScanResult(List<Issue> activeIssues, List<ExcludedIssue> excludedIssues,
+                      List<SuppressedIssue> suppressedIssues) {
         this.activeIssues = new ArrayList<>(activeIssues);
         this.excludedIssues = new ArrayList<>(excludedIssues);
+        this.suppressedIssues = new ArrayList<>(suppressedIssues);
     }
 
     /**
@@ -52,5 +67,15 @@ public class ScanResult {
      */
     public List<ExcludedIssue> excludedIssues() {
         return Collections.unmodifiableList(excludedIssues);
+    }
+
+    /**
+     * Returns the list of issues accepted by {@code @scan:Suppress} annotations in the source.
+     *
+     * @return list of suppressed issues
+     * @since 0.13.0
+     */
+    public List<SuppressedIssue> suppressedIssues() {
+        return Collections.unmodifiableList(suppressedIssues);
     }
 }

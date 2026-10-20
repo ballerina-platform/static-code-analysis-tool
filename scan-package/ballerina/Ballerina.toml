@@ -1,0 +1,9 @@
+[package]
+org = "ballerina"
+name = "scan"
+version = "0.13.0"
+distribution = "2201.13.2"
+authors = ["Ballerina"]
+keywords = ["scan", "static code analysis", "suppression"]
+license = ["Apache-2.0"]
+repository = "https://github.com/ballerina-platform/static-code-analysis-tool"
