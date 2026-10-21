@@ -92,11 +92,19 @@ final class SuppressionFilter {
                     || !suppression.covers(issue.location().lineRange())) {
                 continue;
             }
-            if (innermost == null || suppression.scopeLength() < innermost.scopeLength()) {
+            if (innermost == null || isPreferred(suppression, innermost)) {
                 innermost = suppression;
             }
         }
         return innermost;
+    }
+
+    // On the same construct, an annotation naming the rule is preferred over one naming none; ties keep source order.
+    private static boolean isPreferred(SuppressionAnnotation candidate, SuppressionAnnotation current) {
+        if (candidate.scopeLength() != current.scopeLength()) {
+            return candidate.scopeLength() < current.scopeLength();
+        }
+        return !candidate.rules().isEmpty() && current.rules().isEmpty();
     }
 
     private static List<SuppressionDiagnostic> requirementViolations(List<SuppressionAnnotation> suppressions,

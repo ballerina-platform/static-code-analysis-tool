@@ -57,11 +57,13 @@ public class SuppressionTest extends BaseTest {
             .resolve("bal-project-with-analyzer-suppressions");
     private final Path disabledSuppressionsProject = testResources.resolve("test-resources")
             .resolve("bal-project-with-disabled-suppressions");
+    private final Path sameConstructSuppressionsProject = testResources.resolve("test-resources")
+            .resolve("bal-project-with-same-construct-suppressions");
 
     @AfterClass
     void cleanup() {
         for (Path project : List.of(suppressionsProject, requirementsProject, invalidSuppressionsProject,
-                analyzerSuppressionsProject, disabledSuppressionsProject)) {
+                analyzerSuppressionsProject, disabledSuppressionsProject, sameConstructSuppressionsProject)) {
             Path target = project.resolve("target");
             if (Files.exists(target)) {
                 ProjectUtils.deleteDirectory(target);
@@ -133,6 +135,24 @@ public class SuppressionTest extends BaseTest {
                 .getAsJsonArray("runs").get(0).getAsJsonObject().getAsJsonArray("results");
         Assert.assertEquals(results.size(), 3);
         results.forEach(result -> Assert.assertFalse(result.getAsJsonObject().has("suppressions")));
+    }
+
+    @Test(description = "test a rule-specific suppression takes precedence over a blanket one on the same construct")
+    void testRuleSpecificSuppressionPreferredOnSameConstruct() throws IOException {
+        String console = runScan(sameConstructSuppressionsProject);
+
+        JsonArray issues = readReport(sameConstructSuppressionsProject, "scan_results.json").getAsJsonArray();
+        Assert.assertEquals(issues.size(), 2);
+        for (JsonElement issue : issues) {
+            JsonObject suppression = issue.getAsJsonObject().getAsJsonArray("suppressions").get(0).getAsJsonObject();
+            Assert.assertEquals(suppression.get("justification").getAsString(), "Rule-specific");
+        }
+        Assert.assertTrue(console.contains("0 issue(s), 2 suppressed"), console);
+        Assert.assertTrue(console.contains("WARNING [main.bal:(20:5,20:39)] suppression of all rules did not "
+                + "match any issue"), console);
+        Assert.assertTrue(console.contains("WARNING [main.bal:(26:5,26:39)] suppression of all rules did not "
+                + "match any issue"), console);
+        Assert.assertFalse(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
     }
 
     @Test(description = "test --ignore-suppressions reports every issue as active")
