@@ -40,8 +40,10 @@ import io.ballerina.projects.plugins.AnalysisTask;
 import io.ballerina.projects.plugins.CompilationAnalysisContext;
 import io.ballerina.tools.diagnostics.DiagnosticFactory;
 import io.ballerina.tools.diagnostics.DiagnosticInfo;
+import org.wso2.ballerinalang.compiler.tree.BLangConstantValue;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -114,6 +116,8 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
             ExpressionNode value = specific.valueExpr().get();
             if (name.equals(RULES_FIELD) && value instanceof ListConstructorExpressionNode rules) {
                 validateRules(context, semanticModel, catalog.get(), rules);
+            } else if (name.equals(RULES_FIELD)) {
+                validateConstantRules(context, semanticModel, catalog.get(), value);
             } else if (name.equals(REASON_FIELD)) {
                 stringValue(semanticModel, value).filter(String::isBlank)
                         .ifPresent(reason -> report(context, value, DiagnosticCode.BLANK_REASON));
@@ -135,23 +139,43 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
                 report(context, element, DiagnosticCode.UNVERIFIABLE_RULE, element.toSourceCode().trim());
                 continue;
             }
-            String id = ruleId.get();
-            if (!seen.add(id)) {
-                report(context, element, DiagnosticCode.DUPLICATE_RULE, id);
-                continue;
-            }
-            Matcher matcher = RULE_ID.matcher(id);
-            if (!matcher.matches()) {
-                report(context, element, DiagnosticCode.INVALID_RULE_FORMAT, id);
-                continue;
-            }
-            String provider = matcher.group(1);
-            Optional<Set<Integer>> providerRules = catalog.rulesOf(provider);
-            if (providerRules.isEmpty()) {
-                report(context, element, DiagnosticCode.UNKNOWN_PROVIDER, id, provider);
-            } else if (!providerRules.get().contains(Integer.parseInt(matcher.group(2)))) {
-                report(context, element, DiagnosticCode.UNKNOWN_RULE, id, provider);
-            }
+            validateRule(context, catalog, element, ruleId.get(), seen);
+        }
+    }
+
+    // A reference to a constant list is checked as a whole; every diagnostic points at the reference.
+    private static void validateConstantRules(CompilationAnalysisContext context, SemanticModel semanticModel,
+                                              RuleCatalog catalog, ExpressionNode rules) {
+        Optional<List<String>> ruleIds = constantStrings(semanticModel, rules);
+        if (ruleIds.isEmpty()) {
+            report(context, rules, DiagnosticCode.UNVERIFIABLE_RULE, rules.toSourceCode().trim());
+            return;
+        }
+        if (ruleIds.get().isEmpty()) {
+            report(context, rules, DiagnosticCode.EMPTY_RULE_LIST);
+            return;
+        }
+        Set<String> seen = new HashSet<>();
+        ruleIds.get().forEach(id -> validateRule(context, catalog, rules, id, seen));
+    }
+
+    private static void validateRule(CompilationAnalysisContext context, RuleCatalog catalog, Node node, String id,
+                                     Set<String> seen) {
+        if (!seen.add(id)) {
+            report(context, node, DiagnosticCode.DUPLICATE_RULE, id);
+            return;
+        }
+        Matcher matcher = RULE_ID.matcher(id);
+        if (!matcher.matches()) {
+            report(context, node, DiagnosticCode.INVALID_RULE_FORMAT, id);
+            return;
+        }
+        String provider = matcher.group(1);
+        Optional<Set<Integer>> providerRules = catalog.rulesOf(provider);
+        if (providerRules.isEmpty()) {
+            report(context, node, DiagnosticCode.UNKNOWN_PROVIDER, id, provider);
+        } else if (!providerRules.get().contains(Integer.parseInt(matcher.group(2)))) {
+            report(context, node, DiagnosticCode.UNKNOWN_RULE, id, provider);
         }
     }
 
@@ -160,12 +184,30 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
             String text = ((BasicLiteralNode) expression).literalToken().text();
             return Optional.of(text.substring(1, text.length() - 1));
         }
+        return constantValue(semanticModel, expression).filter(String.class::isInstance).map(String.class::cast);
+    }
+
+    private static Optional<List<String>> constantStrings(SemanticModel semanticModel, Node expression) {
+        return constantValue(semanticModel, expression)
+                .filter(List.class::isInstance)
+                .map(list -> ((List<?>) list).stream().map(SuppressAnnotationValidator::unwrap).toList())
+                .filter(values -> values.stream().allMatch(String.class::isInstance))
+                .map(values -> values.stream().map(String.class::cast).toList());
+    }
+
+    private static Optional<Object> constantValue(SemanticModel semanticModel, Node expression) {
         return semanticModel.symbol(expression)
                 .filter(ConstantSymbol.class::isInstance)
                 .map(symbol -> ((ConstantSymbol) symbol).constValue())
-                .map(value -> value instanceof ConstantValue constant ? constant.value() : value)
-                .filter(String.class::isInstance)
-                .map(String.class::cast);
+                .map(SuppressAnnotationValidator::unwrap);
+    }
+
+    // Members of a constant list are compiler-internal values rather than ConstantValue instances.
+    private static Object unwrap(Object value) {
+        if (value instanceof ConstantValue constant) {
+            return constant.value();
+        }
+        return value instanceof BLangConstantValue constant ? constant.value : value;
     }
 
     private static void report(CompilationAnalysisContext context, Node node, DiagnosticCode code, Object... args) {

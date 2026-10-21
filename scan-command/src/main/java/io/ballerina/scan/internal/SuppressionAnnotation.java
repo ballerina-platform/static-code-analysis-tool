@@ -33,20 +33,24 @@ import java.util.Optional;
  * @param scope           location of the annotated construct
  * @param scopeLength     length of the annotated construct, used to find the innermost suppression
  * @param excludedMembers members of an annotated service, class or object type, which the suppression does not cover
- * @param rules           rules named by the annotation; empty when it applies to every rule
+ * @param blanket         whether the annotation omits {@code rules} and so applies to every rule
+ * @param rules           rules named by the annotation
+ * @param unresolvedRules source text of {@code rules} entries that do not resolve to a rule ID; never suppressed
  * @param reason          the justification, or {@code null} when absent or blank
  * @since 0.13.0
  */
 record SuppressionAnnotation(String filePath, String fileName, LineRange location, LineRange scope, int scopeLength,
-                             List<LineRange> excludedMembers, List<String> rules, String reason) {
+                             List<LineRange> excludedMembers, boolean blanket, List<String> rules,
+                             List<String> unresolvedRules, String reason) {
 
     SuppressionAnnotation {
         excludedMembers = List.copyOf(excludedMembers);
         rules = List.copyOf(rules);
+        unresolvedRules = List.copyOf(unresolvedRules);
     }
 
     boolean appliesTo(String ruleId) {
-        return rules.isEmpty() || rules.contains(ruleId);
+        return blanket || rules.contains(ruleId);
     }
 
     boolean covers(LineRange issueRange) {

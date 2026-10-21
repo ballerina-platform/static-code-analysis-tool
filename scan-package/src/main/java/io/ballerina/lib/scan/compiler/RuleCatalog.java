@@ -19,7 +19,6 @@
 package io.ballerina.lib.scan.compiler;
 
 import com.google.gson.JsonElement;
-import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import io.ballerina.projects.Package;
 import io.ballerina.projects.PackageDependencyScope;
@@ -93,7 +92,7 @@ final class RuleCatalog {
                 if (entry != null) {
                     return Optional.of(parseRuleIds(jarFile.getInputStream(entry)));
                 }
-            } catch (IOException | JsonParseException | IllegalStateException e) {
+            } catch (IOException | RuntimeException e) {
                 // An unreadable plugin contributes no rules, so its rule IDs are reported as unverifiable.
                 return Optional.empty();
             }

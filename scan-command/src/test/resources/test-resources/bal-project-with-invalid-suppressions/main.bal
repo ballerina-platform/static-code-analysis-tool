@@ -36,5 +36,11 @@ public function main() {
     int g = 7;
     @scan:Suppress {rules: [], reason: "Empty rule list"}
     int h = 8;
-    _ = a + b + c + d + e + f + g + h;
+    @scan:Suppress {rules: RULE_LIST, reason: "Constant list with an unknown rule"}
+    int i = 9;
+    @scan:Suppress {rules: [string `ballerina:1`], reason: "Template that is not a constant"}
+    int j = 10;
+    _ = a + b + c + d + e + f + g + h + i + j;
 }
+
+const RULE_LIST = ["ballerina:1", "ballerina:999"];

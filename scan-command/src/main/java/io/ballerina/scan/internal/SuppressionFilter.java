@@ -104,7 +104,7 @@ final class SuppressionFilter {
         if (candidate.scopeLength() != current.scopeLength()) {
             return candidate.scopeLength() < current.scopeLength();
         }
-        return !candidate.rules().isEmpty() && current.rules().isEmpty();
+        return !candidate.blanket() && current.blanket();
     }
 
     private static List<SuppressionDiagnostic> requirementViolations(List<SuppressionAnnotation> suppressions,
@@ -114,7 +114,7 @@ final class SuppressionFilter {
             if (options.requireReason() && suppression.justification().isEmpty()) {
                 violations.add(error(suppression, DiagnosticLog.error(DiagnosticCode.SUPPRESSION_MISSING_REASON)));
             }
-            if (options.requireRuleId() && suppression.rules().isEmpty()) {
+            if (options.requireRuleId() && suppression.blanket()) {
                 violations.add(error(suppression, DiagnosticLog.error(DiagnosticCode.SUPPRESSION_MISSING_RULE_ID)));
             }
         }
@@ -126,9 +126,13 @@ final class SuppressionFilter {
         List<SuppressionDiagnostic> unmatched = new ArrayList<>();
         for (SuppressionAnnotation suppression : suppressions) {
             Set<String> matchedRules = matched.getOrDefault(suppression, Set.of());
-            if (suppression.rules().isEmpty() && matchedRules.isEmpty()) {
+            if (suppression.blanket() && matchedRules.isEmpty()) {
                 unmatched.add(warning(suppression,
                         DiagnosticLog.warning(DiagnosticCode.UNMATCHED_BLANKET_SUPPRESSION)));
+            }
+            for (String rule : suppression.unresolvedRules()) {
+                unmatched.add(warning(suppression,
+                        DiagnosticLog.warning(DiagnosticCode.UNRESOLVED_SUPPRESSION_RULE, rule)));
             }
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
                 if (!matchedRules.contains(rule)) {

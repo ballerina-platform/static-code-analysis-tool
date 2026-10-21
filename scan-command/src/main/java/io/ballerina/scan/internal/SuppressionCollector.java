@@ -45,6 +45,7 @@ import io.ballerina.projects.Project;
 import io.ballerina.projects.ResolvedPackageDependency;
 import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.text.LineRange;
+import org.wso2.ballerinalang.compiler.tree.BLangConstantValue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -136,7 +137,8 @@ final class SuppressionCollector {
                                                        String filePath, String fileName) {
         Node construct = annotation.parent() instanceof MetadataNode ? annotation.parent().parent()
                 : annotation.parent();
-        List<String> rules = new ArrayList<>();
+        List<String> rules = null;
+        List<String> unresolvedRules = new ArrayList<>();
         String reason = null;
         if (annotation.annotValue().isPresent()) {
             for (MappingFieldNode field : annotation.annotValue().get().fields()) {
@@ -145,15 +147,28 @@ final class SuppressionCollector {
                 }
                 String name = specific.fieldName().toSourceCode().trim();
                 ExpressionNode value = specific.valueExpr().get();
-                if (RULES_FIELD.equals(name) && value instanceof ListConstructorExpressionNode list) {
-                    list.expressions().forEach(rule -> stringValue(semanticModel, rule).ifPresent(rules::add));
+                if (RULES_FIELD.equals(name)) {
+                    rules = new ArrayList<>();
+                    resolveRules(semanticModel, value, rules, unresolvedRules);
                 } else if (REASON_FIELD.equals(name)) {
                     reason = stringValue(semanticModel, value).filter(text -> !text.isBlank()).orElse(null);
                 }
             }
         }
         return new SuppressionAnnotation(filePath, fileName, annotation.lineRange(), construct.lineRange(),
-                construct.textRange().length(), memberRanges(construct), rules, reason);
+                construct.textRange().length(), memberRanges(construct), rules == null,
+                rules == null ? List.of() : rules, unresolvedRules, reason);
+    }
+
+    private static void resolveRules(SemanticModel semanticModel, ExpressionNode value, List<String> rules,
+                                     List<String> unresolvedRules) {
+        if (value instanceof ListConstructorExpressionNode list) {
+            list.expressions().forEach(rule -> stringValue(semanticModel, rule)
+                    .ifPresentOrElse(rules::add, () -> unresolvedRules.add(rule.toSourceCode().trim())));
+            return;
+        }
+        constantStrings(semanticModel, value)
+                .ifPresentOrElse(rules::addAll, () -> unresolvedRules.add(value.toSourceCode().trim()));
     }
 
     private static List<LineRange> memberRanges(Node construct) {
@@ -175,11 +190,29 @@ final class SuppressionCollector {
             String text = ((BasicLiteralNode) expression).literalToken().text();
             return Optional.of(text.substring(1, text.length() - 1));
         }
+        return constantValue(semanticModel, expression).filter(String.class::isInstance).map(String.class::cast);
+    }
+
+    private static Optional<List<String>> constantStrings(SemanticModel semanticModel, Node expression) {
+        return constantValue(semanticModel, expression)
+                .filter(List.class::isInstance)
+                .map(list -> ((List<?>) list).stream().map(SuppressionCollector::unwrap).toList())
+                .filter(values -> values.stream().allMatch(String.class::isInstance))
+                .map(values -> values.stream().map(String.class::cast).toList());
+    }
+
+    private static Optional<Object> constantValue(SemanticModel semanticModel, Node expression) {
         return semanticModel.symbol(expression)
                 .filter(ConstantSymbol.class::isInstance)
                 .map(symbol -> ((ConstantSymbol) symbol).constValue())
-                .map(value -> value instanceof ConstantValue constant ? constant.value() : value)
-                .filter(String.class::isInstance)
-                .map(String.class::cast);
+                .map(SuppressionCollector::unwrap);
+    }
+
+    // Members of a constant list are compiler-internal values rather than ConstantValue instances.
+    private static Object unwrap(Object value) {
+        if (value instanceof ConstantValue constant) {
+            return constant.value();
+        }
+        return value instanceof BLangConstantValue constant ? constant.value : value;
     }
 }

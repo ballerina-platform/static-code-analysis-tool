@@ -59,11 +59,14 @@ public class SuppressionTest extends BaseTest {
             .resolve("bal-project-with-disabled-suppressions");
     private final Path sameConstructSuppressionsProject = testResources.resolve("test-resources")
             .resolve("bal-project-with-same-construct-suppressions");
+    private final Path unresolvedSuppressionsProject = testResources.resolve("test-resources")
+            .resolve("bal-project-with-unresolved-suppressions");
 
     @AfterClass
     void cleanup() {
         for (Path project : List.of(suppressionsProject, requirementsProject, invalidSuppressionsProject,
-                analyzerSuppressionsProject, disabledSuppressionsProject, sameConstructSuppressionsProject)) {
+                analyzerSuppressionsProject, disabledSuppressionsProject, sameConstructSuppressionsProject,
+                unresolvedSuppressionsProject)) {
             Path target = project.resolve("target");
             if (Files.exists(target)) {
                 ProjectUtils.deleteDirectory(target);
@@ -153,6 +156,18 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(console.contains("WARNING [main.bal:(26:5,26:39)] suppression of all rules did not "
                 + "match any issue"), console);
         Assert.assertFalse(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
+    }
+
+    @Test(description = "test a constant rule list suppresses and a rule that does not resolve suppresses nothing")
+    void testUnresolvedRulesDoNotWidenSuppression() throws IOException {
+        String console = runScan(unresolvedSuppressionsProject, "--require-suppression-rule-id");
+
+        JsonArray issues = readReport(unresolvedSuppressionsProject, "scan_results.json").getAsJsonArray();
+        Assert.assertEquals(issues.size(), 2);
+        Assert.assertTrue(console.contains("1 issue(s), 1 suppressed"), console);
+        Assert.assertTrue(console.contains("WARNING [main.bal:(22:5,22:94)] suppression rule 'string `ballerina:1`' "
+                + "does not resolve to a rule ID; use a string literal or a constant"), console);
+        Assert.assertFalse(console.contains("suppression names no rule"), console);
     }
 
     @Test(description = "test --ignore-suppressions reports every issue as active")
@@ -258,7 +273,9 @@ public class SuppressionTest extends BaseTest {
                         + "rules; it is checked again when 'bal scan' runs",
                 "WARNING 33 rule 'ballerina:1' is listed more than once",
                 "WARNING 35 blank suppression reason; it is treated as absent",
-                "ERROR 37 empty rule list; omit 'rules' to suppress every rule"));
+                "ERROR 37 empty rule list; omit 'rules' to suppress every rule",
+                "ERROR 39 unknown rule 'ballerina:999': 'ballerina' does not define this rule",
+                "WARNING 41 cannot verify rule 'string `ballerina:1`': use a string literal or a constant"));
     }
 
     @Test(description = "test rules of an analyzer declared only in Scan.toml are checked when the scan runs")

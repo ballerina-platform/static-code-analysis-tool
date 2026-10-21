@@ -50,7 +50,8 @@ public enum DiagnosticCode {
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
-    UNMATCHED_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_004", "unmatched.blanket.suppression");
+    UNMATCHED_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_004", "unmatched.blanket.suppression"),
+    UNRESOLVED_SUPPRESSION_RULE("STATIC_ANALYSIS_WARNING_005", "unresolved.suppression.rule");
 
     private final String diagnosticId;
     private final String messageKey;
