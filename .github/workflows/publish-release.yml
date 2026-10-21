@@ -3,6 +3,8 @@ name: Publish Release
 on:
   workflow_dispatch:
 
+# Not the shared release template: it names the GitHub release module-<org>-<package>-v<version>, while scan tool
+# releases are named scan-tool-v<version>.
 jobs:
   publish_release:
     name: Publish release
@@ -18,11 +20,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21.0.6'
-
-      - name: Set Up Ballerina
-        uses: ballerina-platform/setup-ballerina@585120e3f0e540bf127376ee6e75d39e8ce6aaa4 # v1.1.5
-        with:
-          version: 2201.13.2
 
       - name: Set version env variable
         run: echo "VERSION=$((grep -w "version" | cut -d= -f2) < gradle.properties | rev | cut --complement -d- -f1 | rev)" >> $GITHUB_ENV

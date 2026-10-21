@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -268,7 +269,7 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println("\t" + finalReportPath.toUri());
             outputStream.println();
         } catch (IOException e) {
-            throw new RuntimeException("Error while obtaining report path: " + e.getMessage(), e);
+            throw new UncheckedIOException("Error while obtaining report path: " + e.getMessage(), e);
         }
     }
 

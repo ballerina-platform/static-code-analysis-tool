@@ -26,6 +26,7 @@ import io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -61,13 +62,13 @@ public class PlatformPlugin implements StaticCodeAnalysisPlatformPlugin {
                 StandardCharsets.UTF_8)) {
             gson.toJson(platformArgs, writer);
         } catch (IOException ex) {
-            throw new RuntimeException("Error occurred while writing platform arguments to file", ex);
+            throw new UncheckedIOException("Error occurred while writing platform arguments to file", ex);
         }
         try (FileWriter writer = new FileWriter(projectDir.resolve(ANALYSIS_ISSUES_FILES).toFile(),
                 StandardCharsets.UTF_8)) {
             gson.toJson(issues, writer);
         } catch (IOException ex) {
-            throw new RuntimeException("Error occurred while writing analysis issues to file", ex);
+            throw new UncheckedIOException("Error occurred while writing analysis issues to file", ex);
         }
     }
 }

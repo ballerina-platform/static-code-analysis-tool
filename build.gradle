@@ -16,8 +16,64 @@
  * under the License.
  */
 
+import org.apache.tools.ant.taskdefs.condition.Os
+import org.gradle.process.ExecOperations
+
+import javax.inject.Inject
+
 plugins {
     id "net.researchgate.release"
+}
+
+abstract class ExecOperationsHolder {
+    @Inject
+    abstract ExecOperations getExecOperations()
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = 'https://maven.pkg.github.com/ballerina-platform/*'
+        credentials {
+            username System.getenv("packageUser")
+            password System.getenv("packagePAT")
+        }
+    }
+}
+
+// The build runs the Ballerina distribution matching ballerinaLangVersion instead of whichever `bal` is installed
+configurations {
+    ballerinaDistribution
+}
+
+dependencies {
+    ballerinaDistribution "org.ballerinalang:jballerina-tools:${ballerinaLangVersion}@zip"
+}
+
+def ballerinaDistributionDir = layout.buildDirectory.dir("ballerina-distribution").get().asFile
+ext.ballerinaHome = new File(ballerinaDistributionDir, "jballerina-tools-${ballerinaLangVersion}")
+def balLauncher = new File(ballerinaHome, Os.isFamily(Os.FAMILY_WINDOWS) ? "bin/bal.bat" : "bin/bal")
+def execOperations = objects.newInstance(ExecOperationsHolder).execOperations
+
+tasks.register('unpackBallerinaDistribution', Copy) {
+    from { zipTree(configurations.ballerinaDistribution.singleFile) }
+    into ballerinaDistributionDir
+    doLast {
+        balLauncher.setExecutable(true)
+    }
+}
+
+// Runs a `bal` command of the provisioned distribution on the JDK running the build
+ext.runBal = { File workingDirectory, String... balArguments ->
+    execOperations.exec {
+        workingDir workingDirectory
+        environment 'JAVA_HOME', System.getProperty('java.home')
+        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+            commandLine(['cmd', '/c', balLauncher.absolutePath] + balArguments.toList())
+        } else {
+            commandLine([balLauncher.absolutePath] + balArguments.toList())
+        }
+    }
 }
 
 subprojects {
@@ -93,6 +149,7 @@ release {
     }
 }
 
-tasks.register('build') {
-    dependsOn 'scan-command:build'
+// The release plugin adds the root build task; it builds the scan tool
+tasks.named('build') {
+    dependsOn ':scan-command:build'
 }

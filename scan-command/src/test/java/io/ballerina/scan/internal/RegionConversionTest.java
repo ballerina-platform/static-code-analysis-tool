@@ -47,21 +47,21 @@ public class RegionConversionTest extends BaseTest {
             .resolve("bal-project-with-analyzer-configurations");
 
     @Test(description = "test position/region conversion for a one-character region")
-    void testOneCharacterRegion() throws Exception {
+    void testOneCharacterRegion() {
         assertRegionConversion(new BLangDiagnosticLocation("main.bal", 5, 5, 10, 11, 100, 1));
     }
 
     @Test(description = "test position/region conversion for a zero-width insertion-point region")
-    void testZeroWidthInsertionRegion() throws Exception {
+    void testZeroWidthInsertionRegion() {
         assertRegionConversion(new BLangDiagnosticLocation("main.bal", 5, 5, 10, 10, 100, 0));
     }
 
     @Test(description = "test position/region conversion for a multi-line region")
-    void testMultiLineRegion() throws Exception {
+    void testMultiLineRegion() {
         assertRegionConversion(new BLangDiagnosticLocation("main.bal", 5, 8, 10, 3, 100, 50));
     }
 
-    private void assertRegionConversion(BLangDiagnosticLocation location) throws Exception {
+    private void assertRegionConversion(BLangDiagnosticLocation location) {
         Issue issue = new IssueImpl(location, CoreRule.AVOID_CHECKPANIC.rule(), Source.BUILT_IN, "main.bal",
                 balProject.resolve("main.bal").toString());
 
