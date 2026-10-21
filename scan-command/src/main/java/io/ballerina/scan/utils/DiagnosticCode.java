@@ -47,6 +47,7 @@ public enum DiagnosticCode {
     SUPPRESSION_MISSING_REASON("STATIC_ANALYSIS_ERROR_021", "suppression.missing.reason"),
     SUPPRESSION_MISSING_RULE_ID("STATIC_ANALYSIS_ERROR_022", "suppression.missing.rule.id"),
     SUPPRESSION_REQUIREMENTS_NOT_MET("STATIC_ANALYSIS_ERROR_023", "suppression.requirements.not.met"),
+    UNKNOWN_CORE_RULE("STATIC_ANALYSIS_ERROR_024", "unknown.core.rule"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),

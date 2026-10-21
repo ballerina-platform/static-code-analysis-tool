@@ -45,7 +45,6 @@ import io.ballerina.projects.Project;
 import io.ballerina.projects.ResolvedPackageDependency;
 import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.text.LineRange;
-import org.wso2.ballerinalang.compiler.tree.BLangConstantValue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -196,9 +195,7 @@ final class SuppressionCollector {
     private static Optional<List<String>> constantStrings(SemanticModel semanticModel, Node expression) {
         return constantValue(semanticModel, expression)
                 .filter(List.class::isInstance)
-                .map(list -> ((List<?>) list).stream().map(SuppressionCollector::unwrap).toList())
-                .filter(values -> values.stream().allMatch(String.class::isInstance))
-                .map(values -> values.stream().map(String.class::cast).toList());
+                .map(list -> ((List<?>) list).stream().map(SuppressionCollector::memberValue).toList());
     }
 
     private static Optional<Object> constantValue(SemanticModel semanticModel, Node expression) {
@@ -208,11 +205,13 @@ final class SuppressionCollector {
                 .map(SuppressionCollector::unwrap);
     }
 
-    // Members of a constant list are compiler-internal values rather than ConstantValue instances.
     private static Object unwrap(Object value) {
-        if (value instanceof ConstantValue constant) {
-            return constant.value();
-        }
-        return value instanceof BLangConstantValue constant ? constant.value : value;
+        return value instanceof ConstantValue constant ? constant.value() : value;
+    }
+
+    // Members of a constant list are compiler-internal values whose string form is the member's value.
+    private static String memberValue(Object member) {
+        Object value = unwrap(member);
+        return value instanceof String text ? text : String.valueOf(value);
     }
 }

@@ -28,7 +28,7 @@ plugins {
 }
 
 group = "${group}"
-version = "${version}"
+version = "${scanPackageVersion}"
 
 repositories {
     mavenLocal()
@@ -55,14 +55,6 @@ dependencies {
 
 jar {
     archiveBaseName = 'scan-compiler-plugin'
-}
-
-// The plugin validates core rule IDs against the list shipped with the scan tool built from the same sources
-processResources {
-    from(project(':scan-command').file('src/main/resources/core-rules')) {
-        include 'rules.json'
-        into 'core-rules'
-    }
 }
 
 // Setting up checkstyles

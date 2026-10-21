@@ -27,7 +27,7 @@ import io.ballerina.projects.plugins.CompilerPluginContext;
  * Compiler plugin of the {@code ballerina/scan} package, validating every {@code @scan:Suppress} annotation in the
  * importing package.
  *
- * @since 0.13.0
+ * @since 1.0.0
  */
 public class ScanCompilerPlugin extends CompilerPlugin {
 

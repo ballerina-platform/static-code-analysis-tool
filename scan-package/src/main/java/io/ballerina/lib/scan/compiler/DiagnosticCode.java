@@ -23,7 +23,7 @@ import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 /**
  * Diagnostics reported by the {@code ballerina/scan} compiler plugin.
  *
- * @since 0.13.0
+ * @since 1.0.0
  */
 enum DiagnosticCode {
     INVALID_RULE_FORMAT("SCAN_SUPPRESS_101", "invalid rule ID ''{0}'': expected ''ballerina:<number>'' or "

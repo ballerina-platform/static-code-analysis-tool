@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Applies the {@code @scan:Suppress} annotations of a package to its issues. Shared by the command line and the
@@ -41,7 +42,16 @@ import java.util.Set;
  */
 final class SuppressionFilter {
 
+    private static final Pattern CORE_RULE_ID = Pattern.compile("ballerina:\\d+");
+    private static final Set<String> CORE_RULE_IDS = coreRuleIds();
+
     private SuppressionFilter() {
+    }
+
+    private static Set<String> coreRuleIds() {
+        Set<String> ids = new HashSet<>();
+        CoreRule.rules().forEach(rule -> ids.add(rule.id()));
+        return Set.copyOf(ids);
     }
 
     /**
@@ -59,7 +69,8 @@ final class SuppressionFilter {
             return new SuppressionOutcome(issues, List.of(), List.of());
         }
 
-        List<SuppressionDiagnostic> diagnostics = new ArrayList<>(requirementViolations(suppressions, options));
+        List<SuppressionDiagnostic> diagnostics = new ArrayList<>(unknownCoreRules(suppressions));
+        diagnostics.addAll(requirementViolations(suppressions, options));
         if (options.ignoreSuppressions()) {
             return new SuppressionOutcome(issues, List.of(), diagnostics);
         }
@@ -107,6 +118,23 @@ final class SuppressionFilter {
         return !candidate.blanket() && current.blanket();
     }
 
+    // The ballerina/scan compiler plugin checks only the format of core rule IDs; the running tool owns the list.
+    private static List<SuppressionDiagnostic> unknownCoreRules(List<SuppressionAnnotation> suppressions) {
+        List<SuppressionDiagnostic> unknown = new ArrayList<>();
+        for (SuppressionAnnotation suppression : suppressions) {
+            for (String rule : new LinkedHashSet<>(suppression.rules())) {
+                if (isUnknownCoreRule(rule)) {
+                    unknown.add(error(suppression, DiagnosticLog.error(DiagnosticCode.UNKNOWN_CORE_RULE, rule)));
+                }
+            }
+        }
+        return unknown;
+    }
+
+    private static boolean isUnknownCoreRule(String rule) {
+        return CORE_RULE_ID.matcher(rule).matches() && !CORE_RULE_IDS.contains(rule);
+    }
+
     private static List<SuppressionDiagnostic> requirementViolations(List<SuppressionAnnotation> suppressions,
                                                                      SuppressionOptions options) {
         List<SuppressionDiagnostic> violations = new ArrayList<>();
@@ -135,7 +163,7 @@ final class SuppressionFilter {
                         DiagnosticLog.warning(DiagnosticCode.UNRESOLVED_SUPPRESSION_RULE, rule)));
             }
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
-                if (!matchedRules.contains(rule)) {
+                if (!matchedRules.contains(rule) && !isUnknownCoreRule(rule)) {
                     unmatched.add(warning(suppression,
                             DiagnosticLog.warning(DiagnosticCode.UNMATCHED_SUPPRESSION, rule)));
                 }

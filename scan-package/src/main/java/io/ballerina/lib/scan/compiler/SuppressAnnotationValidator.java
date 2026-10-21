@@ -40,7 +40,6 @@ import io.ballerina.projects.plugins.AnalysisTask;
 import io.ballerina.projects.plugins.CompilationAnalysisContext;
 import io.ballerina.tools.diagnostics.DiagnosticFactory;
 import io.ballerina.tools.diagnostics.DiagnosticInfo;
-import org.wso2.ballerinalang.compiler.tree.BLangConstantValue;
 
 import java.util.HashSet;
 import java.util.List;
@@ -54,7 +53,7 @@ import java.util.stream.Stream;
  * Checks that each rule named in a {@code @scan:Suppress} annotation is one {@code bal scan} can report for the
  * package being compiled.
  *
- * @since 0.13.0
+ * @since 1.0.0
  */
 class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisContext> {
 
@@ -171,6 +170,10 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
             return;
         }
         String provider = matcher.group(1);
+        // Core rules ship with the scan tool, which checks them when it runs
+        if (provider.equals(RuleCatalog.CORE_PROVIDER)) {
+            return;
+        }
         Optional<Set<Integer>> providerRules = catalog.rulesOf(provider);
         if (providerRules.isEmpty()) {
             report(context, node, DiagnosticCode.UNKNOWN_PROVIDER, id, provider);
@@ -190,9 +193,7 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
     private static Optional<List<String>> constantStrings(SemanticModel semanticModel, Node expression) {
         return constantValue(semanticModel, expression)
                 .filter(List.class::isInstance)
-                .map(list -> ((List<?>) list).stream().map(SuppressAnnotationValidator::unwrap).toList())
-                .filter(values -> values.stream().allMatch(String.class::isInstance))
-                .map(values -> values.stream().map(String.class::cast).toList());
+                .map(list -> ((List<?>) list).stream().map(SuppressAnnotationValidator::memberValue).toList());
     }
 
     private static Optional<Object> constantValue(SemanticModel semanticModel, Node expression) {
@@ -202,12 +203,14 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
                 .map(SuppressAnnotationValidator::unwrap);
     }
 
-    // Members of a constant list are compiler-internal values rather than ConstantValue instances.
     private static Object unwrap(Object value) {
-        if (value instanceof ConstantValue constant) {
-            return constant.value();
-        }
-        return value instanceof BLangConstantValue constant ? constant.value : value;
+        return value instanceof ConstantValue constant ? constant.value() : value;
+    }
+
+    // Members of a constant list are compiler-internal values whose string form is the member's value.
+    private static String memberValue(Object member) {
+        Object value = unwrap(member);
+        return value instanceof String text ? text : String.valueOf(value);
     }
 
     private static void report(CompilationAnalysisContext context, Node node, DiagnosticCode code, Object... args) {

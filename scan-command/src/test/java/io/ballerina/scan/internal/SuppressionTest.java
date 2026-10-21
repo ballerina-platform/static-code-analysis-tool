@@ -61,12 +61,14 @@ public class SuppressionTest extends BaseTest {
             .resolve("bal-project-with-same-construct-suppressions");
     private final Path unresolvedSuppressionsProject = testResources.resolve("test-resources")
             .resolve("bal-project-with-unresolved-suppressions");
+    private final Path unknownCoreRuleProject = testResources.resolve("test-resources")
+            .resolve("bal-project-with-unknown-core-rule");
 
     @AfterClass
     void cleanup() {
         for (Path project : List.of(suppressionsProject, requirementsProject, invalidSuppressionsProject,
                 analyzerSuppressionsProject, disabledSuppressionsProject, sameConstructSuppressionsProject,
-                unresolvedSuppressionsProject)) {
+                unresolvedSuppressionsProject, unknownCoreRuleProject)) {
             Path target = project.resolve("target");
             if (Files.exists(target)) {
                 ProjectUtils.deleteDirectory(target);
@@ -217,7 +219,7 @@ public class SuppressionTest extends BaseTest {
         System.setProperty("user.dir", userDir);
 
         Assert.assertTrue(exception.getDetailedMessages().get(0)
-                .contains("1 suppression(s) do not meet the configured suppression requirements"));
+                .contains("1 suppression(s) are invalid or do not meet the configured suppression requirements"));
         String console = readOutput(true);
         Assert.assertTrue(console.contains("ERROR [main.bal:(28:1,28:15)] suppression has no reason"), console);
         Assert.assertTrue(console.contains("1 issue(s), 2 suppressed"), "the suppressions still apply");
@@ -231,10 +233,26 @@ public class SuppressionTest extends BaseTest {
         System.setProperty("user.dir", userDir);
 
         Assert.assertTrue(exception.getDetailedMessages().get(0)
-                .contains("2 suppression(s) do not meet the configured suppression requirements"));
+                .contains("2 suppression(s) are invalid or do not meet the configured suppression requirements"));
         String console = readOutput(true);
         Assert.assertTrue(console.contains("ERROR [main.bal:(20:5,20:44)] suppression has no reason"), console);
         Assert.assertTrue(console.contains("ERROR [main.bal:(22:5,22:51)] suppression names no rule"), console);
+    }
+
+    @Test(description = "test the scan tool rejects a core rule it does not define")
+    void testUnknownCoreRuleFailsTheScan() throws IOException {
+        System.setProperty("user.dir", unknownCoreRuleProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+        System.setProperty("user.dir", userDir);
+
+        Assert.assertTrue(exception.getDetailedMessages().get(0)
+                .contains("1 suppression(s) are invalid or do not meet the configured suppression requirements"));
+        String console = readOutput(true);
+        Assert.assertTrue(console.contains("ERROR [main.bal:(20:5,20:87)] unknown rule 'ballerina:999': "
+                + "'ballerina' does not define this rule"), console);
+        Assert.assertFalse(console.contains("suppression of 'ballerina:999' did not match"), console);
+        Assert.assertTrue(console.contains("0 issue(s), 1 suppressed"), console);
     }
 
     @Test(description = "test the language server returns suppressed issues and suppression diagnostics")
@@ -265,16 +283,15 @@ public class SuppressionTest extends BaseTest {
             }
         }
 
+        // Core rule IDs are checked by the scan tool when it runs, so ballerina:999 is not reported here
         Assert.assertEquals(diagnostics, List.of(
-                "ERROR 25 unknown rule 'ballerina:999': 'ballerina' does not define this rule",
-                "ERROR 27 unknown rule 'ballerina:999': 'ballerina' does not define this rule",
                 "ERROR 29 invalid rule ID 'http:1': expected 'ballerina:<number>' or '<org>/<package>:<number>'",
                 "WARNING 31 cannot verify rule 'acme/lint:1': 'acme/lint' is not a direct dependency with scan "
                         + "rules; it is checked again when 'bal scan' runs",
                 "WARNING 33 rule 'ballerina:1' is listed more than once",
                 "WARNING 35 blank suppression reason; it is treated as absent",
                 "ERROR 37 empty rule list; omit 'rules' to suppress every rule",
-                "ERROR 39 unknown rule 'ballerina:999': 'ballerina' does not define this rule",
+                "ERROR 39 invalid rule ID 'http:1': expected 'ballerina:<number>' or '<org>/<package>:<number>'",
                 "WARNING 41 cannot verify rule 'string `ballerina:1`': use a string literal or a constant"));
     }
 

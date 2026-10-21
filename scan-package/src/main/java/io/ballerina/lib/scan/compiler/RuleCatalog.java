@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -42,18 +41,17 @@ import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 
 /**
- * The rules {@code bal scan} can report for a package, discovered the same way the scan tool discovers them: the
- * core rules shipped with the tool, plus the {@code rules.json} of every direct dependency's compiler plugin.
+ * The analyzer rules {@code bal scan} can report for a package, discovered the same way the scan tool discovers them:
+ * from the {@code rules.json} of every direct dependency's compiler plugin. Core rules are not listed, because they
+ * ship with the scan tool, which checks them when it runs.
  *
- * @since 0.13.0
+ * @since 1.0.0
  */
 final class RuleCatalog {
 
     static final String CORE_PROVIDER = "ballerina";
-    private static final String CORE_RULES_RESOURCE = "core-rules/rules.json";
     private static final String PLUGIN_RULES_FILE = "rules.json";
     private static final String RULE_ID_FIELD = "id";
-    private static final Set<Integer> CORE_RULES = loadCoreRules();
 
     private final Map<String, Set<Integer>> rulesByProvider;
 
@@ -63,7 +61,6 @@ final class RuleCatalog {
 
     static RuleCatalog of(Package currentPackage) {
         Map<String, Set<Integer>> rulesByProvider = new HashMap<>();
-        rulesByProvider.put(CORE_PROVIDER, CORE_RULES);
         ResolvedPackageDependency root = new ResolvedPackageDependency(currentPackage, PackageDependencyScope.DEFAULT);
         for (ResolvedPackageDependency dependency : currentPackage.getResolution().dependencyGraph()
                 .getDirectDependencies(root)) {
@@ -78,7 +75,7 @@ final class RuleCatalog {
      * Returns the rule numbers the provider declares, or empty when the provider's rules are not available to this
      * compilation, because it is not a direct dependency or has no scan rules.
      *
-     * @param provider {@code ballerina} for core rules, or {@code <org>/<package>}
+     * @param provider {@code <org>/<package>}
      * @return the rule numbers of the provider
      */
     Optional<Set<Integer>> rulesOf(String provider) {
@@ -98,17 +95,6 @@ final class RuleCatalog {
             }
         }
         return Optional.empty();
-    }
-
-    private static Set<Integer> loadCoreRules() {
-        try (InputStream stream = RuleCatalog.class.getClassLoader().getResourceAsStream(CORE_RULES_RESOURCE)) {
-            if (stream == null) {
-                throw new IllegalStateException(CORE_RULES_RESOURCE + " is missing from the scan compiler plugin");
-            }
-            return parseRuleIds(stream);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to read " + CORE_RULES_RESOURCE, e);
-        }
     }
 
     private static Set<Integer> parseRuleIds(InputStream stream) throws IOException {
