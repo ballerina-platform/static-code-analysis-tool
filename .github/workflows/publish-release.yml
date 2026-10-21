@@ -3,12 +3,56 @@ name: Publish Release
 on:
   workflow_dispatch:
 
+# Not the shared release template: it names the GitHub release module-<org>-<package>-v<version>, while scan tool
+# releases are named scan-tool-v<version>.
 jobs:
-  call_workflow:
-    name: Run Release Workflow
-    if: ${{ github.repository_owner == 'ballerina-platform' }}
-    uses: ballerina-platform/ballerina-library/.github/workflows/release-package-template.yml@main
-    secrets: inherit
-    with:
-      package-name: tool_scan
-      package-org: ballerina
+  publish_release:
+    name: Publish release
+    runs-on: ubuntu-latest
+
+    if: github.repository_owner == 'ballerina-platform'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: 'temurin'
+          java-version: '21.0.6'
+
+      - name: Set version env variable
+        run: echo "VERSION=$((grep -w "version" | cut -d= -f2) < gradle.properties | rev | cut --complement -d- -f1 | rev)" >> $GITHUB_ENV
+
+      - name: Pre release dependency version update
+        env:
+          GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
+        run: |
+          echo "Version: ${VERSION}"
+          git config --global user.name ${{ secrets.BALLERINA_BOT_USERNAME }}
+          git config --global user.email ${{ secrets.BALLERINA_BOT_EMAIL }}
+          git checkout -b release-${VERSION}
+          sed -i 's/ballerinaLangVersion=\(.*\)-SNAPSHOT/ballerinaLangVersion=\1/g' gradle.properties
+          sed -i 's/ballerinaLangVersion=\(.*\)-[0-9]\{8\}-[0-9]\{6\}-.*$/ballerinaLangVersion=\1/g' gradle.properties
+          git add gradle.properties
+          git commit -m "Move dependencies to stable version" || echo "No changes to commit"
+
+      - name: Publish artifact
+        env:
+          GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
+          BALLERINA_STAGE_CENTRAL: false
+          BALLERINA_CENTRAL_ACCESS_TOKEN: ${{ secrets.BALLERINA_CENTRAL_ACCESS_TOKEN }}
+          packageUser: ${{ secrets.BALLERINA_BOT_USERNAME }}
+          packagePAT: ${{ secrets.BALLERINA_BOT_TOKEN }}
+          publishUser: ${{ secrets.BALLERINA_BOT_USERNAME }}
+          publishPAT: ${{ secrets.BALLERINA_BOT_TOKEN }}
+        run: |
+          ./gradlew clean release -Prelease.useAutomaticVersion=true
+          ./gradlew publish -Pversion=${VERSION}
+
+      - name: GitHub Release and Release Sync PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
+        run: |
+          gh release create v$VERSION --title "scan-tool-v$VERSION"
+          gh pr create --base ${GITHUB_REF##*/} --title "[Automated] Sync ${GITHUB_REF##*/} after $VERSION release" --body "Sync ${GITHUB_REF##*/} after $VERSION release"
