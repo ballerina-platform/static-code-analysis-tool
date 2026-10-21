@@ -29,7 +29,7 @@ All options are optional. Rule filters and platforms can also be configured in a
 | `--include-rules=<rule1, ...>` | Run analysis for a specific set of rules. By default, all available rules are included. |
 | `--exclude-rules=<rule1, ...>` | Exclude analysis for a specific set of rules. By default, no rules are excluded. |
 | `--platforms=<platformName1, ...>` | Define platform(s) to report results to. More than one platform can be defined. By default, results are not reported to any platform. |
-| `--ignore-suppressions` | Disregard `@scan:Suppress` annotations and report every issue, to audit the unsuppressed results. Rule inclusion and exclusion still apply. See [Suppressing issues](#suppressing-issues). |
+| `--ignore-suppressions` | Disregard `@scan:Suppress` annotations and report every issue, to audit the unsuppressed results. Rule inclusion and exclusion still apply. Same as `enabled = false` in `Scan.toml`. See [Suppressing issues](#suppressing-issues). |
 | `--require-suppression-reason` | Fail the scan when a `@scan:Suppress` annotation does not give a reason. Same as `requireReason = true` in `Scan.toml`. |
 | `--require-suppression-rule-id` | Fail the scan when a `@scan:Suppress` annotation does not name the rules it suppresses. Same as `requireRuleId = true` in `Scan.toml`. |
 
@@ -192,10 +192,11 @@ include = ["ballerina:1", "ballerina/io:101"]
 name = "sonarqube"
 path = "path/to/sonar_platform_plugin.jar"
 
-# Requirements for @scan:Suppress annotations (same as --require-suppression-reason and --require-suppression-rule-id)
+# How @scan:Suppress annotations are applied
 [suppression]
-requireReason = true
-requireRuleId = true
+enabled = true        # false reports every issue, same as --ignore-suppressions
+requireReason = true  # same as --require-suppression-reason
+requireRuleId = true  # same as --require-suppression-rule-id
 ```
 
 Rules specified in `Scan.toml` are combined with those passed via `--include-rules` and `--exclude-rules`. Including and excluding rules at the same time is not allowed.
@@ -221,7 +222,7 @@ string hashed = check crypto:hashBcrypt(password, 4);
 - **Results.** Suppressed issues are not printed to the console, included in the HTML report, or sent to platforms, and the console prints a summary such as `3 issue(s), 2 suppressed`. They remain in the saved JSON and SARIF reports with a `suppressions` entry of kind `inSource` carrying the reason, so every accepted issue stays reviewable.
 - **Unmatched suppressions.** A suppression that matches no issue is reported as a warning, for example when the issue was fixed or the rule is excluded.
 - **Requirements.** A project can require every suppression to give a reason or name its rules, with `requireReason` and `requireRuleId` in the `[suppression]` table of `Scan.toml`, or with the matching command-line options. A suppression that does not meet a requirement still applies, but the scan fails.
-- **Audit.** `--ignore-suppressions` reports every issue as though no suppression existed.
+- **Audit.** `--ignore-suppressions` reports every issue as though no suppression existed. To disregard suppressions for every run of a project, for example from a shared `Scan.toml`, set `enabled = false` in the `[suppression]` table.
 
 ## Rules
 

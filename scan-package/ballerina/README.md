@@ -26,12 +26,13 @@ A finding inside a statement that is not a declaration can be suppressed by turn
 
 The package's compiler plugin checks each rule ID against the rules `bal scan` can report for the importing package: the core rules of the scan tool, and the rules of each direct dependency's analyzer. An unknown rule is a compile error. A rule of an analyzer declared only in `Scan.toml` is reported as a warning during `bal build`, and is checked strictly when `bal scan` runs.
 
-### Requiring a reason or a rule ID
+### Configuration
 
-Both fields are optional by default. A project can require them in `Scan.toml`; `bal scan` then fails when a suppression does not meet the requirement:
+Both fields are optional by default. A project can require them in `Scan.toml`, in which case `bal scan` fails when a suppression does not meet the requirement, or disable suppressions altogether so that every finding is reported:
 
 ```toml
 [suppression]
+enabled = true
 requireReason = true
 requireRuleId = true
 ```

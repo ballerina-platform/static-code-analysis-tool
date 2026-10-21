@@ -39,7 +39,8 @@ OPTIONS
 
         --ignore-suppressions
                 Disregard @scan:Suppress annotations and report every issue, to audit the unsuppressed
-                results. Rule inclusion and exclusion still apply.
+                results. Rule inclusion and exclusion still apply. Equivalent to 'enabled = false' in the
+                [suppression] table of Scan.toml.
 
         --require-suppression-reason
                 Fail the scan when a @scan:Suppress annotation does not give a reason. Equivalent to

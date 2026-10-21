@@ -31,12 +31,12 @@ import io.ballerina.scan.utils.ScanTomlFile;
 record SuppressionOptions(boolean ignoreSuppressions, boolean requireReason, boolean requireRuleId) {
 
     /**
-     * Combines the scan configuration with the command-line options. A command-line option can switch a
-     * requirement on for a single run, but not off.
+     * Combines the scan configuration with the command-line options. A command-line option can disable
+     * suppressions or switch a requirement on for a single run, but cannot undo the scan configuration.
      */
     static SuppressionOptions of(ScanTomlFile scanTomlFile, boolean ignoreSuppressions, boolean requireReason,
                                  boolean requireRuleId) {
-        return new SuppressionOptions(ignoreSuppressions,
+        return new SuppressionOptions(ignoreSuppressions || !scanTomlFile.isSuppressionEnabled(),
                 requireReason || scanTomlFile.isSuppressionReasonRequired(),
                 requireRuleId || scanTomlFile.isSuppressionRuleIdRequired());
     }

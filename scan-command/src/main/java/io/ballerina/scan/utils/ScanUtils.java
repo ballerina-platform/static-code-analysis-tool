@@ -146,6 +146,7 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SCANNED_FILES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ZIP_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_TABLE;
 import static io.ballerina.scan.utils.Constants.SUPPRESSIONS;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_ENABLED;
 import static io.ballerina.scan.utils.Constants.SUPPRESSION_JUSTIFICATION;
 import static io.ballerina.scan.utils.Constants.SUPPRESSION_KIND;
 import static io.ballerina.scan.utils.Constants.SUPPRESSION_KIND_IN_SOURCE;
@@ -987,6 +988,7 @@ public final class ScanUtils {
             ruleTable.get("exclude").ifPresent(loadRules(scanTomlFile, false));
         });
         scanTomlDocumentContent.getTable(SUPPRESSION_TABLE).ifPresent(suppressionTable -> {
+            scanTomlFile.setSuppressionEnabled(!isFalse(suppressionTable, SUPPRESSION_ENABLED));
             scanTomlFile.setSuppressionReasonRequired(isTrue(suppressionTable, SUPPRESSION_REQUIRE_REASON));
             scanTomlFile.setSuppressionRuleIdRequired(isTrue(suppressionTable, SUPPRESSION_REQUIRE_RULE_ID));
         });
@@ -1096,6 +1098,10 @@ public final class ScanUtils {
 
     private static boolean isTrue(Toml table, String key) {
         return table.get(key).map(TomlValueNode::toNativeValue).map(Boolean.TRUE::equals).orElse(false);
+    }
+
+    private static boolean isFalse(Toml table, String key) {
+        return table.get(key).map(TomlValueNode::toNativeValue).map(Boolean.FALSE::equals).orElse(false);
     }
 
     /**

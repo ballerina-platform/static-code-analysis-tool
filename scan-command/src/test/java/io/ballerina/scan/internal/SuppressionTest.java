@@ -55,11 +55,13 @@ public class SuppressionTest extends BaseTest {
             .resolve("bal-project-with-invalid-suppressions");
     private final Path analyzerSuppressionsProject = testResources.resolve("test-resources")
             .resolve("bal-project-with-analyzer-suppressions");
+    private final Path disabledSuppressionsProject = testResources.resolve("test-resources")
+            .resolve("bal-project-with-disabled-suppressions");
 
     @AfterClass
     void cleanup() {
         for (Path project : List.of(suppressionsProject, requirementsProject, invalidSuppressionsProject,
-                analyzerSuppressionsProject)) {
+                analyzerSuppressionsProject, disabledSuppressionsProject)) {
             Path target = project.resolve("target");
             if (Files.exists(target)) {
                 ProjectUtils.deleteDirectory(target);
@@ -143,6 +145,23 @@ public class SuppressionTest extends BaseTest {
         Assert.assertFalse(console.contains("suppressed"));
         Assert.assertFalse(console.contains("did not match any issue"),
                 "the audit run does not report unmatched suppressions");
+    }
+
+    @Test(description = "test suppressions disabled in Scan.toml report every issue as active")
+    void testSuppressionsDisabledInScanToml() throws IOException {
+        String console = runScan(disabledSuppressionsProject);
+
+        JsonArray issues = readReport(disabledSuppressionsProject, "scan_results.json").getAsJsonArray();
+        Assert.assertEquals(issues.size(), 3);
+        issues.forEach(issue -> Assert.assertFalse(issue.getAsJsonObject().has("suppressions")));
+        Assert.assertFalse(console.contains("suppressed"));
+        Assert.assertFalse(console.contains("did not match any issue"));
+
+        String response = ScanLanguageServerTool.runScan(disabledSuppressionsProject.toAbsolutePath().toString(),
+                Map.of());
+        JsonObject result = JsonParser.parseString(response).getAsJsonObject();
+        Assert.assertEquals(result.getAsJsonArray("activeIssues").size(), 3, response);
+        Assert.assertEquals(result.getAsJsonArray("suppressedIssues").size(), 0);
     }
 
     @Test(description = "test a suppression of an excluded rule is reported as unmatched")

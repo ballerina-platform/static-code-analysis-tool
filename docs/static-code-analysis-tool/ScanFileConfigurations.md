@@ -96,15 +96,17 @@ exclude = ["ballerina:101", "ballerina/io:101"]
 
 # Configuration for Suppressions
 
-Issues can be accepted in the source with the `@scan:Suppress` annotation from the `ballerina/scan` package. By default, a suppression may omit both its reason and its rule list. Users can require either of them by defining the `[suppression]` table in a `Scan.toml` file:
+Issues can be accepted in the source with the `@scan:Suppress` annotation from the `ballerina/scan` package. Users can control how suppressions are applied by defining the `[suppression]` table in a `Scan.toml` file:
 
 ```toml
 [suppression]
+enabled = true
 requireReason = true
 requireRuleId = true
 ```
 
-- `requireReason` - Fail the scan when a suppression does not give a reason. Same as `--require-suppression-reason`.
-- `requireRuleId` - Fail the scan when a suppression does not name the rules it suppresses. Same as `--require-suppression-rule-id`.
+- `enabled` - Apply `@scan:Suppress` annotations. Defaults to `true`. When `false`, every issue is reported as though no suppression existed, as `--ignore-suppressions` does for a single run; this suits a shared `Scan.toml` that must always show the unsuppressed results.
+- `requireReason` - Fail the scan when a suppression does not give a reason. Defaults to `false`. Same as `--require-suppression-reason`.
+- `requireRuleId` - Fail the scan when a suppression does not name the rules it suppresses. Defaults to `false`. Same as `--require-suppression-rule-id`.
 
-Both default to `false`. A suppression that does not meet a requirement still suppresses its issue; the scan fails and reports the suppression's location.
+A suppression that does not meet a requirement still suppresses its issue; the scan fails and reports the suppression's location. The command-line options can disable suppressions or switch a requirement on for a single run, but cannot undo the `Scan.toml` settings.

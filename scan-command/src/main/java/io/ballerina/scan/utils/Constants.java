@@ -86,6 +86,7 @@ public class Constants {
     static final String SUPPRESSION_STATUS = "status";
     static final String SUPPRESSION_STATUS_ACCEPTED = "accepted";
     static final String SUPPRESSION_JUSTIFICATION = "justification";
+    static final String SUPPRESSION_ENABLED = "enabled";
     static final String SUPPRESSION_REQUIRE_REASON = "requireReason";
     static final String SUPPRESSION_REQUIRE_RULE_ID = "requireRuleId";
     static final String EXCLUDE_KEY = "exclude";
