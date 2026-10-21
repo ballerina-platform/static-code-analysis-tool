@@ -60,8 +60,9 @@ import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.utils.Constants;
 import io.ballerina.tools.diagnostics.Location;
 import io.ballerina.tools.text.LinePosition;
+import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextDocument;
-import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
+import io.ballerina.tools.text.TextRange;
 
 import java.util.List;
 import java.util.Optional;
@@ -517,8 +518,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
         int endOffset = node.textRange().endOffset();
         LinePosition start = textDocument.linePositionFrom(startOffset);
         LinePosition end = textDocument.linePositionFrom(endOffset);
-        return new BLangDiagnosticLocation(node.lineRange().fileName(), start.line(), end.line(), start.offset(),
-                end.offset(), startOffset, endOffset - startOffset);
+        return new SourceLocation(LineRange.from(node.lineRange().fileName(), start, end),
+                TextRange.from(startOffset, endOffset - startOffset));
     }
 
     private boolean isUnusedNode(Node node) {
