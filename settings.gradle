@@ -25,7 +25,7 @@ pluginManagement {
         id 'com.github.spotbugs' version "${spotbugsPluginVersion}"
         id 'de.undercouch.download' version "${downloadPluginVersion}"
         id "net.researchgate.release" version "${releasePluginVersion}"
-        id "com.gradle.enterprise" version "${enterprisePluginVersion}"
+        id "com.gradle.develocity" version "${develocityPluginVersion}"
     }
 }
 
@@ -42,10 +42,10 @@ include 'test-compiler-plugins:invalid-rulekind-plugin'
 include 'test-static-code-analysis-platform-plugins:exampleOrg-static-code-analysis-platform-plugin'
 
 if (gradle.startParameter.buildScan) {
-    gradleEnterprise {
+    develocity {
         buildScan {
-            termsOfServiceUrl = 'https://gradle.com/terms-of-service'
-            termsOfServiceAgree = 'yes'
+            termsOfUseUrl = 'https://gradle.com/help/legal-terms-of-use'
+            termsOfUseAgree = 'yes'
         }
     }
 }

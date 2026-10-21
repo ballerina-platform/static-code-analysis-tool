@@ -92,7 +92,7 @@ public final class CoreRuleOutputTest extends BaseTest {
     }
 
     @Test(description = "test that standards-derived tags are present in the SARIF output but not in tags")
-    void testStandardsDerivedTagsInSarifOutput() throws Exception {
+    void testStandardsDerivedTagsInSarifOutput() {
         Project project = ProjectLoader.load(balProject).project();
         Issue issue = new IssueImpl(location, CoreRule.AVOID_CHECKPANIC.rule(), Source.BUILT_IN, "main.bal",
                 balProject.resolve("main.bal").toString());
@@ -111,7 +111,7 @@ public final class CoreRuleOutputTest extends BaseTest {
     }
 
     @Test(description = "test that a rule with no severity falls back to the RuleKind-based SARIF level")
-    void testMissingSeverityFallsBackToRuleKindLevel() throws Exception {
+    void testMissingSeverityFallsBackToRuleKindLevel() {
         Project project = ProjectLoader.load(balProject).project();
         Rule externalRule = RuleFactory.createRule(101, "external rule 101", RuleKind.BUG);
         Issue issue = new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
@@ -126,7 +126,7 @@ public final class CoreRuleOutputTest extends BaseTest {
     @Test(description = "test that a rule created via the basic (no rich metadata) API does not duplicate its "
             + "description into a redundant SARIF fullDescription, nor into a \"name\" field in the Ballerina "
             + "JSON output")
-    void testBasicRuleOmitsFullDescriptionAndNameWhenNotAuthored() throws Exception {
+    void testBasicRuleOmitsFullDescriptionAndNameWhenNotAuthored() {
         Project project = ProjectLoader.load(balProject).project();
         Rule externalRule = RuleFactory.createRule(101, "external rule 101", RuleKind.BUG, "exampleOrg",
                 "exampleModule");

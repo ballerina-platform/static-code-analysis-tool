@@ -1,10 +1,10 @@
 name: Full Build
 
+# Pull requests are built by the shared PR build workflow in pull-request.yml
 on:
   push:
     branches:
       - main
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -25,11 +25,6 @@ jobs:
           distribution: 'temurin'
           java-version: '21.0.6'
 
-      - name: Set Up Ballerina
-        uses: ballerina-platform/setup-ballerina@585120e3f0e540bf127376ee6e75d39e8ce6aaa4 # v1.1.5
-        with:
-          version: 2201.13.2
-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -37,7 +32,7 @@ jobs:
         env:
           packageUser: ${{ github.actor }}
           packagePAT: ${{ secrets.GITHUB_TOKEN }}
-        run: unset BALLERINA_HOME && ./gradlew build --scan
+        run: ./gradlew build --scan
 
       - name: Generate Jacoco report
         run: ./gradlew createCodeCoverageReport
@@ -46,7 +41,7 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./.jacoco/reports/jacoco/report.xml
+          files: ./scan-command/build/reports/jacoco/report.xml
 
   windows_build:
     name: Build on Windows with tests
@@ -65,13 +60,8 @@ jobs:
           distribution: 'temurin'
           java-version: '21.0.6'
 
-      - name: Set Up Ballerina
-        uses: ballerina-platform/setup-ballerina@585120e3f0e540bf127376ee6e75d39e8ce6aaa4 # v1.1.5
-        with:
-          version: 2201.13.2
-
       - name: Build with Gradle
         env:
           packageUser: ${{ github.actor }}
           packagePAT: ${{ secrets.GITHUB_TOKEN }}
-        run: Remove-Item Env:BALLERINA_HOME -ErrorAction SilentlyContinue;  ./gradlew build --scan
+        run: ./gradlew build --scan

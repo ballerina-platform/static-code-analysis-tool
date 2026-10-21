@@ -12,50 +12,10 @@ on:
           - STAGE CENTRAL
 
 jobs:
-  central_publish:
-    name: Run DEV/STAGE central publish workflow
-    runs-on: ubuntu-latest
-
-    if: github.repository_owner == 'ballerina-platform'
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: 'temurin'
-          java-version: '21.0.6'
-
-      - name: Set Up Ballerina
-        uses: ballerina-platform/setup-ballerina@585120e3f0e540bf127376ee6e75d39e8ce6aaa4 # v1.1.5
-        with:
-          version: 2201.13.2
-
-      - name: Build with Gradle
-        env:
-          packageUser: ${{ github.actor }}
-          packagePAT: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew build --scan
-
-      - name: Ballerina Central Dev Push
-        if: ${{ inputs.environment == 'DEV CENTRAL' }}
-        env:
-          BALLERINA_DEV_CENTRAL: true
-          BALLERINA_STAGE_CENTRAL: false
-          BALLERINA_CENTRAL_ACCESS_TOKEN: ${{ secrets.BALLERINA_CENTRAL_DEV_ACCESS_TOKEN }}
-          packageUser: ${{ secrets.BALLERINA_BOT_USERNAME }}
-          packagePAT: ${{ secrets.BALLERINA_BOT_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
-        run: ./gradlew publishScanPackage
-
-      - name: Ballerina Central Stage Push
-        if: ${{ inputs.environment == 'STAGE CENTRAL' }}
-        env:
-          BALLERINA_DEV_CENTRAL: false
-          BALLERINA_STAGE_CENTRAL: true
-          BALLERINA_CENTRAL_ACCESS_TOKEN: ${{ secrets.BALLERINA_CENTRAL_STAGE_ACCESS_TOKEN }}
-          packageUser: ${{ secrets.BALLERINA_BOT_USERNAME }}
-          packagePAT: ${{ secrets.BALLERINA_BOT_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
-        run: ./gradlew publishScanPackage
+  call_workflow:
+    name: Run Central Publish Workflow
+    if: ${{ github.repository_owner == 'ballerina-platform' }}
+    uses: ballerina-platform/ballerina-library/.github/workflows/central-publish-template.yml@main
+    secrets: inherit
+    with:
+      environment: ${{ github.event.inputs.environment }}
