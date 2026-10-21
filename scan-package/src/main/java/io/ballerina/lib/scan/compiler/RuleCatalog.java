@@ -23,21 +23,24 @@ import com.google.gson.JsonParser;
 import io.ballerina.projects.Package;
 import io.ballerina.projects.PackageDependencyScope;
 import io.ballerina.projects.PackageManifest;
+import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.ResolvedPackageDependency;
-import io.ballerina.projects.internal.model.CompilerPluginDescriptor;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.jar.JarFile;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 
 /**
@@ -51,6 +54,10 @@ final class RuleCatalog {
 
     static final String CORE_PROVIDER = "ballerina";
     private static final String PLUGIN_RULES_FILE = "rules.json";
+    private static final String BALA_PLUGIN_DIRECTORY = "compiler-plugin";
+    private static final String BALA_PLUGIN_LIBS_DIRECTORY = "libs";
+    private static final String PLUGIN_TOML_DEPENDENCY = "dependency";
+    private static final String PLUGIN_TOML_PATH = "path";
     private static final String RULE_ID_FIELD = "id";
 
     private final Map<String, Set<Integer>> rulesByProvider;
@@ -64,8 +71,9 @@ final class RuleCatalog {
         ResolvedPackageDependency root = new ResolvedPackageDependency(currentPackage, PackageDependencyScope.DEFAULT);
         for (ResolvedPackageDependency dependency : currentPackage.getResolution().dependencyGraph()
                 .getDirectDependencies(root)) {
-            PackageManifest manifest = dependency.packageInstance().manifest();
-            manifest.compilerPluginDescriptor().flatMap(RuleCatalog::readPluginRules).ifPresent(rules ->
+            Package dependencyPackage = dependency.packageInstance();
+            PackageManifest manifest = dependencyPackage.manifest();
+            readPluginRules(pluginJars(dependencyPackage)).ifPresent(rules ->
                     rulesByProvider.put(manifest.org().value() + "/" + manifest.name().value(), rules));
         }
         return new RuleCatalog(rulesByProvider);
@@ -82,9 +90,36 @@ final class RuleCatalog {
         return Optional.ofNullable(rulesByProvider.get(provider));
     }
 
-    private static Optional<Set<Integer>> readPluginRules(CompilerPluginDescriptor descriptor) {
-        for (CompilerPluginDescriptor.Dependency jar : descriptor.dependencies()) {
-            try (JarFile jarFile = new JarFile(Path.of(jar.getPath()).toFile())) {
+    // A bala keeps its compiler plugin's jars under compiler-plugin/libs; a source package lists them in
+    // CompilerPlugin.toml, relative to the package root.
+    private static List<Path> pluginJars(Package dependency) {
+        Path packageRoot = dependency.project().sourceRoot();
+        if (dependency.project().kind() == ProjectKind.BALA_PROJECT) {
+            Path libs = packageRoot.resolve(BALA_PLUGIN_DIRECTORY).resolve(BALA_PLUGIN_LIBS_DIRECTORY);
+            if (!Files.isDirectory(libs)) {
+                return List.of();
+            }
+            try (Stream<Path> jars = Files.list(libs)) {
+                return jars.filter(jar -> jar.toString().endsWith(".jar")).sorted().toList();
+            } catch (IOException e) {
+                return List.of();
+            }
+        }
+        return dependency.compilerPluginToml()
+                .map(toml -> toml.tomlAstNode().toNativeObject().get(PLUGIN_TOML_DEPENDENCY))
+                .filter(List.class::isInstance)
+                .map(entries -> ((List<?>) entries).stream()
+                        .filter(Map.class::isInstance)
+                        .map(entry -> ((Map<?, ?>) entry).get(PLUGIN_TOML_PATH))
+                        .filter(String.class::isInstance)
+                        .map(path -> packageRoot.resolve((String) path).normalize())
+                        .toList())
+                .orElse(List.of());
+    }
+
+    private static Optional<Set<Integer>> readPluginRules(List<Path> jars) {
+        for (Path jar : jars) {
+            try (JarFile jarFile = new JarFile(jar.toFile())) {
                 ZipEntry entry = jarFile.getEntry(PLUGIN_RULES_FILE);
                 if (entry != null) {
                     return Optional.of(parseRuleIds(jarFile.getInputStream(entry)));
