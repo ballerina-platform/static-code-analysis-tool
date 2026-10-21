@@ -95,3 +95,12 @@ function testIncludedParams2(*IncludedRecord includedRecordParam) {
 isolated function externHasKey(string key) returns boolean = @java:Method {
     'class: "io.ballerina.stdlib.cache.nativeimpl.Cache"
 } external;
+
+type ParamMeta record {|
+    string note;
+|};
+
+annotation ParamMeta Info on parameter;
+
+function test15(int a, @Info {note: "x"} int b, @Info {note: "y"} int c = 3, @Info {note: "z"} int... d) // warning * 3
+    returns int => a;
