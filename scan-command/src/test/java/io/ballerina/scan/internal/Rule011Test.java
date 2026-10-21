@@ -42,7 +42,7 @@ public class Rule011Test extends StaticCodeAnalyzerTest {
                 document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 5);
+        Assert.assertEquals(issues.size(), 8);
         assertIssue(issues.get(0), documentName, 17, 4, 17, 26, "ballerina:11", 11,
                 UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
         assertIssue(issues.get(1), documentName, 23, 4, 23, 26, "ballerina:11", 11,
@@ -52,6 +52,12 @@ public class Rule011Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(3), documentName, 33, 4, 33, 30, "ballerina:11", 11,
                 UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
         assertIssue(issues.get(4), documentName, 75, 4, 75, 26, "ballerina:11", 11,
+                UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(5), documentName, 96, 4, 96, 26, "ballerina:11", 11,
+                UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(6), documentName, 98, 4, 98, 32, "ballerina:11", 11,
+                UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(7), documentName, 101, 4, 101, 22, "ballerina:11", 11,
                 UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
     }
 }
