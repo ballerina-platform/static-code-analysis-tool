@@ -25,3 +25,12 @@ public function main() {
 }
 
 const RULES = ["ballerina:1"];
+
+function shorthand() {
+    @scan:Suppress {rules, reason}
+    int value = checkpanic int:fromString("3");
+    _ = value;
+}
+
+const rules = ["ballerina:7"];
+const reason = "Shorthand fields";

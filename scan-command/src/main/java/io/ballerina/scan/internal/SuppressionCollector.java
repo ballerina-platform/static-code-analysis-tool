@@ -25,7 +25,7 @@ import io.ballerina.compiler.api.values.ConstantValue;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
-import io.ballerina.compiler.syntax.tree.ExpressionNode;
+import io.ballerina.compiler.syntax.tree.DistinctTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.MappingFieldNode;
 import io.ballerina.compiler.syntax.tree.MetadataNode;
@@ -141,11 +141,12 @@ final class SuppressionCollector {
         String reason = null;
         if (annotation.annotValue().isPresent()) {
             for (MappingFieldNode field : annotation.annotValue().get().fields()) {
-                if (!(field instanceof SpecificFieldNode specific) || specific.valueExpr().isEmpty()) {
+                if (!(field instanceof SpecificFieldNode specific)) {
                     continue;
                 }
-                String name = specific.fieldName().toSourceCode().trim();
-                ExpressionNode value = specific.valueExpr().get();
+                String name = fieldName(specific);
+                // A shorthand field such as `{rules}` takes the value of the constant its name refers to
+                Node value = specific.valueExpr().map(Node.class::cast).orElse(specific.fieldName());
                 if (RULES_FIELD.equals(name)) {
                     rules = new ArrayList<>();
                     resolveRules(semanticModel, value, rules, unresolvedRules);
@@ -159,7 +160,7 @@ final class SuppressionCollector {
                 rules == null ? List.of() : rules, unresolvedRules, reason);
     }
 
-    private static void resolveRules(SemanticModel semanticModel, ExpressionNode value, List<String> rules,
+    private static void resolveRules(SemanticModel semanticModel, Node value, List<String> rules,
                                      List<String> unresolvedRules) {
         if (value instanceof ListConstructorExpressionNode list) {
             list.expressions().forEach(rule -> stringValue(semanticModel, rule)
@@ -174,9 +175,7 @@ final class SuppressionCollector {
         Iterable<Node> members = switch (construct) {
             case ServiceDeclarationNode service -> service.members();
             case ClassDefinitionNode classDefinition -> classDefinition.members();
-            case TypeDefinitionNode typeDefinition
-                    when typeDefinition.typeDescriptor() instanceof ObjectTypeDescriptorNode objectType ->
-                    objectType.members();
+            case TypeDefinitionNode typeDefinition -> objectTypeMembers(typeDefinition.typeDescriptor());
             default -> List.of();
         };
         List<LineRange> ranges = new ArrayList<>();
@@ -184,10 +183,32 @@ final class SuppressionCollector {
         return ranges;
     }
 
+    private static Iterable<Node> objectTypeMembers(Node typeDescriptor) {
+        return switch (typeDescriptor) {
+            case ObjectTypeDescriptorNode objectType -> objectType.members();
+            case DistinctTypeDescriptorNode distinctType -> objectTypeMembers(distinctType.typeDescriptor());
+            default -> List.of();
+        };
+    }
+
+    // `rules`, `'rules` and `"rules"` all name the same field
+    private static String fieldName(SpecificFieldNode field) {
+        Node name = field.fieldName();
+        if (name.kind() == SyntaxKind.STRING_LITERAL) {
+            return literalText((BasicLiteralNode) name);
+        }
+        String text = name.toSourceCode().trim();
+        return text.startsWith("'") ? text.substring(1) : text;
+    }
+
+    private static String literalText(BasicLiteralNode literal) {
+        String text = literal.literalToken().text();
+        return text.substring(1, text.length() - 1);
+    }
+
     private static Optional<String> stringValue(SemanticModel semanticModel, Node expression) {
         if (expression.kind() == SyntaxKind.STRING_LITERAL) {
-            String text = ((BasicLiteralNode) expression).literalToken().text();
-            return Optional.of(text.substring(1, text.length() - 1));
+            return Optional.of(literalText((BasicLiteralNode) expression));
         }
         return constantValue(semanticModel, expression).filter(String.class::isInstance).map(String.class::cast);
     }

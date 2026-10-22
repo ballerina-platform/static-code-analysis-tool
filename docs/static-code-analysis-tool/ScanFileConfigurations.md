@@ -109,4 +109,4 @@ requireRuleId = true
 - `requireReason` - Fail the scan when a suppression does not give a reason. Defaults to `false`. Same as `--require-suppression-reason`.
 - `requireRuleId` - Fail the scan when a suppression does not name the rules it suppresses. Defaults to `false`. Same as `--require-suppression-rule-id`.
 
-A suppression that does not meet a requirement still suppresses its issue; the scan fails and reports the suppression's location. The command-line options can disable suppressions or switch a requirement on for a single run, but cannot undo the `Scan.toml` settings.
+Each setting must be a TOML boolean; a value such as `"true"` stops the scan with an error. A suppression that does not meet a requirement still suppresses its issue; the scan fails and reports the suppression's location. The command-line options can disable suppressions or switch a requirement on for a single run, but cannot undo the `Scan.toml` settings.

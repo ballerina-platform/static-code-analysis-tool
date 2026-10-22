@@ -90,8 +90,7 @@ public class ScanLanguageServerTool {
                 JsonObject errorObject = new JsonObject();
                 errorObject.addProperty("success", false);
                 errorObject.addProperty("error", "Dependent Package Scan Error: " + errorMsg);
-                errorObject.add("activeIssues", new JsonArray());
-                errorObject.add("excludedIssues", new JsonArray());
+                addEmptyIssueArrays(errorObject);
                 return GSON.toJson(errorObject);
             }
 
@@ -110,8 +109,7 @@ public class ScanLanguageServerTool {
             errorObject.addProperty("success", false);
             String errorMsg = e.getMessage();
             errorObject.addProperty("error", errorMsg != null && !errorMsg.trim().isEmpty() ? errorMsg : e.toString());
-            errorObject.add("activeIssues", new JsonArray());
-            errorObject.add("excludedIssues", new JsonArray());
+            addEmptyIssueArrays(errorObject);
             return GSON.toJson(errorObject);
         }
     }
@@ -357,7 +355,9 @@ public class ScanLanguageServerTool {
         }
 
         // The same suppression filter as the command line, applied after rule selection as it is there
-        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, activeIssues,
+        List<Rule> projectRules = new ArrayList<>(coreRules);
+        externalAnalyzers.values().forEach(projectRules::addAll);
+        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, activeIssues, projectRules,
                 SuppressionOptions.of(scanToml, false, false, false));
         return new LsScanResult(new ScanResult(suppressionOutcome.activeIssues(), excludedIssues,
                 suppressionOutcome.suppressedIssues()), suppressionOutcome.diagnostics());
@@ -386,6 +386,13 @@ public class ScanLanguageServerTool {
             jsonArray.add(obj);
         }
         return jsonArray;
+    }
+
+    private static void addEmptyIssueArrays(JsonObject errorObject) {
+        errorObject.add("activeIssues", new JsonArray());
+        errorObject.add("excludedIssues", new JsonArray());
+        errorObject.add("suppressedIssues", new JsonArray());
+        errorObject.add("suppressionDiagnostics", new JsonArray());
     }
 
     private static JsonArray suppressedIssuesToJsonArray(List<SuppressedIssue> suppressedIssues) {

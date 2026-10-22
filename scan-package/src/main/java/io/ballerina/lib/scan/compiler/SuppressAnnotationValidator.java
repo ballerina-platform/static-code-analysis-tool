@@ -24,7 +24,6 @@ import io.ballerina.compiler.api.symbols.ConstantSymbol;
 import io.ballerina.compiler.api.values.ConstantValue;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
-import io.ballerina.compiler.syntax.tree.ExpressionNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.MappingFieldNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
@@ -45,13 +44,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * Checks that each rule named in a {@code @scan:Suppress} annotation is one {@code bal scan} can report for the
- * package being compiled.
+ * Checks the form of each {@code @scan:Suppress} annotation: that every rule ID is well formed and listed once, and
+ * that the reason is not blank. Whether a rule exists is checked by {@code bal scan}, which knows the rules of the
+ * scan tool and analyzers it runs.
  *
  * @since 1.0.0
  */
@@ -62,23 +61,22 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
     private static final String ANNOTATION_NAME = "Suppress";
     private static final String RULES_FIELD = "rules";
     private static final String REASON_FIELD = "reason";
-    private static final Pattern RULE_ID = Pattern.compile("^(ballerina|[A-Za-z0-9_.]+/[A-Za-z0-9_.]+):([1-9][0-9]*)$");
+    private static final Pattern RULE_ID = Pattern.compile("^(ballerina|[A-Za-z0-9_.]+/[A-Za-z0-9_.]+):[1-9][0-9]*$");
 
     @Override
     public void perform(CompilationAnalysisContext context) {
         Package currentPackage = context.currentPackage();
-        LazyCatalog catalog = new LazyCatalog(currentPackage);
         for (ModuleId moduleId : currentPackage.moduleIds()) {
             Module module = currentPackage.module(moduleId);
             SemanticModel semanticModel = context.compilation().getSemanticModel(moduleId);
             Stream.concat(module.documentIds().stream(), module.testDocumentIds().stream())
                     .map(module::document)
-                    .forEach(document -> validateDocument(context, document, semanticModel, catalog));
+                    .forEach(document -> validateDocument(context, document, semanticModel));
         }
     }
 
     private static void validateDocument(CompilationAnalysisContext context, Document document,
-                                         SemanticModel semanticModel, LazyCatalog catalog) {
+                                         SemanticModel semanticModel) {
         Node root = document.syntaxTree().rootNode();
         if (!(root instanceof ModulePartNode modulePart)) {
             return;
@@ -87,7 +85,7 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
             @Override
             public void visit(AnnotationNode annotation) {
                 if (isSuppressAnnotation(semanticModel, annotation)) {
-                    validateAnnotation(context, semanticModel, catalog, annotation);
+                    validateAnnotation(context, semanticModel, annotation);
                 }
             }
         });
@@ -103,20 +101,21 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
     }
 
     private static void validateAnnotation(CompilationAnalysisContext context, SemanticModel semanticModel,
-                                           LazyCatalog catalog, AnnotationNode annotation) {
+                                           AnnotationNode annotation) {
         if (annotation.annotValue().isEmpty()) {
             return;
         }
         for (MappingFieldNode field : annotation.annotValue().get().fields()) {
-            if (!(field instanceof SpecificFieldNode specific) || specific.valueExpr().isEmpty()) {
+            if (!(field instanceof SpecificFieldNode specific)) {
                 continue;
             }
-            String name = specific.fieldName().toSourceCode().trim();
-            ExpressionNode value = specific.valueExpr().get();
+            String name = fieldName(specific);
+            // A shorthand field such as `{rules}` takes the value of the constant its name refers to
+            Node value = specific.valueExpr().map(Node.class::cast).orElse(specific.fieldName());
             if (name.equals(RULES_FIELD) && value instanceof ListConstructorExpressionNode rules) {
-                validateRules(context, semanticModel, catalog.get(), rules);
+                validateRules(context, semanticModel, rules);
             } else if (name.equals(RULES_FIELD)) {
-                validateConstantRules(context, semanticModel, catalog.get(), value);
+                validateConstantRules(context, semanticModel, value);
             } else if (name.equals(REASON_FIELD)) {
                 stringValue(semanticModel, value).filter(String::isBlank)
                         .ifPresent(reason -> report(context, value, DiagnosticCode.BLANK_REASON));
@@ -125,7 +124,7 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
     }
 
     private static void validateRules(CompilationAnalysisContext context, SemanticModel semanticModel,
-                                      RuleCatalog catalog, ListConstructorExpressionNode rules) {
+                                      ListConstructorExpressionNode rules) {
         // `[]` compiles against the non-empty tuple type because the first member takes the string filler value
         if (rules.expressions().isEmpty()) {
             report(context, rules, DiagnosticCode.EMPTY_RULE_LIST);
@@ -138,13 +137,13 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
                 report(context, element, DiagnosticCode.UNVERIFIABLE_RULE, element.toSourceCode().trim());
                 continue;
             }
-            validateRule(context, catalog, element, ruleId.get(), seen);
+            validateRule(context, element, ruleId.get(), seen);
         }
     }
 
     // A reference to a constant list is checked as a whole; every diagnostic points at the reference.
     private static void validateConstantRules(CompilationAnalysisContext context, SemanticModel semanticModel,
-                                              RuleCatalog catalog, ExpressionNode rules) {
+                                              Node rules) {
         Optional<List<String>> ruleIds = constantStrings(semanticModel, rules);
         if (ruleIds.isEmpty()) {
             report(context, rules, DiagnosticCode.UNVERIFIABLE_RULE, rules.toSourceCode().trim());
@@ -155,37 +154,35 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
             return;
         }
         Set<String> seen = new HashSet<>();
-        ruleIds.get().forEach(id -> validateRule(context, catalog, rules, id, seen));
+        ruleIds.get().forEach(id -> validateRule(context, rules, id, seen));
     }
 
-    private static void validateRule(CompilationAnalysisContext context, RuleCatalog catalog, Node node, String id,
-                                     Set<String> seen) {
+    private static void validateRule(CompilationAnalysisContext context, Node node, String id, Set<String> seen) {
         if (!seen.add(id)) {
             report(context, node, DiagnosticCode.DUPLICATE_RULE, id);
-            return;
-        }
-        Matcher matcher = RULE_ID.matcher(id);
-        if (!matcher.matches()) {
+        } else if (!RULE_ID.matcher(id).matches()) {
             report(context, node, DiagnosticCode.INVALID_RULE_FORMAT, id);
-            return;
         }
-        String provider = matcher.group(1);
-        // Core rules ship with the scan tool, which checks them when it runs
-        if (provider.equals(RuleCatalog.CORE_PROVIDER)) {
-            return;
+    }
+
+    // `rules`, `'rules` and `"rules"` all name the same field
+    private static String fieldName(SpecificFieldNode field) {
+        Node name = field.fieldName();
+        if (name.kind() == SyntaxKind.STRING_LITERAL) {
+            return literalText((BasicLiteralNode) name);
         }
-        Optional<Set<Integer>> providerRules = catalog.rulesOf(provider);
-        if (providerRules.isEmpty()) {
-            report(context, node, DiagnosticCode.UNKNOWN_PROVIDER, id, provider);
-        } else if (!providerRules.get().contains(Integer.parseInt(matcher.group(2)))) {
-            report(context, node, DiagnosticCode.UNKNOWN_RULE, id, provider);
-        }
+        String text = name.toSourceCode().trim();
+        return text.startsWith("'") ? text.substring(1) : text;
+    }
+
+    private static String literalText(BasicLiteralNode literal) {
+        String text = literal.literalToken().text();
+        return text.substring(1, text.length() - 1);
     }
 
     private static Optional<String> stringValue(SemanticModel semanticModel, Node expression) {
         if (expression.kind() == SyntaxKind.STRING_LITERAL) {
-            String text = ((BasicLiteralNode) expression).literalToken().text();
-            return Optional.of(text.substring(1, text.length() - 1));
+            return Optional.of(literalText((BasicLiteralNode) expression));
         }
         return constantValue(semanticModel, expression).filter(String.class::isInstance).map(String.class::cast);
     }
@@ -216,24 +213,5 @@ class SuppressAnnotationValidator implements AnalysisTask<CompilationAnalysisCon
     private static void report(CompilationAnalysisContext context, Node node, DiagnosticCode code, Object... args) {
         DiagnosticInfo info = new DiagnosticInfo(code.code(), code.messageFormat(), code.severity());
         context.reportDiagnostic(DiagnosticFactory.createDiagnostic(info, node.location(), args));
-    }
-
-    /**
-     * Builds the rule catalog on first use, so a package without suppressions never reads its dependencies' rules.
-     */
-    private static final class LazyCatalog {
-        private final Package currentPackage;
-        private RuleCatalog catalog;
-
-        private LazyCatalog(Package currentPackage) {
-            this.currentPackage = currentPackage;
-        }
-
-        private RuleCatalog get() {
-            if (catalog == null) {
-                catalog = RuleCatalog.of(currentPackage);
-            }
-            return catalog;
-        }
     }
 }

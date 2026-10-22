@@ -987,12 +987,29 @@ public final class ScanUtils {
             ruleTable.get("include").ifPresent(loadRules(scanTomlFile, true));
             ruleTable.get("exclude").ifPresent(loadRules(scanTomlFile, false));
         });
-        scanTomlDocumentContent.getTable(SUPPRESSION_TABLE).ifPresent(suppressionTable -> {
-            scanTomlFile.setSuppressionEnabled(!isFalse(suppressionTable, SUPPRESSION_ENABLED));
-            scanTomlFile.setSuppressionReasonRequired(isTrue(suppressionTable, SUPPRESSION_REQUIRE_REASON));
-            scanTomlFile.setSuppressionRuleIdRequired(isTrue(suppressionTable, SUPPRESSION_REQUIRE_RULE_ID));
-        });
+        Optional<Toml> suppressionTable = scanTomlDocumentContent.getTable(SUPPRESSION_TABLE);
+        if (suppressionTable.isPresent()) {
+            Toml table = suppressionTable.get();
+            if (hasNonBooleanSetting(table, outputStream)) {
+                return Optional.empty();
+            }
+            scanTomlFile.setSuppressionEnabled(!isFalse(table, SUPPRESSION_ENABLED));
+            scanTomlFile.setSuppressionReasonRequired(isTrue(table, SUPPRESSION_REQUIRE_REASON));
+            scanTomlFile.setSuppressionRuleIdRequired(isTrue(table, SUPPRESSION_REQUIRE_RULE_ID));
+        }
         return Optional.of(scanTomlFile);
+    }
+
+    // A quoted "true" would otherwise read as unset and silently turn a requirement off.
+    private static boolean hasNonBooleanSetting(Toml suppressionTable, PrintStream outputStream) {
+        for (String key : List.of(SUPPRESSION_ENABLED, SUPPRESSION_REQUIRE_REASON, SUPPRESSION_REQUIRE_RULE_ID)) {
+            Optional<TomlValueNode> value = suppressionTable.get(key);
+            if (value.isPresent() && value.get().kind() != TomlType.BOOLEAN) {
+                outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, key));
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

@@ -24,7 +24,7 @@ A finding inside a statement that is not a declaration can be suppressed by turn
 
 ### Rule ID validation
 
-The package's compiler plugin checks each rule ID against the rules `bal scan` can report for the importing package: the core rules of the scan tool, and the rules of each direct dependency's analyzer. An unknown rule is a compile error. A rule of an analyzer declared only in `Scan.toml` is reported as a warning during `bal build`, and is checked strictly when `bal scan` runs.
+The package's compiler plugin checks the form of each rule ID during `bal build` and in the editor: a malformed ID such as `http:1` or an empty rule list is a compile error, and a duplicate rule or a blank reason is a warning. Whether a rule exists is checked when `bal scan` runs, against the core rules of the scan tool in use and the rules of every analyzer it engages; a rule that does not exist fails the scan, and a rule of an analyzer the scan does not engage is reported as a warning, since it cannot be verified.
 
 ### Configuration
 

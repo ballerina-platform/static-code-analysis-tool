@@ -162,14 +162,18 @@ public class SuppressionTest extends BaseTest {
 
     @Test(description = "test a constant rule list suppresses and a rule that does not resolve suppresses nothing")
     void testUnresolvedRulesDoNotWidenSuppression() throws IOException {
-        String console = runScan(unresolvedSuppressionsProject, "--require-suppression-rule-id");
+        String console = runScan(unresolvedSuppressionsProject, "--require-suppression-rule-id",
+                "--require-suppression-reason");
 
         JsonArray issues = readReport(unresolvedSuppressionsProject, "scan_results.json").getAsJsonArray();
-        Assert.assertEquals(issues.size(), 2);
-        Assert.assertTrue(console.contains("1 issue(s), 1 suppressed"), console);
+        Assert.assertEquals(issues.size(), 3);
+        Assert.assertTrue(console.contains("2 issue(s), 1 suppressed"), console);
         Assert.assertTrue(console.contains("WARNING [main.bal:(22:5,22:94)] suppression rule 'string `ballerina:1`' "
                 + "does not resolve to a rule ID; use a string literal or a constant"), console);
+        Assert.assertTrue(console.contains("WARNING [main.bal:(30:5,30:35)] suppression of 'ballerina:7' did not "
+                + "match any issue"), "a shorthand rules field names the rules of its constant");
         Assert.assertFalse(console.contains("suppression names no rule"), console);
+        Assert.assertFalse(console.contains("suppression has no reason"), console);
     }
 
     @Test(description = "test --ignore-suppressions reports every issue as active")
@@ -239,8 +243,8 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(console.contains("ERROR [main.bal:(22:5,22:51)] suppression names no rule"), console);
     }
 
-    @Test(description = "test the scan tool rejects a core rule it does not define")
-    void testUnknownCoreRuleFailsTheScan() throws IOException {
+    @Test(description = "test the scan tool rejects a rule it does not know")
+    void testUnknownRulesFailTheScan() throws IOException {
         System.setProperty("user.dir", unknownCoreRuleProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
@@ -251,8 +255,21 @@ public class SuppressionTest extends BaseTest {
         String console = readOutput(true);
         Assert.assertTrue(console.contains("ERROR [main.bal:(20:5,20:87)] unknown rule 'ballerina:999': "
                 + "'ballerina' does not define this rule"), console);
-        Assert.assertFalse(console.contains("suppression of 'ballerina:999' did not match"), console);
+        Assert.assertTrue(console.contains("WARNING [main.bal:(24:5,24:89)] cannot verify rule 'acme/lint:1': "
+                + "'acme/lint' provides no scan rules to this project"), console);
+        Assert.assertFalse(console.contains("did not match"), console);
         Assert.assertTrue(console.contains("0 issue(s), 1 suppressed"), console);
+    }
+
+    @Test(description = "test ignored suppressions do not fail the scan on suppression errors")
+    void testIgnoredSuppressionsDoNotFailTheScan() throws IOException {
+        String console = runScan(requirementsProject, "--ignore-suppressions");
+        Assert.assertFalse(console.contains("suppression has no reason"), console);
+        Assert.assertFalse(console.contains("suppression names no rule"), console);
+
+        console = runScan(unknownCoreRuleProject, "--ignore-suppressions");
+        Assert.assertFalse(console.contains("unknown rule 'ballerina:999'"), console);
+        Assert.assertFalse(console.contains("suppressed"), console);
     }
 
     @Test(description = "test the language server returns suppressed issues and suppression diagnostics")
@@ -283,11 +300,9 @@ public class SuppressionTest extends BaseTest {
             }
         }
 
-        // Core rule IDs are checked by the scan tool when it runs, so ballerina:999 is not reported here
+        // Whether a rule exists is checked by the scan tool when it runs, so ballerina:999 and acme/lint:1 pass
         Assert.assertEquals(diagnostics, List.of(
                 "ERROR 29 invalid rule ID 'http:1': expected 'ballerina:<number>' or '<org>/<package>:<number>'",
-                "WARNING 31 cannot verify rule 'acme/lint:1': 'acme/lint' is not a direct dependency with scan "
-                        + "rules; it is checked again when 'bal scan' runs",
                 "WARNING 33 rule 'ballerina:1' is listed more than once",
                 "WARNING 35 blank suppression reason; it is treated as absent",
                 "ERROR 37 empty rule list; omit 'rules' to suppress every rule",
@@ -298,10 +313,10 @@ public class SuppressionTest extends BaseTest {
     @Test(description = "test rules of an analyzer declared only in Scan.toml are checked when the scan runs")
     void testScanTomlAnalyzerRulesCheckedUnderScan() throws IOException {
         BuildProject project = BuildProject.load(analyzerSuppressionsProject.toAbsolutePath());
-        long buildWarnings = project.currentPackage().getCompilation().diagnosticResult().diagnostics().stream()
-                .filter(diagnostic -> diagnostic.diagnosticInfo().code().equals("SCAN_SUPPRESS_103"))
+        long buildDiagnostics = project.currentPackage().getCompilation().diagnosticResult().diagnostics().stream()
+                .filter(diagnostic -> diagnostic.diagnosticInfo().code().startsWith("SCAN_SUPPRESS_"))
                 .count();
-        Assert.assertEquals(buildWarnings, 2, "the analyzer is not a dependency of an ordinary build");
+        Assert.assertEquals(buildDiagnostics, 0, "a build checks only the form of the rule IDs");
 
         System.setProperty("user.dir", analyzerSuppressionsProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream, printStream);
@@ -311,8 +326,8 @@ public class SuppressionTest extends BaseTest {
         String console = readOutput(true);
         Assert.assertTrue(console.contains("unknown rule 'exampleOrg/example_module_static_code_analyzer:99': "
                 + "'exampleOrg/example_module_static_code_analyzer' does not define this rule"), console);
-        Assert.assertFalse(console.contains("example_module_static_code_analyzer:1'"),
-                "a rule the analyzer defines is accepted");
+        Assert.assertFalse(console.contains("unknown rule 'exampleOrg/example_module_static_code_analyzer:1'"),
+                console);
     }
 
     private String runScan(Path project, String... args) throws IOException {

@@ -140,7 +140,7 @@ public class ScanCmd implements BLauncherCmd {
     private final Set<String> allRuleIds = new HashSet<>();
     private final List<Issue> allIssues;
     private final Map<Issue, SuppressedIssue> allSuppressions = new IdentityHashMap<>();
-    private long suppressionErrors;
+    private long invalidSuppressions;
     private boolean scanningWorkspace;
 
     public ScanCmd() {
@@ -250,7 +250,7 @@ public class ScanCmd implements BLauncherCmd {
                 outputStream.println("View scan report at:");
                 outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
             }
-            failOnSuppressionErrors(suppressionErrors);
+            failOnSuppressionErrors(invalidSuppressions);
             return;
         }
         if (ProjectUtils.isProjectEmpty(project.get())) {
@@ -269,10 +269,10 @@ public class ScanCmd implements BLauncherCmd {
         throw LauncherUtils.createLauncherException(DiagnosticLog.error(DiagnosticCode.COMPILATION_CONTAINS_ERRORS));
     }
 
-    private static void failOnSuppressionErrors(long errorCount) {
-        if (errorCount > 0) {
+    private static void failOnSuppressionErrors(long invalidSuppressionCount) {
+        if (invalidSuppressionCount > 0) {
             throw LauncherUtils.createLauncherException(
-                    DiagnosticLog.error(DiagnosticCode.SUPPRESSION_REQUIREMENTS_NOT_MET, errorCount));
+                    DiagnosticLog.error(DiagnosticCode.SUPPRESSION_REQUIREMENTS_NOT_MET, invalidSuppressionCount));
         }
     }
 
@@ -387,8 +387,11 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         // Applied after rule selection, so a suppression of an excluded rule is reported as unmatched
-        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, issues, SuppressionOptions.of(
-                scanTomlFile.get(), ignoreSuppressions, requireSuppressionReason, requireSuppressionRuleId));
+        List<Rule> projectRules = new ArrayList<>(coreRules);
+        externalAnalyzers.values().forEach(projectRules::addAll);
+        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, issues, projectRules,
+                SuppressionOptions.of(scanTomlFile.get(), ignoreSuppressions, requireSuppressionReason,
+                        requireSuppressionRuleId));
         List<Issue> activeIssues = suppressionOutcome.activeIssues();
         Map<Issue, SuppressedIssue> suppressions = suppressionOutcome.suppressionsByIssue();
         allIssues.addAll(issues);
@@ -436,9 +439,9 @@ public class ScanCmd implements BLauncherCmd {
         });
 
         if (scanningWorkspace) {
-            suppressionErrors += suppressionOutcome.errorCount();
+            invalidSuppressions += suppressionOutcome.invalidSuppressionCount();
         } else {
-            failOnSuppressionErrors(suppressionOutcome.errorCount());
+            failOnSuppressionErrors(suppressionOutcome.invalidSuppressionCount());
         }
     }
 

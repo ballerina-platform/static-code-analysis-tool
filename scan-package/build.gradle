@@ -45,7 +45,6 @@ repositories {
 }
 
 dependencies {
-    compileOnly "com.google.code.gson:gson:${gsonVersion}"
     compileOnly group: 'org.ballerinalang', name: 'ballerina-lang', version: "${ballerinaLangVersion}"
     compileOnly group: 'org.ballerinalang', name: 'ballerina-parser', version: "${ballerinaLangVersion}"
     compileOnly group: 'org.ballerinalang', name: 'ballerina-tools-api', version: "${ballerinaLangVersion}"

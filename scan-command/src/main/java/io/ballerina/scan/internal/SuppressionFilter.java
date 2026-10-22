@@ -20,19 +20,23 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.projects.Project;
 import io.ballerina.scan.Issue;
+import io.ballerina.scan.Rule;
 import io.ballerina.scan.SuppressedIssue;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Applies the {@code @scan:Suppress} annotations of a package to its issues. Shared by the command line and the
@@ -42,16 +46,9 @@ import java.util.regex.Pattern;
  */
 final class SuppressionFilter {
 
-    private static final Pattern CORE_RULE_ID = Pattern.compile("ballerina:\\d+");
-    private static final Set<String> CORE_RULE_IDS = coreRuleIds();
+    private static final Pattern RULE_ID = Pattern.compile("(ballerina|[A-Za-z0-9_.]+/[A-Za-z0-9_.]+):[1-9][0-9]*");
 
     private SuppressionFilter() {
-    }
-
-    private static Set<String> coreRuleIds() {
-        Set<String> ids = new HashSet<>();
-        CoreRule.rules().forEach(rule -> ids.add(rule.id()));
-        return Set.copyOf(ids);
     }
 
     /**
@@ -60,20 +57,23 @@ final class SuppressionFilter {
      *
      * @param project the project the issues were reported for
      * @param issues  the issues remaining after rule selection
+     * @param rules   every rule the scan can report, before rule selection
      * @param options how the suppressions are applied
      * @return the active and suppressed issues, and diagnostics about the suppressions
      */
-    static SuppressionOutcome apply(Project project, List<Issue> issues, SuppressionOptions options) {
+    static SuppressionOutcome apply(Project project, List<Issue> issues, Collection<Rule> rules,
+                                    SuppressionOptions options) {
+        if (options.ignoreSuppressions()) {
+            return new SuppressionOutcome(issues, List.of(), List.of());
+        }
         List<SuppressionAnnotation> suppressions = SuppressionCollector.collect(project);
         if (suppressions.isEmpty()) {
             return new SuppressionOutcome(issues, List.of(), List.of());
         }
 
-        List<SuppressionDiagnostic> diagnostics = new ArrayList<>(unknownCoreRules(suppressions));
+        KnownRules knownRules = new KnownRules(rules);
+        List<SuppressionDiagnostic> diagnostics = new ArrayList<>(unknownRules(suppressions, knownRules));
         diagnostics.addAll(requirementViolations(suppressions, options));
-        if (options.ignoreSuppressions()) {
-            return new SuppressionOutcome(issues, List.of(), diagnostics);
-        }
 
         List<Issue> activeIssues = new ArrayList<>();
         List<SuppressedIssue> suppressedIssues = new ArrayList<>();
@@ -88,7 +88,7 @@ final class SuppressionFilter {
             suppressedIssues.add(new SuppressedIssue(issue, suppression.rules(),
                     suppression.justification().orElse(null)));
         }
-        diagnostics.addAll(unmatchedSuppressions(suppressions, matchedRules));
+        diagnostics.addAll(unmatchedSuppressions(suppressions, matchedRules, knownRules));
         return new SuppressionOutcome(activeIssues, suppressedIssues, diagnostics);
     }
 
@@ -118,21 +118,25 @@ final class SuppressionFilter {
         return !candidate.blanket() && current.blanket();
     }
 
-    // The ballerina/scan compiler plugin checks only the format of core rule IDs; the running tool owns the list.
-    private static List<SuppressionDiagnostic> unknownCoreRules(List<SuppressionAnnotation> suppressions) {
+    // The ballerina/scan compiler plugin checks only the format of a rule ID; whether it exists is known only here.
+    private static List<SuppressionDiagnostic> unknownRules(List<SuppressionAnnotation> suppressions,
+                                                            KnownRules knownRules) {
         List<SuppressionDiagnostic> unknown = new ArrayList<>();
         for (SuppressionAnnotation suppression : suppressions) {
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
-                if (isUnknownCoreRule(rule)) {
-                    unknown.add(error(suppression, DiagnosticLog.error(DiagnosticCode.UNKNOWN_CORE_RULE, rule)));
+                Matcher matcher = RULE_ID.matcher(rule);
+                if (!matcher.matches() || knownRules.ids().contains(rule)) {
+                    continue;
                 }
+                String provider = matcher.group(1);
+                // Rules of a provider that is not engaged cannot be verified, so they do not fail the scan
+                unknown.add(knownRules.providers().contains(provider)
+                        ? error(suppression, DiagnosticLog.error(DiagnosticCode.UNKNOWN_RULE, rule, provider))
+                        : warning(suppression,
+                                DiagnosticLog.warning(DiagnosticCode.UNKNOWN_RULE_PROVIDER, rule, provider)));
             }
         }
         return unknown;
-    }
-
-    private static boolean isUnknownCoreRule(String rule) {
-        return CORE_RULE_ID.matcher(rule).matches() && !CORE_RULE_IDS.contains(rule);
     }
 
     private static List<SuppressionDiagnostic> requirementViolations(List<SuppressionAnnotation> suppressions,
@@ -150,7 +154,8 @@ final class SuppressionFilter {
     }
 
     private static List<SuppressionDiagnostic> unmatchedSuppressions(List<SuppressionAnnotation> suppressions,
-                                                                     Map<SuppressionAnnotation, Set<String>> matched) {
+                                                                     Map<SuppressionAnnotation, Set<String>> matched,
+                                                                     KnownRules knownRules) {
         List<SuppressionDiagnostic> unmatched = new ArrayList<>();
         for (SuppressionAnnotation suppression : suppressions) {
             Set<String> matchedRules = matched.getOrDefault(suppression, Set.of());
@@ -163,7 +168,7 @@ final class SuppressionFilter {
                         DiagnosticLog.warning(DiagnosticCode.UNRESOLVED_SUPPRESSION_RULE, rule)));
             }
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
-                if (!matchedRules.contains(rule) && !isUnknownCoreRule(rule)) {
+                if (!matchedRules.contains(rule) && knownRules.ids().contains(rule)) {
                     unmatched.add(warning(suppression,
                             DiagnosticLog.warning(DiagnosticCode.UNMATCHED_SUPPRESSION, rule)));
                 }
@@ -180,5 +185,14 @@ final class SuppressionFilter {
     private static SuppressionDiagnostic warning(SuppressionAnnotation suppression, String message) {
         return new SuppressionDiagnostic(DiagnosticSeverity.WARNING, message, suppression.fileName(),
                 suppression.location());
+    }
+
+    private record KnownRules(Set<String> ids, Set<String> providers) {
+
+        private KnownRules(Collection<Rule> rules) {
+            this(rules.stream().map(Rule::id).collect(Collectors.toUnmodifiableSet()),
+                    rules.stream().map(rule -> rule.id().substring(0, rule.id().lastIndexOf(':')))
+                            .collect(Collectors.toUnmodifiableSet()));
+        }
     }
 }

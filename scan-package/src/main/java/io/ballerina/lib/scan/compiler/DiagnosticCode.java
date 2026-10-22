@@ -28,10 +28,6 @@ import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 enum DiagnosticCode {
     INVALID_RULE_FORMAT("SCAN_SUPPRESS_101", "invalid rule ID ''{0}'': expected ''ballerina:<number>'' or "
             + "''<org>/<package>:<number>''", DiagnosticSeverity.ERROR),
-    UNKNOWN_RULE("SCAN_SUPPRESS_102", "unknown rule ''{0}'': ''{1}'' does not define this rule",
-            DiagnosticSeverity.ERROR),
-    UNKNOWN_PROVIDER("SCAN_SUPPRESS_103", "cannot verify rule ''{0}'': ''{1}'' is not a direct dependency with "
-            + "scan rules; it is checked again when ''bal scan'' runs", DiagnosticSeverity.WARNING),
     BLANK_REASON("SCAN_SUPPRESS_104", "blank suppression reason; it is treated as absent",
             DiagnosticSeverity.WARNING),
     DUPLICATE_RULE("SCAN_SUPPRESS_105", "rule ''{0}'' is listed more than once", DiagnosticSeverity.WARNING),
