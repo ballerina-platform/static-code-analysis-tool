@@ -45,39 +45,44 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         List<Issue> issues = scannerContext.getReporter().getIssues();
         Assert.assertEquals(issues.size(), 17);
 
-        assertIssue(issues.get(0), documentName, 28, 29, 28, 34, "ballerina:2", 2,
+        boolean externalFunctionParamFlagged = issues.stream()
+                .anyMatch(issue -> issue.location().lineRange().startLine().line() == 94);
+        Assert.assertFalse(externalFunctionParamFlagged,
+                "parameter 'key' of external function 'externHasKey' must not be reported as unused");
+
+        assertIssue(issues.get(0), documentName, 29, 29, 29, 34, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(1), documentName, 36, 29, 36, 38, "ballerina:2", 2,
+        assertIssue(issues.get(1), documentName, 37, 29, 37, 38, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(2), documentName, 40, 29, 40, 38, "ballerina:2", 2,
+        assertIssue(issues.get(2), documentName, 41, 29, 41, 38, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(3), documentName, 42, 22, 42, 27, "ballerina:2", 2,
+        assertIssue(issues.get(3), documentName, 43, 22, 43, 27, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(4), documentName, 42, 29, 42, 37, "ballerina:2", 2,
+        assertIssue(issues.get(4), documentName, 43, 29, 43, 37, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(5), documentName, 44, 22, 44, 27, "ballerina:2", 2,
+        assertIssue(issues.get(5), documentName, 45, 22, 45, 27, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(6), documentName, 44, 29, 44, 37, "ballerina:2", 2,
+        assertIssue(issues.get(6), documentName, 45, 29, 45, 37, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(7), documentName, 53, 33, 53, 38, "ballerina:2", 2,
+        assertIssue(issues.get(7), documentName, 54, 33, 54, 38, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(8), documentName, 57, 33, 57, 42, "ballerina:2", 2,
+        assertIssue(issues.get(8), documentName, 58, 33, 58, 42, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(9), documentName, 61, 26, 61, 31, "ballerina:2", 2,
+        assertIssue(issues.get(9), documentName, 62, 26, 62, 31, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(10), documentName, 61, 33, 61, 41, "ballerina:2", 2,
+        assertIssue(issues.get(10), documentName, 62, 33, 62, 41, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(11), documentName, 72, 19, 72, 24, "ballerina:2", 2,
+        assertIssue(issues.get(11), documentName, 73, 19, 73, 24, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(12), documentName, 76, 11, 76, 16, "ballerina:2", 2,
+        assertIssue(issues.get(12), documentName, 77, 11, 77, 16, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(13), documentName, 76, 25, 76, 30, "ballerina:2", 2,
+        assertIssue(issues.get(13), documentName, 77, 25, 77, 30, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(14), documentName, 77, 22, 77, 28, "ballerina:2", 2,
+        assertIssue(issues.get(14), documentName, 78, 22, 78, 28, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(15), documentName, 77, 30, 77, 36, "ballerina:2", 2,
+        assertIssue(issues.get(15), documentName, 78, 30, 78, 36, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(16), documentName, 83, 44, 83, 63, "ballerina:2", 2,
+        assertIssue(issues.get(16), documentName, 84, 44, 84, 63, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
 
