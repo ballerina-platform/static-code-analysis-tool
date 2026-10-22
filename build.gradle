@@ -98,11 +98,6 @@ ext.runScanPackageBal = { File workingDirectory, String... balArguments ->
 
 subprojects {
     apply plugin: 'java-library'
-
-    // Ballerina distributions run on Java 21, whatever JDK runs the build
-    tasks.withType(JavaCompile).configureEach {
-        options.release = 21
-    }
 }
 
 project(':scan-command') {
