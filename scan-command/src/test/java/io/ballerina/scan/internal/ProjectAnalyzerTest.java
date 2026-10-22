@@ -56,12 +56,12 @@ public class ProjectAnalyzerTest extends BaseTest {
     private ProjectAnalyzer projectAnalyzer = null;
 
     @BeforeMethod
-    void initializeMethod() throws RuntimeException {
+    void initializeMethod() {
         System.setProperty("user.dir", project.sourceRoot().toString());
         Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream);
         System.setProperty("user.dir", userDir);
         if (scanTomlFile.isEmpty()) {
-            throw new RuntimeException("Failed to load scan toml file!");
+            throw new IllegalStateException("Failed to load scan toml file!");
         }
         projectAnalyzer = new ProjectAnalyzer(project, scanTomlFile.get());
     }

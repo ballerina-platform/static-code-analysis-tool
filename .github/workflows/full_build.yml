@@ -1,8 +1,10 @@
 name: Full Build
 
+# Pull requests are built by the shared PR build workflow in pull-request.yml
 on:
   push:
-  pull_request:
+    branches:
+      - support/**
   workflow_dispatch:
 
 jobs:
@@ -23,11 +25,6 @@ jobs:
           distribution: 'temurin'
           java-version: '21.0.6'
 
-      - name: Set Up Ballerina
-        uses: ballerina-platform/setup-ballerina@v1.1.1
-        with:
-          version: 2201.12.0
-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -44,7 +41,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./.jacoco/reports/jacoco/report.xml
+          files: ./scan-command/build/reports/jacoco/report.xml
 
   windows_build:
     name: Build on Windows with tests
@@ -62,11 +59,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21.0.6'
-
-      - name: Set Up Ballerina
-        uses: ballerina-platform/setup-ballerina@v1.1.1
-        with:
-          version: 2201.12.0
 
       - name: Build with Gradle
         env:
