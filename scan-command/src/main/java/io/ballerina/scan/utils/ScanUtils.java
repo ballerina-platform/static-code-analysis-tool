@@ -30,6 +30,7 @@ import io.ballerina.projects.internal.model.Target;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.SuppressedIssue;
 import io.ballerina.scan.internal.IssueImpl;
 import io.ballerina.toml.api.Toml;
 import io.ballerina.toml.semantic.TomlType;
@@ -114,6 +115,16 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_NAME;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SCANNED_FILES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ZIP_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_TABLE;
+import static io.ballerina.scan.utils.Constants.SUPPRESSIONS;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_ENABLED;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_JUSTIFICATION;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_KIND;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_KIND_IN_SOURCE;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_REQUIRE_REASON;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_REQUIRE_RULE_ID;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_STATUS;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_STATUS_ACCEPTED;
+import static io.ballerina.scan.utils.Constants.SUPPRESSION_TABLE;
 import static java.util.Locale.ROOT;
 
 /**
@@ -162,9 +173,38 @@ public final class ScanUtils {
      * @return json string array of generated issues
      */
     private static String convertIssuesToJsonString(List<Issue> issues) {
+        return convertIssuesToJsonString(issues, Map.of());
+    }
+
+    /**
+     * Returns the json {@link String} array of generated issues, where each suppressed issue carries a
+     * {@code suppressions} entry mirroring the SARIF suppression object.
+     *
+     * @param issues       generated issues, including suppressed ones
+     * @param suppressions the suppressed issues, keyed by the issue they suppress
+     * @return json string array of generated issues
+     */
+    private static String convertIssuesToJsonString(List<Issue> issues, Map<Issue, SuppressedIssue> suppressions) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         JsonArray issuesAsJson = gson.toJsonTree(issues).getAsJsonArray();
+        for (int i = 0; i < issues.size(); i++) {
+            SuppressedIssue suppressedIssue = suppressions.get(issues.get(i));
+            if (suppressedIssue != null) {
+                issuesAsJson.get(i).getAsJsonObject().add(SUPPRESSIONS, toSuppressionsJson(suppressedIssue));
+            }
+        }
         return gson.toJson(issuesAsJson);
+    }
+
+    private static JsonArray toSuppressionsJson(SuppressedIssue suppressedIssue) {
+        JsonObject suppression = new JsonObject();
+        suppression.addProperty(SUPPRESSION_KIND, SUPPRESSION_KIND_IN_SOURCE);
+        suppression.addProperty(SUPPRESSION_STATUS, SUPPRESSION_STATUS_ACCEPTED);
+        suppressedIssue.justification().ifPresent(reason -> suppression.addProperty(SUPPRESSION_JUSTIFICATION,
+                reason));
+        JsonArray suppressionsAsJson = new JsonArray();
+        suppressionsAsJson.add(suppression);
+        return suppressionsAsJson;
     }
 
     /**
@@ -176,6 +216,20 @@ public final class ScanUtils {
      * @return SARIF string representation of generated issues
      */
     private static String convertIssuesToSarifString(List<Issue> issues, Project project) {
+        return convertIssuesToSarifString(issues, project, Map.of());
+    }
+
+    /**
+     * Returns the SARIF (Static Analysis Results Interchange Format) {@link String} representation of generated
+     * issues, where each suppressed issue carries an {@code inSource} suppression with its justification.
+     *
+     * @param issues       generated issues, including suppressed ones
+     * @param project      Ballerina project
+     * @param suppressions the suppressed issues, keyed by the issue they suppress
+     * @return SARIF string representation of generated issues
+     */
+    private static String convertIssuesToSarifString(List<Issue> issues, Project project,
+                                                     Map<Issue, SuppressedIssue> suppressions) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
         // Create SARIF root object
@@ -272,6 +326,15 @@ public final class ScanUtils {
             locations.add(location);
             result.add("locations", locations);
 
+            // SARIF requires the suppressions of a run's results to be all present or all absent; an empty array
+            // marks a result as not suppressed
+            SuppressedIssue suppressedIssue = suppressions.get(issueImpl);
+            if (suppressedIssue != null) {
+                result.add(SUPPRESSIONS, toSuppressionsJson(suppressedIssue));
+            } else if (!suppressions.isEmpty()) {
+                result.add(SUPPRESSIONS, new JsonArray());
+            }
+
             results.add(result);
         }
 
@@ -344,6 +407,22 @@ public final class ScanUtils {
      * @return path of the json analysis report where generated issues are saved
      */
     public static Path saveToDirectory(List<Issue> issues, Project project, String directoryName) {
+        return saveToDirectory(issues, project, directoryName, Map.of());
+    }
+
+    /**
+     * Returns the {@link Path} of the json analysis report where generated issues, including suppressed ones, are
+     * saved.
+     *
+     * @param issues        generated issues, including suppressed ones
+     * @param project       Ballerina project
+     * @param directoryName target directory name
+     * @param suppressions  the suppressed issues, keyed by the issue they suppress
+     * @return path of the json analysis report where generated issues are saved
+     * @since 0.11.1
+     */
+    public static Path saveToDirectory(List<Issue> issues, Project project, String directoryName,
+                                       Map<Issue, SuppressedIssue> suppressions) {
         Target target = getTargetPath(project, directoryName);
 
         Path jsonFilePath;
@@ -351,7 +430,7 @@ public final class ScanUtils {
             Path reportPath = target.getReportPath();
 
             // Save JSON report
-            String jsonOutput = convertIssuesToJsonString(issues);
+            String jsonOutput = convertIssuesToJsonString(issues, suppressions);
             File jsonFile = new File(reportPath.resolve(RESULTS_JSON_FILE).toString());
             try (FileOutputStream fileOutputStream = new FileOutputStream(jsonFile);
                  Writer writer = new OutputStreamWriter(fileOutputStream, StandardCharsets.UTF_8)) {
@@ -373,10 +452,25 @@ public final class ScanUtils {
      * @return path of the SARIF analysis report
      */
     public static Path saveSarifToDirectory(List<Issue> issues, Project project, String directoryName) {
+        return saveSarifToDirectory(issues, project, directoryName, Map.of());
+    }
+
+    /**
+     * Saves only the SARIF analysis report, including suppressed issues, to the target directory.
+     *
+     * @param issues        generated issues, including suppressed ones
+     * @param project       Ballerina project
+     * @param directoryName target directory name
+     * @param suppressions  the suppressed issues, keyed by the issue they suppress
+     * @return path of the SARIF analysis report
+     * @since 0.11.1
+     */
+    public static Path saveSarifToDirectory(List<Issue> issues, Project project, String directoryName,
+                                            Map<Issue, SuppressedIssue> suppressions) {
         Target target = getTargetPath(project, directoryName);
         try {
             Path reportPath = target.getReportPath();
-            String sarifOutput = convertIssuesToSarifString(issues, project);
+            String sarifOutput = convertIssuesToSarifString(issues, project, suppressions);
             File sarifFile = new File(reportPath.resolve(RESULTS_SARIF_FILE).toString());
             try (FileOutputStream fos = new FileOutputStream(sarifFile);
                  Writer writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
@@ -663,7 +757,37 @@ public final class ScanUtils {
             ruleTable.get("include").ifPresent(loadRules(scanTomlFile, true));
             ruleTable.get("exclude").ifPresent(loadRules(scanTomlFile, false));
         });
+        Optional<Toml> suppressionTable = scanTomlDocumentContent.getTable(SUPPRESSION_TABLE);
+        if (suppressionTable.isPresent()) {
+            Toml table = suppressionTable.get();
+            if (hasNonBooleanSetting(table, outputStream)) {
+                return Optional.empty();
+            }
+            scanTomlFile.setSuppressionEnabled(!isFalse(table, SUPPRESSION_ENABLED));
+            scanTomlFile.setSuppressionReasonRequired(isTrue(table, SUPPRESSION_REQUIRE_REASON));
+            scanTomlFile.setSuppressionRuleIdRequired(isTrue(table, SUPPRESSION_REQUIRE_RULE_ID));
+        }
         return Optional.of(scanTomlFile);
+    }
+
+    // A quoted "true" would otherwise read as unset and silently turn a requirement off.
+    private static boolean hasNonBooleanSetting(Toml suppressionTable, PrintStream outputStream) {
+        for (String key : List.of(SUPPRESSION_ENABLED, SUPPRESSION_REQUIRE_REASON, SUPPRESSION_REQUIRE_RULE_ID)) {
+            Optional<TomlValueNode> value = suppressionTable.get(key);
+            if (value.isPresent() && value.get().kind() != TomlType.BOOLEAN) {
+                outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, key));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isTrue(Toml table, String key) {
+        return table.get(key).map(TomlValueNode::toNativeValue).map(Boolean.TRUE::equals).orElse(false);
+    }
+
+    private static boolean isFalse(Toml table, String key) {
+        return table.get(key).map(TomlValueNode::toNativeValue).map(Boolean.FALSE::equals).orElse(false);
     }
 
     /**

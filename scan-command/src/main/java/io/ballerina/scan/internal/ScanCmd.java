@@ -19,6 +19,7 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.cli.BLauncherCmd;
+import io.ballerina.cli.launcher.LauncherUtils;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.directory.BuildProject;
@@ -30,6 +31,7 @@ import io.ballerina.scan.PlatformPluginContext;
 import io.ballerina.scan.ReportFormat;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
+import io.ballerina.scan.SuppressedIssue;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
@@ -105,6 +107,18 @@ public class ScanCmd implements BLauncherCmd {
     @CommandLine.Option(names = "--platforms", converter = StringToListConverter.class,
             description = "Specify the comma separated list of static code analysis platforms to report issues")
     private List<String> platforms = new ArrayList<>();
+
+    @CommandLine.Option(names = "--ignore-suppressions",
+            description = "Disregard @scan:Suppress annotations and report every issue")
+    private boolean ignoreSuppressions;
+
+    @CommandLine.Option(names = "--require-suppression-reason",
+            description = "Fail the scan when a @scan:Suppress annotation gives no reason")
+    private boolean requireSuppressionReason;
+
+    @CommandLine.Option(names = "--require-suppression-rule-id",
+            description = "Fail the scan when a @scan:Suppress annotation names no rule")
+    private boolean requireSuppressionRuleId;
 
     private final List<Rule> allRules = new ArrayList<>();
 
@@ -247,22 +261,31 @@ public class ScanCmd implements BLauncherCmd {
             issues.removeIf(issue -> excludeRules.contains(issue.rule().id()));
         }
 
+        // Applied after rule selection, so a suppression of an excluded rule is reported as unmatched
+        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project.get(), issues, allRules,
+                SuppressionOptions.of(scanTomlFile.get(), ignoreSuppressions, requireSuppressionReason,
+                        requireSuppressionRuleId));
+        List<Issue> activeIssues = suppressionOutcome.activeIssues();
+        Map<Issue, SuppressedIssue> suppressions = suppressionOutcome.suppressionsByIssue();
+        printSuppressionDiagnostics(suppressionOutcome.diagnostics());
+
         if (platforms.isEmpty() && !platformTriggered) {
             boolean isSarifFormat = ReportFormat.SARIF.equals(format);
-            ScanUtils.printToConsole(issues, outputStream, isSarifFormat, project.get());
+            ScanUtils.printToConsole(activeIssues, outputStream, isSarifFormat, project.get());
+            printSuppressionSummary(activeIssues.size(), suppressions.size());
             if (project.get().kind().equals(ProjectKind.BUILD_PROJECT)) {
                 Path reportPath;
                 if (isSarifFormat) {
-                    reportPath = ScanUtils.saveSarifToDirectory(issues, project.get(), targetDir);
+                    reportPath = ScanUtils.saveSarifToDirectory(issues, project.get(), targetDir, suppressions);
                 } else {
-                    reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir);
+                    reportPath = ScanUtils.saveToDirectory(issues, project.get(), targetDir, suppressions);
                 }
                 outputStream.println();
                 outputStream.println("View scan results at:");
                 outputStream.println("\t" + reportPath.toUri());
                 outputStream.println();
                 if (scanReport) {
-                    Path scanReportPath = ScanUtils.generateScanReport(issues, project.get(), targetDir);
+                    Path scanReportPath = ScanUtils.generateScanReport(activeIssues, project.get(), targetDir);
                     outputStream.println();
                     outputStream.println("View scan report at:");
                     outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
@@ -283,7 +306,7 @@ public class ScanCmd implements BLauncherCmd {
         scannerPlatformPlugins.forEach(staticCodeAnalysisPlatformPlugin -> {
             if (platforms.contains(staticCodeAnalysisPlatformPlugin.platform())) {
                 outputStream.println("Reporting issues to: " + staticCodeAnalysisPlatformPlugin.platform());
-                staticCodeAnalysisPlatformPlugin.onScan(issues);
+                staticCodeAnalysisPlatformPlugin.onScan(activeIssues);
                 platforms.removeAll(Collections.singleton(staticCodeAnalysisPlatformPlugin.platform()));
             }
         });
@@ -292,6 +315,27 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println("The specified platform '" + remainingPlatform + "' is not available.");
             outputStream.println("Please ensure that the required platform plugin path is specified in 'Scan.toml'.");
         });
+
+        if (suppressionOutcome.invalidSuppressionCount() > 0) {
+            throw LauncherUtils.createLauncherException(DiagnosticLog.error(
+                    DiagnosticCode.SUPPRESSION_REQUIREMENTS_NOT_MET, suppressionOutcome.invalidSuppressionCount()));
+        }
+    }
+
+    private void printSuppressionDiagnostics(List<SuppressionDiagnostic> diagnostics) {
+        if (diagnostics.isEmpty()) {
+            return;
+        }
+        outputStream.println();
+        diagnostics.forEach(outputStream::println);
+    }
+
+    private void printSuppressionSummary(int activeIssueCount, int suppressedIssueCount) {
+        if (suppressedIssueCount == 0) {
+            return;
+        }
+        outputStream.println();
+        outputStream.println(activeIssueCount + " issue(s), " + suppressedIssueCount + " suppressed");
     }
 
     private StringBuilder helpMessage() {

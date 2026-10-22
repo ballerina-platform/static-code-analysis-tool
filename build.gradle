@@ -83,6 +83,7 @@ subprojects {
 project(':scan-command') {
     dependencies {
         tasks.test{
+            dependsOn ':scan-package:build'
             dependsOn ':test-compiler-plugins:exampleOrg-plugin:build'
             dependsOn ':test-compiler-plugins:ballerina-plugin:build'
             dependsOn ':test-compiler-plugins:ballerinax-plugin:build'
