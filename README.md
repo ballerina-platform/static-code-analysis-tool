@@ -12,9 +12,9 @@ This repository consists of
 
 ## Prerequisites
 
-1. OpenJDK 21 ([Adopt OpenJDK](https://adoptium.net/temurin/releases/?version=21) or any other OpenJDK distribution)
+1. OpenJDK 21 ([Adopt OpenJDK](https://adoptium.net/temurin/releases/?version=21) or any other OpenJDK distribution), or OpenJDK 25 for Ballerina 2201.14.0 and later
 
-2. [Ballerina](https://ballerina.io/)
+The build downloads and uses the Ballerina distribution matching `ballerinaLangVersion` in `gradle.properties`, so a separate Ballerina installation is not required.
 
 ## Building from the source
 
