@@ -26,12 +26,14 @@ import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.SymbolKind;
 import io.ballerina.compiler.api.symbols.TypeDefinitionSymbol;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
+import io.ballerina.compiler.syntax.tree.AnnotationNode;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
+import io.ballerina.compiler.syntax.tree.DefaultableParameterNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExternalFunctionBodyNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
@@ -45,6 +47,8 @@ import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeLocation;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
+import io.ballerina.compiler.syntax.tree.RequiredParameterNode;
+import io.ballerina.compiler.syntax.tree.RestParameterNode;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
@@ -54,6 +58,11 @@ import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.utils.Constants;
+import io.ballerina.tools.diagnostics.Location;
+import io.ballerina.tools.text.LinePosition;
+import io.ballerina.tools.text.LineRange;
+import io.ballerina.tools.text.TextDocument;
+import io.ballerina.tools.text.TextRange;
 
 import java.util.List;
 import java.util.Optional;
@@ -156,7 +165,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 List<Qualifier> qualifiers = classFieldSymbol.qualifiers();
                 if (hasQualifier(qualifiers, PRIVATE_KEYWORD)) {
                     if (semanticModel.references(symbol).size() == 1) {
-                        reportIssue(objectFieldNode, CoreRule.UNUSED_PRIVATE_CLASS_FIELD);
+                        reportIssue(withoutMetadata(objectFieldNode), CoreRule.UNUSED_PRIVATE_CLASS_FIELD);
                     }
                 }
             }
@@ -452,8 +461,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 includedRecordParameterNode.paramName().ifPresent(name -> {
                     reportIssueIfNodeIsUnused(name, CoreRule.UNUSED_FUNCTION_PARAMETER);
                 });
-            } else {
-                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETER);
+            } else if (isUnusedNode(parameter)) {
+                reportIssue(withoutAnnotations(parameter), CoreRule.UNUSED_FUNCTION_PARAMETER);
             }
             this.visitSyntaxNode(parameter);
         });
@@ -466,7 +475,49 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     private void reportIssue(Node node, CoreRule coreRule) {
-        scannerContext.getReporter().reportIssue(document, node.location(), coreRule.rule());
+        reportIssue(node.location(), coreRule);
+    }
+
+    private void reportIssue(Location location, CoreRule coreRule) {
+        scannerContext.getReporter().reportIssue(document, location, coreRule.rule());
+    }
+
+    private Location withoutMetadata(ObjectFieldNode objectFieldNode) {
+        if (objectFieldNode.metadata().isEmpty()) {
+            return objectFieldNode.location();
+        }
+        Node firstNode = objectFieldNode.visibilityQualifier().map(Node.class::cast)
+                .or(() -> objectFieldNode.qualifierList().stream().findFirst())
+                .orElse(objectFieldNode.typeName());
+        return locationFrom(firstNode, objectFieldNode);
+    }
+
+    private Location withoutAnnotations(Node parameter) {
+        NodeList<AnnotationNode> annotations;
+        Node typeName;
+        if (parameter instanceof RequiredParameterNode requiredParameterNode) {
+            annotations = requiredParameterNode.annotations();
+            typeName = requiredParameterNode.typeName();
+        } else if (parameter instanceof DefaultableParameterNode defaultableParameterNode) {
+            annotations = defaultableParameterNode.annotations();
+            typeName = defaultableParameterNode.typeName();
+        } else if (parameter instanceof RestParameterNode restParameterNode) {
+            annotations = restParameterNode.annotations();
+            typeName = restParameterNode.typeName();
+        } else {
+            return parameter.location();
+        }
+        return annotations.isEmpty() ? parameter.location() : locationFrom(typeName, parameter);
+    }
+
+    private Location locationFrom(Node firstNode, Node node) {
+        TextDocument textDocument = document.syntaxTree().textDocument();
+        int startOffset = firstNode.textRange().startOffset();
+        int endOffset = node.textRange().endOffset();
+        LinePosition start = textDocument.linePositionFrom(startOffset);
+        LinePosition end = textDocument.linePositionFrom(endOffset);
+        return new SourceLocation(LineRange.from(node.lineRange().fileName(), start, end),
+                TextRange.from(startOffset, endOffset - startOffset));
     }
 
     private boolean isUnusedNode(Node node) {

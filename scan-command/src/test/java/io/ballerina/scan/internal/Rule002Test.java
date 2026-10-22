@@ -43,7 +43,7 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
                 scannerContext, document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 17);
+        Assert.assertEquals(issues.size(), 20);
 
         boolean externalFunctionParamFlagged = issues.stream()
                 .anyMatch(issue -> issue.location().lineRange().startLine().line() == 94);
@@ -83,6 +83,12 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(15), documentName, 78, 30, 78, 36, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
         assertIssue(issues.get(16), documentName, 84, 44, 84, 63, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(17), documentName, 104, 41, 104, 46, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(18), documentName, 104, 66, 104, 75, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(19), documentName, 104, 95, 104, 103, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
 

@@ -85,3 +85,19 @@ service class SA {
         self.c = s;
     }
 }
+
+type FieldMeta record {|
+    string note;
+|};
+
+annotation FieldMeta Info on field;
+
+class A5 {
+    # Documented field
+    private string b = ""; // warning
+    @Info {note: "annotated"}
+    private final string c = ""; // warning
+    # Documented and annotated field
+    @Info {note: "annotated"}
+    private int d = 0; // warning
+}
