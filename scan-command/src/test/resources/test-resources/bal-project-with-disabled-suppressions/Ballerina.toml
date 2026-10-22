@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "bal_project_with_disabled_suppressions"
+version = "0.1.0"

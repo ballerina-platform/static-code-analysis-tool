@@ -2,6 +2,11 @@ name: Publish Release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish-scan-package:
+        description: Also publish the ballerina/scan package at its own version
+        type: boolean
+        default: false
 
 # Not the shared release template: it names the GitHub release module-<org>-<package>-v<version>, while scan tool
 # releases are named scan-tool-v<version>.
@@ -48,7 +53,7 @@ jobs:
           publishPAT: ${{ secrets.BALLERINA_BOT_TOKEN }}
         run: |
           ./gradlew clean release -Prelease.useAutomaticVersion=true
-          ./gradlew publish -Pversion=${VERSION}
+          ./gradlew publish -Pversion=${VERSION} -PpublishBallerinaScanPackage=${{ inputs.publish-scan-package }}
 
       - name: GitHub Release and Release Sync PR
         env:

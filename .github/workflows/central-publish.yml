@@ -10,6 +10,10 @@ on:
         options:
           - DEV CENTRAL
           - STAGE CENTRAL
+      publish-scan-package:
+        description: Also publish the ballerina/scan package at its own version
+        type: boolean
+        default: false
 
 jobs:
   call_workflow:
@@ -19,3 +23,4 @@ jobs:
     secrets: inherit
     with:
       environment: ${{ github.event.inputs.environment }}
+      additional-publish-flags: ${{ inputs.publish-scan-package && '-PpublishBallerinaScanPackage=true' || '' }}

@@ -33,6 +33,9 @@ public class ScanTomlFile {
     private final Set<Analyzer> analyzers = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToInclude = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToExclude = new LinkedHashSet<>();
+    private boolean suppressionEnabled = true;
+    private boolean suppressionReasonRequired;
+    private boolean suppressionRuleIdRequired;
 
     ScanTomlFile() {
     }
@@ -51,6 +54,51 @@ public class ScanTomlFile {
 
     void setRuleToExclude(RuleToFilter rule) {
         rulesToExclude.add(rule);
+    }
+
+    void setSuppressionEnabled(boolean enabled) {
+        suppressionEnabled = enabled;
+    }
+
+    void setSuppressionReasonRequired(boolean required) {
+        suppressionReasonRequired = required;
+    }
+
+    void setSuppressionRuleIdRequired(boolean required) {
+        suppressionRuleIdRequired = required;
+    }
+
+    /**
+     * Returns whether {@code @scan:Suppress} annotations are applied, as set by {@code [suppression] enabled}.
+     * Disabling them reports every issue, as {@code --ignore-suppressions} does for a single run.
+     *
+     * @return false if suppressions are disregarded for the project
+     * @since 0.13.0
+     */
+    public boolean isSuppressionEnabled() {
+        return suppressionEnabled;
+    }
+
+    /**
+     * Returns whether every {@code @scan:Suppress} annotation must give a reason, as set by
+     * {@code [suppression] requireReason}.
+     *
+     * @return true if a suppression without a reason fails the scan
+     * @since 0.13.0
+     */
+    public boolean isSuppressionReasonRequired() {
+        return suppressionReasonRequired;
+    }
+
+    /**
+     * Returns whether every {@code @scan:Suppress} annotation must name the rules it suppresses, as set by
+     * {@code [suppression] requireRuleId}.
+     *
+     * @return true if a suppression naming no rule fails the scan
+     * @since 0.13.0
+     */
+    public boolean isSuppressionRuleIdRequired() {
+        return suppressionRuleIdRequired;
     }
 
 

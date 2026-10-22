@@ -41,39 +41,59 @@ repositories {
     }
 }
 
-// The build runs the Ballerina distribution matching ballerinaLangVersion instead of whichever `bal` is installed
+// The build runs the Ballerina distribution matching ballerinaLangVersion instead of whichever `bal` is installed.
+// ballerina/scan is packed with the oldest distribution it supports, so that distribution and later ones can use it.
 configurations {
     ballerinaDistribution
+    scanPackageBallerinaDistribution
 }
 
 dependencies {
     ballerinaDistribution "org.ballerinalang:jballerina-tools:${ballerinaLangVersion}@zip"
+    scanPackageBallerinaDistribution "org.ballerinalang:jballerina-tools:${scanPackageBallerinaLangVersion}@zip"
 }
 
 def ballerinaDistributionDir = layout.buildDirectory.dir("ballerina-distribution").get().asFile
 ext.ballerinaHome = new File(ballerinaDistributionDir, "jballerina-tools-${ballerinaLangVersion}")
-def balLauncher = new File(ballerinaHome, Os.isFamily(Os.FAMILY_WINDOWS) ? "bin/bal.bat" : "bin/bal")
+def balLauncherOf = { String distributionVersion ->
+    new File(ballerinaDistributionDir, "jballerina-tools-${distributionVersion}/"
+            + (Os.isFamily(Os.FAMILY_WINDOWS) ? "bin/bal.bat" : "bin/bal"))
+}
 def execOperations = objects.newInstance(ExecOperationsHolder).execOperations
 
-tasks.register('unpackBallerinaDistribution', Copy) {
-    from { zipTree(configurations.ballerinaDistribution.singleFile) }
-    into ballerinaDistributionDir
-    doLast {
-        balLauncher.setExecutable(true)
+[unpackBallerinaDistribution          : [configurations.ballerinaDistribution, ballerinaLangVersion],
+ unpackScanPackageBallerinaDistribution: [configurations.scanPackageBallerinaDistribution,
+                                          scanPackageBallerinaLangVersion]].each { taskName, distribution ->
+    def (configuration, distributionVersion) = distribution
+    tasks.register(taskName, Copy) {
+        from { zipTree(configuration.singleFile) }
+        into ballerinaDistributionDir
+        doLast {
+            balLauncherOf(distributionVersion).setExecutable(true)
+        }
+    }
+}
+
+def execBal = { String distributionVersion, File workingDirectory, List<String> balArguments ->
+    def balLauncher = balLauncherOf(distributionVersion)
+    execOperations.exec {
+        workingDir workingDirectory
+        environment 'JAVA_HOME', System.getProperty('java.home')
+        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+            commandLine(['cmd', '/c', balLauncher.absolutePath] + balArguments)
+        } else {
+            commandLine([balLauncher.absolutePath] + balArguments)
+        }
     }
 }
 
 // Runs a `bal` command of the provisioned distribution on the JDK running the build
 ext.runBal = { File workingDirectory, String... balArguments ->
-    execOperations.exec {
-        workingDir workingDirectory
-        environment 'JAVA_HOME', System.getProperty('java.home')
-        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-            commandLine(['cmd', '/c', balLauncher.absolutePath] + balArguments.toList())
-        } else {
-            commandLine([balLauncher.absolutePath] + balArguments.toList())
-        }
-    }
+    execBal(ballerinaLangVersion, workingDirectory, balArguments.toList())
+}
+
+ext.runScanPackageBal = { File workingDirectory, String... balArguments ->
+    execBal(scanPackageBallerinaLangVersion, workingDirectory, balArguments.toList())
 }
 
 subprojects {
@@ -83,6 +103,7 @@ subprojects {
 project(':scan-command') {
     dependencies {
         tasks.test{
+            dependsOn ':scan-package:build'
             dependsOn ':test-compiler-plugins:exampleOrg-plugin:build'
             dependsOn ':test-compiler-plugins:ballerina-plugin:build'
             dependsOn ':test-compiler-plugins:ballerinax-plugin:build'

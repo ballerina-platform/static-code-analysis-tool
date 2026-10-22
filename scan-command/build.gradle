@@ -299,10 +299,13 @@ tasks.register('createCodeCoverageReport', JacocoReport) {
     }
 }
 
-// Publish scan tool to central
+// Publish scan tool to central; ballerina/scan is versioned separately and published only on its own release
 tasks.register('publishScanPackage') {
     dependsOn jar
     dependsOn ':unpackBallerinaDistribution'
+    if (findProperty('publishBallerinaScanPackage') == 'true') {
+        dependsOn ':scan-package:publishBallerinaPackage'
+    }
     mustRunAfter buildScanTool
     doLast {
         rootProject.runBal(file('tool-scan'), 'pack')

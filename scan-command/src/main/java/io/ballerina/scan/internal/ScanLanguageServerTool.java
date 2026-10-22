@@ -34,6 +34,7 @@ import io.ballerina.scan.ExcludedIssue;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScanResult;
+import io.ballerina.scan.SuppressedIssue;
 import io.ballerina.scan.utils.Constants;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanTomlWriter;
@@ -72,7 +73,8 @@ public class ScanLanguageServerTool {
             Project project = loadProjectForLs(projectPath, buildOptionsMap);
 
             // Run the scanner
-            ScanResult result = runScan(project);
+            LsScanResult lsResult = runLsScan(project);
+            ScanResult result = lsResult.result();
 
             // Check dependent workspace packages for issues
             boolean dependentPackageIssuesFound;
@@ -88,8 +90,7 @@ public class ScanLanguageServerTool {
                 JsonObject errorObject = new JsonObject();
                 errorObject.addProperty("success", false);
                 errorObject.addProperty("error", "Dependent Package Scan Error: " + errorMsg);
-                errorObject.add("activeIssues", new JsonArray());
-                errorObject.add("excludedIssues", new JsonArray());
+                addEmptyIssueArrays(errorObject);
                 return GSON.toJson(errorObject);
             }
 
@@ -98,6 +99,8 @@ public class ScanLanguageServerTool {
             jsonObject.addProperty("success", true);
             jsonObject.add("activeIssues", issuesToJsonArray(result.activeIssues()));
             jsonObject.add("excludedIssues", excludedIssuesToJsonArray(result.excludedIssues()));
+            jsonObject.add("suppressedIssues", suppressedIssuesToJsonArray(result.suppressedIssues()));
+            jsonObject.add("suppressionDiagnostics", suppressionDiagnosticsToJsonArray(lsResult.diagnostics()));
             jsonObject.addProperty("dependentPackageIssuesFound", dependentPackageIssuesFound);
             return GSON.toJson(jsonObject);
 
@@ -106,8 +109,7 @@ public class ScanLanguageServerTool {
             errorObject.addProperty("success", false);
             String errorMsg = e.getMessage();
             errorObject.addProperty("error", errorMsg != null && !errorMsg.trim().isEmpty() ? errorMsg : e.toString());
-            errorObject.add("activeIssues", new JsonArray());
-            errorObject.add("excludedIssues", new JsonArray());
+            addEmptyIssueArrays(errorObject);
             return GSON.toJson(errorObject);
         }
     }
@@ -265,6 +267,10 @@ public class ScanLanguageServerTool {
     }
 
     private static ScanResult runScan(Project project) throws IOException {
+        return runLsScan(project).result();
+    }
+
+    private static LsScanResult runLsScan(Project project) throws IOException {
         // Load Constants.SCAN_FILE configurations
         Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, System.err);
 
@@ -278,7 +284,7 @@ public class ScanLanguageServerTool {
         ProjectAnalyzer analyzer = new ProjectAnalyzer(project, scanToml.get());
 
         // Execute
-        return execute(analyzer, scanToml.get());
+        return execute(project, analyzer, scanToml.get());
     }
 
     /**
@@ -287,8 +293,8 @@ public class ScanLanguageServerTool {
      * @throws IllegalArgumentException when both include and exclude rule filters are configured,
      *                                  since they are mutually exclusive.
      */
-    private static ScanResult execute(ProjectAnalyzer projectAnalyzer,
-                                      ScanTomlFile scanToml) {
+    private static LsScanResult execute(Project project, ProjectAnalyzer projectAnalyzer,
+                                        ScanTomlFile scanToml) {
         // Gather all available Rules
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
@@ -348,7 +354,13 @@ public class ScanLanguageServerTool {
             }
         }
 
-        return new ScanResult(activeIssues, excludedIssues);
+        // The same suppression filter as the command line, applied after rule selection as it is there
+        List<Rule> projectRules = new ArrayList<>(coreRules);
+        externalAnalyzers.values().forEach(projectRules::addAll);
+        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, activeIssues, projectRules,
+                SuppressionOptions.of(scanToml, false, false, false));
+        return new LsScanResult(new ScanResult(suppressionOutcome.activeIssues(), excludedIssues,
+                suppressionOutcome.suppressedIssues()), suppressionOutcome.diagnostics());
     }
 
     // ===================================================================================
@@ -371,6 +383,46 @@ public class ScanLanguageServerTool {
             obj.addProperty("ruleId", ex.ruleId());
             obj.addProperty("isGlobalExclusion", ex.isGlobalExclusion());
             obj.add("issueContext", issueToJsonObject(ex.issue()));
+            jsonArray.add(obj);
+        }
+        return jsonArray;
+    }
+
+    private static void addEmptyIssueArrays(JsonObject errorObject) {
+        errorObject.add("activeIssues", new JsonArray());
+        errorObject.add("excludedIssues", new JsonArray());
+        errorObject.add("suppressedIssues", new JsonArray());
+        errorObject.add("suppressionDiagnostics", new JsonArray());
+    }
+
+    private static JsonArray suppressedIssuesToJsonArray(List<SuppressedIssue> suppressedIssues) {
+        JsonArray jsonArray = new JsonArray();
+        for (SuppressedIssue suppressed : suppressedIssues) {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("ruleId", suppressed.issue().rule().id());
+            suppressed.justification().ifPresent(reason -> obj.addProperty("justification", reason));
+            JsonArray rules = new JsonArray();
+            suppressed.rules().forEach(rules::add);
+            obj.add("suppressionRules", rules);
+            obj.add("issueContext", issueToJsonObject(suppressed.issue()));
+            jsonArray.add(obj);
+        }
+        return jsonArray;
+    }
+
+    private static JsonArray suppressionDiagnosticsToJsonArray(List<SuppressionDiagnostic> diagnostics) {
+        JsonArray jsonArray = new JsonArray();
+        for (SuppressionDiagnostic diagnostic : diagnostics) {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("severity", diagnostic.severity().toString());
+            obj.addProperty("message", diagnostic.message());
+            LineRange range = diagnostic.location();
+            // The document name, as issues report it; fileName() carries the module prefix of a workspace
+            obj.addProperty("filePath", range.fileName());
+            obj.addProperty("startLine", range.startLine().line());
+            obj.addProperty("startColumn", range.startLine().offset());
+            obj.addProperty("endLine", range.endLine().line());
+            obj.addProperty("endColumn", range.endLine().offset());
             jsonArray.add(obj);
         }
         return jsonArray;
@@ -411,4 +463,6 @@ public class ScanLanguageServerTool {
     }
 
     private record ScanMutationResponse(boolean success, String ruleId, String message) { }
+
+    private record LsScanResult(ScanResult result, List<SuppressionDiagnostic> diagnostics) { }
 }
