@@ -45,10 +45,10 @@ repositories {
 }
 
 dependencies {
-    compileOnly group: 'org.ballerinalang', name: 'ballerina-lang', version: "${ballerinaLangVersion}"
-    compileOnly group: 'org.ballerinalang', name: 'ballerina-parser', version: "${ballerinaLangVersion}"
-    compileOnly group: 'org.ballerinalang', name: 'ballerina-tools-api', version: "${ballerinaLangVersion}"
-    compileOnly group: 'org.ballerinalang', name: 'toml-parser', version: "${ballerinaLangVersion}"
+    compileOnly group: 'org.ballerinalang', name: 'ballerina-lang', version: "${scanPackageBallerinaLangVersion}"
+    compileOnly group: 'org.ballerinalang', name: 'ballerina-parser', version: "${scanPackageBallerinaLangVersion}"
+    compileOnly group: 'org.ballerinalang', name: 'ballerina-tools-api', version: "${scanPackageBallerinaLangVersion}"
+    compileOnly group: 'org.ballerinalang', name: 'toml-parser', version: "${scanPackageBallerinaLangVersion}"
     checkstyle group: 'com.puppycrawl.tools', name: 'checkstyle', version: "${puppycrawlCheckstyleVersion}"
 }
 
@@ -114,7 +114,7 @@ def balCentralCacheDir = project.file(System.getProperty("user.home") + "/.balle
 
 tasks.register('updateTomlFiles') {
     doLast {
-        def newConfig = ballerinaTomlFilePlaceHolder.text.replace("@toml.distribution@", ballerinaLangVersion)
+        def newConfig = ballerinaTomlFilePlaceHolder.text.replace("@toml.distribution@", scanPackageBallerinaLangVersion)
         ballerinaTomlFile.text = newConfig.replace("@toml.version@", tomlVersion)
         compilerPluginTomlFile.text = compilerPluginTomlFilePlaceHolder.text.replace("@toml.version@", tomlVersion)
     }
@@ -123,10 +123,10 @@ tasks.register('updateTomlFiles') {
 tasks.register('buildScanPackage') {
     dependsOn jar
     dependsOn updateTomlFiles
-    dependsOn ':unpackBallerinaDistribution'
+    dependsOn ':unpackScanPackageBallerinaDistribution'
     doLast {
-        rootProject.runBal(file(packageDir), 'pack')
-        rootProject.runBal(file(packageDir), 'push', '--repository=local')
+        rootProject.runScanPackageBal(file(packageDir), 'pack')
+        rootProject.runScanPackageBal(file(packageDir), 'push', '--repository=local')
         println("Successfully built and pushed the package ${packageOrg}/${packageName} to the local repository")
 
         delete {
@@ -156,10 +156,10 @@ tasks.named('build') {
 tasks.register('publishBallerinaPackage') {
     dependsOn jar
     dependsOn updateTomlFiles
-    dependsOn ':unpackBallerinaDistribution'
+    dependsOn ':unpackScanPackageBallerinaDistribution'
     doLast {
-        rootProject.runBal(file(packageDir), 'pack')
-        rootProject.runBal(file(packageDir), 'push')
+        rootProject.runScanPackageBal(file(packageDir), 'pack')
+        rootProject.runScanPackageBal(file(packageDir), 'push')
         println("Successfully published the ${packageOrg}/${packageName} package to central.")
     }
 }
