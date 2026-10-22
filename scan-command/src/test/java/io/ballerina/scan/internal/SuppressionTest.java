@@ -286,6 +286,9 @@ public class SuppressionTest extends BaseTest {
         JsonArray diagnostics = result.getAsJsonArray("suppressionDiagnostics");
         Assert.assertEquals(diagnostics.size(), 1);
         Assert.assertEquals(diagnostics.get(0).getAsJsonObject().get("severity").getAsString(), "WARNING");
+        Assert.assertEquals(diagnostics.get(0).getAsJsonObject().get("filePath").getAsString(),
+                suppressedIssues.get(0).getAsJsonObject().getAsJsonObject("issueContext").get("filePath")
+                        .getAsString());
     }
 
     @Test(description = "test the ballerina/scan compiler plugin validates rule IDs")

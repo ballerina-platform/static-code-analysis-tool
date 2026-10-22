@@ -416,8 +416,9 @@ public class ScanLanguageServerTool {
             JsonObject obj = new JsonObject();
             obj.addProperty("severity", diagnostic.severity().toString());
             obj.addProperty("message", diagnostic.message());
-            obj.addProperty("filePath", diagnostic.fileName());
             LineRange range = diagnostic.location();
+            // The document name, as issues report it; fileName() carries the module prefix of a workspace
+            obj.addProperty("filePath", range.fileName());
             obj.addProperty("startLine", range.startLine().line());
             obj.addProperty("startColumn", range.startLine().offset());
             obj.addProperty("endLine", range.endLine().line());
