@@ -302,6 +302,7 @@ tasks.register('createCodeCoverageReport', JacocoReport) {
 // Publish scan tool to central
 tasks.register('publishScanPackage') {
     dependsOn jar
+    dependsOn updateTomlFiles
     dependsOn ':unpackBallerinaDistribution'
     mustRunAfter buildScanTool
     doLast {
