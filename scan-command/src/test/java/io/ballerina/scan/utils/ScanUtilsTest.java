@@ -204,6 +204,19 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
+    @Test(description = "test method for loading a Scan.toml file with a suppression setting that is not a boolean")
+    void testLoadScanTomlConfigurationsWithNonBooleanSuppressionSetting() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-invalid-suppression-settings");
+        Project project = ProjectLoader.loadProject(ballerinaProject);
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
+        System.setProperty("user.dir", userDir);
+        Assert.assertNull(scanTomlFile);
+        String expected = DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, "requireReason");
+        Assert.assertTrue(readOutput(true).contains(expected));
+    }
+
     @Test(description = "test method for loading configurations from an external configuration file")
     void testloadExternalScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")

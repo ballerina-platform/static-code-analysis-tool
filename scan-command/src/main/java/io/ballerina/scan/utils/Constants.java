@@ -60,6 +60,16 @@ public class Constants {
     static final String ANALYZER_VERSION = "version";
     static final String ANALYZER_REPOSITORY = "repository";
     static final String RULES_TABLE = "rule";
+    static final String SUPPRESSION_TABLE = "suppression";
+    static final String SUPPRESSIONS = "suppressions";
+    static final String SUPPRESSION_KIND = "kind";
+    static final String SUPPRESSION_KIND_IN_SOURCE = "inSource";
+    static final String SUPPRESSION_STATUS = "status";
+    static final String SUPPRESSION_STATUS_ACCEPTED = "accepted";
+    static final String SUPPRESSION_JUSTIFICATION = "justification";
+    static final String SUPPRESSION_ENABLED = "enabled";
+    static final String SUPPRESSION_REQUIRE_REASON = "requireReason";
+    static final String SUPPRESSION_REQUIRE_RULE_ID = "requireRuleId";
     static final String JAR_PREDICATE = ".jar";
     static final String CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN = "^\\d+\\.\\d+\\.\\d+$";
     static final String RULE_ID_COLUMN = "RuleID";
