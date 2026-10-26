@@ -189,14 +189,14 @@ public class SuppressionTest extends BaseTest {
         Assert.assertFalse(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
     }
 
-    @Test(description = "test a constant rule list suppresses and a rule that does not resolve suppresses nothing")
+    @Test(description = "test constant and escaped rule IDs suppress and an unresolved rule suppresses nothing")
     void testUnresolvedRulesDoNotWidenSuppression() throws IOException {
         String console = runScan(unresolvedSuppressionsProject, "--require-suppression-rule-id",
                 "--require-suppression-reason");
 
         JsonArray issues = readReport(unresolvedSuppressionsProject, "scan_results.json").getAsJsonArray();
-        Assert.assertEquals(issues.size(), 3);
-        Assert.assertTrue(console.contains("2 issue(s), 1 suppressed"), console);
+        Assert.assertEquals(issues.size(), 4);
+        Assert.assertTrue(console.contains("2 issue(s), 2 suppressed"), "an escaped rule ID is decoded");
         Assert.assertTrue(console.contains("WARNING [bal_project_with_unresolved_suppressions/main.bal:(22:5,22:94)] "
                 + "suppression rule 'string `ballerina:1`' does not resolve to a rule ID; use a string literal or a "
                 + "constant"), console);

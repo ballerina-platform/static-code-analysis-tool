@@ -34,3 +34,9 @@ function shorthand() {
 
 const rules = ["ballerina:7"];
 const reason = "Shorthand fields";
+
+function escaped() {
+    @scan:Suppress {rules: ["ballerina:\u{31}"], reason: "Escaped rule ID"}
+    int value = checkpanic int:fromString("4");
+    _ = value;
+}
