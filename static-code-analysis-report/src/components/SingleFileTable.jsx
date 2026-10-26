@@ -584,7 +584,7 @@ const IssueDetails = ({ issue, onShowInCode }) => {
     );
 };
 
-// Explains why a suppressed issue isn't counted: the annotation's reason and the rules it covers.
+// Explains why a suppressed issue isn't counted: the suppression's reason and the rules it covers.
 const SuppressionDetails = ({ issue }) => {
     const justification = getJustification(issue);
     const rules = getSuppressedRules(issue);
@@ -600,9 +600,7 @@ const SuppressionDetails = ({ issue }) => {
         }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <SUPPRESSED.Icon fontSize="small" sx={{ color: SUPPRESSED.color }} />
-                <Typography variant="body2" fontWeight={700}>
-                    Suppressed in source with <Box component="code" sx={{ fontFamily: "consolas, monospace" }}>@scan:Suppress</Box>
-                </Typography>
+                <Typography variant="body2" fontWeight={700}>Suppressed</Typography>
             </Box>
             <DetailField label="Reason">
                 {justification
