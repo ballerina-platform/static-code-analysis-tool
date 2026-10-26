@@ -107,7 +107,7 @@ spotbugsMain {
 // Configurations to build the ballerina/scan package and deploy it to the local and central caches
 def packageOrg = "ballerina"
 def packageName = "scan"
-def tomlVersion = "${version}"
+def tomlVersion = "${version}".replace("-SNAPSHOT", "")
 def packageDir = "${projectDir}/ballerina"
 def ballerinaTomlFilePlaceHolder = new File("${rootDir}/build-config/resources/scan-package/Ballerina.toml")
 def compilerPluginTomlFilePlaceHolder = new File("${rootDir}/build-config/resources/scan-package/CompilerPlugin.toml")
@@ -121,7 +121,7 @@ tasks.register('updateTomlFiles') {
     doLast {
         def newConfig = ballerinaTomlFilePlaceHolder.text.replace("@toml.distribution@", scanPackageBallerinaLangVersion)
         ballerinaTomlFile.text = newConfig.replace("@toml.version@", tomlVersion)
-        compilerPluginTomlFile.text = compilerPluginTomlFilePlaceHolder.text.replace("@toml.version@", tomlVersion)
+        compilerPluginTomlFile.text = compilerPluginTomlFilePlaceHolder.text.replace("@project.version@", "${version}")
     }
 }
 

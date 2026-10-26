@@ -3,4 +3,4 @@ id = "scan-compiler-plugin"
 class = "io.ballerina.lib.scan.compiler.ScanCompilerPlugin"
 
 [[dependency]]
-path = "../build/libs/scan-compiler-plugin-1.0.0.jar"
+path = "../build/libs/scan-compiler-plugin-1.0.0-SNAPSHOT.jar"

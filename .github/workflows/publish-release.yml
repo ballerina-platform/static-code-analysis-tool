@@ -27,7 +27,7 @@ jobs:
           java-version: '21.0.6'
 
       - name: Set version env variable
-        run: echo "VERSION=$((grep -w "version" | cut -d= -f2) < gradle.properties | rev | cut --complement -d- -f1 | rev)" >> $GITHUB_ENV
+        run: echo "VERSION=$((grep -E '^version=' | cut -d= -f2) < gradle.properties | rev | cut --complement -d- -f1 | rev)" >> $GITHUB_ENV
 
       - name: Pre release dependency version update
         env:
@@ -39,6 +39,9 @@ jobs:
           git checkout -b release-${VERSION}
           sed -i 's/ballerinaLangVersion=\(.*\)-SNAPSHOT/ballerinaLangVersion=\1/g' gradle.properties
           sed -i 's/ballerinaLangVersion=\(.*\)-[0-9]\{8\}-[0-9]\{6\}-.*$/ballerinaLangVersion=\1/g' gradle.properties
+          if [ "${{ inputs.publish-scan-package }}" == "true" ]; then
+            sed -i 's/^scanPackageVersion=\(.*\)-SNAPSHOT$/scanPackageVersion=\1/' gradle.properties
+          fi
           git add gradle.properties
           git commit -m "Move dependencies to stable version" || echo "No changes to commit"
 
@@ -54,6 +57,17 @@ jobs:
         run: |
           ./gradlew clean release -Prelease.useAutomaticVersion=true
           ./gradlew publish -Pversion=${VERSION} -PpublishBallerinaScanPackage=${{ inputs.publish-scan-package }}
+
+      # The release plugin only manages `version`, so move ballerina/scan to its next development version here
+      - name: Post release ballerina/scan version update
+        if: ${{ inputs.publish-scan-package }}
+        run: |
+          SCAN_PACKAGE_VERSION=$(grep -E '^scanPackageVersion=' gradle.properties | cut -d= -f2)
+          NEXT_SCAN_PACKAGE_VERSION=$(echo "${SCAN_PACKAGE_VERSION}" | awk -F. '{print $1"."$2"."$3+1}')-SNAPSHOT
+          sed -i "s/^scanPackageVersion=.*/scanPackageVersion=${NEXT_SCAN_PACKAGE_VERSION}/" gradle.properties
+          git add gradle.properties
+          git commit -m "Move ballerina/scan to ${NEXT_SCAN_PACKAGE_VERSION}"
+          git push origin release-${VERSION}
 
       - name: GitHub Release and Release Sync PR
         env:
