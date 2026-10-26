@@ -201,9 +201,45 @@ final class SuppressionCollector {
         return text.startsWith("'") ? text.substring(1) : text;
     }
 
+    // The value of a string literal, with its character and numeric escapes decoded
     private static String literalText(BasicLiteralNode literal) {
         String text = literal.literalToken().text();
-        return text.substring(1, text.length() - 1);
+        text = text.substring(1, text.length() - 1);
+        StringBuilder value = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c != '\\' || i + 1 == text.length()) {
+                value.append(c);
+                continue;
+            }
+            char escape = text.charAt(++i);
+            switch (escape) {
+                case 't' -> value.append('\t');
+                case 'n' -> value.append('\n');
+                case 'r' -> value.append('\r');
+                case 'u' -> {
+                    int close = text.indexOf('}', i);
+                    if (i + 1 < text.length() && text.charAt(i + 1) == '{' && close > i + 2
+                            && appendCodePoint(value, text.substring(i + 2, close))) {
+                        i = close;
+                    } else {
+                        value.append('\\').append(escape);
+                    }
+                }
+                default -> value.append(escape);
+            }
+        }
+        return value.toString();
+    }
+
+    // A malformed escape is a compile error already; it is kept as written
+    private static boolean appendCodePoint(StringBuilder value, String hex) {
+        try {
+            value.appendCodePoint(Integer.parseInt(hex, 16));
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private static Optional<String> stringValue(SemanticModel semanticModel, Node expression) {
