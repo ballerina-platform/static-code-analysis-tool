@@ -3,19 +3,26 @@ name: Publish Release
 on:
   workflow_dispatch:
     inputs:
-      publish-scan-package:
-        description: Also publish the ballerina/scan package at its own version
-        type: boolean
-        default: false
+      publish-target:
+        type: choice
+        description: "What to release: the scan tool, the ballerina/scan package, or all of them"
+        required: true
+        default: tool
+        options:
+          - tool
+          - package
+          - all
 
 # Not the shared release template: it names the GitHub release module-<org>-<package>-v<version>, while scan tool
-# releases are named scan-tool-v<version>.
+# releases are named scan-tool-v<version> and ballerina/scan releases scan-package-v<version>.
 jobs:
   publish_release:
     name: Publish release
     runs-on: ubuntu-latest
 
     if: github.repository_owner == 'ballerina-platform'
+    env:
+      PUBLISH_TARGET: ${{ inputs.publish-target }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -26,26 +33,31 @@ jobs:
           distribution: 'temurin'
           java-version: '21.0.6'
 
-      - name: Set version env variable
-        run: echo "VERSION=$((grep -E '^version=' | cut -d= -f2) < gradle.properties | rev | cut --complement -d- -f1 | rev)" >> $GITHUB_ENV
+      - name: Set version env variables
+        run: |
+          echo "VERSION=$((grep -E '^version=' | cut -d= -f2) < gradle.properties | rev | cut --complement -d- -f1 | rev)" >> $GITHUB_ENV
+          echo "SCAN_PACKAGE_VERSION=$(grep -E '^scanPackageVersion=' gradle.properties | cut -d= -f2 | sed 's/-SNAPSHOT$//')" >> $GITHUB_ENV
 
       - name: Pre release dependency version update
-        env:
-          GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
         run: |
-          echo "Version: ${VERSION}"
+          if [ "${PUBLISH_TARGET}" == "package" ]; then
+            RELEASE_BRANCH=release-scan-package-${SCAN_PACKAGE_VERSION}
+          else
+            RELEASE_BRANCH=release-${VERSION}
+          fi
+          echo "RELEASE_BRANCH=${RELEASE_BRANCH}" >> $GITHUB_ENV
           git config --global user.name ${{ secrets.BALLERINA_BOT_USERNAME }}
           git config --global user.email ${{ secrets.BALLERINA_BOT_EMAIL }}
-          git checkout -b release-${VERSION}
+          git checkout -b ${RELEASE_BRANCH}
           sed -i 's/ballerinaLangVersion=\(.*\)-SNAPSHOT/ballerinaLangVersion=\1/g' gradle.properties
           sed -i 's/ballerinaLangVersion=\(.*\)-[0-9]\{8\}-[0-9]\{6\}-.*$/ballerinaLangVersion=\1/g' gradle.properties
-          if [ "${{ inputs.publish-scan-package }}" == "true" ]; then
-            sed -i 's/^scanPackageVersion=\(.*\)-SNAPSHOT$/scanPackageVersion=\1/' gradle.properties
+          if [ "${PUBLISH_TARGET}" != "tool" ]; then
+            sed -i "s/^scanPackageVersion=.*/scanPackageVersion=${SCAN_PACKAGE_VERSION}/" gradle.properties
           fi
           git add gradle.properties
           git commit -m "Move dependencies to stable version" || echo "No changes to commit"
 
-      - name: Publish artifact
+      - name: Publish artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
           BALLERINA_STAGE_CENTRAL: false
@@ -55,23 +67,34 @@ jobs:
           publishUser: ${{ secrets.BALLERINA_BOT_USERNAME }}
           publishPAT: ${{ secrets.BALLERINA_BOT_TOKEN }}
         run: |
-          ./gradlew clean release -Prelease.useAutomaticVersion=true
-          ./gradlew publish -Pversion=${VERSION} -PpublishBallerinaScanPackage=${{ inputs.publish-scan-package }}
+          if [ "${PUBLISH_TARGET}" == "package" ]; then
+            ./gradlew clean build :scan-package:publishBallerinaPackage
+          else
+            ./gradlew clean release -Prelease.useAutomaticVersion=true
+            ./gradlew publish -Pversion=${VERSION} -PpublishTarget=${PUBLISH_TARGET}
+          fi
 
-      # The release plugin only manages `version`, so move ballerina/scan to its next development version here
+      # The release plugin only manages `version`, so ballerina/scan is tagged and moved to its next development
+      # version here
       - name: Post release ballerina/scan version update
-        if: ${{ inputs.publish-scan-package }}
+        if: ${{ inputs.publish-target != 'tool' }}
         run: |
-          SCAN_PACKAGE_VERSION=$(grep -E '^scanPackageVersion=' gradle.properties | cut -d= -f2)
+          git tag scan-package-v${SCAN_PACKAGE_VERSION}
           NEXT_SCAN_PACKAGE_VERSION=$(echo "${SCAN_PACKAGE_VERSION}" | awk -F. '{print $1"."$2"."$3+1}')-SNAPSHOT
           sed -i "s/^scanPackageVersion=.*/scanPackageVersion=${NEXT_SCAN_PACKAGE_VERSION}/" gradle.properties
           git add gradle.properties
           git commit -m "Move ballerina/scan to ${NEXT_SCAN_PACKAGE_VERSION}"
-          git push origin release-${VERSION}
+          git push origin ${RELEASE_BRANCH} scan-package-v${SCAN_PACKAGE_VERSION}
 
       - name: GitHub Release and Release Sync PR
         env:
           GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
         run: |
-          gh release create v$VERSION --title "scan-tool-v$VERSION"
-          gh pr create --base ${GITHUB_REF##*/} --title "[Automated] Sync ${GITHUB_REF##*/} after $VERSION release" --body "Sync ${GITHUB_REF##*/} after $VERSION release"
+          if [ "${PUBLISH_TARGET}" != "package" ]; then
+            gh release create v${VERSION} --title "scan-tool-v${VERSION}"
+          fi
+          if [ "${PUBLISH_TARGET}" != "tool" ]; then
+            gh release create scan-package-v${SCAN_PACKAGE_VERSION} --title "scan-package-v${SCAN_PACKAGE_VERSION}" --latest=false
+          fi
+          BASE_BRANCH=${GITHUB_REF##*/}
+          gh pr create --base ${BASE_BRANCH} --title "[Automated] Sync ${BASE_BRANCH} after ${RELEASE_BRANCH#release-} release" --body "Sync ${BASE_BRANCH} after ${RELEASE_BRANCH#release-} release"

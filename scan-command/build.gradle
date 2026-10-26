@@ -299,13 +299,20 @@ tasks.register('createCodeCoverageReport', JacocoReport) {
     }
 }
 
-// Publish scan tool to central; ballerina/scan is versioned separately and published only on its own release
+// publishTarget selects what goes to central: the scan tool (default), the ballerina/scan package, or all of them.
+// ballerina/scan is versioned separately, so it is published only when its own release is due.
+def publishTarget = findProperty('publishTarget') ?: 'tool'
+if (!(publishTarget in ['tool', 'package', 'all'])) {
+    throw new GradleException("publishTarget must be one of tool, package or all, but was '${publishTarget}'")
+}
+
 tasks.register('publishScanPackage') {
     dependsOn jar
     dependsOn ':unpackBallerinaDistribution'
-    if (findProperty('publishBallerinaScanPackage') == 'true') {
+    if (publishTarget != 'tool') {
         dependsOn ':scan-package:publishBallerinaPackage'
     }
+    onlyIf { publishTarget != 'package' }
     mustRunAfter buildScanTool
     doLast {
         rootProject.runBal(file('tool-scan'), 'pack')
