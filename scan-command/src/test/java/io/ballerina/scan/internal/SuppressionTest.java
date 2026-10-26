@@ -165,21 +165,24 @@ public class SuppressionTest extends BaseTest {
         results.forEach(result -> Assert.assertFalse(result.getAsJsonObject().has("suppressions")));
     }
 
-    @Test(description = "test a rule-specific suppression takes precedence over a blanket one on the same construct")
+    @Test(description = "test a rule-specific suppression wins on a construct and a repeated rule is reported")
     void testRuleSpecificSuppressionPreferredOnSameConstruct() throws IOException {
         String console = runScan(sameConstructSuppressionsProject);
 
         JsonArray issues = readReport(sameConstructSuppressionsProject, "scan_results.json").getAsJsonArray();
-        Assert.assertEquals(issues.size(), 2);
+        List<String> justifications = new ArrayList<>();
         for (JsonElement issue : issues) {
             JsonObject suppression = issue.getAsJsonObject().getAsJsonArray("suppressions").get(0).getAsJsonObject();
-            Assert.assertEquals(suppression.get("justification").getAsString(), "Rule-specific");
+            justifications.add(suppression.get("justification").getAsString());
         }
-        Assert.assertTrue(console.contains("0 issue(s), 2 suppressed"), console);
+        Assert.assertEquals(justifications, List.of("Rule-specific", "Rule-specific", "First"));
+        Assert.assertTrue(console.contains("0 issue(s), 3 suppressed"), console);
         Assert.assertTrue(console.contains("WARNING [main.bal:(20:5,20:39)] suppression of all rules did not "
                 + "match any issue"), console);
         Assert.assertTrue(console.contains("WARNING [main.bal:(26:5,26:39)] suppression of all rules did not "
                 + "match any issue"), console);
+        Assert.assertTrue(console.contains("WARNING [main.bal:(31:5,31:44)] rule 'ballerina:1' is already "
+                + "suppressed on this construct"), console);
         Assert.assertFalse(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
     }
 

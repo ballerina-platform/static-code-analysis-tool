@@ -54,7 +54,8 @@ public enum DiagnosticCode {
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
     UNMATCHED_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_004", "unmatched.blanket.suppression"),
     UNRESOLVED_SUPPRESSION_RULE("STATIC_ANALYSIS_WARNING_005", "unresolved.suppression.rule"),
-    UNKNOWN_RULE_PROVIDER("STATIC_ANALYSIS_WARNING_006", "unknown.rule.provider");
+    UNKNOWN_RULE_PROVIDER("STATIC_ANALYSIS_WARNING_006", "unknown.rule.provider"),
+    DUPLICATE_SUPPRESSION_RULE("STATIC_ANALYSIS_WARNING_007", "duplicate.suppression.rule");
 
     private final String diagnosticId;
     private final String messageKey;

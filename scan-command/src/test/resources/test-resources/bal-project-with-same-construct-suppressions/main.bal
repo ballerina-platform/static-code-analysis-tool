@@ -26,4 +26,9 @@ public function main() {
     @scan:Suppress {reason: "Blanket"}
     int blanketLast = checkpanic int:fromString("2");
     _ = blanketLast;
+
+    @scan:Suppress {rules: ["ballerina:1"], reason: "First"}
+    @scan:Suppress {rules: ["ballerina:1"]}
+    int duplicate = checkpanic int:fromString("3");
+    _ = duplicate;
 }
