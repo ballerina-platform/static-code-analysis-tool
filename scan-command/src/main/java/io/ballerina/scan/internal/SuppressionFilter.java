@@ -53,16 +53,18 @@ final class SuppressionFilter {
 
     /**
      * Splits the issues into active and suppressed ones and reports diagnostics about the suppressions. The issues
-     * are expected to have passed rule selection already, so a suppression naming an excluded rule is unmatched.
+     * are expected to have passed rule selection already. A suppression is not reported as unmatched for a rule the
+     * selection leaves out, since whether it is still needed cannot be told from this scan.
      *
-     * @param project the project the issues were reported for
-     * @param issues  the issues remaining after rule selection
-     * @param rules   every rule the scan can report, before rule selection
-     * @param options how the suppressions are applied
+     * @param project   the project the issues were reported for
+     * @param issues    the issues remaining after rule selection
+     * @param rules     every rule the scan can report, before rule selection
+     * @param selection the rules the scan reports
+     * @param options   how the suppressions are applied
      * @return the active and suppressed issues, and diagnostics about the suppressions
      */
     static SuppressionOutcome apply(Project project, List<Issue> issues, Collection<Rule> rules,
-                                    SuppressionOptions options) {
+                                    RuleSelection selection, SuppressionOptions options) {
         if (options.ignoreSuppressions()) {
             return new SuppressionOutcome(issues, List.of(), List.of());
         }
@@ -88,7 +90,7 @@ final class SuppressionFilter {
             suppressedIssues.add(new SuppressedIssue(issue, suppression.rules(),
                     suppression.justification().orElse(null)));
         }
-        diagnostics.addAll(unmatchedSuppressions(suppressions, matchedRules, knownRules));
+        diagnostics.addAll(unmatchedSuppressions(suppressions, matchedRules, knownRules, selection));
         return new SuppressionOutcome(activeIssues, suppressedIssues, diagnostics);
     }
 
@@ -155,11 +157,13 @@ final class SuppressionFilter {
 
     private static List<SuppressionDiagnostic> unmatchedSuppressions(List<SuppressionAnnotation> suppressions,
                                                                      Map<SuppressionAnnotation, Set<String>> matched,
-                                                                     KnownRules knownRules) {
+                                                                     KnownRules knownRules,
+                                                                     RuleSelection selection) {
         List<SuppressionDiagnostic> unmatched = new ArrayList<>();
         for (SuppressionAnnotation suppression : suppressions) {
             Set<String> matchedRules = matched.getOrDefault(suppression, Set.of());
-            if (suppression.blanket() && matchedRules.isEmpty()) {
+            // A blanket suppression may cover issues of the rules left out, so it is judged only on a full scan
+            if (suppression.blanket() && matchedRules.isEmpty() && !selection.isPartial()) {
                 unmatched.add(warning(suppression,
                         DiagnosticLog.warning(DiagnosticCode.UNMATCHED_BLANKET_SUPPRESSION)));
             }
@@ -168,7 +172,7 @@ final class SuppressionFilter {
                         DiagnosticLog.warning(DiagnosticCode.UNRESOLVED_SUPPRESSION_RULE, rule)));
             }
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
-                if (!matchedRules.contains(rule) && knownRules.ids().contains(rule)) {
+                if (!matchedRules.contains(rule) && knownRules.ids().contains(rule) && selection.selects(rule)) {
                     unmatched.add(warning(suppression,
                             DiagnosticLog.warning(DiagnosticCode.UNMATCHED_SUPPRESSION, rule)));
                 }

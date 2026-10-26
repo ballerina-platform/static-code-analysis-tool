@@ -228,13 +228,36 @@ public class SuppressionTest extends BaseTest {
         Assert.assertEquals(result.getAsJsonArray("suppressedIssues").size(), 0);
     }
 
-    @Test(description = "test a suppression of an excluded rule is reported as unmatched")
-    void testSuppressionOfExcludedRuleIsUnmatched() throws IOException {
+    @Test(description = "test a suppression of an excluded rule is not reported as unmatched")
+    void testSuppressionOfExcludedRuleIsNotUnmatched() throws IOException {
         String console = runScan(suppressionsProject, "--exclude-rules=ballerina:1");
 
         Assert.assertEquals(readReport(suppressionsProject, "scan_results.json").getAsJsonArray().size(), 0);
-        Assert.assertTrue(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
-        Assert.assertTrue(console.contains("suppression of all rules did not match any issue"), console);
+        Assert.assertFalse(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
+        Assert.assertFalse(console.contains("suppression of all rules did not match any issue"), console);
+        Assert.assertTrue(console.contains("suppression of 'ballerina:7' did not match any issue"), console);
+    }
+
+    @Test(description = "test only suppressions of the included rules are reported as unmatched")
+    void testSuppressionOfRuleNotIncludedIsNotUnmatched() throws IOException {
+        String console = runScan(suppressionsProject, "--include-rules=ballerina:7");
+
+        Assert.assertEquals(readReport(suppressionsProject, "scan_results.json").getAsJsonArray().size(), 0);
+        Assert.assertFalse(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
+        Assert.assertFalse(console.contains("suppression of all rules did not match any issue"), console);
+        Assert.assertTrue(console.contains("suppression of 'ballerina:7' did not match any issue"), console);
+    }
+
+    @Test(description = "test a suppression of an unknown rule fails the scan even when the rule is not included")
+    void testUnknownRuleFailsTheScanWhenNotIncluded() throws IOException {
+        System.setProperty("user.dir", unknownCoreRuleProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        new CommandLine(scanCmd).parseArgs("--include-rules=ballerina:1");
+        Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+        System.setProperty("user.dir", userDir);
+
+        String console = readOutput(true);
+        Assert.assertTrue(console.contains("unknown rule 'ballerina:999'"), console);
     }
 
     @Test(description = "test the command-line requirement fails the scan but still suppresses")

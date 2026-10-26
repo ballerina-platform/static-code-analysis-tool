@@ -378,17 +378,12 @@ public class ScanCmd implements BLauncherCmd {
         List<Issue> issues = projectAnalyzer.analyze(coreRules);
         issues.addAll(externalIssues);
 
-        if (!projectIncludeRules.isEmpty()) {
-            issues.removeIf(issue -> !projectIncludeRules.contains(issue.rule().id()));
-        }
-        if (!projectExcludeRules.isEmpty()) {
-            issues.removeIf(issue -> projectExcludeRules.contains(issue.rule().id()));
-        }
+        RuleSelection ruleSelection = new RuleSelection(projectIncludeRules, projectExcludeRules);
+        issues.removeIf(issue -> !ruleSelection.selects(issue.rule().id()));
 
-        // Applied after rule selection, so a suppression of an excluded rule is reported as unmatched
         List<Rule> projectRules = new ArrayList<>(coreRules);
         externalAnalyzers.values().forEach(projectRules::addAll);
-        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, issues, projectRules,
+        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, issues, projectRules, ruleSelection,
                 SuppressionOptions.of(scanTomlFile.get(), ignoreSuppressions, requireSuppressionReason,
                         requireSuppressionRuleId));
         List<Issue> activeIssues = suppressionOutcome.activeIssues();

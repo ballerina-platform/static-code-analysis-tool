@@ -358,7 +358,7 @@ public class ScanLanguageServerTool {
         List<Rule> projectRules = new ArrayList<>(coreRules);
         externalAnalyzers.values().forEach(projectRules::addAll);
         SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, activeIssues, projectRules,
-                SuppressionOptions.of(scanToml, false, false, false));
+                new RuleSelection(includeRules, excludeRules), SuppressionOptions.of(scanToml, false, false, false));
         return new LsScanResult(new ScanResult(suppressionOutcome.activeIssues(), excludedIssues,
                 suppressionOutcome.suppressedIssues()), suppressionOutcome.diagnostics());
     }
