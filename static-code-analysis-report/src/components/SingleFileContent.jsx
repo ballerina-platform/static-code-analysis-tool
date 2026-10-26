@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 const REACT_REPORT_OFFSET = 1;
 function SingleFileContent({ issues, fileContent }) {
     const [issueLines, setIssueLines] = useState([])
+    const [suppressedLines, setSuppressedLines] = useState([])
 
     useEffect(() => {
         if (issues?.length !== 0) {
             const allIssueLines = [];
+            const allSuppressedLines = [];
             issues?.forEach((issue) => {
                 if (!issue?.textRange
                     || typeof issue.textRange.startLine !== 'number'
@@ -21,20 +23,30 @@ function SingleFileContent({ issues, fileContent }) {
                 }
                 const issueLineRange = Array.from(
                     { length: issueEndLine - issueStartLine + 1 }, (_, i) => issueStartLine + i);
-                allIssueLines.push(...issueLineRange);
+                (issue.suppression ? allSuppressedLines : allIssueLines).push(...issueLineRange);
             });
             setIssueLines(allIssueLines);
+            setSuppressedLines(allSuppressedLines);
         } else {
             setIssueLines([]);
+            setSuppressedLines([]);
         }
     }, [issues])
 
     return (
-        <ContentMapper fileContent={fileContent} issueLines={issueLines} />
+        <ContentMapper fileContent={fileContent} issueLines={issueLines} suppressedLines={suppressedLines} />
     )
 }
 
-const ContentMapper = ({ fileContent, issueLines }) => {
+// A line with an active issue stays red; a line with only suppressed issues is shown in gray.
+const lineColor = (lineNumber, issueLines, suppressedLines) => {
+    if (issueLines.includes(lineNumber)) {
+        return "#F74B5A";
+    }
+    return suppressedLines.includes(lineNumber) ? "#CFD8DC" : "#f5f5f5";
+}
+
+const ContentMapper = ({ fileContent, issueLines, suppressedLines }) => {
     // Create a column of line numbers and the content of the file
     return (
         <Box sx={{
@@ -61,7 +73,7 @@ const ContentMapper = ({ fileContent, issueLines }) => {
                                 margin: "0",
                                 padding: "0.3rem 1rem",
                                 // backgroundColor: "#f5f5f5",
-                                backgroundColor: issueLines.includes(index + REACT_REPORT_OFFSET) ? "#F74B5A" : "#f5f5f5",
+                                backgroundColor: lineColor(index + REACT_REPORT_OFFSET, issueLines, suppressedLines),
                             }}>
                             <Box key={index + REACT_REPORT_OFFSET} sx={{ display: "flex", gap: "1rem" }}>
                                 <Box>

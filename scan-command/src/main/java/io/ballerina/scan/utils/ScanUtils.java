@@ -104,6 +104,7 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_FILE_PATH;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_MESSAGE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_RULE_ID;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_SEVERITY;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_SUPPRESSION;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET;
@@ -113,6 +114,7 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TYPE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_NAME;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SCANNED_FILES;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SUPPRESSION_RULES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ZIP_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_TABLE;
 import static io.ballerina.scan.utils.Constants.SUPPRESSIONS;
@@ -516,6 +518,23 @@ public final class ScanUtils {
      * @return path of the html analysis report where generated issues are saved
      */
     public static Path generateScanReport(List<Issue> issues, Project project, String directoryName) {
+        return generateScanReport(issues, project, directoryName, Map.of());
+    }
+
+    /**
+     * Returns the {@link Path} of the html analysis report where generated issues are saved. Each suppressed
+     * issue is listed with its suppression, so that the report can show the accepted issues apart from the
+     * active ones.
+     *
+     * @param issues        generated issues, including suppressed ones
+     * @param project       Ballerina project
+     * @param directoryName target directory name
+     * @param suppressions  the suppressed issues, keyed by the issue they suppress
+     * @return path of the html analysis report where generated issues are saved
+     * @since 0.11.1
+     */
+    public static Path generateScanReport(List<Issue> issues, Project project, String directoryName,
+                                          Map<Issue, SuppressedIssue> suppressions) {
         JsonObject scannedProject = new JsonObject();
         scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, project.currentPackage().packageName().toString());
         Map<String, JsonObject> scanReportPathAndFile = new HashMap<>();
@@ -527,7 +546,7 @@ public final class ScanUtils {
             if (scanReportPathAndFile.containsKey(filePath)) {
                 JsonObject scanReportFile = scanReportPathAndFile.get(filePath);
                 JsonArray issuesArray = scanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES);
-                JsonObject issueObject = getJsonIssue(issueImpl);
+                JsonObject issueObject = getJsonIssue(issueImpl, suppressions.get(issue));
                 issuesArray.add(issueObject);
                 scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
             } else {
@@ -543,7 +562,7 @@ public final class ScanUtils {
                 }
                 scanReportFile.addProperty(SCAN_REPORT_FILE_CONTENT, fileContent);
                 JsonArray issuesArray = new JsonArray();
-                JsonObject issueObject = getJsonIssue(issueImpl);
+                JsonObject issueObject = getJsonIssue(issueImpl, suppressions.get(issue));
                 issuesArray.add(issueObject);
                 scanReportFile.add(SCAN_REPORT_ISSUES, issuesArray);
                 scanReportPathAndFile.put(filePath, scanReportFile);
@@ -581,11 +600,12 @@ public final class ScanUtils {
      * Returns the {@link JsonObject} representation of the static code analysis
      * issue.
      *
-     * @param issueImpl the {@link IssueImpl} representing the issue, to be
-     *                  converted to a JSON object
+     * @param issueImpl       the {@link IssueImpl} representing the issue, to be
+     *                        converted to a JSON object
+     * @param suppressedIssue the suppression that accepted the issue, or {@code null} when it is active
      * @return json object representation of the static code analysis issue
      */
-    private static JsonObject getJsonIssue(IssueImpl issueImpl) {
+    private static JsonObject getJsonIssue(IssueImpl issueImpl, SuppressedIssue suppressedIssue) {
         JsonObject scanReportIssue = new JsonObject();
         scanReportIssue.addProperty(SCAN_REPORT_ISSUE_RULE_ID, issueImpl.rule().id());
         scanReportIssue.addProperty(SCAN_REPORT_ISSUE_SEVERITY, issueImpl.rule().kind().toString());
@@ -602,7 +622,21 @@ public final class ScanUtils {
                 .offset());
 
         scanReportIssue.add(SCAN_REPORT_ISSUE_TEXT_RANGE, scanReportIssueTextRange);
+        if (suppressedIssue != null) {
+            scanReportIssue.add(SCAN_REPORT_ISSUE_SUPPRESSION, getJsonSuppression(suppressedIssue));
+        }
         return scanReportIssue;
+    }
+
+    // An empty rule list means the suppression applies to every rule.
+    private static JsonObject getJsonSuppression(SuppressedIssue suppressedIssue) {
+        JsonObject suppression = new JsonObject();
+        suppressedIssue.justification().ifPresent(reason -> suppression.addProperty(SUPPRESSION_JUSTIFICATION,
+                reason));
+        JsonArray rules = new JsonArray();
+        suppressedIssue.rules().forEach(rules::add);
+        suppression.add(SCAN_REPORT_SUPPRESSION_RULES, rules);
+        return suppression;
     }
 
     /**

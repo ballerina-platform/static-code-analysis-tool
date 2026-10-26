@@ -3,13 +3,19 @@ import InfoCards from "./InfoCards";
 import MainTable from "./MainTable";
 import { useEffect, useState } from "react";
 
+// Issues accepted with `@scan:Suppress` are counted on their own, not by kind.
 function retrieveSingleFileStats(analyzedFile) {
     let codeSmells = 0
     let bugs = 0
     let vulnerabilities = 0
+    let suppressed = 0
 
     if (analyzedFile?.issues.length !== 0) {
         analyzedFile.issues.forEach((issue) => {
+            if (issue.suppression) {
+                suppressed += 1
+                return
+            }
             switch (issue.issueSeverity) {
                 case "CODE_SMELL":
                     codeSmells += 1
@@ -30,7 +36,8 @@ function retrieveSingleFileStats(analyzedFile) {
         fileName: analyzedFile.fileName,
         codeSmells: codeSmells,
         bugs: bugs,
-        vulnerabilities: vulnerabilities
+        vulnerabilities: vulnerabilities,
+        suppressed: suppressed
     }
 
     return singleFileRecord
@@ -41,6 +48,7 @@ function retrieveAllStats(analyzedFiles) {
     let totalCodeSmells = 0
     let totalBugs = 0
     let totalVulnerabilities = 0
+    let totalSuppressed = 0
     let singleFileRecords = []
 
     analyzedFiles?.forEach((analyzedFile) => {
@@ -50,6 +58,7 @@ function retrieveAllStats(analyzedFiles) {
         totalCodeSmells += singleFileRecord.codeSmells
         totalBugs += singleFileRecord.bugs
         totalVulnerabilities += singleFileRecord.vulnerabilities
+        totalSuppressed += singleFileRecord.suppressed
     })
 
     return {
@@ -57,6 +66,7 @@ function retrieveAllStats(analyzedFiles) {
         totalCodeSmells: totalCodeSmells,
         totalBugs: totalBugs,
         totalVulnerabilities: totalVulnerabilities,
+        totalSuppressed: totalSuppressed,
         singleFileRecords: singleFileRecords
     }
 }
@@ -66,7 +76,8 @@ function MainView({ toggleSingleFileView, analyzedFiles }) {
         filesScanned: 0,
         totalCodeSmells: 0,
         totalBugs: 0,
-        totalVulnerabilities: 0
+        totalVulnerabilities: 0,
+        totalSuppressed: 0
     })
 
     const [fileRecords, setFileRecords] = useState([])
@@ -79,7 +90,8 @@ function MainView({ toggleSingleFileView, analyzedFiles }) {
                 filesScanned: newStats.filesScanned,
                 totalCodeSmells: newStats.totalCodeSmells,
                 totalBugs: newStats.totalBugs,
-                totalVulnerabilities: newStats.totalVulnerabilities
+                totalVulnerabilities: newStats.totalVulnerabilities,
+                totalSuppressed: newStats.totalSuppressed
             })
 
             setFileRecords(newStats.singleFileRecords)

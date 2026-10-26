@@ -37,6 +37,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * In-source suppression tests.
@@ -104,6 +106,33 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(console.contains("1 issue(s), 2 suppressed"));
         Assert.assertTrue(console.contains("WARNING [bal_project_with_suppressions/main.bal:(23:5,23:71)] "
                 + "suppression of 'ballerina:7' did not match any issue"), console);
+    }
+
+    @Test(description = "test the HTML report lists suppressed issues with their suppression")
+    void testSuppressionsInHtmlReport() throws IOException {
+        runScan(suppressionsProject, "--scan-report");
+
+        String html = Files.readString(suppressionsProject.resolve("target").resolve("report").resolve("index.html"),
+                StandardCharsets.UTF_8);
+        Matcher scanData = Pattern.compile("<script id=\"scanData\" type=\"text/json\">(.*?)</script>",
+                Pattern.DOTALL).matcher(html);
+        Assert.assertTrue(scanData.find(), "the report is missing the embedded scan data");
+        List<JsonObject> issues = new ArrayList<>();
+        JsonParser.parseString(scanData.group(1)).getAsJsonObject().getAsJsonArray("scannedFiles")
+                .forEach(file -> file.getAsJsonObject().getAsJsonArray("issues")
+                        .forEach(issue -> issues.add(issue.getAsJsonObject())));
+        Assert.assertEquals(issues.size(), 3);
+        List<JsonObject> suppressions = issues.stream().filter(issue -> issue.has("suppression"))
+                .map(issue -> issue.getAsJsonObject("suppression")).toList();
+        Assert.assertEquals(suppressions.size(), 2);
+
+        JsonObject withReason = suppressions.stream().filter(suppression -> suppression.has("justification"))
+                .findFirst().orElseThrow();
+        Assert.assertEquals(withReason.get("justification").getAsString(), "Literal input that always parses");
+        Assert.assertEquals(withReason.getAsJsonArray("rules").get(0).getAsString(), "ballerina:1");
+        JsonObject everyRule = suppressions.stream().filter(suppression -> !suppression.has("justification"))
+                .findFirst().orElseThrow();
+        Assert.assertTrue(everyRule.getAsJsonArray("rules").isEmpty(), "a suppression without rules covers all");
     }
 
     @Test(description = "test suppressed issues carry an accepted inSource suppression in the SARIF report")
