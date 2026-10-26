@@ -31,6 +31,7 @@ abstract class ExecOperationsHolder {
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
     maven {
         url = 'https://maven.pkg.github.com/ballerina-platform/*'
@@ -41,13 +42,16 @@ repositories {
     }
 }
 
-// The build runs the Ballerina distribution matching ballerinaLangVersion instead of whichever `bal` is installed
+// The build runs the Ballerina distribution matching ballerinaLangVersion instead of whichever `bal` is installed.
+// Library packages the tests import, such as ballerina/scan, are added to it as a full distribution bundles them.
 configurations {
     ballerinaDistribution
+    ballerinaStdLibs
 }
 
 dependencies {
     ballerinaDistribution "org.ballerinalang:jballerina-tools:${ballerinaLangVersion}@zip"
+    ballerinaStdLibs "io.ballerina.lib:scan-ballerina:${stdlibScanVersion}@zip"
 }
 
 def ballerinaDistributionDir = layout.buildDirectory.dir("ballerina-distribution").get().asFile
@@ -57,6 +61,9 @@ def execOperations = objects.newInstance(ExecOperationsHolder).execOperations
 
 tasks.register('unpackBallerinaDistribution', Copy) {
     from { zipTree(configurations.ballerinaDistribution.singleFile) }
+    into("jballerina-tools-${ballerinaLangVersion}/repo") {
+        from { configurations.ballerinaStdLibs.collect { zipTree(it) } }
+    }
     into ballerinaDistributionDir
     doLast {
         balLauncher.setExecutable(true)
@@ -83,7 +90,6 @@ subprojects {
 project(':scan-command') {
     dependencies {
         tasks.test{
-            dependsOn ':scan-package:build'
             dependsOn ':test-compiler-plugins:exampleOrg-plugin:build'
             dependsOn ':test-compiler-plugins:ballerina-plugin:build'
             dependsOn ':test-compiler-plugins:ballerinax-plugin:build'

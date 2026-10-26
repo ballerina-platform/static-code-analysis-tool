@@ -1,6 +1,0 @@
-[plugin]
-id = "scan-compiler-plugin"
-class = "io.ballerina.lib.scan.compiler.ScanCompilerPlugin"
-
-[[dependency]]
-path = "../build/libs/scan-compiler-plugin-@toml.version@.jar"

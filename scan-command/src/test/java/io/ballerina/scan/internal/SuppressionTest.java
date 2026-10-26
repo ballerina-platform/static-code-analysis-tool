@@ -26,8 +26,6 @@ import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
-import io.ballerina.tools.diagnostics.Diagnostic;
-import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
@@ -268,28 +266,6 @@ public class SuppressionTest extends BaseTest {
         console = runScan(unknownCoreRuleProject, "--ignore-suppressions");
         Assert.assertFalse(console.contains("unknown rule 'ballerina:999'"), console);
         Assert.assertFalse(console.contains("suppressed"), console);
-    }
-
-    @Test(description = "test the ballerina/scan compiler plugin validates rule IDs")
-    void testCompilerPluginRuleIdValidation() {
-        BuildProject project = BuildProject.load(invalidSuppressionsProject.toAbsolutePath());
-        List<String> diagnostics = new ArrayList<>();
-        for (Diagnostic diagnostic : project.currentPackage().getCompilation().diagnosticResult().diagnostics()) {
-            if (diagnostic.diagnosticInfo().code().startsWith("SCAN_SUPPRESS_")) {
-                DiagnosticSeverity severity = diagnostic.diagnosticInfo().severity();
-                diagnostics.add(severity + " " + (diagnostic.location().lineRange().startLine().line() + 1) + " "
-                        + diagnostic.message());
-            }
-        }
-
-        // Whether a rule exists is checked by the scan tool when it runs, so ballerina:999 and acme/lint:1 pass
-        Assert.assertEquals(diagnostics, List.of(
-                "ERROR 29 invalid rule ID 'http:1': expected 'ballerina:<number>' or '<org>/<package>:<number>'",
-                "WARNING 33 rule 'ballerina:1' is listed more than once",
-                "WARNING 35 blank suppression reason; it is treated as absent",
-                "ERROR 37 empty rule list; omit 'rules' to suppress every rule",
-                "ERROR 39 invalid rule ID 'http:1': expected 'ballerina:<number>' or '<org>/<package>:<number>'",
-                "WARNING 41 cannot verify rule 'string `ballerina:1`': use a string literal or a constant"));
     }
 
     @Test(description = "test rules of an analyzer declared only in Scan.toml are checked when the scan runs")
