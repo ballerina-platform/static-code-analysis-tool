@@ -90,7 +90,7 @@ final class SuppressionFilter {
             suppressedIssues.add(new SuppressedIssue(issue, suppression.rules(),
                     suppression.justification().orElse(null)));
         }
-        diagnostics.addAll(unmatchedSuppressions(suppressions, matchedRules, knownRules, selection));
+        diagnostics.addAll(unusedSuppressions(suppressions, matchedRules, knownRules, selection));
         return new SuppressionOutcome(activeIssues, suppressedIssues, diagnostics);
     }
 
@@ -155,30 +155,40 @@ final class SuppressionFilter {
         return violations;
     }
 
-    private static List<SuppressionDiagnostic> unmatchedSuppressions(List<SuppressionAnnotation> suppressions,
-                                                                     Map<SuppressionAnnotation, Set<String>> matched,
-                                                                     KnownRules knownRules,
-                                                                     RuleSelection selection) {
-        List<SuppressionDiagnostic> unmatched = new ArrayList<>();
+    private static List<SuppressionDiagnostic> unusedSuppressions(List<SuppressionAnnotation> suppressions,
+                                                                  Map<SuppressionAnnotation, Set<String>> matched,
+                                                                  KnownRules knownRules, RuleSelection selection) {
+        List<SuppressionDiagnostic> unused = new ArrayList<>();
+        Map<String, Set<String>> rulesOnConstruct = new HashMap<>();
         for (SuppressionAnnotation suppression : suppressions) {
+            // An earlier annotation on the same construct wins the tie for its rules, so this one never matches them
+            Set<String> earlierRules = rulesOnConstruct.computeIfAbsent(
+                    suppression.filePath() + suppression.scope(), construct -> new HashSet<>());
+            Set<String> duplicateRules = new LinkedHashSet<>(suppression.rules());
+            duplicateRules.retainAll(earlierRules);
+            earlierRules.addAll(suppression.rules());
+            duplicateRules.forEach(rule -> unused.add(warning(suppression,
+                    DiagnosticLog.warning(DiagnosticCode.DUPLICATE_SUPPRESSION_RULE, rule))));
+
             Set<String> matchedRules = matched.getOrDefault(suppression, Set.of());
             // A blanket suppression may cover issues of the rules left out, so it is judged only on a full scan
             if (suppression.blanket() && matchedRules.isEmpty() && !selection.isPartial()) {
-                unmatched.add(warning(suppression,
+                unused.add(warning(suppression,
                         DiagnosticLog.warning(DiagnosticCode.UNMATCHED_BLANKET_SUPPRESSION)));
             }
             for (String rule : suppression.unresolvedRules()) {
-                unmatched.add(warning(suppression,
+                unused.add(warning(suppression,
                         DiagnosticLog.warning(DiagnosticCode.UNRESOLVED_SUPPRESSION_RULE, rule)));
             }
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
-                if (!matchedRules.contains(rule) && knownRules.ids().contains(rule) && selection.selects(rule)) {
-                    unmatched.add(warning(suppression,
+                if (!matchedRules.contains(rule) && !duplicateRules.contains(rule) && knownRules.ids().contains(rule)
+                        && selection.selects(rule)) {
+                    unused.add(warning(suppression,
                             DiagnosticLog.warning(DiagnosticCode.UNMATCHED_SUPPRESSION, rule)));
                 }
             }
         }
-        return unmatched;
+        return unused;
     }
 
     private static SuppressionDiagnostic error(SuppressionAnnotation suppression, String message) {
