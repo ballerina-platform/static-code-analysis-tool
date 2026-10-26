@@ -10,15 +10,6 @@ on:
         options:
           - DEV CENTRAL
           - STAGE CENTRAL
-      publish-target:
-        type: choice
-        description: "What to publish: the scan tool, the ballerina/scan package, or all of them"
-        required: true
-        default: tool
-        options:
-          - tool
-          - package
-          - all
 
 jobs:
   call_workflow:
@@ -28,4 +19,3 @@ jobs:
     secrets: inherit
     with:
       environment: ${{ github.event.inputs.environment }}
-      additional-publish-flags: -PpublishTarget=${{ inputs.publish-target }}
