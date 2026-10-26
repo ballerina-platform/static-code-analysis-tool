@@ -42,7 +42,7 @@ import {
 } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { ClearFiltersButton, IssueFilterFields, KindFilterChips, SearchField, StatusFilter } from './IssueFilters';
-import { DEFAULT_STATUS, RULE_KINDS, countActiveFilters } from '../issueMeta';
+import { DEFAULT_STATUS, RULE_KINDS, changeStatus, countActiveFilters } from '../issueMeta';
 import {
     buildTree,
     collectFolderIds,
@@ -167,7 +167,7 @@ const NodeLabel = ({ node, depth, expanded, listMode }) => {
 
 // Lists files as a folder tree (workspace packages at the top level) or as a flat list. Counts only
 // include issues matching the filters, and the same filters carry over when a file is opened.
-function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, onFiltersChange, packages, workspace }) {
+function MainTable({ onOpenFile, fileRecords, allIssues, statusIssues, kindCounts, filters, onFiltersChange, packages, workspace }) {
     const filtering = countActiveFilters(filters) > 0
     const [viewMode, setViewMode] = useState("tree")
     const [collapsed, setCollapsed] = useState(() => new Set())
@@ -239,7 +239,7 @@ function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, on
                     <StatusFilter
                         issues={allIssues}
                         selected={filters.status}
-                        onChange={(status) => onFiltersChange({ ...filters, status })}
+                        onChange={(status) => onFiltersChange(changeStatus(filters, status, allIssues))}
                     />
                     <KindFilterChips
                         counts={kindCounts}
@@ -332,7 +332,7 @@ function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, on
             <Collapse in={filtersOpen} timeout="auto">
                 <Box sx={{ padding: "0.75rem 1rem", bgcolor: "var(--page-background)", borderBottom: "1px solid var(--surface-border)" }}>
                     <IssueFilterFields
-                        issues={allIssues}
+                        issues={statusIssues}
                         filters={filters}
                         onChange={onFiltersChange}
                         fields={PANEL_FILTER_KEYS}

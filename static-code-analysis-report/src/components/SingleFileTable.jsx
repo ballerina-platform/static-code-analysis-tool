@@ -43,6 +43,7 @@ import {
     RULE_KIND_ORDER,
     SEVERITIES,
     SUPPRESSED,
+    changeStatus,
     countActiveFilters,
     cweLabel,
     formatLocation,
@@ -258,14 +259,18 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
         ? visibleIssues.slice(currentPage * rowsPerPage, currentPage * rowsPerPage + rowsPerPage)
         : visibleIssues;
 
+    // The kind chips and the filter dropdowns offer only what the selected status lists.
+    const statusIssues = useMemo(
+        () => (issues ?? []).filter((issue) => matchesStatus(issue, filters.status)), [issues, filters.status]);
+
     const kindCounts = useMemo(() => {
         const counts = {};
-        indexedIssues.filter(({ issue }) => matchesStatus(issue, filters.status)).forEach(({ issue }) => {
+        statusIssues.forEach((issue) => {
             const kind = getRuleKind(issue);
             counts[kind] = (counts[kind] ?? 0) + 1;
         });
         return counts;
-    }, [indexedIssues, filters.status]);
+    }, [statusIssues]);
 
     const updateFilters = (next) => {
         setPage(0);
@@ -313,7 +318,7 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
                     <StatusFilter
                         issues={issues}
                         selected={filters.status}
-                        onChange={(status) => updateFilters({ ...filters, status })}
+                        onChange={(status) => updateFilters(changeStatus(filters, status, issues))}
                     />
                     <KindFilterChips
                         counts={kindCounts}
@@ -383,7 +388,7 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
             <Collapse in={filtersOpen} timeout="auto">
                 <Box sx={{ padding: "0.75rem 1rem", bgcolor: "var(--page-background)", borderBottom: "1px solid var(--surface-border)" }}>
                     <IssueFilterFields
-                        issues={issues}
+                        issues={statusIssues}
                         filters={filters}
                         onChange={updateFilters}
                         fields={PANEL_FILTER_KEYS}

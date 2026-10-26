@@ -40,9 +40,10 @@ function MainView({ analyzedFiles, packages, workspace, onOpenFile, missingFile,
     const statistics = useMemo(() => retrieveAllStats(analyzedFiles), [analyzedFiles])
     const allIssues = useMemo(() => (analyzedFiles ?? []).flatMap((file) => file.issues ?? []), [analyzedFiles])
     const fileRecords = useMemo(() => buildFileRecords(analyzedFiles, filters), [analyzedFiles, filters])
-    const kindCounts = useMemo(
-        () => countByKind(allIssues.filter((issue) => matchesStatus(issue, filters.status))),
-        [allIssues, filters.status])
+    // The kind chips and the filter dropdowns offer only what the selected status lists.
+    const statusIssues = useMemo(
+        () => allIssues.filter((issue) => matchesStatus(issue, filters.status)), [allIssues, filters.status])
+    const kindCounts = useMemo(() => countByKind(statusIssues), [statusIssues])
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -58,6 +59,7 @@ function MainView({ analyzedFiles, packages, workspace, onOpenFile, missingFile,
                     onOpenFile={onOpenFile}
                     fileRecords={fileRecords}
                     allIssues={allIssues}
+                    statusIssues={statusIssues}
                     kindCounts={kindCounts}
                     filters={filters}
                     onFiltersChange={onFiltersChange}

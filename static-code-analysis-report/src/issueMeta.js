@@ -245,10 +245,24 @@ export const collectFilterOptions = (issues) => {
     });
     const byLabel = (a, b) => a.label.localeCompare(b.label, undefined, { numeric: true });
     return {
+        kinds: RULE_KIND_ORDER.filter((kind) => (issues ?? []).some((issue) => getRuleKind(issue) === kind))
+            .map((kind) => ({ value: kind })),
         severities: [...severities.values()].sort((a, b) => SEVERITIES[b.value].rank - SEVERITIES[a.value].rank),
         rules: [...rules.values()].sort(byLabel),
         tags: [...tags.values()].sort(byLabel),
         cwes: [...cwes.values()].sort((a, b) => Number(a.value) - Number(b.value)),
         owasp: [...owasp.values()].sort(byLabel),
     };
+};
+
+// Switches the status and drops selections that no issue under the new status carries, so a choice made for
+// one status doesn't silently empty the list under another.
+export const changeStatus = (filters, status, issues) => {
+    const options = collectFilterOptions((issues ?? []).filter((issue) => matchesStatus(issue, status)));
+    const next = { ...filters, status };
+    FILTER_LIST_KEYS.forEach((key) => {
+        const available = new Set(options[key].map(({ value }) => value));
+        next[key] = filters[key].filter((value) => available.has(value));
+    });
+    return next;
 };
