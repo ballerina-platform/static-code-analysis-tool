@@ -39,6 +39,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static io.ballerina.scan.ScanReportTestUtils.readScanReportData;
+
 /**
  * In-source suppression tests.
  *
@@ -105,6 +107,29 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(console.contains("1 issue(s), 2 suppressed"));
         Assert.assertTrue(console.contains("WARNING [main.bal:(23:5,23:71)] suppression of 'ballerina:7' did "
                 + "not match any issue"), console);
+    }
+
+    @Test(description = "test the HTML report lists suppressed issues with their suppression")
+    void testSuppressionsInHtmlReport() throws IOException {
+        runScan(suppressionsProject, "--scan-report");
+
+        JsonObject scanData = readScanReportData(suppressionsProject.resolve("target").resolve("report")
+                .resolve("index.html"));
+        List<JsonObject> issues = new ArrayList<>();
+        scanData.getAsJsonArray("scannedFiles").forEach(file -> file.getAsJsonObject().getAsJsonArray("issues")
+                .forEach(issue -> issues.add(issue.getAsJsonObject())));
+        Assert.assertEquals(issues.size(), 3);
+        List<JsonObject> suppressions = issues.stream().filter(issue -> issue.has("suppression"))
+                .map(issue -> issue.getAsJsonObject("suppression")).toList();
+        Assert.assertEquals(suppressions.size(), 2);
+
+        JsonObject withReason = suppressions.stream().filter(suppression -> suppression.has("justification"))
+                .findFirst().orElseThrow();
+        Assert.assertEquals(withReason.get("justification").getAsString(), "Literal input that always parses");
+        Assert.assertEquals(withReason.getAsJsonArray("rules").get(0).getAsString(), "ballerina:1");
+        JsonObject everyRule = suppressions.stream().filter(suppression -> !suppression.has("justification"))
+                .findFirst().orElseThrow();
+        Assert.assertTrue(everyRule.getAsJsonArray("rules").isEmpty(), "a suppression without rules covers all");
     }
 
     @Test(description = "test suppressed issues carry an accepted inSource suppression in the SARIF report")

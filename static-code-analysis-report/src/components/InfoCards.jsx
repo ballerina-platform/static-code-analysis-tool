@@ -4,7 +4,7 @@ import {
     Card,
     Typography
 } from "@mui/material"
-import { RULE_KINDS, RULE_KIND_ORDER } from "../issueMeta"
+import { RULE_KINDS, RULE_KIND_ORDER, SUPPRESSED } from "../issueMeta"
 
 const StatCard = ({ value, label, color, Icon }) => (
     <Card elevation={0} sx={{
@@ -36,11 +36,13 @@ const StatCard = ({ value, label, color, Icon }) => (
     </Card>
 )
 
+// The suppressed card only appears when the scan accepted issues with `@scan:Suppress`.
 function InfoCards({ statistics }) {
+    const showSuppressed = statistics.suppressed > 0
     return (
         <Box sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: `repeat(${showSuppressed ? 5 : 4}, 1fr)` },
             gap: "1rem",
         }}>
             <StatCard
@@ -58,6 +60,14 @@ function InfoCards({ statistics }) {
                     Icon={RULE_KINDS[kind].Icon}
                 />
             ))}
+            {showSuppressed &&
+                <StatCard
+                    value={statistics.suppressed}
+                    label={SUPPRESSED.label}
+                    color={SUPPRESSED.color}
+                    Icon={SUPPRESSED.Icon}
+                />
+            }
         </Box>
     )
 }

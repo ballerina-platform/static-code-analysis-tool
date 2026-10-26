@@ -126,6 +126,7 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_OWASP_CATEGORI
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_OWASP_YEAR;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_RULE_ID;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_SEVERITY;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_SUPPRESSION;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TAGS;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE;
@@ -143,6 +144,7 @@ import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_KIND;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_NAME;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_PROJECT_VERSION;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SCANNED_FILES;
+import static io.ballerina.scan.utils.Constants.SCAN_REPORT_SUPPRESSION_RULES;
 import static io.ballerina.scan.utils.Constants.SCAN_REPORT_ZIP_FILE;
 import static io.ballerina.scan.utils.Constants.SCAN_TABLE;
 import static io.ballerina.scan.utils.Constants.SUPPRESSIONS;
@@ -613,6 +615,23 @@ public final class ScanUtils {
      * @return path of the html analysis report where generated issues are saved
      */
     public static Path generateScanReport(List<Issue> issues, Project project, String directoryName) {
+        return generateScanReport(issues, project, directoryName, Map.of());
+    }
+
+    /**
+     * Returns the {@link Path} of the html analysis report where generated issues are saved. Each suppressed
+     * issue is listed with its suppression, so that the report can show the accepted issues apart from the
+     * active ones.
+     *
+     * @param issues        generated issues, including suppressed ones
+     * @param project       Ballerina project
+     * @param directoryName target directory name
+     * @param suppressions  the suppressed issues, keyed by the issue they suppress
+     * @return path of the html analysis report where generated issues are saved
+     * @since 0.13.0
+     */
+    public static Path generateScanReport(List<Issue> issues, Project project, String directoryName,
+                                          Map<Issue, SuppressedIssue> suppressions) {
         JsonObject scannedProject = new JsonObject();
         String name;
         if (project.kind() == ProjectKind.WORKSPACE_PROJECT) {
@@ -662,7 +681,7 @@ public final class ScanUtils {
             IssueImpl issueImpl = (IssueImpl) issue;
             JsonObject scanReportFile = scanReportPathAndFile.computeIfAbsent(toReportFileKey(issueImpl.filePath()),
                     key -> createScanReportFile(issueImpl.fileName(), issueImpl.filePath()));
-            scanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES).add(getJsonIssue(issueImpl));
+            scanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES).add(getJsonIssue(issueImpl, suppressions.get(issue)));
         }
 
         JsonArray scannedFiles = new JsonArray();
@@ -768,7 +787,7 @@ public final class ScanUtils {
      *                  converted to a JSON object
      * @return json object representation of the static code analysis issue
      */
-    private static JsonObject getJsonIssue(IssueImpl issueImpl) {
+    private static JsonObject getJsonIssue(IssueImpl issueImpl, SuppressedIssue suppressedIssue) {
         Rule rule = issueImpl.rule();
         JsonObject scanReportIssue = new JsonObject();
         scanReportIssue.addProperty(SCAN_REPORT_ISSUE_RULE_ID, rule.id());
@@ -803,7 +822,21 @@ public final class ScanUtils {
                 .offset());
 
         scanReportIssue.add(SCAN_REPORT_ISSUE_TEXT_RANGE, scanReportIssueTextRange);
+        if (suppressedIssue != null) {
+            scanReportIssue.add(SCAN_REPORT_ISSUE_SUPPRESSION, getJsonSuppression(suppressedIssue));
+        }
         return scanReportIssue;
+    }
+
+    // An empty rule list means the suppression applies to every rule.
+    private static JsonObject getJsonSuppression(SuppressedIssue suppressedIssue) {
+        JsonObject suppression = new JsonObject();
+        suppressedIssue.justification().ifPresent(reason -> suppression.addProperty(SUPPRESSION_JUSTIFICATION,
+                reason));
+        JsonArray rules = new JsonArray();
+        suppressedIssue.rules().forEach(rules::add);
+        suppression.add(SCAN_REPORT_SUPPRESSION_RULES, rules);
+        return suppression;
     }
 
     /**

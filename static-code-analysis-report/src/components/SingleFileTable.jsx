@@ -33,25 +33,32 @@ import {
     alpha
 } from '@mui/material';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { CweChips, KindChip, OwaspChips, SeverityChip } from './IssueBadges';
+import { CweChips, KindChip, OwaspChips, SeverityChip, SuppressedChip } from './IssueBadges';
 import RichText from './RichText';
-import { ClearFiltersButton, IssueFilterFields, KindFilterChips, SearchField } from './IssueFilters';
+import { ClearFiltersButton, IssueFilterFields, KindFilterChips, SearchField, StatusFilter } from './IssueFilters';
 import {
+    DEFAULT_STATUS,
     EMPTY_FILTERS,
     RULE_KINDS,
     RULE_KIND_ORDER,
     SEVERITIES,
+    SUPPRESSED,
     countActiveFilters,
     cweLabel,
     formatLocation,
     getCweList,
+    getIssueColor,
+    getJustification,
     getLineRange,
     getOwaspEntries,
     getRuleKind,
     getRuleName,
     getSeverity,
     getSeverityRank,
-    matchesFilters
+    getSuppressedRules,
+    isSuppressed,
+    matchesFilters,
+    matchesStatus
 } from '../issueMeta';
 
 const SOURCE_LABELS = {
@@ -59,8 +66,11 @@ const SOURCE_LABELS = {
     EXTERNAL: "External analyzer",
 };
 
-// Filters that live in the collapsible panel; kinds and search sit in the header.
+// Filters that live in the collapsible panel; status, kinds and search sit in the header.
 const PANEL_FILTER_KEYS = ["severities", "rules", "tags", "cwes", "owasp"];
+
+const countPanelFilters = (filters) =>
+    countActiveFilters({ ...filters, search: "", status: DEFAULT_STATUS }, PANEL_FILTER_KEYS);
 
 const DENSITIES = {
     compact: { label: "Compact", padding: "4px" },
@@ -100,7 +110,12 @@ const COLUMNS = [
     {
         id: "name", label: "Name", sortField: "name",
         cellSx: { fontWeight: 600, minWidth: 200 },
-        render: (issue) => getRuleName(issue),
+        render: (issue) => isSuppressed(issue)
+            ? <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
+                {getRuleName(issue)}
+                <SuppressedChip issue={issue} />
+            </Box>
+            : getRuleName(issue),
         csv: (issue) => getRuleName(issue),
     },
     {
@@ -139,8 +154,13 @@ const csvEscape = (value) => {
 };
 
 const downloadCsv = (issues, fileName) => {
-    const header = [...COLUMNS.map(({ label }) => label), "Description"];
-    const rows = issues.map(({ issue }) => [...COLUMNS.map(({ csv }) => csv(issue)), issue.details ?? issue.message]);
+    const header = [...COLUMNS.map(({ label }) => label), "Description", "Status", "Justification"];
+    const rows = issues.map(({ issue }) => [
+        ...COLUMNS.map(({ csv }) => csv(issue)),
+        issue.details ?? issue.message,
+        isSuppressed(issue) ? SUPPRESSED.label : "Active",
+        getJustification(issue) ?? "",
+    ]);
     const content = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
@@ -164,7 +184,7 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
     const [sort, setSort] = useState({ field: "line", direction: "asc" });
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [filtersOpen, setFiltersOpen] = useState(() => countActiveFilters(filters, PANEL_FILTER_KEYS) > 0);
+    const [filtersOpen, setFiltersOpen] = useState(() => countPanelFilters(filters) > 0);
     const [hiddenColumns, setHiddenColumns] = useState(
         () => COLUMNS.filter(({ hiddenByDefault }) => hiddenByDefault).map(({ id }) => id));
     const [density, setDensity] = useState("standard");
@@ -209,11 +229,13 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
         }
         const position = visibleIssues.findIndex(({ index }) => index === target);
         if (position === -1) {
-            if (countActiveFilters(filters) === 0) {
+            const issue = issues?.[target];
+            if (issue && !matchesFilters(issue, filters)) {
+                // A suppressed issue stays hidden under the default status, so reveal it among all issues.
+                onFiltersChange({ ...EMPTY_FILTERS, status: isSuppressed(issue) ? "all" : DEFAULT_STATUS });
+            } else {
                 // Not hidden by a filter, so there's nothing to reveal (e.g. a stale index in the URL).
                 pendingReveal.current = null;
-            } else {
-                onFiltersChange(EMPTY_FILTERS);
             }
             return;
         }
@@ -238,12 +260,12 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
 
     const kindCounts = useMemo(() => {
         const counts = {};
-        indexedIssues.forEach(({ issue }) => {
+        indexedIssues.filter(({ issue }) => matchesStatus(issue, filters.status)).forEach(({ issue }) => {
             const kind = getRuleKind(issue);
             counts[kind] = (counts[kind] ?? 0) + 1;
         });
         return counts;
-    }, [indexedIssues]);
+    }, [indexedIssues, filters.status]);
 
     const updateFilters = (next) => {
         setPage(0);
@@ -261,7 +283,7 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
         setHiddenColumns((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]);
     };
 
-    const panelFilterCount = countActiveFilters({ ...filters, search: "" }, PANEL_FILTER_KEYS);
+    const panelFilterCount = countPanelFilters(filters);
 
     return (
         <Box sx={{
@@ -288,6 +310,11 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
                         sx={{ fontWeight: 700, height: 22 }} />
                 </Box>
                 <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
+                    <StatusFilter
+                        issues={issues}
+                        selected={filters.status}
+                        onChange={(status) => updateFilters({ ...filters, status })}
+                    />
                     <KindFilterChips
                         counts={kindCounts}
                         selected={filters.kinds}
@@ -424,7 +451,7 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
 }
 
 const IssueRow = ({ issue, columns, cellPadding, expanded, onToggle, onShowInCode, rowRef }) => {
-    const kindColor = RULE_KINDS[getRuleKind(issue)]?.color ?? "#20b6b0";
+    const kindColor = getIssueColor(issue, "#20b6b0");
 
     return (
         <Fragment>
@@ -488,6 +515,7 @@ const IssueDetails = ({ issue, onShowInCode }) => {
             padding: "0.5rem 1.5rem 1.5rem 4.5rem",
         }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                {isSuppressed(issue) && <SuppressionDetails issue={issue} />}
                 <DetailField label="Details">
                     {description
                         ? <RichText text={description} />
@@ -547,6 +575,45 @@ const IssueDetails = ({ issue, onShowInCode }) => {
                     <DetailField label="OWASP Top 10"><OwaspChips issue={issue} showTitles /></DetailField>
                 </Box>
             </Box>
+        </Box>
+    );
+};
+
+// Explains why a suppressed issue isn't counted: the annotation's reason and the rules it covers.
+const SuppressionDetails = ({ issue }) => {
+    const justification = getJustification(issue);
+    const rules = getSuppressedRules(issue);
+    return (
+        <Box sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.5rem",
+            padding: "0.75rem 1rem",
+            borderRadius: "0.6rem",
+            border: `1px solid ${alpha(SUPPRESSED.color, 0.4)}`,
+            bgcolor: alpha(SUPPRESSED.color, 0.08),
+        }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <SUPPRESSED.Icon fontSize="small" sx={{ color: SUPPRESSED.color }} />
+                <Typography variant="body2" fontWeight={700}>
+                    Suppressed in source with <Box component="code" sx={{ fontFamily: "consolas, monospace" }}>@scan:Suppress</Box>
+                </Typography>
+            </Box>
+            <DetailField label="Reason">
+                {justification
+                    ? <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{justification}</Typography>
+                    : <Typography variant="body2" color="text.secondary">No reason given</Typography>}
+            </DetailField>
+            <DetailField label="Applies to">
+                {rules.length === 0
+                    ? <Typography variant="body2">Every rule</Typography>
+                    : <Box sx={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                        {rules.map((rule) => (
+                            <Chip key={rule} size="small" label={rule}
+                                sx={{ height: 22, fontSize: "12px", fontFamily: "consolas, monospace" }} />
+                        ))}
+                    </Box>}
+            </DetailField>
         </Box>
     );
 };

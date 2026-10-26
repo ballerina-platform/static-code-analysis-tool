@@ -11,7 +11,7 @@ import {
 import { useState } from "react"
 import SingleFileTable from "./SingleFileTable"
 import SingleFileContent from "./SingleFileContent"
-import { RULE_KINDS, RULE_KIND_ORDER, countByKind } from "../issueMeta"
+import { RULE_KINDS, RULE_KIND_ORDER, SUPPRESSED, countByKind, countSuppressed, isSuppressed } from "../issueMeta"
 import { PROJECT_KINDS, findPackage, getBaseName, getRelativePath, packageLabel } from "../projectTree"
 
 function SingleFileView({ requestedFile, project, selectedIssue, onBack, onSelectIssue, filters, onFiltersChange }) {
@@ -73,8 +73,26 @@ const pathCrumbs = (file, pkg, workspace) => {
     return crumbs
 }
 
+const CountPill = ({ count, color, Icon, label, plural }) => (
+    <Box sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.4rem",
+        padding: "0.3rem 0.75rem",
+        borderRadius: "999px",
+        bgcolor: alpha(color, count > 0 ? 0.14 : 0.05),
+        opacity: count > 0 ? 1 : 0.6,
+    }}>
+        <Icon fontSize="small" sx={{ color }} />
+        <Typography variant="body2" fontWeight={700}>{count}</Typography>
+        <Typography variant="body2">{count === 1 ? label : plural}</Typography>
+    </Box>
+)
+
+// The kind pills count active issues; suppressed ones get their own pill when there are any.
 const FileHeader = ({ file, project, issues, onBack }) => {
-    const counts = countByKind(issues)
+    const counts = countByKind(issues.filter((issue) => !isSuppressed(issue)))
+    const suppressed = countSuppressed(issues)
     const workspace = project?.projectKind === PROJECT_KINDS.WORKSPACE
     const pkg = findPackage(project?.packages, file)
     const crumbs = pathCrumbs(file, pkg, workspace)
@@ -142,24 +160,13 @@ const FileHeader = ({ file, project, issues, onBack }) => {
                     </Box>
                 </Box>
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                    {RULE_KIND_ORDER.map((kind) => {
-                        const { Icon, color, label, plural } = RULE_KINDS[kind]
-                        return (
-                            <Box key={kind} sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.4rem",
-                                padding: "0.3rem 0.75rem",
-                                borderRadius: "999px",
-                                bgcolor: alpha(color, counts[kind] > 0 ? 0.14 : 0.05),
-                                opacity: counts[kind] > 0 ? 1 : 0.6,
-                            }}>
-                                <Icon fontSize="small" sx={{ color }} />
-                                <Typography variant="body2" fontWeight={700}>{counts[kind]}</Typography>
-                                <Typography variant="body2">{counts[kind] === 1 ? label : plural}</Typography>
-                            </Box>
-                        )
-                    })}
+                    {RULE_KIND_ORDER.map((kind) => (
+                        <CountPill key={kind} count={counts[kind]} {...RULE_KINDS[kind]} />
+                    ))}
+                    {suppressed > 0 &&
+                        <CountPill count={suppressed} color={SUPPRESSED.color} Icon={SUPPRESSED.Icon}
+                            label={SUPPRESSED.label} plural={SUPPRESSED.label} />
+                    }
                 </Box>
             </Box>
         </Box>

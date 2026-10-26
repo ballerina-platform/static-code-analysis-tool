@@ -7,6 +7,7 @@ import {
     DragHandle,
     KeyboardArrowDown,
     InfoOutlined,
+    VisibilityOffOutlined,
 } from "@mui/icons-material";
 
 // Line/column numbers in the report data are 0-based; everything shown to the user is 1-based.
@@ -20,6 +21,22 @@ export const RULE_KINDS = {
 };
 
 export const RULE_KIND_ORDER = ["CODE_SMELL", "BUG", "VULNERABILITY"];
+
+// Issues accepted in the source with `@scan:Suppress` are shown in this neutral color, apart from the active ones.
+export const SUPPRESSED = { label: "Suppressed", color: "#78909C", Icon: VisibilityOffOutlined };
+
+export const isSuppressed = (issue) => Boolean(issue?.suppression);
+
+export const getJustification = (issue) => issue?.suppression?.justification ?? null;
+
+// The rules named by the issue's suppression; an empty list means it suppresses every rule.
+export const getSuppressedRules = (issue) => issue?.suppression?.rules ?? [];
+
+export const countSuppressed = (issues) => (issues ?? []).filter(isSuppressed).length;
+
+// Color of an issue's highlights and accents; `fallback` covers an unknown rule kind.
+export const getIssueColor = (issue, fallback) =>
+    isSuppressed(issue) ? SUPPRESSED.color : RULE_KINDS[getRuleKind(issue)]?.color ?? fallback;
 
 export const SEVERITIES = {
     BLOCKER: { label: "Blocker", rank: 5, color: "#F74B5A", Icon: KeyboardDoubleArrowUp },
@@ -141,10 +158,21 @@ export const countByKind = (issues) => {
 // Stable key used in the URL hash to identify a scanned file.
 export const getFileKey = (file) => file?.filePath ?? file?.fileName;
 
+// Which issues are listed: the active ones by default, so the counts match the console and the reports'
+// active issues, or the suppressed ones, or both.
+export const STATUSES = {
+    active: { label: "Active" },
+    suppressed: { label: "Suppressed" },
+    all: { label: "All" },
+};
+
+export const DEFAULT_STATUS = "active";
+
 // Filters shared by the overview and the single file view. Each list is an "any of" match and the
 // lists combine with AND, e.g. tags=[a, b] + cwes=[89] keeps issues tagged a or b that map to CWE-89.
 export const EMPTY_FILTERS = {
     search: "",
+    status: DEFAULT_STATUS,
     kinds: [],
     severities: [],
     rules: [],
@@ -156,7 +184,12 @@ export const EMPTY_FILTERS = {
 export const FILTER_LIST_KEYS = ["kinds", "severities", "rules", "tags", "cwes", "owasp"];
 
 export const countActiveFilters = (filters, keys = FILTER_LIST_KEYS) =>
-    (filters.search.trim() ? 1 : 0) + keys.filter((key) => filters[key].length > 0).length;
+    (filters.search.trim() ? 1 : 0)
+    + (filters.status !== DEFAULT_STATUS ? 1 : 0)
+    + keys.filter((key) => filters[key].length > 0).length;
+
+export const matchesStatus = (issue, status) =>
+    status === "all" || (status === "suppressed") === isSuppressed(issue);
 
 const intersects = (selected, values) => selected.length === 0 || values.some((value) => selected.includes(value));
 
@@ -172,12 +205,14 @@ export const matchesSearch = (issue, term) => {
         ...(issue.tags ?? []),
         ...getCweList(issue).map(cweLabel),
         ...getOwaspEntries(issue).flatMap(({ code, title }) => [code, title]),
+        getJustification(issue),
     ].filter(Boolean).join(" ").toLowerCase();
     return haystack.includes(term.toLowerCase());
 };
 
 export const matchesFilters = (issue, filters) =>
-    intersects(filters.kinds, [getRuleKind(issue)])
+    matchesStatus(issue, filters.status)
+    && intersects(filters.kinds, [getRuleKind(issue)])
     && intersects(filters.severities, [getSeverity(issue)])
     && intersects(filters.rules, [issue.ruleID])
     && intersects(filters.tags, issue.tags ?? [])

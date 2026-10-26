@@ -243,9 +243,8 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println();
             accumulateWorkspaceReports(workspaceProject);
             if (scanReport) {
-                List<Issue> activeIssues = allIssues.stream().filter(issue -> !allSuppressions.containsKey(issue))
-                        .toList();
-                Path scanReportPath = ScanUtils.generateScanReport(activeIssues, project.get(), targetDir);
+                Path scanReportPath = ScanUtils.generateScanReport(allIssues, project.get(), targetDir,
+                        allSuppressions);
                 outputStream.println();
                 outputStream.println("View scan report at:");
                 outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
@@ -416,7 +415,8 @@ public class ScanCmd implements BLauncherCmd {
                     outputStream.println("\t" + reportPath.toUri());
                     outputStream.println();
                     if (scanReport) {
-                        Path scanReportPath = ScanUtils.generateScanReport(activeIssues, project, targetDir);
+                        Path scanReportPath = ScanUtils.generateScanReport(issues, project, targetDir,
+                                suppressions);
                         outputStream.println();
                         outputStream.println("View scan report at:");
                         outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());

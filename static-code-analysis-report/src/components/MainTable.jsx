@@ -41,8 +41,8 @@ import {
     alpha
 } from '@mui/material';
 import { useMemo, useState } from 'react';
-import { ClearFiltersButton, IssueFilterFields, KindFilterChips, SearchField } from './IssueFilters';
-import { RULE_KINDS, countActiveFilters } from '../issueMeta';
+import { ClearFiltersButton, IssueFilterFields, KindFilterChips, SearchField, StatusFilter } from './IssueFilters';
+import { DEFAULT_STATUS, RULE_KINDS, countActiveFilters } from '../issueMeta';
 import {
     buildTree,
     collectFolderIds,
@@ -54,8 +54,11 @@ import {
     packageLabel
 } from '../projectTree';
 
-// Filters that live in the collapsible panel; kinds and search sit in the header.
+// Filters that live in the collapsible panel; status, kinds and search sit in the header.
 const PANEL_FILTER_KEYS = ["severities", "rules", "tags", "cwes", "owasp"];
+
+const countPanelFilters = (filters) =>
+    countActiveFilters({ ...filters, search: "", status: DEFAULT_STATUS }, PANEL_FILTER_KEYS);
 
 const DENSITIES = {
     compact: { label: "Compact", padding: "4px" },
@@ -171,7 +174,7 @@ function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, on
     const [sort, setSort] = useState({ field: "totalIssues", direction: "desc" })
     const [page, setPage] = useState(0)
     const [rowsPerPage, setRowsPerPage] = useState(25)
-    const [filtersOpen, setFiltersOpen] = useState(() => countActiveFilters(filters, PANEL_FILTER_KEYS) > 0)
+    const [filtersOpen, setFiltersOpen] = useState(() => countPanelFilters(filters) > 0)
     const [hiddenColumns, setHiddenColumns] = useState([])
     const [density, setDensity] = useState("standard")
     const [columnsMenu, setColumnsMenu] = useState(null)
@@ -185,7 +188,7 @@ function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, on
         [listMode, fileRecords, tree, collapsed, sort])
     const rows = listMode ? allRows.slice(page * rowsPerPage, (page + 1) * rowsPerPage) : allRows
 
-    const panelFilterCount = countActiveFilters({ ...filters, search: "" }, PANEL_FILTER_KEYS)
+    const panelFilterCount = countPanelFilters(filters)
     const countColumns = [
         ...COUNT_COLUMNS.map(({ field, kind }) => ({ field, kind, label: RULE_KINDS[kind].plural })),
         { field: "totalIssues", label: filtering ? "Matching" : "Total" },
@@ -233,6 +236,11 @@ function MainTable({ onOpenFile, fileRecords, allIssues, kindCounts, filters, on
                     <Typography variant="h5" fontWeight="bold">Filter by issue</Typography>
                 </Box>
                 <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
+                    <StatusFilter
+                        issues={allIssues}
+                        selected={filters.status}
+                        onChange={(status) => onFiltersChange({ ...filters, status })}
+                    />
                     <KindFilterChips
                         counts={kindCounts}
                         selected={filters.kinds}

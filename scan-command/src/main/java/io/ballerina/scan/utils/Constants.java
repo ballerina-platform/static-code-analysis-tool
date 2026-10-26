@@ -63,6 +63,8 @@ public class Constants {
     static final String SCAN_REPORT_ISSUE_TYPE = "issueType";
     static final String SCAN_REPORT_ISSUE_MESSAGE = "message";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE = "textRange";
+    static final String SCAN_REPORT_ISSUE_SUPPRESSION = "suppression";
+    static final String SCAN_REPORT_SUPPRESSION_RULES = "rules";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE = "startLine";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET = "startLineOffset";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE = "endLine";

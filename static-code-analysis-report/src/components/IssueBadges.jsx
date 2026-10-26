@@ -2,13 +2,17 @@ import { Box, Chip, Tooltip, Typography, alpha } from "@mui/material";
 import {
     RULE_KINDS,
     SEVERITIES,
+    SUPPRESSED,
     cweLabel,
     cweUrl,
     getCweList,
+    getIssueColor,
+    getJustification,
     getOwaspEntries,
     getRuleKind,
     getRuleName,
     getSeverity,
+    isSuppressed,
 } from "../issueMeta";
 import RichText from "./RichText";
 
@@ -51,6 +55,24 @@ export const SeverityChip = ({ issue }) => {
             label={meta.label}
             sx={{ ...chipBase, borderColor: alpha(meta.color, 0.6), color: "text.primary", bgcolor: "#ffffff" }}
         />
+    );
+};
+
+// Marks an issue accepted with `@scan:Suppress`; the tooltip gives the reason when there is one.
+export const SuppressedChip = ({ issue }) => {
+    if (!isSuppressed(issue)) {
+        return null;
+    }
+    const justification = getJustification(issue);
+    return (
+        <Tooltip title={justification ? `Suppressed: ${justification}` : "Suppressed without a reason"}>
+            <Chip
+                size="small"
+                icon={<SUPPRESSED.Icon style={{ color: SUPPRESSED.color }} />}
+                label={SUPPRESSED.label}
+                sx={{ ...chipBase, bgcolor: alpha(SUPPRESSED.color, 0.14), color: "text.primary" }}
+            />
+        </Tooltip>
     );
 };
 
@@ -124,11 +146,11 @@ export const OwaspChips = ({ issue, limit, showTitles = false, linked = true }) 
 
 // Compact card shown when hovering an issue highlight in the code view; clicking the highlight opens the details.
 export const IssueSummaryCard = ({ issue }) => {
-    const kind = RULE_KINDS[getRuleKind(issue)];
+    const justification = getJustification(issue);
     return (
         <Box sx={{
             padding: "10px 12px",
-            borderLeft: `3px solid ${kind?.color ?? "var(--primary-color)"}`,
+            borderLeft: `3px solid ${getIssueColor(issue, "var(--primary-color)")}`,
             borderRadius: "4px",
         }}>
             <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.3 }}>
@@ -142,7 +164,13 @@ export const IssueSummaryCard = ({ issue }) => {
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
                 <KindChip issue={issue} />
                 {getSeverity(issue) && <SeverityChip issue={issue} />}
+                <SuppressedChip issue={issue} />
             </Box>
+            {justification &&
+                <Typography variant="caption" color="text.secondary" component="div" sx={{ marginTop: "6px" }}>
+                    Reason: {justification}
+                </Typography>
+            }
         </Box>
     );
 };

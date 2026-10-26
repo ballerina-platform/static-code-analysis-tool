@@ -7,11 +7,23 @@ import {
     Chip,
     InputAdornment,
     TextField,
+    ToggleButton,
+    ToggleButtonGroup,
     Typography,
     alpha
 } from "@mui/material";
 import { useMemo } from "react";
-import { EMPTY_FILTERS, RULE_KINDS, RULE_KIND_ORDER, collectFilterOptions, countActiveFilters } from "../issueMeta";
+import {
+    DEFAULT_STATUS,
+    EMPTY_FILTERS,
+    RULE_KINDS,
+    RULE_KIND_ORDER,
+    STATUSES,
+    SUPPRESSED,
+    collectFilterOptions,
+    countActiveFilters,
+    countSuppressed
+} from "../issueMeta";
 
 const FIELD_LABELS = {
     severities: "Severity",
@@ -50,6 +62,33 @@ export const KindFilterChips = ({ counts, selected, onChange }) => (
         })}
     </Box>
 );
+
+// Switches between the active issues, the ones suppressed with `@scan:Suppress`, and both. It's hidden while
+// nothing in scope is suppressed, unless a status other than the default is already selected.
+export const StatusFilter = ({ issues, selected, onChange }) => {
+    const suppressed = countSuppressed(issues);
+    if (suppressed === 0 && selected === DEFAULT_STATUS) {
+        return null;
+    }
+    const counts = { active: (issues ?? []).length - suppressed, suppressed, all: (issues ?? []).length };
+    return (
+        <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={selected}
+            onChange={(_, status) => { if (status) { onChange(status); } }}
+            aria-label="Issue status"
+            sx={{ "& .MuiToggleButton-root": { textTransform: "none", fontWeight: 600, padding: "2px 10px", gap: "0.35rem" } }}
+        >
+            {Object.entries(STATUSES).map(([status, { label }]) => (
+                <ToggleButton key={status} value={status}>
+                    {status === "suppressed" && <SUPPRESSED.Icon sx={{ fontSize: 16, color: SUPPRESSED.color }} />}
+                    {label} · {counts[status]}
+                </ToggleButton>
+            ))}
+        </ToggleButtonGroup>
+    );
+};
 
 export const SearchField = ({ value, onChange, placeholder, width = 240 }) => (
     <TextField
