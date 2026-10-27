@@ -264,6 +264,12 @@ public class ScanCmd implements BLauncherCmd {
         Map<Issue, SuppressedIssue> suppressions = suppressionOutcome.suppressionsByIssue();
         printSuppressionDiagnostics(suppressionOutcome.diagnostics());
 
+        // Nothing is reported when a suppression does not meet the requirements
+        if (suppressionOutcome.invalidSuppressionCount() > 0) {
+            throw LauncherUtils.createLauncherException(DiagnosticLog.error(
+                    DiagnosticCode.SUPPRESSION_REQUIREMENTS_NOT_MET, suppressionOutcome.invalidSuppressionCount()));
+        }
+
         if (platforms.isEmpty() && !platformTriggered) {
             boolean isSarifFormat = ReportFormat.SARIF.equals(format);
             ScanUtils.printToConsole(activeIssues, outputStream, isSarifFormat, project.get());
@@ -311,11 +317,6 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println("The specified platform '" + remainingPlatform + "' is not available.");
             outputStream.println("Please ensure that the required platform plugin path is specified in 'Scan.toml'.");
         });
-
-        if (suppressionOutcome.invalidSuppressionCount() > 0) {
-            throw LauncherUtils.createLauncherException(DiagnosticLog.error(
-                    DiagnosticCode.SUPPRESSION_REQUIREMENTS_NOT_MET, suppressionOutcome.invalidSuppressionCount()));
-        }
     }
 
     private void printSuppressionDiagnostics(List<SuppressionDiagnostic> diagnostics) {

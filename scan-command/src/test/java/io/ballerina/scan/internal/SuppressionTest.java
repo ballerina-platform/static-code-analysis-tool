@@ -263,8 +263,9 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(console.contains("unknown rule 'ballerina:999'"), console);
     }
 
-    @Test(description = "test the command-line requirement fails the scan but still suppresses")
+    @Test(description = "test the command-line requirement fails the scan before anything is reported")
     void testRequireReasonFromCommandLine() throws IOException {
+        deleteTarget(suppressionsProject);
         System.setProperty("user.dir", suppressionsProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         new CommandLine(scanCmd).parseArgs("--require-suppression-reason");
@@ -276,13 +277,15 @@ public class SuppressionTest extends BaseTest {
         String console = readOutput(true);
         Assert.assertTrue(console.contains("ERROR [bal_project_with_suppressions/main.bal:(28:1,28:15)] "
                 + "suppression has no reason"), console);
-        Assert.assertTrue(console.contains("1 issue(s), 2 suppressed"), "the suppressions still apply");
+        assertNothingReported(suppressionsProject, console);
     }
 
-    @Test(description = "test the Scan.toml requirements fail the scan")
+    @Test(description = "test the Scan.toml requirements fail the scan before anything is reported")
     void testRequirementsFromScanToml() throws IOException {
+        deleteTarget(requirementsProject);
         System.setProperty("user.dir", requirementsProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
+        new CommandLine(scanCmd).parseArgs("--scan-report");
         BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
         System.setProperty("user.dir", userDir);
 
@@ -293,10 +296,12 @@ public class SuppressionTest extends BaseTest {
                 + "suppression has no reason"), console);
         Assert.assertTrue(console.contains("ERROR [bal_project_with_suppression_requirements/main.bal:(22:5,22:51)] "
                 + "suppression names no rule"), console);
+        assertNothingReported(requirementsProject, console);
     }
 
-    @Test(description = "test the scan tool rejects a rule it does not know")
+    @Test(description = "test the scan tool rejects a rule it does not know before anything is reported")
     void testUnknownRulesFailTheScan() throws IOException {
+        deleteTarget(unknownCoreRuleProject);
         System.setProperty("user.dir", unknownCoreRuleProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
@@ -310,7 +315,7 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(console.contains("WARNING [bal_project_with_unknown_core_rule/main.bal:(24:5,24:89)] "
                 + "cannot verify rule 'acme/lint:1': 'acme/lint' provides no scan rules to this project"), console);
         Assert.assertFalse(console.contains("did not match"), console);
-        Assert.assertTrue(console.contains("0 issue(s), 1 suppressed"), console);
+        assertNothingReported(unknownCoreRuleProject, console);
     }
 
     @Test(description = "test ignored suppressions do not fail the scan on suppression errors")
@@ -351,6 +356,20 @@ public class SuppressionTest extends BaseTest {
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         return readOutput(true);
+    }
+
+    private static void assertNothingReported(Path project, String console) {
+        Assert.assertFalse(console.contains("\"rule\""), "no issue is printed: " + console);
+        Assert.assertFalse(console.contains("suppressed"), "no summary is printed: " + console);
+        Assert.assertFalse(console.contains("View scan"), "no report is saved: " + console);
+        Assert.assertFalse(Files.exists(project.resolve("target").resolve("report")), "no report is saved");
+    }
+
+    private static void deleteTarget(Path project) {
+        Path target = project.resolve("target");
+        if (Files.exists(target)) {
+            ProjectUtils.deleteDirectory(target);
+        }
     }
 
     private static JsonElement readReport(Path project, String fileName) throws IOException {
