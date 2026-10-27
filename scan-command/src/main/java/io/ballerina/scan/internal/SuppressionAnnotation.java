@@ -35,16 +35,18 @@ import java.util.Optional;
  * @param excludedMembers members of an annotated service, class or object type, which the suppression does not cover
  * @param blanket         whether the annotation omits {@code rules} and so applies to every rule
  * @param rules           rules named by the annotation
+ * @param ruleLocations   location of each rule, in the order of {@code rules}
  * @param reason          the justification, or {@code null} when absent or blank
  * @since 0.11.1
  */
 record SuppressionAnnotation(String filePath, String fileName, LineRange location, LineRange scope, int scopeLength,
                              List<LineRange> excludedMembers, boolean blanket, List<String> rules,
-                             String reason) {
+                             List<LineRange> ruleLocations, String reason) {
 
     SuppressionAnnotation {
         excludedMembers = List.copyOf(excludedMembers);
         rules = List.copyOf(rules);
+        ruleLocations = List.copyOf(ruleLocations);
     }
 
     boolean appliesTo(String ruleId) {
@@ -57,6 +59,12 @@ record SuppressionAnnotation(String filePath, String fileName, LineRange locatio
         }
         return excludedMembers.stream()
                 .noneMatch(member -> contains(member, issueRange.startLine(), issueRange.startLine()));
+    }
+
+    // The first occurrence of a rule, which is the one its diagnostics point at
+    LineRange ruleLocation(String rule) {
+        int index = rules.indexOf(rule);
+        return index < 0 ? location : ruleLocations.get(index);
     }
 
     Optional<String> justification() {

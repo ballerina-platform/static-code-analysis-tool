@@ -104,7 +104,7 @@ public class SuppressionTest extends BaseTest {
         String consoleIssues = console.substring(console.indexOf("\n[") + 1, console.lastIndexOf(']') + 1);
         Assert.assertEquals(JsonParser.parseString(consoleIssues).getAsJsonArray().size(), 1);
         Assert.assertTrue(console.contains("1 issue(s), 2 suppressed"));
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_suppressions/main.bal:(23:5,23:71)] "
+        Assert.assertTrue(console.contains("WARNING [bal_project_with_suppressions/main.bal:(23:29,23:42)] "
                 + "suppression of 'ballerina:7' did not match any issue"), console);
     }
 
@@ -185,7 +185,7 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(console.contains("WARNING [bal_project_with_same_construct_suppressions/"
                 + "main.bal:(26:5,26:39)] suppression of all rules did not match any issue"), console);
         Assert.assertTrue(console.contains("WARNING [bal_project_with_same_construct_suppressions/"
-                + "main.bal:(31:5,31:44)] rule 'ballerina:1' is already suppressed on this construct"), console);
+                + "main.bal:(31:29,31:42)] rule 'ballerina:1' is already suppressed on this construct"), console);
         Assert.assertTrue(console.contains("WARNING [bal_project_with_same_construct_suppressions/"
                 + "main.bal:(36:5,36:48)] every rule is already suppressed on this construct"), console);
         Assert.assertFalse(console.contains("main.bal:(36:5,36:48)] suppression of all rules"), console);
@@ -201,7 +201,7 @@ public class SuppressionTest extends BaseTest {
         Assert.assertEquals(issues.size(), 6);
         Assert.assertTrue(console.contains("1 issue(s), 5 suppressed"),
                 "constant, template, escaped, commented and worker suppressions all apply: " + console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_unresolved_suppressions/main.bal:(30:5,30:35)] "
+        Assert.assertTrue(console.contains("WARNING [bal_project_with_unresolved_suppressions/main.bal:(30:21,30:26)] "
                 + "suppression of 'ballerina:7' did not match any "
                 + "issue"), "a shorthand rules field names the rules of its constant");
         Assert.assertFalse(console.contains("suppression names no rule"), console);
@@ -310,9 +310,9 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(exception.getDetailedMessages().get(0)
                 .contains("1 suppression(s) are invalid or do not meet the configured suppression requirements"));
         String console = readOutput(true);
-        Assert.assertTrue(console.contains("ERROR [bal_project_with_unknown_core_rule/main.bal:(20:5,20:87)] "
+        Assert.assertTrue(console.contains("ERROR [bal_project_with_unknown_core_rule/main.bal:(20:29,20:44)] "
                 + "unknown rule 'ballerina:999': 'ballerina' does not define this rule"), console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_unknown_core_rule/main.bal:(24:5,24:89)] "
+        Assert.assertTrue(console.contains("WARNING [bal_project_with_unknown_core_rule/main.bal:(24:29,24:42)] "
                 + "cannot verify rule 'acme/lint:1': 'acme/lint' provides no scan rules to this project"), console);
         Assert.assertFalse(console.contains("did not match"), console);
         assertNothingReported(unknownCoreRuleProject, console);
