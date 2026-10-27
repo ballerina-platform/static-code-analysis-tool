@@ -35,18 +35,16 @@ import java.util.Optional;
  * @param excludedMembers members of an annotated service, class or object type, which the suppression does not cover
  * @param blanket         whether the annotation omits {@code rules} and so applies to every rule
  * @param rules           rules named by the annotation
- * @param unresolvedRules source text of {@code rules} entries that do not resolve to a rule ID; never suppressed
  * @param reason          the justification, or {@code null} when absent or blank
  * @since 0.13.0
  */
 record SuppressionAnnotation(String filePath, String fileName, LineRange location, LineRange scope, int scopeLength,
                              List<LineRange> excludedMembers, boolean blanket, List<String> rules,
-                             List<String> unresolvedRules, String reason) {
+                             String reason) {
 
     SuppressionAnnotation {
         excludedMembers = List.copyOf(excludedMembers);
         rules = List.copyOf(rules);
-        unresolvedRules = List.copyOf(unresolvedRules);
     }
 
     boolean appliesTo(String ruleId) {

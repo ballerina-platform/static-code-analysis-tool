@@ -31,4 +31,9 @@ public function main() {
     @scan:Suppress {rules: ["ballerina:1"]}
     int duplicate = checkpanic int:fromString("3");
     _ = duplicate;
+
+    @scan:Suppress {reason: "First"}
+    @scan:Suppress {reason: "Every rule again"}
+    int twice = checkpanic int:fromString("4");
+    _ = twice;
 }

@@ -19,23 +19,26 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.symbols.Annotatable;
+import io.ballerina.compiler.api.symbols.AnnotationAttachmentSymbol;
 import io.ballerina.compiler.api.symbols.AnnotationSymbol;
-import io.ballerina.compiler.api.symbols.ConstantSymbol;
+import io.ballerina.compiler.api.symbols.ExternalFunctionSymbol;
+import io.ballerina.compiler.api.symbols.FunctionSymbol;
+import io.ballerina.compiler.api.symbols.FunctionTypeSymbol;
+import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.values.ConstantValue;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
-import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.DistinctTypeDescriptorNode;
-import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
-import io.ballerina.compiler.syntax.tree.MappingFieldNode;
+import io.ballerina.compiler.syntax.tree.ExternalFunctionBodyNode;
+import io.ballerina.compiler.syntax.tree.ListenerDeclarationNode;
 import io.ballerina.compiler.syntax.tree.MetadataNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.ObjectTypeDescriptorNode;
+import io.ballerina.compiler.syntax.tree.ReturnTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
-import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
-import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
@@ -49,13 +52,15 @@ import io.ballerina.tools.text.LineRange;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
 import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
 
 /**
- * Collects the {@code @scan:Suppress} annotations of a package.
+ * Collects the {@code @scan:Suppress} annotations of a package. Each annotation is read from the value the compiler
+ * resolved for it, so constants, string templates and escapes count as written and comments do not interfere.
  *
  * @since 0.13.0
  */
@@ -116,59 +121,81 @@ final class SuppressionCollector {
         modulePart.accept(new NodeVisitor() {
             @Override
             public void visit(AnnotationNode annotation) {
-                if (isSuppressAnnotation(semanticModel, annotation)) {
-                    suppressions.add(toSuppression(semanticModel, annotation, filePath, fileName));
-                }
+                resolve(semanticModel, annotation).ifPresent(value ->
+                        suppressions.add(toSuppression(annotation, value, filePath, fileName)));
+                // A construct inside another annotation's value can carry suppressions of its own
+                annotation.annotValue().ifPresent(value -> value.accept(this));
             }
         });
     }
 
-    private static boolean isSuppressAnnotation(SemanticModel semanticModel, AnnotationNode annotation) {
-        if (!(semanticModel.symbol(annotation).orElse(null) instanceof AnnotationSymbol symbol)) {
-            return false;
-        }
-        return symbol.getName().filter(ANNOTATION_NAME::equals).isPresent()
-                && symbol.getModule().map(module -> SCAN_ORG.equals(module.id().orgName())
-                && SCAN_PACKAGE.equals(module.id().moduleName())).orElse(false);
-    }
-
-    private static SuppressionAnnotation toSuppression(SemanticModel semanticModel, AnnotationNode annotation,
-                                                       String filePath, String fileName) {
+    private static SuppressionAnnotation toSuppression(AnnotationNode annotation, Map<?, ?> value, String filePath,
+                                                       String fileName) {
         Node construct = annotation.parent() instanceof MetadataNode ? annotation.parent().parent()
                 : annotation.parent();
         List<String> rules = null;
-        List<String> unresolvedRules = new ArrayList<>();
-        String reason = null;
-        if (annotation.annotValue().isPresent()) {
-            for (MappingFieldNode field : annotation.annotValue().get().fields()) {
-                if (!(field instanceof SpecificFieldNode specific)) {
-                    continue;
-                }
-                String name = fieldName(specific);
-                // A shorthand field such as `{rules}` takes the value of the constant its name refers to
-                Node value = specific.valueExpr().map(Node.class::cast).orElse(specific.fieldName());
-                if (RULES_FIELD.equals(name)) {
-                    rules = new ArrayList<>();
-                    resolveRules(semanticModel, value, rules, unresolvedRules);
-                } else if (REASON_FIELD.equals(name)) {
-                    reason = stringValue(semanticModel, value).filter(text -> !text.isBlank()).orElse(null);
-                }
+        if (unwrap(value.get(RULES_FIELD)) instanceof List<?> members) {
+            rules = new ArrayList<>();
+            for (Object member : members) {
+                // Members are compiler-internal values whose string form is the member's value
+                Object rule = unwrap(member);
+                rules.add(rule instanceof String text ? text : String.valueOf(rule));
             }
         }
+        String reason = unwrap(value.get(REASON_FIELD)) instanceof String text && !text.isBlank() ? text : null;
         return new SuppressionAnnotation(filePath, fileName, annotation.lineRange(), construct.lineRange(),
                 construct.textRange().length(), memberRanges(construct), rules == null,
-                rules == null ? List.of() : rules, unresolvedRules, reason);
+                rules == null ? List.of() : rules, reason);
     }
 
-    private static void resolveRules(SemanticModel semanticModel, Node value, List<String> rules,
-                                     List<String> unresolvedRules) {
-        if (value instanceof ListConstructorExpressionNode list) {
-            list.expressions().forEach(rule -> stringValue(semanticModel, rule)
-                    .ifPresentOrElse(rules::add, () -> unresolvedRules.add(rule.toSourceCode().trim())));
-            return;
+    // The resolved value of a @scan:Suppress annotation, absent for any other annotation
+    private static Optional<Map<?, ?>> resolve(SemanticModel semanticModel, AnnotationNode annotation) {
+        return attachments(semanticModel, annotation).stream()
+                .filter(attachment -> attachment.getLocation()
+                        .map(location -> location.lineRange().equals(annotation.lineRange())).orElse(false))
+                .filter(SuppressionCollector::isSuppress)
+                .findFirst()
+                .flatMap(AnnotationAttachmentSymbol::attachmentValue)
+                .map(ConstantValue::value)
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast);
+    }
+
+    // The construct's symbol holds the attachments, except on a return type, an external body and a listener
+    private static List<AnnotationAttachmentSymbol> attachments(SemanticModel semanticModel,
+                                                                AnnotationNode annotation) {
+        Node parent = annotation.parent();
+        if (parent instanceof ReturnTypeDescriptorNode) {
+            Symbol owner = semanticModel.symbol(parent.parent().parent()).orElse(null);
+            FunctionTypeSymbol type = owner instanceof FunctionSymbol function ? function.typeDescriptor()
+                    : owner instanceof FunctionTypeSymbol functionType ? functionType : null;
+            return type == null ? List.of()
+                    : type.returnTypeAnnotations().map(Annotatable::annotAttachments).orElse(List.of());
         }
-        constantStrings(semanticModel, value)
-                .ifPresentOrElse(rules::addAll, () -> unresolvedRules.add(value.toSourceCode().trim()));
+        if (parent instanceof ExternalFunctionBodyNode body) {
+            return semanticModel.symbol(body.parent())
+                    .filter(ExternalFunctionSymbol.class::isInstance)
+                    .map(symbol -> ((ExternalFunctionSymbol) symbol).annotAttachmentsOnExternal())
+                    .orElse(List.of());
+        }
+        Node construct = parent instanceof MetadataNode ? parent.parent() : parent;
+        Node named = construct instanceof ListenerDeclarationNode listener ? listener.variableName() : construct;
+        return semanticModel.symbol(named)
+                .filter(Annotatable.class::isInstance)
+                .map(symbol -> ((Annotatable) symbol).annotAttachments())
+                .orElse(List.of());
+    }
+
+    // Identified by the attachment's annotation, since a worker's annotation node has no symbol of its own
+    private static boolean isSuppress(AnnotationAttachmentSymbol attachment) {
+        AnnotationSymbol annotation = attachment.typeDescriptor();
+        return annotation.getName().filter(ANNOTATION_NAME::equals).isPresent()
+                && annotation.getModule().map(module -> SCAN_ORG.equals(module.id().orgName())
+                && SCAN_PACKAGE.equals(module.id().moduleName())).orElse(false);
+    }
+
+    private static Object unwrap(Object value) {
+        return value instanceof ConstantValue constant ? constant.value() : value;
     }
 
     private static List<LineRange> memberRanges(Node construct) {
@@ -189,86 +216,5 @@ final class SuppressionCollector {
             case DistinctTypeDescriptorNode distinctType -> objectTypeMembers(distinctType.typeDescriptor());
             default -> List.of();
         };
-    }
-
-    // `rules`, `'rules` and `"rules"` all name the same field
-    private static String fieldName(SpecificFieldNode field) {
-        Node name = field.fieldName();
-        if (name.kind() == SyntaxKind.STRING_LITERAL) {
-            return literalText((BasicLiteralNode) name);
-        }
-        String text = name.toSourceCode().trim();
-        return text.startsWith("'") ? text.substring(1) : text;
-    }
-
-    // The value of a string literal, with its character and numeric escapes decoded
-    private static String literalText(BasicLiteralNode literal) {
-        String text = literal.literalToken().text();
-        text = text.substring(1, text.length() - 1);
-        StringBuilder value = new StringBuilder(text.length());
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c != '\\' || i + 1 == text.length()) {
-                value.append(c);
-                continue;
-            }
-            char escape = text.charAt(++i);
-            switch (escape) {
-                case 't' -> value.append('\t');
-                case 'n' -> value.append('\n');
-                case 'r' -> value.append('\r');
-                case 'u' -> {
-                    int close = text.indexOf('}', i);
-                    if (i + 1 < text.length() && text.charAt(i + 1) == '{' && close > i + 2
-                            && appendCodePoint(value, text.substring(i + 2, close))) {
-                        i = close;
-                    } else {
-                        value.append('\\').append(escape);
-                    }
-                }
-                default -> value.append(escape);
-            }
-        }
-        return value.toString();
-    }
-
-    // A malformed escape is a compile error already; it is kept as written
-    private static boolean appendCodePoint(StringBuilder value, String hex) {
-        try {
-            value.appendCodePoint(Integer.parseInt(hex, 16));
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-    }
-
-    private static Optional<String> stringValue(SemanticModel semanticModel, Node expression) {
-        if (expression.kind() == SyntaxKind.STRING_LITERAL) {
-            return Optional.of(literalText((BasicLiteralNode) expression));
-        }
-        return constantValue(semanticModel, expression).filter(String.class::isInstance).map(String.class::cast);
-    }
-
-    private static Optional<List<String>> constantStrings(SemanticModel semanticModel, Node expression) {
-        return constantValue(semanticModel, expression)
-                .filter(List.class::isInstance)
-                .map(list -> ((List<?>) list).stream().map(SuppressionCollector::memberValue).toList());
-    }
-
-    private static Optional<Object> constantValue(SemanticModel semanticModel, Node expression) {
-        return semanticModel.symbol(expression)
-                .filter(ConstantSymbol.class::isInstance)
-                .map(symbol -> ((ConstantSymbol) symbol).constValue())
-                .map(SuppressionCollector::unwrap);
-    }
-
-    private static Object unwrap(Object value) {
-        return value instanceof ConstantValue constant ? constant.value() : value;
-    }
-
-    // Members of a constant list are compiler-internal values whose string form is the member's value.
-    private static String memberValue(Object member) {
-        Object value = unwrap(member);
-        return value instanceof String text ? text : String.valueOf(value);
     }
 }

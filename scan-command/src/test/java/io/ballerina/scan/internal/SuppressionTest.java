@@ -175,31 +175,33 @@ public class SuppressionTest extends BaseTest {
             JsonObject suppression = issue.getAsJsonObject().getAsJsonArray("suppressions").get(0).getAsJsonObject();
             justifications.add(suppression.get("justification").getAsString());
         }
-        Assert.assertEquals(justifications, List.of("Rule-specific", "Rule-specific", "First"));
-        Assert.assertTrue(console.contains("0 issue(s), 3 suppressed"), console);
+        Assert.assertEquals(justifications, List.of("Rule-specific", "Rule-specific", "First", "First"));
+        Assert.assertTrue(console.contains("0 issue(s), 4 suppressed"), console);
         Assert.assertTrue(console.contains("WARNING [main.bal:(20:5,20:39)] suppression of all rules did not "
                 + "match any issue"), console);
         Assert.assertTrue(console.contains("WARNING [main.bal:(26:5,26:39)] suppression of all rules did not "
                 + "match any issue"), console);
         Assert.assertTrue(console.contains("WARNING [main.bal:(31:5,31:44)] rule 'ballerina:1' is already "
                 + "suppressed on this construct"), console);
+        Assert.assertTrue(console.contains("WARNING [main.bal:(36:5,36:48)] every rule is already suppressed on "
+                + "this construct"), console);
+        Assert.assertFalse(console.contains("WARNING [main.bal:(36:5,36:48)] suppression of all rules"), console);
         Assert.assertFalse(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
     }
 
-    @Test(description = "test constant and escaped rule IDs suppress and an unresolved rule suppresses nothing")
-    void testUnresolvedRulesDoNotWidenSuppression() throws IOException {
+    @Test(description = "test rules and reasons are read from the compiler-resolved annotation value")
+    void testRuleValuesAreResolvedByTheCompiler() throws IOException {
         String console = runScan(unresolvedSuppressionsProject, "--require-suppression-rule-id",
                 "--require-suppression-reason");
 
         JsonArray issues = readReport(unresolvedSuppressionsProject, "scan_results.json").getAsJsonArray();
-        Assert.assertEquals(issues.size(), 4);
-        Assert.assertTrue(console.contains("2 issue(s), 2 suppressed"), "an escaped rule ID is decoded");
-        Assert.assertTrue(console.contains("WARNING [main.bal:(22:5,22:94)] suppression rule 'string `ballerina:1`' "
-                + "does not resolve to a rule ID; use a string literal or a constant"), console);
+        Assert.assertEquals(issues.size(), 6);
+        Assert.assertTrue(console.contains("1 issue(s), 5 suppressed"),
+                "constant, template, escaped, commented and worker suppressions all apply: " + console);
         Assert.assertTrue(console.contains("WARNING [main.bal:(30:5,30:35)] suppression of 'ballerina:7' did not "
                 + "match any issue"), "a shorthand rules field names the rules of its constant");
         Assert.assertFalse(console.contains("suppression names no rule"), console);
-        Assert.assertFalse(console.contains("suppression has no reason"), console);
+        Assert.assertFalse(console.contains("suppression has no reason"), "a commented reason is still read");
     }
 
     @Test(description = "test --ignore-suppressions reports every issue as active")
