@@ -28,10 +28,13 @@ import io.ballerina.compiler.api.symbols.FunctionTypeSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.values.ConstantValue;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
+import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.DistinctTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ExternalFunctionBodyNode;
+import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.ListenerDeclarationNode;
+import io.ballerina.compiler.syntax.tree.MappingFieldNode;
 import io.ballerina.compiler.syntax.tree.MetadataNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
@@ -39,6 +42,8 @@ import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.ObjectTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ReturnTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
+import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
+import io.ballerina.compiler.syntax.tree.Token;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
@@ -51,6 +56,7 @@ import io.ballerina.tools.text.LineRange;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -145,7 +151,39 @@ final class SuppressionCollector {
         String reason = unwrap(value.get(REASON_FIELD)) instanceof String text && !text.isBlank() ? text : null;
         return new SuppressionAnnotation(filePath, fileName, annotation.lineRange(), construct.lineRange(),
                 construct.textRange().length(), memberRanges(construct), rules == null,
-                rules == null ? List.of() : rules, reason);
+                rules == null ? List.of() : rules, rules == null ? List.of() : ruleLocations(annotation, rules.size()),
+                reason);
+    }
+
+    // A list written in place locates each rule at its member; a constant locates them all at its reference
+    private static List<LineRange> ruleLocations(AnnotationNode annotation, int ruleCount) {
+        Node rules = rulesValue(annotation).orElse(annotation);
+        if (rules instanceof ListConstructorExpressionNode list && list.expressions().size() == ruleCount) {
+            return list.expressions().stream().map(Node::lineRange).toList();
+        }
+        return Collections.nCopies(ruleCount, rules.lineRange());
+    }
+
+    private static Optional<Node> rulesValue(AnnotationNode annotation) {
+        if (annotation.annotValue().isEmpty()) {
+            return Optional.empty();
+        }
+        for (MappingFieldNode field : annotation.annotValue().get().fields()) {
+            if (field instanceof SpecificFieldNode specific && fieldName(specific).equals(RULES_FIELD)) {
+                // A shorthand field such as `{rules}` takes the value of the constant its name refers to
+                return Optional.of(specific.valueExpr().map(Node.class::cast).orElse(specific.fieldName()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static String fieldName(SpecificFieldNode field) {
+        Node name = field.fieldName();
+        String text = name instanceof BasicLiteralNode literal ? literal.literalToken().text() : ((Token) name).text();
+        if (text.startsWith("\"")) {
+            return text.substring(1, text.length() - 1);
+        }
+        return text.startsWith("'") ? text.substring(1) : text;
     }
 
     // The resolved value of a @scan:Suppress annotation, absent for any other annotation

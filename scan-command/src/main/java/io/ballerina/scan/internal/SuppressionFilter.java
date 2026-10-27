@@ -25,6 +25,7 @@ import io.ballerina.scan.SuppressedIssue;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.tools.diagnostics.DiagnosticSeverity;
+import io.ballerina.tools.text.LineRange;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -133,8 +134,9 @@ final class SuppressionFilter {
                 String provider = matcher.group(1);
                 // Rules of a provider that is not engaged cannot be verified, so they do not fail the scan
                 unknown.add(knownRules.providers().contains(provider)
-                        ? error(suppression, DiagnosticLog.error(DiagnosticCode.UNKNOWN_RULE, rule, provider))
-                        : warning(suppression,
+                        ? error(suppression, suppression.ruleLocation(rule),
+                                DiagnosticLog.error(DiagnosticCode.UNKNOWN_RULE, rule, provider))
+                        : warning(suppression, suppression.ruleLocation(rule),
                                 DiagnosticLog.warning(DiagnosticCode.UNKNOWN_RULE_PROVIDER, rule, provider)));
             }
         }
@@ -168,7 +170,7 @@ final class SuppressionFilter {
             Set<String> duplicateRules = new LinkedHashSet<>(suppression.rules());
             duplicateRules.retainAll(earlierRules);
             earlierRules.addAll(suppression.rules());
-            duplicateRules.forEach(rule -> unused.add(warning(suppression,
+            duplicateRules.forEach(rule -> unused.add(warning(suppression, suppression.ruleLocation(rule),
                     DiagnosticLog.warning(DiagnosticCode.DUPLICATE_SUPPRESSION_RULE, rule))));
             boolean duplicateBlanket = suppression.blanket() && !blanketConstructs.add(construct);
             if (duplicateBlanket) {
@@ -184,7 +186,7 @@ final class SuppressionFilter {
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
                 if (!matchedRules.contains(rule) && !duplicateRules.contains(rule) && knownRules.ids().contains(rule)
                         && selection.selects(rule)) {
-                    unused.add(warning(suppression,
+                    unused.add(warning(suppression, suppression.ruleLocation(rule),
                             DiagnosticLog.warning(DiagnosticCode.UNMATCHED_SUPPRESSION, rule)));
                 }
             }
@@ -193,13 +195,20 @@ final class SuppressionFilter {
     }
 
     private static SuppressionDiagnostic error(SuppressionAnnotation suppression, String message) {
-        return new SuppressionDiagnostic(DiagnosticSeverity.ERROR, message, suppression.fileName(),
-                suppression.location());
+        return error(suppression, suppression.location(), message);
+    }
+
+    private static SuppressionDiagnostic error(SuppressionAnnotation suppression, LineRange location, String message) {
+        return new SuppressionDiagnostic(DiagnosticSeverity.ERROR, message, suppression.fileName(), location);
     }
 
     private static SuppressionDiagnostic warning(SuppressionAnnotation suppression, String message) {
-        return new SuppressionDiagnostic(DiagnosticSeverity.WARNING, message, suppression.fileName(),
-                suppression.location());
+        return warning(suppression, suppression.location(), message);
+    }
+
+    private static SuppressionDiagnostic warning(SuppressionAnnotation suppression, LineRange location,
+                                                 String message) {
+        return new SuppressionDiagnostic(DiagnosticSeverity.WARNING, message, suppression.fileName(), location);
     }
 
     private record KnownRules(Set<String> ids, Set<String> providers) {
