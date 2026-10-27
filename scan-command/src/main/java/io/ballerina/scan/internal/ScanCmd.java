@@ -141,6 +141,7 @@ public class ScanCmd implements BLauncherCmd {
     private final List<Issue> allIssues;
     private final Map<Issue, SuppressedIssue> allSuppressions = new IdentityHashMap<>();
     private long invalidSuppressions;
+    private final List<Runnable> pendingReports = new ArrayList<>();
     private boolean scanningWorkspace;
 
     public ScanCmd() {
@@ -240,6 +241,8 @@ public class ScanCmd implements BLauncherCmd {
                 }
                 return;
             }
+            failOnSuppressionErrors(invalidSuppressions);
+            pendingReports.forEach(Runnable::run);
             outputStream.println();
             accumulateWorkspaceReports(workspaceProject);
             if (scanReport) {
@@ -249,7 +252,6 @@ public class ScanCmd implements BLauncherCmd {
                 outputStream.println("View scan report at:");
                 outputStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
             }
-            failOnSuppressionErrors(invalidSuppressions);
             return;
         }
         if (ProjectUtils.isProjectEmpty(project.get())) {
@@ -392,6 +394,19 @@ public class ScanCmd implements BLauncherCmd {
         allSuppressions.putAll(suppressions);
         printSuppressionDiagnostics(suppressionOutcome.diagnostics());
 
+        // Nothing is reported until every scanned package meets the suppression requirements
+        if (scanningWorkspace) {
+            invalidSuppressions += suppressionOutcome.invalidSuppressionCount();
+            pendingReports.add(() -> report(project, issues, activeIssues, suppressions, scannerPlatformPlugins));
+            return;
+        }
+        failOnSuppressionErrors(suppressionOutcome.invalidSuppressionCount());
+        report(project, issues, activeIssues, suppressions, scannerPlatformPlugins);
+    }
+
+    private void report(Project project, List<Issue> issues, List<Issue> activeIssues,
+                        Map<Issue, SuppressedIssue> suppressions,
+                        ServiceLoader<StaticCodeAnalysisPlatformPlugin> scannerPlatformPlugins) {
         if (platforms.isEmpty() && !platformTriggered) {
             boolean isSarifFormat = ReportFormat.SARIF.equals(format);
             ScanUtils.printToConsole(activeIssues, outputStream, isSarifFormat, project);
@@ -432,12 +447,6 @@ public class ScanCmd implements BLauncherCmd {
             outputStream.println("The specified platform '" + remainingPlatform + "' is not available.");
             outputStream.println("Please ensure that the required platform plugin path is specified in 'Scan.toml'.");
         });
-
-        if (scanningWorkspace) {
-            invalidSuppressions += suppressionOutcome.invalidSuppressionCount();
-        } else {
-            failOnSuppressionErrors(suppressionOutcome.invalidSuppressionCount());
-        }
     }
 
     private void printSuppressionDiagnostics(List<SuppressionDiagnostic> diagnostics) {

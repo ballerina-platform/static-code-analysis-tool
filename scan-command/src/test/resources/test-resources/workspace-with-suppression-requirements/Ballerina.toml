@@ -1,0 +1,2 @@
+[workspace]
+packages = ["clean-package", "requirements-package"]
