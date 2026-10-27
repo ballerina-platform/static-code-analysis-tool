@@ -36,17 +36,13 @@ OPTIONS
                 Define platform(s) to report results. The user can define more than one platform.
 
         --ignore-suppressions
-                Disregard @scan:Suppress annotations and report every issue, to audit the unsuppressed
-                results. Rule inclusion and exclusion still apply. Equivalent to 'enabled = false' in the
-                [suppression] table of Scan.toml.
+                Disregard @scan:Suppress annotations and report every issue.
 
         --require-suppression-reason
-                Fail the scan when a @scan:Suppress annotation does not give a reason. Equivalent to
-                'requireReason = true' in the [suppression] table of Scan.toml.
+                Fail the scan when a @scan:Suppress annotation gives no reason.
 
         --require-suppression-rule-id
-                Fail the scan when a @scan:Suppress annotation does not name the rules it suppresses.
-                Equivalent to 'requireRuleId = true' in the [suppression] table of Scan.toml.
+                Fail the scan when a @scan:Suppress annotation names no rule.
 
 EXAMPLES
         Run analysis against all Ballerina documents in the current package, print results to the
