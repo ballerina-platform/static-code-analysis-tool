@@ -160,25 +160,26 @@ final class SuppressionFilter {
                                                                   KnownRules knownRules, RuleSelection selection) {
         List<SuppressionDiagnostic> unused = new ArrayList<>();
         Map<String, Set<String>> rulesOnConstruct = new HashMap<>();
+        Set<String> blanketConstructs = new HashSet<>();
         for (SuppressionAnnotation suppression : suppressions) {
             // An earlier annotation on the same construct wins the tie for its rules, so this one never matches them
-            Set<String> earlierRules = rulesOnConstruct.computeIfAbsent(
-                    suppression.filePath() + suppression.scope(), construct -> new HashSet<>());
+            String construct = suppression.filePath() + suppression.scope();
+            Set<String> earlierRules = rulesOnConstruct.computeIfAbsent(construct, key -> new HashSet<>());
             Set<String> duplicateRules = new LinkedHashSet<>(suppression.rules());
             duplicateRules.retainAll(earlierRules);
             earlierRules.addAll(suppression.rules());
             duplicateRules.forEach(rule -> unused.add(warning(suppression,
                     DiagnosticLog.warning(DiagnosticCode.DUPLICATE_SUPPRESSION_RULE, rule))));
+            boolean duplicateBlanket = suppression.blanket() && !blanketConstructs.add(construct);
+            if (duplicateBlanket) {
+                unused.add(warning(suppression, DiagnosticLog.warning(DiagnosticCode.DUPLICATE_BLANKET_SUPPRESSION)));
+            }
 
             Set<String> matchedRules = matched.getOrDefault(suppression, Set.of());
             // A blanket suppression may cover issues of the rules left out, so it is judged only on a full scan
-            if (suppression.blanket() && matchedRules.isEmpty() && !selection.isPartial()) {
+            if (suppression.blanket() && !duplicateBlanket && matchedRules.isEmpty() && !selection.isPartial()) {
                 unused.add(warning(suppression,
                         DiagnosticLog.warning(DiagnosticCode.UNMATCHED_BLANKET_SUPPRESSION)));
-            }
-            for (String rule : suppression.unresolvedRules()) {
-                unused.add(warning(suppression,
-                        DiagnosticLog.warning(DiagnosticCode.UNRESOLVED_SUPPRESSION_RULE, rule)));
             }
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
                 if (!matchedRules.contains(rule) && !duplicateRules.contains(rule) && knownRules.ids().contains(rule)
