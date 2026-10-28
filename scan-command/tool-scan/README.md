@@ -61,13 +61,13 @@ bal scan [OPTIONS] [<package>|<source-file>]
 --ignore-suppressions
 ```
 
-- Fail the scan when a `@scan:Suppress` annotation does not give a reason. Same as `requireReason = true` in `Scan.toml`.
+- Fail the scan when a `@scan:Suppress` annotation does not give a reason. Same as `requireReason = true` in `Scan.toml`. Has no effect with `--ignore-suppressions` or `enabled = false`.
 
 ```text
 --require-suppression-reason
 ```
 
-- Fail the scan when a `@scan:Suppress` annotation does not name the rules it suppresses. Same as `requireRuleId = true` in `Scan.toml`.
+- Fail the scan when a `@scan:Suppress` annotation does not name the rules it suppresses. Same as `requireRuleId = true` in `Scan.toml`. Has no effect with `--ignore-suppressions` or `enabled = false`.
 
 ```text
 --require-suppression-rule-id
@@ -181,7 +181,7 @@ function hashPassword(string password) returns string|error {
 - **Rule ID validation.** The compiler plugin of `ballerina/scan` reports a malformed rule ID as a compile error. `bal scan` checks that each rule exists, among the core rules and the rules of every analyzer it engages, and fails before reporting anything when one does not. A rule of an analyzer the scan does not engage cannot be verified and is reported as a warning.
 - **Results.** Suppressed issues are not printed to the console or sent to platforms, and the closing summary counts them, such as `3 issue(s), 2 suppressed`. They remain in the saved JSON and SARIF reports with a `suppressions` entry of kind `inSource` carrying the reason, so every accepted issue stays reviewable. The HTML report counts them separately from the active issues, and lists them with a `Suppressed` status and their justification.
 - **Unmatched suppressions.** A suppression that matches no issue is reported as a warning, for example when the issue was fixed. A suppression is not reported for a rule left out by `--include-rules`, `--exclude-rules` or `Scan.toml`, and one without `rules` is only reported when every rule is scanned, since whether it is still needed cannot be told from a narrowed scan. An unknown rule still fails the scan, before anything is reported. A rule that an earlier annotation on the same construct already names is reported as already suppressed instead, since that annotation is the one that applies. Likewise, a second annotation without `rules` on a construct is reported as suppressing rules that are already suppressed.
-- **Requirements.** A project can require every suppression to give a reason or name its rules, with `requireReason` and `requireRuleId` in the `[suppression]` table of `Scan.toml`, or with the matching command-line options. A suppression that does not meet a requirement fails the scan before anything is reported: the errors are printed, and no issues are printed, saved to the target directory or sent to platforms.
+- **Requirements.** A project can require every suppression to give a reason or name its rules, with `requireReason` and `requireRuleId` in the `[suppression]` table of `Scan.toml`, or with the matching command-line options. The requirements have no effect when suppressions are disabled, since every issue is then reported. A suppression that does not meet a requirement fails the scan before anything is reported: the errors are printed, and no issues are printed, saved to the target directory or sent to platforms.
 - **Audit.** `--ignore-suppressions` reports every issue as though no suppression existed. To disregard suppressions for every run of a project, for example from a shared `Scan.toml`, set `enabled = false` in the `[suppression]` table.
 
 ```toml
