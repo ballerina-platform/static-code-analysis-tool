@@ -31,7 +31,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 import picocli.CommandLine;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -113,6 +115,24 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(console.contains("1 issue(s), 2 suppressed"));
         Assert.assertTrue(console.contains("WARNING [main.bal:(23:29,23:42)] suppression of 'ballerina:7' did "
                 + "not match any issue"), console);
+    }
+
+    @Test(description = "test only the issues go to standard output, and the status and summary to standard error")
+    void testConsoleOutputStreams() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        System.setProperty("user.dir", suppressionsProject.toString());
+        new ScanCmd(new PrintStream(out, true, StandardCharsets.UTF_8),
+                new PrintStream(err, true, StandardCharsets.UTF_8)).execute();
+        System.setProperty("user.dir", userDir);
+
+        String stdout = out.toString(StandardCharsets.UTF_8);
+        String stderr = err.toString(StandardCharsets.UTF_8).replace("\r\n", "\n").trim();
+        Assert.assertEquals(JsonParser.parseString(stdout).getAsJsonArray().size(), 1, stdout);
+        Assert.assertTrue(stderr.contains("Running Scans"), stderr);
+        Assert.assertTrue(stderr.contains("did not match any issue"), stderr);
+        Assert.assertTrue(stderr.contains("View scan results at:"), stderr);
+        Assert.assertTrue(stderr.endsWith("\n1 issue(s), 2 suppressed"), "the summary is the last line: " + stderr);
     }
 
     @Test(description = "test the HTML report lists suppressed issues with their suppression")
@@ -232,6 +252,7 @@ public class SuppressionTest extends BaseTest {
         Assert.assertEquals(issues.size(), 3);
         issues.forEach(issue -> Assert.assertFalse(issue.getAsJsonObject().has("suppressions")));
         Assert.assertFalse(console.contains("suppressed"));
+        Assert.assertTrue(console.contains("3 issue(s)"), console);
         Assert.assertFalse(console.contains("did not match any issue"),
                 "the audit run does not report unmatched suppressions");
     }
@@ -423,7 +444,7 @@ public class SuppressionTest extends BaseTest {
 
     private static void assertNothingReported(Path project, String console) {
         Assert.assertFalse(console.contains("\"rule\""), "no issue is printed: " + console);
-        Assert.assertFalse(console.contains("suppressed"), "no summary is printed: " + console);
+        Assert.assertFalse(console.contains("issue(s)"), "no summary is printed: " + console);
         Assert.assertFalse(console.contains("View scan"), "no report is saved: " + console);
         Assert.assertFalse(Files.exists(project.resolve("target").resolve("report")), "no report is saved");
     }
