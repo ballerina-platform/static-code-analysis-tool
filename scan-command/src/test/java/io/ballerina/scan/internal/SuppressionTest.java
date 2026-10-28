@@ -62,12 +62,14 @@ public class SuppressionTest extends BaseTest {
             .resolve("bal-project-with-unresolved-suppressions");
     private final Path unknownCoreRuleProject = testResources.resolve("test-resources")
             .resolve("bal-project-with-unknown-core-rule");
+    private final Path partSuppressionsProject = testResources.resolve("test-resources")
+            .resolve("bal-project-with-part-suppressions");
 
     @AfterClass
     void cleanup() {
         for (Path project : List.of(suppressionsProject, requirementsProject, invalidSuppressionsProject,
                 analyzerSuppressionsProject, disabledSuppressionsProject, sameConstructSuppressionsProject,
-                unresolvedSuppressionsProject, unknownCoreRuleProject)) {
+                unresolvedSuppressionsProject, unknownCoreRuleProject, partSuppressionsProject)) {
             Path target = project.resolve("target");
             if (Files.exists(target)) {
                 ProjectUtils.deleteDirectory(target);
@@ -190,6 +192,20 @@ public class SuppressionTest extends BaseTest {
                 + "main.bal:(36:5,36:48)] every rule is already suppressed on this construct"), console);
         Assert.assertFalse(console.contains("main.bal:(36:5,36:48)] suppression of all rules"), console);
         Assert.assertFalse(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
+    }
+
+    @Test(description = "test suppressions on a tuple member, an included record parameter and an anonymous "
+            + "function's return type are collected, and an escaped field name is read as the field")
+    void testSuppressionsOnPartsOfConstructs() throws IOException {
+        String console = runScan(partSuppressionsProject);
+
+        Assert.assertTrue(console.contains("WARNING [bal_project_with_part_suppressions/main.bal:(23:36,23:49)] "
+                + "suppression of 'ballerina:1' did not match any issue"), "the tuple member: " + console);
+        Assert.assertTrue(console.contains("WARNING [bal_project_with_part_suppressions/main.bal:(25:42,25:55)] "
+                + "suppression of 'ballerina:1' did not match any issue"), "the included parameter: " + console);
+        Assert.assertTrue(console.contains("WARNING [bal_project_with_part_suppressions/main.bal:(29:61,29:74)] "
+                + "suppression of 'ballerina:1' did not match any issue"), "the anonymous function: " + console);
+        Assert.assertTrue(console.contains("1 issue(s), 1 suppressed"), "the escaped rules field applies: " + console);
     }
 
     @Test(description = "test rules and reasons are read from the compiler-resolved annotation value")
