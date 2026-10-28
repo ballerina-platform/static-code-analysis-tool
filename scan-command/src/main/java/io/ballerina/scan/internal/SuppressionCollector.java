@@ -26,15 +26,21 @@ import io.ballerina.compiler.api.symbols.ExternalFunctionSymbol;
 import io.ballerina.compiler.api.symbols.FunctionSymbol;
 import io.ballerina.compiler.api.symbols.FunctionTypeSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
+import io.ballerina.compiler.api.symbols.TupleTypeSymbol;
+import io.ballerina.compiler.api.symbols.TypeDefinitionSymbol;
+import io.ballerina.compiler.api.symbols.TypeSymbol;
 import io.ballerina.compiler.api.values.ConstantValue;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.DistinctTypeDescriptorNode;
+import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExternalFunctionBodyNode;
+import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.ListenerDeclarationNode;
 import io.ballerina.compiler.syntax.tree.MappingFieldNode;
+import io.ballerina.compiler.syntax.tree.MemberTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.MetadataNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
@@ -44,6 +50,7 @@ import io.ballerina.compiler.syntax.tree.ReturnTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
 import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
 import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.TupleTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
@@ -60,6 +67,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
@@ -77,6 +86,8 @@ final class SuppressionCollector {
     private static final String ANNOTATION_NAME = "Suppress";
     private static final String RULES_FIELD = "rules";
     private static final String REASON_FIELD = "reason";
+    private static final Pattern NUMERIC_ESCAPE = Pattern.compile("\\\\u\\{([0-9A-Fa-f]+)}");
+    private static final Pattern CHARACTER_ESCAPE = Pattern.compile("\\\\(.)");
 
     private SuppressionCollector() {
     }
@@ -177,13 +188,21 @@ final class SuppressionCollector {
         return Optional.empty();
     }
 
+    // `rules`, `'rules`, `"rules"` and their escaped forms all name the same field
     private static String fieldName(SpecificFieldNode field) {
         Node name = field.fieldName();
         String text = name instanceof BasicLiteralNode literal ? literal.literalToken().text() : ((Token) name).text();
         if (text.startsWith("\"")) {
-            return text.substring(1, text.length() - 1);
+            return unescape(text.substring(1, text.length() - 1));
         }
-        return text.startsWith("'") ? text.substring(1) : text;
+        return unescape(text.startsWith("'") ? text.substring(1) : text);
+    }
+
+    // io.ballerina.identifier does not export its unescaping to this module
+    private static String unescape(String text) {
+        String decoded = NUMERIC_ESCAPE.matcher(text).replaceAll(escape ->
+                Matcher.quoteReplacement(Character.toString(Integer.parseInt(escape.group(1), 16))));
+        return CHARACTER_ESCAPE.matcher(decoded).replaceAll("$1");
     }
 
     // The resolved value of a @scan:Suppress annotation, absent for any other annotation
@@ -199,16 +218,15 @@ final class SuppressionCollector {
                 .map(Map.class::cast);
     }
 
-    // The construct's symbol holds the attachments, except on a return type, an external body and a listener
+    // The construct's symbol holds the attachments, except where the annotation is on a part of the construct
     private static List<AnnotationAttachmentSymbol> attachments(SemanticModel semanticModel,
                                                                 AnnotationNode annotation) {
         Node parent = annotation.parent();
         if (parent instanceof ReturnTypeDescriptorNode) {
-            Symbol owner = semanticModel.symbol(parent.parent().parent()).orElse(null);
-            FunctionTypeSymbol type = owner instanceof FunctionSymbol function ? function.typeDescriptor()
-                    : owner instanceof FunctionTypeSymbol functionType ? functionType : null;
-            return type == null ? List.of()
-                    : type.returnTypeAnnotations().map(Annotatable::annotAttachments).orElse(List.of());
+            return functionType(semanticModel, parent.parent().parent())
+                    .flatMap(FunctionTypeSymbol::returnTypeAnnotations)
+                    .map(Annotatable::annotAttachments)
+                    .orElse(List.of());
         }
         if (parent instanceof ExternalFunctionBodyNode body) {
             return semanticModel.symbol(body.parent())
@@ -216,12 +234,43 @@ final class SuppressionCollector {
                     .map(symbol -> ((ExternalFunctionSymbol) symbol).annotAttachmentsOnExternal())
                     .orElse(List.of());
         }
+        if (parent instanceof MemberTypeDescriptorNode member
+                && member.parent() instanceof TupleTypeDescriptorNode tuple) {
+            int index = tuple.memberTypeDesc().stream().toList().indexOf(member);
+            return definedType(semanticModel, tuple)
+                    .filter(TupleTypeSymbol.class::isInstance)
+                    .map(type -> ((TupleTypeSymbol) type).members())
+                    .filter(members -> index >= 0 && index < members.size())
+                    .map(members -> members.get(index).annotAttachments())
+                    .orElse(List.of());
+        }
         Node construct = parent instanceof MetadataNode ? parent.parent() : parent;
-        Node named = construct instanceof ListenerDeclarationNode listener ? listener.variableName() : construct;
+        Node named = switch (construct) {
+            case ListenerDeclarationNode listener -> listener.variableName();
+            case IncludedRecordParameterNode parameter -> parameter.paramName().map(Node.class::cast).orElse(parameter);
+            default -> construct;
+        };
         return semanticModel.symbol(named)
                 .filter(Annotatable.class::isInstance)
                 .map(symbol -> ((Annotatable) symbol).annotAttachments())
                 .orElse(List.of());
+    }
+
+    private static Optional<FunctionTypeSymbol> functionType(SemanticModel semanticModel, Node owner) {
+        Optional<? extends Symbol> type = owner instanceof ExplicitAnonymousFunctionExpressionNode function
+                ? semanticModel.typeOf(function)
+                : semanticModel.symbol(owner).map(symbol ->
+                        symbol instanceof FunctionSymbol function ? function.typeDescriptor() : symbol);
+        return type.filter(FunctionTypeSymbol.class::isInstance).map(FunctionTypeSymbol.class::cast);
+    }
+
+    // A type descriptor has no symbol of its own; only the type definition it defines can be looked up
+    private static Optional<TypeSymbol> definedType(SemanticModel semanticModel, Node typeDescriptor) {
+        return typeDescriptor.parent() instanceof TypeDefinitionNode definition
+                ? semanticModel.symbol(definition)
+                        .filter(TypeDefinitionSymbol.class::isInstance)
+                        .map(symbol -> ((TypeDefinitionSymbol) symbol).typeDescriptor())
+                : Optional.empty();
     }
 
     // Identified by the attachment's annotation, since a worker's annotation node has no symbol of its own
