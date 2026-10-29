@@ -161,6 +161,8 @@ bal scan --require-suppression-reason
 
 Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON, or SARIF with `--format=sarif`. Progress messages, warnings, report paths and the closing summary, such as `3 issue(s)`, are written to standard error.
 
+The scan uses the dependency versions locked in `Dependencies.toml`, as `bal build --sticky` does, and resolves only the dependencies that are not locked yet. It does not update `Dependencies.toml`; `bal build` does.
+
 ## Suppressing issues
 
 An individual issue can be accepted in the source with the `@scan:Suppress` annotation from the `ballerina/scan` package. Unlike excluding a rule, which turns it off for the whole project, a suppression applies only to the construct it is attached to and records why the issue is accepted:
