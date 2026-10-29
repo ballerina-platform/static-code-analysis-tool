@@ -199,7 +199,8 @@ final class SuppressionFilter {
     }
 
     private static SuppressionDiagnostic error(SuppressionAnnotation suppression, LineRange location, String message) {
-        return new SuppressionDiagnostic(DiagnosticSeverity.ERROR, message, suppression.fileName(), location);
+        return new SuppressionDiagnostic(DiagnosticSeverity.ERROR, message, suppression.filePath(),
+                suppression.fileName(), location);
     }
 
     private static SuppressionDiagnostic warning(SuppressionAnnotation suppression, String message) {
@@ -208,7 +209,8 @@ final class SuppressionFilter {
 
     private static SuppressionDiagnostic warning(SuppressionAnnotation suppression, LineRange location,
                                                  String message) {
-        return new SuppressionDiagnostic(DiagnosticSeverity.WARNING, message, suppression.fileName(), location);
+        return new SuppressionDiagnostic(DiagnosticSeverity.WARNING, message, suppression.filePath(),
+                suppression.fileName(), location);
     }
 
     private record KnownRules(Set<String> ids, Set<String> providers) {

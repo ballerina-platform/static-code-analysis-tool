@@ -42,10 +42,12 @@ import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.text.LineRange;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +60,89 @@ import java.util.Optional;
  */
 public class ScanLanguageServerTool {
     private static final Gson GSON = new Gson();
+
+    /**
+     * Version of the {@code scan}, {@code excludeRuleEdit}, {@code includeRuleEdit} and {@code enableSuppressionEdit}
+     * entry points. The language server checks it before calling them, so bump it on any incompatible change to their
+     * signatures or JSON.
+     */
+    public static final int API_VERSION = 1;
+
+    /**
+     * Returns the version of the language server entry points this tool provides.
+     *
+     * @return the API version
+     */
+    public static int apiVersion() {
+        return API_VERSION;
+    }
+
+    /**
+     * Scans a package, or every package of a workspace, and returns the active issues of each package with the same
+     * issue fields as the HTML report, plus the absolute path of the file the issue is in and the alternative edits
+     * that suppress it with a {@code @scan:Suppress} annotation, innermost construct first. Suppressed issues and
+     * diagnostics about the suppressions are returned separately. When Scan.toml disables suppressions, an issue that
+     * an annotation would suppress carries that suppression as {@code inactiveSuppression}, and the title of the action
+     * that enables suppressions as {@code enableSuppressions}, instead of a fix. With the
+     * {@code report} option, it also writes each package's HTML report to its target directory and returns the report
+     * path.
+     *
+     * @param projectPathStr  package or workspace root
+     * @param buildOptionsMap build options, plus {@code report}
+     * @return scan result as JSON
+     */
+    public static String scan(String projectPathStr, Map<String, Boolean> buildOptionsMap) {
+        JsonObject response = new JsonObject();
+        response.addProperty("apiVersion", API_VERSION);
+        try {
+            Path projectPath = Paths.get(projectPathStr).toAbsolutePath().normalize();
+            boolean report = buildOptionsMap != null && Boolean.TRUE.equals(buildOptionsMap.get("report"));
+            JsonArray packages = new JsonArray();
+            for (Project pkg : loadPackagesForLs(projectPath, buildOptionsMap)) {
+                packages.add(scanPackage(pkg, report));
+            }
+            response.addProperty("success", true);
+            response.add("packages", packages);
+        } catch (Exception e) {
+            response.addProperty("success", false);
+            String errorMsg = e.getMessage();
+            response.addProperty("error", errorMsg != null && !errorMsg.isBlank() ? errorMsg : e.toString());
+        }
+        return GSON.toJson(response);
+    }
+
+    /**
+     * Computes the Scan.toml content that globally excludes a rule, without writing it, so the client can apply it
+     * as an undoable edit.
+     *
+     * @param projectPathStr package root that holds the Scan.toml
+     * @param ruleId         rule identifier
+     * @return the edit as JSON
+     */
+    public static String excludeRuleEdit(String projectPathStr, String ruleId) {
+        return ruleEdit(projectPathStr, ruleId, true);
+    }
+
+    /**
+     * Computes the Scan.toml content that stops globally excluding a rule, without writing it.
+     *
+     * @param projectPathStr package root that holds the Scan.toml
+     * @param ruleId         rule identifier
+     * @return the edit as JSON
+     */
+    public static String includeRuleEdit(String projectPathStr, String ruleId) {
+        return ruleEdit(projectPathStr, ruleId, false);
+    }
+
+    /**
+     * Computes the Scan.toml content that applies {@code @scan:Suppress} annotations again, without writing it.
+     *
+     * @param projectPathStr package root that holds the Scan.toml
+     * @return the edit as JSON
+     */
+    public static String enableSuppressionEdit(String projectPathStr) {
+        return GSON.toJson(scanTomlEdit(projectPathStr, ScanTomlWriter::contentWithSuppressionEnabled));
+    }
 
     /**
      * Runs a scan for the given project path.
@@ -175,6 +260,157 @@ public class ScanLanguageServerTool {
             return GSON.toJson(new ScanMutationResponse(false, null,
                     "Failed to remove global exclusion due to unexpected error: " + e.getMessage()));
         }
+    }
+
+    private static String ruleEdit(String projectPathStr, String ruleId, boolean exclude) {
+        String normalizedRuleId = ruleId == null ? "" : ruleId.trim();
+        if (normalizedRuleId.isEmpty()) {
+            JsonObject response = new JsonObject();
+            response.addProperty("success", false);
+            response.addProperty("error", "Invalid ruleId: must be a non-empty string");
+            return GSON.toJson(response);
+        }
+        JsonObject response = scanTomlEdit(projectPathStr, scanTomlPath -> exclude
+                ? ScanTomlWriter.contentWithGlobalExclusion(scanTomlPath, normalizedRuleId)
+                : ScanTomlWriter.contentWithoutGlobalExclusion(scanTomlPath, normalizedRuleId));
+        if (response.get("success").getAsBoolean()) {
+            response.addProperty("ruleId", normalizedRuleId);
+        }
+        return GSON.toJson(response);
+    }
+
+    private interface ScanTomlContent {
+        Optional<String> compute(Path scanTomlPath) throws IOException;
+    }
+
+    private static JsonObject scanTomlEdit(String projectPathStr, ScanTomlContent contentFunction) {
+        JsonObject response = new JsonObject();
+        try {
+            Path scanTomlPath = Paths.get(projectPathStr).toAbsolutePath().normalize().resolve(Constants.SCAN_FILE);
+            Optional<String> content = contentFunction.compute(scanTomlPath);
+            response.addProperty("success", true);
+            response.addProperty("path", scanTomlPath.toString());
+            response.addProperty("exists", Files.exists(scanTomlPath));
+            response.addProperty("changed", content.isPresent());
+            content.ifPresent(newContent -> response.addProperty("content", newContent));
+        } catch (Exception e) {
+            response.addProperty("success", false);
+            response.addProperty("error", "Failed to compute the " + Constants.SCAN_FILE + " edit: "
+                    + e.getMessage());
+        }
+        return response;
+    }
+
+    private static List<Project> loadPackagesForLs(Path projectPath, Map<String, Boolean> buildOptionsMap) {
+        Project project = loadProjectForLs(projectPath, buildOptionsMap);
+        if (project.kind() == ProjectKind.WORKSPACE_PROJECT) {
+            return new ArrayList<>(((WorkspaceProject) project).projects());
+        }
+        return List.of(project);
+    }
+
+    private static JsonObject scanPackage(Project project, boolean report) throws IOException {
+        JsonObject pkg = new JsonObject();
+        pkg.addProperty("path", project.sourceRoot().toAbsolutePath().normalize().toString());
+        pkg.addProperty("name", project.currentPackage().packageName().value());
+        JsonArray issues = new JsonArray();
+        pkg.add("issues", issues);
+
+        Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, System.err);
+        if (scanToml.isEmpty()) {
+            throw new IOException("Failed to load " + Constants.SCAN_FILE + " of package '"
+                    + project.currentPackage().packageName().value() + "': invalid configuration.");
+        }
+
+        // Same order as the CLI: external analyzers add an import document, so compilation errors are checked after.
+        ProjectAnalyzer analyzer = new ProjectAnalyzer(project, scanToml.get());
+        Map<String, List<Rule>> externalAnalyzers = analyzer.getExternalAnalyzers();
+        List<Issue> allIssues = new ArrayList<>(analyzer.runExternalAnalyzers(externalAnalyzers));
+        if (!analyzer.getCompilationErrors().isEmpty()) {
+            pkg.addProperty("skippedReason", "The package has compilation errors. Fix them and scan again.");
+            return pkg;
+        }
+        List<Rule> coreRules = CoreRule.rules();
+        allIssues.addAll(analyzer.analyze(coreRules));
+
+        ScanResult filtered = filterIssues(allIssues, scanToml.get());
+        LsScanResult result = applySuppressions(project, filtered, coreRules, externalAnalyzers, scanToml.get());
+        SuppressionFixes suppressionFixes = new SuppressionFixes(project);
+        for (Issue issue : result.result().activeIssues()) {
+            SuppressedIssue inactive = result.inactiveSuppressions().get(issue);
+            JsonObject issueJson = toLsIssueJson(issue, inactive);
+            if (inactive != null) {
+                issueJson.add("inactiveSuppression", issueJson.remove("suppression"));
+                JsonObject enableSuppressions = new JsonObject();
+                enableSuppressions.addProperty("title", "Enable suppressions in " + Constants.SCAN_FILE);
+                enableSuppressions.addProperty("note", "It has a @scan:Suppress annotation, but suppressions are "
+                        + "disabled in " + Constants.SCAN_FILE + ".");
+                issueJson.add("enableSuppressions", enableSuppressions);
+            } else {
+                List<SuppressionFixes.Fix> fixes = suppressionFixes.find(issue, ((IssueImpl) issue).filePath());
+                if (!fixes.isEmpty()) {
+                    JsonArray fixesJson = new JsonArray();
+                    fixes.forEach(fix -> fixesJson.add(toSuppressFixJson(fix)));
+                    issueJson.add("suppressFixes", fixesJson);
+                }
+            }
+            issues.add(issueJson);
+        }
+        JsonArray suppressedIssues = new JsonArray();
+        Map<Issue, SuppressedIssue> suppressions = new IdentityHashMap<>();
+        for (SuppressedIssue suppressed : result.result().suppressedIssues()) {
+            suppressedIssues.add(toLsIssueJson(suppressed.issue(), suppressed));
+            suppressions.put(suppressed.issue(), suppressed);
+        }
+        pkg.add("suppressedIssues", suppressedIssues);
+        JsonArray suppressionDiagnostics = new JsonArray();
+        for (SuppressionDiagnostic diagnostic : result.diagnostics()) {
+            JsonObject diagnosticJson = new JsonObject();
+            diagnosticJson.addProperty("severity", diagnostic.severity().toString());
+            diagnosticJson.addProperty("message", diagnostic.message());
+            diagnosticJson.addProperty("filePath", diagnostic.filePath());
+            diagnosticJson.add("textRange", toTextRangeJson(diagnostic.location()));
+            suppressionDiagnostics.add(diagnosticJson);
+        }
+        pkg.add("suppressionDiagnostics", suppressionDiagnostics);
+        pkg.addProperty("suppressionEnabled", scanToml.get().isSuppressionEnabled());
+        if (report) {
+            pkg.addProperty("reportPath", ScanUtils.generateScanReport(filtered.activeIssues(), project, null,
+                    suppressions).toString());
+        }
+        return pkg;
+    }
+
+    private static JsonObject toLsIssueJson(Issue issue, SuppressedIssue suppressed) {
+        IssueImpl issueImpl = (IssueImpl) issue;
+        JsonObject issueJson = ScanUtils.getJsonIssue(issueImpl, suppressed);
+        issueJson.addProperty("filePath", issueImpl.filePath());
+        return issueJson;
+    }
+
+    private static JsonObject toSuppressFixJson(SuppressionFixes.Fix fix) {
+        JsonObject fixJson = new JsonObject();
+        fixJson.addProperty("construct", fix.construct());
+        fixJson.addProperty("title", fix.title());
+        JsonArray edits = new JsonArray();
+        for (SuppressionFixes.Edit edit : fix.edits()) {
+            JsonObject editJson = new JsonObject();
+            editJson.add("textRange", toTextRangeJson(edit.range()));
+            editJson.addProperty("newText", edit.newText());
+            editJson.addProperty("snippet", edit.snippet());
+            edits.add(editJson);
+        }
+        fixJson.add("edits", edits);
+        return fixJson;
+    }
+
+    private static JsonObject toTextRangeJson(LineRange range) {
+        JsonObject textRange = new JsonObject();
+        textRange.addProperty("startLine", range.startLine().line());
+        textRange.addProperty("startLineOffset", range.startLine().offset());
+        textRange.addProperty("endLine", range.endLine().line());
+        textRange.addProperty("endLineOffset", range.endLine().offset());
+        return textRange;
     }
 
     // ===================================================================================
@@ -299,6 +535,38 @@ public class ScanLanguageServerTool {
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
 
+        // Run Analysis
+        List<Issue> issues = projectAnalyzer.analyze(coreRules);
+
+        if (!externalAnalyzers.isEmpty()) {
+            issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
+        }
+
+        return applySuppressions(project, filterIssues(issues, scanToml), coreRules, externalAnalyzers, scanToml);
+    }
+
+    // The same suppression filter as the command line, applied after rule selection as it is there
+    private static LsScanResult applySuppressions(Project project, ScanResult filtered, List<Rule> coreRules,
+                                                  Map<String, List<Rule>> externalAnalyzers, ScanTomlFile scanToml) {
+        List<Rule> projectRules = new ArrayList<>(coreRules);
+        externalAnalyzers.values().forEach(projectRules::addAll);
+        RuleSelection selection = new RuleSelection(
+                scanToml.getRulesToInclude().stream().map(ScanTomlFile.RuleToFilter::id).toList(),
+                scanToml.getRulesToExclude().stream().map(ScanTomlFile.RuleToFilter::id).toList());
+        SuppressionOptions options = SuppressionOptions.of(scanToml, false, false, false);
+        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, filtered.activeIssues(),
+                projectRules, selection, options);
+        // With suppressions disabled every issue stays active, but the editor must not offer to annotate an issue
+        // that an annotation already covers, so the annotations are matched without applying them.
+        Map<Issue, SuppressedIssue> inactiveSuppressions = options.ignoreSuppressions()
+                ? SuppressionFilter.apply(project, filtered.activeIssues(), projectRules, selection,
+                        new SuppressionOptions(false, false, false)).suppressionsByIssue()
+                : Map.of();
+        return new LsScanResult(new ScanResult(suppressionOutcome.activeIssues(), filtered.excludedIssues(),
+                suppressionOutcome.suppressedIssues()), suppressionOutcome.diagnostics(), inactiveSuppressions);
+    }
+
+    private static ScanResult filterIssues(List<Issue> issues, ScanTomlFile scanToml) {
         // Prepare Filter Lists
         List<String> includeRules = new ArrayList<>();
         List<String> excludeRules = new ArrayList<>();
@@ -317,13 +585,6 @@ public class ScanLanguageServerTool {
             throw new IllegalArgumentException("Invalid " + Constants.SCAN_FILE
                     + " configuration: both include and exclude rule "
                     + "filters are set. Configure only one of [rule.include] or [rule.exclude].");
-        }
-
-        // Run Analysis
-        List<Issue> issues = projectAnalyzer.analyze(coreRules);
-
-        if (!externalAnalyzers.isEmpty()) {
-            issues.addAll(projectAnalyzer.runExternalAnalyzers(externalAnalyzers));
         }
 
         List<Issue> activeIssues = new ArrayList<>();
@@ -354,13 +615,7 @@ public class ScanLanguageServerTool {
             }
         }
 
-        // The same suppression filter as the command line, applied after rule selection as it is there
-        List<Rule> projectRules = new ArrayList<>(coreRules);
-        externalAnalyzers.values().forEach(projectRules::addAll);
-        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, activeIssues, projectRules,
-                new RuleSelection(includeRules, excludeRules), SuppressionOptions.of(scanToml, false, false, false));
-        return new LsScanResult(new ScanResult(suppressionOutcome.activeIssues(), excludedIssues,
-                suppressionOutcome.suppressedIssues()), suppressionOutcome.diagnostics());
+        return new ScanResult(activeIssues, excludedIssues);
     }
 
     // ===================================================================================
@@ -464,5 +719,6 @@ public class ScanLanguageServerTool {
 
     private record ScanMutationResponse(boolean success, String ruleId, String message) { }
 
-    private record LsScanResult(ScanResult result, List<SuppressionDiagnostic> diagnostics) { }
+    private record LsScanResult(ScanResult result, List<SuppressionDiagnostic> diagnostics,
+                                Map<Issue, SuppressedIssue> inactiveSuppressions) { }
 }

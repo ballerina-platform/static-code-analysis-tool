@@ -26,11 +26,13 @@ import io.ballerina.tools.text.LineRange;
  *
  * @param severity severity of the diagnostic
  * @param message  description of the problem
+ * @param filePath absolute path of the document containing the annotation
  * @param fileName name of the document containing the annotation
  * @param location location of the annotation
  * @since 0.13.0
  */
-record SuppressionDiagnostic(DiagnosticSeverity severity, String message, String fileName, LineRange location) {
+record SuppressionDiagnostic(DiagnosticSeverity severity, String message, String filePath, String fileName,
+                             LineRange location) {
 
     boolean isError() {
         return severity == DiagnosticSeverity.ERROR;

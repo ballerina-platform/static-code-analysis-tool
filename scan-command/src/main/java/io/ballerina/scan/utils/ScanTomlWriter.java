@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * {@code ScanTomlWriter} provides utilities for creating and modifying Scan.toml files,
@@ -48,7 +49,22 @@ public final class ScanTomlWriter {
      * @throws IOException if an I/O error occurs
      */
     public static void addGlobalExclusion(Path scanTomlPath, String ruleId) throws IOException {
-        modifyAndWrite(scanTomlPath, tomlMap -> {
+        Optional<String> content = contentWithGlobalExclusion(scanTomlPath, ruleId);
+        if (content.isPresent()) {
+            write(scanTomlPath, content.get());
+        }
+    }
+
+    /**
+     * Computes the Scan.toml content with a rule ID added to the global [rule] exclude array, without writing it.
+     *
+     * @param scanTomlPath the path to the Scan.toml file
+     * @param ruleId       the rule identifier to globally exclude
+     * @return the new content, or empty when the file already excludes the rule
+     * @throws IOException if an I/O error occurs
+     */
+    public static Optional<String> contentWithGlobalExclusion(Path scanTomlPath, String ruleId) throws IOException {
+        return modifiedContent(scanTomlPath, tomlMap -> {
             Map<String, Object> ruleMap = getOrCreateTable(tomlMap, Constants.RULES_TABLE);
             List<Object> excludeList = getOrCreateArray(ruleMap, Constants.EXCLUDE_KEY);
 
@@ -66,7 +82,23 @@ public final class ScanTomlWriter {
      * @throws IOException if an I/O error occurs
      */
     public static void removeGlobalExclusion(Path scanTomlPath, String ruleId) throws IOException {
-        modifyAndWrite(scanTomlPath, tomlMap -> {
+        Optional<String> content = contentWithoutGlobalExclusion(scanTomlPath, ruleId);
+        if (content.isPresent()) {
+            write(scanTomlPath, content.get());
+        }
+    }
+
+    /**
+     * Computes the Scan.toml content with a rule ID removed from the global [rule] exclude array, without writing it.
+     *
+     * @param scanTomlPath the path to the Scan.toml file
+     * @param ruleId       the rule identifier to remove from exclusions
+     * @return the new content, or empty when the file does not exclude the rule
+     * @throws IOException if an I/O error occurs
+     */
+    public static Optional<String> contentWithoutGlobalExclusion(Path scanTomlPath, String ruleId)
+            throws IOException {
+        return modifiedContent(scanTomlPath, tomlMap -> {
             if (tomlMap.containsKey(Constants.RULES_TABLE) && tomlMap.get(Constants.RULES_TABLE) instanceof Map) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> ruleMap = (Map<String, Object>) tomlMap.get(Constants.RULES_TABLE);
@@ -85,13 +117,32 @@ public final class ScanTomlWriter {
         });
     }
 
+    /**
+     * Computes the Scan.toml content with {@code @scan:Suppress} annotations applied again, by setting
+     * {@code [suppression] enabled} to true, without writing it. Other suppression settings are kept.
+     *
+     * @param scanTomlPath the path to the Scan.toml file
+     * @return the new content, or empty when suppressions are not disabled
+     * @throws IOException if an I/O error occurs
+     */
+    public static Optional<String> contentWithSuppressionEnabled(Path scanTomlPath) throws IOException {
+        return modifiedContent(scanTomlPath, tomlMap -> {
+            if (tomlMap.get(Constants.SUPPRESSION_TABLE) instanceof Map<?, ?> suppressionMap
+                    && suppressionMap.containsKey(Constants.SUPPRESSION_ENABLED)) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> settings = (Map<String, Object>) suppressionMap;
+                settings.put(Constants.SUPPRESSION_ENABLED, true);
+            }
+        });
+    }
+
     // --- Core Modification Logic ---
 
     private interface Modifier {
         void modify(Map<String, Object> tomlMap);
     }
 
-    private static void modifyAndWrite(Path scanTomlPath, Modifier modifier) throws IOException {
+    private static Optional<String> modifiedContent(Path scanTomlPath, Modifier modifier) throws IOException {
         Map<String, Object> tomlMap = new LinkedHashMap<>();
         if (Files.exists(scanTomlPath)) {
             String content = Files.readString(scanTomlPath, StandardCharsets.UTF_8).trim();
@@ -104,17 +155,15 @@ public final class ScanTomlWriter {
         String originalTomlContent = generateTomlString(tomlMap);
         modifier.modify(tomlMap);
         String newTomlContent = generateTomlString(tomlMap);
+        return originalTomlContent.equals(newTomlContent) ? Optional.empty() : Optional.of(newTomlContent);
+    }
 
-        if (originalTomlContent.equals(newTomlContent)) {
-            return;
-        }
-
+    private static void write(Path scanTomlPath, String content) throws IOException {
         Path parentDir = scanTomlPath.getParent();
         if (parentDir != null) {
             Files.createDirectories(parentDir);
         }
-
-        Files.writeString(scanTomlPath, newTomlContent, StandardCharsets.UTF_8);
+        Files.writeString(scanTomlPath, content, StandardCharsets.UTF_8);
     }
 
     @SuppressWarnings("unchecked")

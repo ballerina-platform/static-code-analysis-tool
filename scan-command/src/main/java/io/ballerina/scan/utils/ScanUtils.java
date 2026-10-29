@@ -785,9 +785,10 @@ public final class ScanUtils {
      *
      * @param issueImpl the {@link IssueImpl} representing the issue, to be
      *                  converted to a JSON object
+     * @param suppressedIssue the suppression of the issue, or {@code null} when it is not suppressed
      * @return json object representation of the static code analysis issue
      */
-    private static JsonObject getJsonIssue(IssueImpl issueImpl, SuppressedIssue suppressedIssue) {
+    public static JsonObject getJsonIssue(IssueImpl issueImpl, SuppressedIssue suppressedIssue) {
         Rule rule = issueImpl.rule();
         JsonObject scanReportIssue = new JsonObject();
         scanReportIssue.addProperty(SCAN_REPORT_ISSUE_RULE_ID, rule.id());

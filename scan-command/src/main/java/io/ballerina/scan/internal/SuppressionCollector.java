@@ -81,9 +81,9 @@ import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
  */
 final class SuppressionCollector {
 
-    private static final String SCAN_ORG = "ballerina";
-    private static final String SCAN_PACKAGE = "scan";
-    private static final String ANNOTATION_NAME = "Suppress";
+    static final String SCAN_ORG = "ballerina";
+    static final String SCAN_PACKAGE = "scan";
+    static final String ANNOTATION_NAME = "Suppress";
     private static final String RULES_FIELD = "rules";
     private static final String REASON_FIELD = "reason";
     private static final Pattern NUMERIC_ESCAPE = Pattern.compile("\\\\u\\{([0-9A-Fa-f]+)}");

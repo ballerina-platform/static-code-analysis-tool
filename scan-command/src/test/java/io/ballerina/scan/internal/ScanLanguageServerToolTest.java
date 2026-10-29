@@ -19,6 +19,7 @@
 package io.ballerina.scan.internal;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.projects.util.ProjectUtils;
@@ -32,6 +33,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -550,5 +552,462 @@ public class ScanLanguageServerToolTest extends BaseTest {
             Assert.assertTrue(issueContext.has("ruleId"), 
                     "Issue context should have ruleId");
         }
+    }
+
+    // =========================================================================
+    // Versioned entry point Tests
+    // =========================================================================
+
+    @Test(description = "test apiVersion returns the declared API version")
+    void testApiVersion() {
+        Assert.assertEquals(ScanLanguageServerTool.apiVersion(), ScanLanguageServerTool.API_VERSION);
+    }
+
+    @Test(description = "test scan returns report issue fields with absolute file paths")
+    void testScanReturnsReportIssues() throws IOException {
+        Path project = testProjectDir.resolve("scan-" + UUID.randomUUID());
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("Ballerina.toml"),
+                "[package]\norg = \"test\"\nname = \"scan_issues\"\nversion = \"0.1.0\"\n");
+        Files.writeString(project.resolve("main.bal"),
+                "public function main() {\n    int value = checkpanic int:fromString(\"1\");\n    _ = value;\n}\n");
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.scan(project.toString(), null)).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        Assert.assertEquals(response.get("apiVersion").getAsInt(), ScanLanguageServerTool.API_VERSION);
+        JsonArray packages = response.getAsJsonArray("packages");
+        Assert.assertEquals(packages.size(), 1);
+        JsonObject pkg = packages.get(0).getAsJsonObject();
+        Assert.assertEquals(Path.of(pkg.get("path").getAsString()), project.toAbsolutePath().normalize());
+        JsonArray issues = pkg.getAsJsonArray("issues");
+        Assert.assertEquals(issues.get(0).getAsJsonObject().get("ruleID").getAsString(), "ballerina:1");
+        for (int i = 0; i < issues.size(); i++) {
+            JsonObject issue = issues.get(i).getAsJsonObject();
+            Assert.assertTrue(issue.has("ruleID"));
+            Assert.assertTrue(issue.has("ruleKind"));
+            Assert.assertTrue(issue.has("message"));
+            Assert.assertTrue(issue.has("textRange"));
+            Path filePath = Path.of(issue.get("filePath").getAsString());
+            Assert.assertTrue(filePath.isAbsolute() && Files.exists(filePath), filePath.toString());
+        }
+    }
+
+    @Test(description = "test scan separates suppressed issues and reports suppression diagnostics")
+    void testScanAppliesSuppressions() {
+        Path project = testResources.resolve("test-resources").resolve("bal-project-with-suppressions");
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.scan(project.toString(), null)).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        JsonObject pkg = response.getAsJsonArray("packages").get(0).getAsJsonObject();
+        JsonArray issues = pkg.getAsJsonArray("issues");
+        Assert.assertEquals(issues.size(), 1);
+        JsonArray suppressFixes = issues.get(0).getAsJsonObject().getAsJsonArray("suppressFixes");
+        Assert.assertEquals(suppressFixes.size(), 2);
+        Assert.assertEquals(suppressFixes.get(1).getAsJsonObject().get("construct").getAsString(), "function 'main'");
+        JsonObject suppressFix = suppressFixes.get(0).getAsJsonObject();
+        Assert.assertEquals(suppressFix.get("construct").getAsString(), "variable 'active'");
+        Assert.assertEquals(suppressFix.get("title").getAsString(),
+                "Suppress ballerina:1 on variable 'active' with @scan:Suppress");
+        JsonArray edits = suppressFix.getAsJsonArray("edits");
+        Assert.assertEquals(edits.size(), 1, "the file already imports ballerina/scan");
+        assertEdit(edits.get(0).getAsJsonObject(), 21, 4,
+                "@scan:Suppress {rules: [\"ballerina:1\"], reason: \"$1\"}\n    ", true);
+        Assert.assertTrue(pkg.get("suppressionEnabled").getAsBoolean());
+        JsonArray suppressedIssues = pkg.getAsJsonArray("suppressedIssues");
+        Assert.assertEquals(suppressedIssues.size(), 2);
+        for (int i = 0; i < suppressedIssues.size(); i++) {
+            Assert.assertTrue(suppressedIssues.get(i).getAsJsonObject().has("suppression"));
+        }
+        JsonArray diagnostics = pkg.getAsJsonArray("suppressionDiagnostics");
+        Assert.assertEquals(diagnostics.size(), 1);
+        JsonObject diagnostic = diagnostics.get(0).getAsJsonObject();
+        Assert.assertEquals(diagnostic.get("severity").getAsString(), "WARNING");
+        Assert.assertTrue(diagnostic.get("message").getAsString().contains("ballerina:7"));
+        Assert.assertEquals(Path.of(diagnostic.get("filePath").getAsString()),
+                project.resolve("main.bal").toAbsolutePath().normalize());
+        Assert.assertEquals(diagnostic.getAsJsonObject("textRange").get("startLine").getAsInt(), 22);
+    }
+
+    @Test(description = "test scan does not report a suppression of a rule Scan.toml leaves out as unmatched")
+    void testScanSkipsUnmatchedSuppressionOfExcludedRule() throws IOException {
+        Path fixture = testResources.resolve("test-resources").resolve("bal-project-with-suppressions");
+        Path project = testProjectDir.resolve("excluded-suppression-" + UUID.randomUUID());
+        Files.createDirectories(project);
+        for (String file : List.of("Ballerina.toml", "main.bal")) {
+            Files.copy(fixture.resolve(file), project.resolve(file));
+        }
+        Files.writeString(project.resolve("Scan.toml"), "[rule]\nexclude = [\"ballerina:7\"]\n");
+
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.scan(project.toString(), null)).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        JsonObject pkg = response.getAsJsonArray("packages").get(0).getAsJsonObject();
+        Assert.assertEquals(pkg.getAsJsonArray("suppressedIssues").size(), 2);
+        Assert.assertEquals(pkg.getAsJsonArray("suppressionDiagnostics").size(), 0, pkg.toString());
+    }
+
+    @Test(description = "test scan marks annotated issues instead of offering a fix when suppressions are disabled")
+    void testScanWithSuppressionsDisabled() throws IOException {
+        Path fixture = testResources.resolve("test-resources").resolve("bal-project-with-suppressions");
+        Path project = testProjectDir.resolve("disabled-suppression-" + UUID.randomUUID());
+        Files.createDirectories(project);
+        for (String file : List.of("Ballerina.toml", "main.bal")) {
+            Files.copy(fixture.resolve(file), project.resolve(file));
+        }
+        Files.writeString(project.resolve("Scan.toml"), "[suppression]\nenabled = false\n");
+
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.scan(project.toString(), null)).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        JsonObject pkg = response.getAsJsonArray("packages").get(0).getAsJsonObject();
+        Assert.assertFalse(pkg.get("suppressionEnabled").getAsBoolean());
+        Assert.assertEquals(pkg.getAsJsonArray("suppressedIssues").size(), 0);
+        Assert.assertEquals(pkg.getAsJsonArray("suppressionDiagnostics").size(), 0);
+        JsonArray issues = pkg.getAsJsonArray("issues");
+        Assert.assertEquals(issues.size(), 3);
+        int annotated = 0;
+        for (int i = 0; i < issues.size(); i++) {
+            JsonObject issue = issues.get(i).getAsJsonObject();
+            Assert.assertFalse(issue.has("suppression"), issue.toString());
+            if (issue.has("inactiveSuppression")) {
+                annotated++;
+                Assert.assertFalse(issue.has("suppressFixes"), "an annotated issue must not get a second annotation");
+                JsonObject enableSuppressions = issue.getAsJsonObject("enableSuppressions");
+                Assert.assertEquals(enableSuppressions.get("title").getAsString(), "Enable suppressions in Scan.toml");
+                Assert.assertTrue(enableSuppressions.get("note").getAsString().contains("suppressions are disabled"));
+            } else {
+                Assert.assertTrue(issue.has("suppressFixes"), issue.toString());
+                Assert.assertFalse(issue.has("enableSuppressions"), issue.toString());
+            }
+        }
+        Assert.assertEquals(annotated, 2);
+    }
+
+    @Test(description = "test the suppression fix imports ballerina/scan below the leading comments")
+    void testSuppressFixAddsImport() throws IOException {
+        Path project = testProjectDir.resolve("suppress-fix-" + UUID.randomUUID());
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("Ballerina.toml"),
+                "[package]\norg = \"test\"\nname = \"suppress_fix\"\nversion = \"0.1.0\"\n");
+        Files.writeString(project.resolve("main.bal"), "// License header\n\npublic function main() {\n"
+                + "    int value = checkpanic int:fromString(\"1\");\n    _ = value;\n}\n");
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.scan(project.toString(), null)).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        JsonArray issues = response.getAsJsonArray("packages").get(0).getAsJsonObject().getAsJsonArray("issues");
+        JsonObject checkpanic = null;
+        for (int i = 0; i < issues.size(); i++) {
+            if ("ballerina:1".equals(issues.get(i).getAsJsonObject().get("ruleID").getAsString())) {
+                checkpanic = issues.get(i).getAsJsonObject();
+            }
+        }
+        Assert.assertNotNull(checkpanic, issues.toString());
+        JsonArray edits = checkpanic.getAsJsonArray("suppressFixes").get(0).getAsJsonObject().getAsJsonArray("edits");
+        Assert.assertEquals(edits.size(), 2);
+        assertEdit(edits.get(0).getAsJsonObject(), 2, 0, "import ballerina/scan;\n\n", false);
+        assertEdit(edits.get(1).getAsJsonObject(), 3, 4,
+                "@scan:Suppress {rules: [\"ballerina:1\"], reason: \"$1\"}\n    ", true);
+    }
+
+    @Test(description = "test each suppression fix restructures its statement and suppresses only that finding")
+    void testSuppressFixesRestructureStatements() throws IOException {
+        Path project = testProjectDir.resolve("restructure-" + UUID.randomUUID());
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("Ballerina.toml"),
+                "[package]\norg = \"test\"\nname = \"restructure\"\nversion = \"0.1.0\"\n");
+        Path main = project.resolve("main.bal");
+        Files.writeString(main, String.join("\n",
+                "class Counter {",
+                "    int count;",
+                "",
+                "    function init() {",
+                "        self.count = checkpanic int:fromString(\"1\");",
+                "    }",
+                "}",
+                "",
+                "function parse(string value) returns int {",
+                "    return checkpanic int:fromString(value);",
+                "}",
+                "",
+                "function track(string value) {",
+                "    consume(checkpanic int:fromString(value));",
+                "}",
+                "",
+                "function consume(int value) {",
+                "    _ = value;",
+                "}",
+                "",
+                "function same(int a) returns boolean {",
+                "    if a == a {",
+                "        return true;",
+                "    }",
+                "    return false;",
+                "}",
+                "",
+                "function countDown() {",
+                "    foreach int i in 0...-1 {",
+                "        _ = i;",
+                "    }",
+                "}",
+                "",
+                "function reassign() {",
+                "    int total = 1;",
+                "    total = total;",
+                "}",
+                ""));
+
+        List<String[]> cases = List.of(
+                new String[]{"ballerina:1", "self.count = checkpanic int:fromString(\"1\");", "the assigned value"},
+                new String[]{"ballerina:1", "return checkpanic int:fromString(value);", "the returned value"},
+                new String[]{"ballerina:1", "consume(checkpanic int:fromString(value));", "this statement"},
+                new String[]{"ballerina:7", "if a == a {", "the if condition"},
+                new String[]{"ballerina:12", "foreach int i in 0...-1 {", "the foreach range"});
+        for (String[] expected : cases) {
+            String source = Files.readString(main);
+            String marker = expected[1];
+            JsonObject before = scanPackage(project);
+            JsonObject issue = findIssue(before, expected[0], main, source, marker);
+            JsonArray fixes = issue.getAsJsonArray("suppressFixes");
+            Assert.assertEquals(fixes.size(), 2, issue.toString());
+            JsonObject first = fixes.get(0).getAsJsonObject();
+            Assert.assertEquals(first.get("construct").getAsString(), expected[2]);
+            Assert.assertTrue(fixes.get(1).getAsJsonObject().get("construct").getAsString().startsWith("function")
+                    || fixes.get(1).getAsJsonObject().get("construct").getAsString().startsWith("method"));
+            Files.writeString(main, applyEdits(source, first.getAsJsonArray("edits")));
+
+            JsonObject pkg = scanPackage(project);
+            Assert.assertFalse(pkg.has("skippedReason"), Files.readString(main));
+            Assert.assertEquals(pkg.getAsJsonArray("suppressionDiagnostics").size(), 0, pkg.toString());
+            Assert.assertEquals(count(pkg, "issues", expected[0]), count(before, "issues", expected[0]) - 1,
+                    "still reported: " + Files.readString(main));
+            Assert.assertEquals(count(pkg, "suppressedIssues", expected[0]),
+                    count(before, "suppressedIssues", expected[0]) + 1);
+        }
+
+        JsonObject selfAssignment = findIssue(scanPackage(project), "ballerina:10", main, Files.readString(main),
+                "total = total;");
+        JsonArray fixes = selfAssignment.getAsJsonArray("suppressFixes");
+        Assert.assertEquals(fixes.size(), 1, "a rewritten self-assignment is no longer reported");
+        Assert.assertEquals(fixes.get(0).getAsJsonObject().get("construct").getAsString(), "function 'reassign'");
+    }
+
+    private static JsonObject scanPackage(Path project) {
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.scan(project.toString(), null)).getAsJsonObject();
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        return response.getAsJsonArray("packages").get(0).getAsJsonObject();
+    }
+
+    // The statement is identified by its text because each applied fix moves the lines below it.
+    private static JsonObject findIssue(JsonObject pkg, String ruleId, Path file, String source, String statement) {
+        String[] lines = source.split("\n", -1);
+        for (JsonElement element : pkg.getAsJsonArray("issues")) {
+            JsonObject issue = element.getAsJsonObject();
+            int line = issue.getAsJsonObject("textRange").get("startLine").getAsInt();
+            if (ruleId.equals(issue.get("ruleID").getAsString()) && lines[line].trim().equals(statement)
+                    && Path.of(issue.get("filePath").getAsString()).equals(file.toAbsolutePath().normalize())) {
+                return issue;
+            }
+        }
+        throw new AssertionError("no " + ruleId + " issue on '" + statement + "' in " + pkg);
+    }
+
+    private static int count(JsonObject pkg, String list, String ruleId) {
+        int count = 0;
+        for (JsonElement element : pkg.getAsJsonArray(list)) {
+            if (ruleId.equals(element.getAsJsonObject().get("ruleID").getAsString())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    // Applies the edits from the end of the file back, typing "accepted" where the snippet puts the reason.
+    private static String applyEdits(String source, JsonArray edits) {
+        List<int[]> lineStarts = new ArrayList<>();
+        String[] lines = source.split("\n", -1);
+        int offset = 0;
+        for (String line : lines) {
+            lineStarts.add(new int[]{offset});
+            offset += line.length() + 1;
+        }
+        List<JsonObject> sorted = new ArrayList<>();
+        edits.forEach(edit -> sorted.add(edit.getAsJsonObject()));
+        sorted.sort((a, b) -> Integer.compare(position(b, lineStarts, "start"), position(a, lineStarts, "start")));
+        StringBuilder result = new StringBuilder(source);
+        for (JsonObject edit : sorted) {
+            String text = edit.get("newText").getAsString();
+            if (edit.get("snippet").getAsBoolean()) {
+                text = text.replace("$1", "accepted").replace("\\}", "}").replace("\\$", "$");
+            }
+            result.replace(position(edit, lineStarts, "start"), position(edit, lineStarts, "end"), text);
+        }
+        return result.toString();
+    }
+
+    private static int position(JsonObject edit, List<int[]> lineStarts, String which) {
+        JsonObject range = edit.getAsJsonObject("textRange");
+        String prefix = which.equals("start") ? "start" : "end";
+        return lineStarts.get(range.get(prefix + "Line").getAsInt())[0] + range.get(prefix + "LineOffset").getAsInt();
+    }
+
+    private static void assertEdit(JsonObject edit, int line, int offset, String newText, boolean snippet) {
+        JsonObject range = edit.getAsJsonObject("textRange");
+        Assert.assertEquals(range.get("startLine").getAsInt(), line);
+        Assert.assertEquals(range.get("startLineOffset").getAsInt(), offset);
+        Assert.assertEquals(range.get("endLine").getAsInt(), line);
+        Assert.assertEquals(range.get("endLineOffset").getAsInt(), offset);
+        Assert.assertEquals(edit.get("newText").getAsString(), newText);
+        Assert.assertEquals(edit.get("snippet").getAsBoolean(), snippet);
+    }
+
+    @Test(description = "test scan skips a package with compilation errors")
+    void testScanSkipsPackageWithCompilationErrors() {
+        Path project = testResources.resolve("test-resources").resolve("bal-project-with-compilation-errors");
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.scan(project.toString(), null)).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        JsonObject pkg = response.getAsJsonArray("packages").get(0).getAsJsonObject();
+        Assert.assertTrue(pkg.has("skippedReason"));
+        Assert.assertTrue(pkg.getAsJsonArray("issues").isEmpty());
+    }
+
+    @Test(description = "test scan of a missing path reports an error")
+    void testScanMissingPath() {
+        JsonObject response = JsonParser.parseString(ScanLanguageServerTool.scan(
+                testProjectDir.resolve("does-not-exist").toString(), null)).getAsJsonObject();
+
+        Assert.assertFalse(response.get("success").getAsBoolean());
+        Assert.assertTrue(response.has("error"));
+    }
+
+    @Test(description = "test excludeRuleEdit returns the new content without writing Scan.toml")
+    void testExcludeRuleEditDoesNotWrite() {
+        Path projectDir = testProjectDir.resolve("edit-" + UUID.randomUUID());
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.excludeRuleEdit(projectDir.toString(), " ballerina:1 ")).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        Assert.assertEquals(response.get("ruleId").getAsString(), "ballerina:1");
+        Assert.assertFalse(response.get("exists").getAsBoolean());
+        Assert.assertTrue(response.get("changed").getAsBoolean());
+        Assert.assertTrue(response.get("content").getAsString().contains("\"ballerina:1\""));
+        Assert.assertEquals(Path.of(response.get("path").getAsString()), projectDir.resolve("Scan.toml"));
+        Assert.assertFalse(Files.exists(projectDir.resolve("Scan.toml")), "the edit must not be written");
+    }
+
+    @Test(description = "test includeRuleEdit reports no change when the rule is not excluded")
+    void testIncludeRuleEditNoChange() {
+        JsonObject response = JsonParser.parseString(ScanLanguageServerTool.includeRuleEdit(
+                testProjectDir.resolve("edit-" + UUID.randomUUID()).toString(), "ballerina:1")).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        Assert.assertFalse(response.get("changed").getAsBoolean());
+        Assert.assertFalse(response.has("content"));
+    }
+
+    @Test(description = "test includeRuleEdit removes an existing exclusion")
+    void testIncludeRuleEditRemovesExclusion() throws IOException {
+        Path projectDir = testProjectDir.resolve("edit-" + UUID.randomUUID());
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("Scan.toml"), "[rule]\nexclude = [\"ballerina:1\", \"ballerina:2\"]\n");
+
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.includeRuleEdit(projectDir.toString(), "ballerina:1")).getAsJsonObject();
+
+        Assert.assertTrue(response.get("changed").getAsBoolean(), response.toString());
+        String content = response.get("content").getAsString();
+        Assert.assertFalse(content.contains("\"ballerina:1\""));
+        Assert.assertTrue(content.contains("\"ballerina:2\""));
+    }
+
+    @Test(description = "test enableSuppressionEdit sets enabled to true and keeps the other settings")
+    void testEnableSuppressionEdit() throws IOException {
+        Path projectDir = testProjectDir.resolve("enable-suppression-" + UUID.randomUUID());
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("Scan.toml"),
+                "[rule]\nexclude = [\"ballerina:2\"]\n\n[suppression]\nenabled = false\nrequireReason = true\n");
+
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.enableSuppressionEdit(projectDir.toString())).getAsJsonObject();
+
+        Assert.assertTrue(response.get("changed").getAsBoolean(), response.toString());
+        String content = response.get("content").getAsString();
+        Assert.assertTrue(content.contains("enabled = true"), content);
+        Assert.assertTrue(content.contains("requireReason = true"), content);
+        Assert.assertTrue(content.contains("\"ballerina:2\""), content);
+    }
+
+    @Test(description = "test enableSuppressionEdit makes no change when enabled is not set")
+    void testEnableSuppressionEditDefaultEnabled() throws IOException {
+        Path projectDir = testProjectDir.resolve("enable-suppression-" + UUID.randomUUID());
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("Scan.toml"), "[suppression]\nrequireReason = true\n");
+
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.enableSuppressionEdit(projectDir.toString())).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        Assert.assertFalse(response.get("changed").getAsBoolean());
+    }
+
+    @Test(description = "test enableSuppressionEdit makes no change when suppressions are enabled")
+    void testEnableSuppressionEditNoChange() {
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.enableSuppressionEdit(testProjectDir.toString())).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        Assert.assertFalse(response.get("changed").getAsBoolean());
+    }
+
+    @Test(description = "test rule edits reject an empty rule ID")
+    void testRuleEditEmptyRuleId() {
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.excludeRuleEdit(testProjectDir.toString(), " ")).getAsJsonObject();
+
+        Assert.assertFalse(response.get("success").getAsBoolean());
+        Assert.assertTrue(response.get("error").getAsString().contains("non-empty string"));
+    }
+
+    @Test(description = "test scan with the report option writes the HTML report with the scan data")
+    void testScanWritesHtmlReport() throws IOException {
+        Path project = testProjectDir.resolve("report-" + UUID.randomUUID());
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("Ballerina.toml"),
+                "[package]\norg = \"test\"\nname = \"scan_report\"\nversion = \"0.1.0\"\n");
+        Files.writeString(project.resolve("main.bal"),
+                "public function main() {\n    int value = checkpanic int:fromString(\"1\");\n    _ = value;\n}\n");
+
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.scan(project.toString(), Map.of("report", true))).getAsJsonObject();
+
+        Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+        JsonObject pkg = response.getAsJsonArray("packages").get(0).getAsJsonObject();
+        Path reportPath = Path.of(pkg.get("reportPath").getAsString());
+        Assert.assertTrue(Files.exists(reportPath), reportPath.toString());
+        String html = Files.readString(reportPath);
+        Assert.assertTrue(html.contains("ballerina:1"));
+        Assert.assertFalse(html.contains("__data__"));
+    }
+
+    @Test(description = "test scan without the report option does not return a report path")
+    void testScanWithoutReport() throws IOException {
+        Path project = testProjectDir.resolve("no-report-" + UUID.randomUUID());
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("Ballerina.toml"),
+                "[package]\norg = \"test\"\nname = \"no_report\"\nversion = \"0.1.0\"\n");
+        Files.writeString(project.resolve("main.bal"), "public function main() {\n}\n");
+
+        JsonObject response = JsonParser.parseString(
+                ScanLanguageServerTool.scan(project.toString(), null)).getAsJsonObject();
+
+        JsonObject pkg = response.getAsJsonArray("packages").get(0).getAsJsonObject();
+        Assert.assertFalse(pkg.has("reportPath"));
     }
 }
