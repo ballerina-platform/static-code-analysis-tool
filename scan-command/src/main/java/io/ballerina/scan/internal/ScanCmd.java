@@ -20,12 +20,14 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.cli.BLauncherCmd;
 import io.ballerina.cli.launcher.LauncherUtils;
+import io.ballerina.projects.BuildOptions;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.ProjectLoadResult;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.directory.WorkspaceProject;
+import io.ballerina.projects.environment.PackageLockingMode;
 import io.ballerina.projects.util.ProjectConstants;
 import io.ballerina.projects.util.ProjectPaths;
 import io.ballerina.projects.util.ProjectUtils;
@@ -509,7 +511,10 @@ public class ScanCmd implements BLauncherCmd {
                 return Optional.empty();
             }
 
-            ProjectLoadResult loadResult = ProjectLoader.load(projectPath);
+            // The scan never updates Dependencies.toml, so it uses the locked versions instead of looking for
+            // newer ones in Central after every source change.
+            BuildOptions buildOptions = BuildOptions.builder().setLockingMode(PackageLockingMode.HARD).build();
+            ProjectLoadResult loadResult = ProjectLoader.load(projectPath, buildOptions);
             if (loadResult.diagnostics().hasErrors()) {
                 loadResult.diagnostics().errors().forEach(errorStream::println);
                 return Optional.empty();

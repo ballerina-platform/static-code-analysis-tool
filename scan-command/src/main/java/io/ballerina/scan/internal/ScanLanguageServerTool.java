@@ -29,6 +29,7 @@ import io.ballerina.projects.ProjectLoadResult;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.directory.WorkspaceProject;
+import io.ballerina.projects.environment.PackageLockingMode;
 import io.ballerina.projects.util.ProjectPaths;
 import io.ballerina.scan.ExcludedIssue;
 import io.ballerina.scan.Issue;
@@ -188,6 +189,7 @@ public class ScanLanguageServerTool {
         BuildOptions buildOptions = BuildOptions.builder()
                 .setOffline(isOffline)
                 .setSkipTests(isSkipTests)
+                .setLockingMode(PackageLockingMode.HARD)
                 .build();
 
         ProjectLoadResult loadResult = ProjectLoader.load(projectPath, buildOptions);
@@ -233,6 +235,7 @@ public class ScanLanguageServerTool {
                 BuildOptions wsBuildOptions = BuildOptions.builder()
                         .setOffline(isOffline)
                         .setSkipTests(isSkipTests)
+                        .setLockingMode(PackageLockingMode.HARD)
                         .build();
                 ProjectLoadResult wsResult = ProjectLoader.load(wsRoot.get(), wsBuildOptions);
                 if (wsResult.project().kind() == ProjectKind.WORKSPACE_PROJECT) {

@@ -150,6 +150,8 @@ Running `bal scan` reports each finding as a JSON issue with its location and fu
 
 Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON, or SARIF with `--format=sarif`. Progress messages, warnings, report paths and the closing summary, such as `3 issue(s)`, are written to standard error.
 
+The scan uses the dependency versions locked in `Dependencies.toml`, as `bal build --locking-mode=hard` does, and resolves only the dependencies that are not locked yet. It does not update `Dependencies.toml`; `bal build` does.
+
 ## Scan report
 
 To generate a detailed HTML report of the analysis results, use the `--scan-report` option:
