@@ -79,12 +79,20 @@ final class SuppressionFilter {
         List<SuppressionDiagnostic> diagnostics = new ArrayList<>(collected.ignored());
         diagnostics.addAll(unknownRules(suppressions, knownRules));
         diagnostics.addAll(requirementViolations(suppressions, options));
+        // An invalid suppression fails the scan, so the language server, which reports instead of failing, must not
+        // apply it either
+        Set<SuppressionAnnotation> invalid = diagnostics.stream().filter(SuppressionDiagnostic::isError)
+                .map(SuppressionDiagnostic::suppression).collect(Collectors.toSet());
+        List<SuppressionAnnotation> valid = suppressions.stream().filter(suppression -> !invalid.contains(suppression))
+                .toList();
+        Map<String, List<SuppressionAnnotation>> suppressionsByFile = valid.stream()
+                .collect(Collectors.groupingBy(SuppressionAnnotation::filePath));
 
         List<Issue> activeIssues = new ArrayList<>();
         List<SuppressedIssue> suppressedIssues = new ArrayList<>();
         Map<SuppressionAnnotation, Set<String>> matchedRules = new HashMap<>();
         for (Issue issue : issues) {
-            SuppressionAnnotation suppression = innermostSuppression(issue, suppressions);
+            SuppressionAnnotation suppression = innermostSuppression(issue, suppressionsByFile);
             if (suppression == null) {
                 activeIssues.add(issue);
                 continue;
@@ -93,18 +101,18 @@ final class SuppressionFilter {
             suppressedIssues.add(new SuppressedIssue(issue, suppression.rules(),
                     suppression.justification().orElse(null)));
         }
-        diagnostics.addAll(unusedSuppressions(suppressions, matchedRules, knownRules, selection));
+        diagnostics.addAll(unusedSuppressions(valid, matchedRules, knownRules, selection));
         return new SuppressionOutcome(activeIssues, suppressedIssues, diagnostics);
     }
 
-    private static SuppressionAnnotation innermostSuppression(Issue issue, List<SuppressionAnnotation> suppressions) {
+    private static SuppressionAnnotation innermostSuppression(Issue issue,
+                                                              Map<String, List<SuppressionAnnotation>> byFile) {
         if (!(issue instanceof IssueImpl issueImpl)) {
             return null;
         }
         SuppressionAnnotation innermost = null;
-        for (SuppressionAnnotation suppression : suppressions) {
-            if (!suppression.filePath().equals(issueImpl.filePath())
-                    || !suppression.appliesTo(issue.rule().id())
+        for (SuppressionAnnotation suppression : byFile.getOrDefault(issueImpl.filePath(), List.of())) {
+            if (!suppression.appliesTo(issue.rule().id())
                     || !suppression.covers(issue.location().lineRange())) {
                 continue;
             }

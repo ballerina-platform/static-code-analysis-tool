@@ -133,6 +133,8 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with an empty Ballerina project")
     void testScanCommandEmptyProject() throws IOException {
         Path emptyBalProject = testResources.resolve("test-resources").resolve("empty-bal-project");
+        // An empty package has no dependencies to lock, so it is reported as empty even without Dependencies.toml
+        Files.deleteIfExists(emptyBalProject.resolve("Dependencies.toml"));
         System.setProperty("user.dir", emptyBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         scanCmd.execute();
@@ -1057,9 +1059,12 @@ public class ScanCmdTest extends BaseTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         System.setProperty("user.dir", workspacePath.toString());
-        new ScanCmd(new PrintStream(out, true, StandardCharsets.UTF_8),
-                new PrintStream(err, true, StandardCharsets.UTF_8)).execute();
-        System.setProperty("user.dir", userDir);
+        try {
+            new ScanCmd(new PrintStream(out, true, StandardCharsets.UTF_8),
+                    new PrintStream(err, true, StandardCharsets.UTF_8)).execute();
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
         return new String[]{out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8)};
     }
 

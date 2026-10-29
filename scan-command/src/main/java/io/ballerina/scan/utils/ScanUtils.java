@@ -47,6 +47,7 @@ import io.ballerina.toml.api.Toml;
 import io.ballerina.toml.semantic.TomlType;
 import io.ballerina.toml.semantic.ast.TomlArrayValueNode;
 import io.ballerina.toml.semantic.ast.TomlValueNode;
+import io.ballerina.toml.semantic.ast.TopLevelNode;
 import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextRange;
 import org.apache.commons.io.FileUtils;
@@ -184,7 +185,8 @@ public final class ScanUtils {
         };
         for (BuildProject buildProject : packages) {
             Package currentPackage = buildProject.currentPackage();
-            if (currentPackage.dependenciesToml().isEmpty()) {
+            // An empty package has no dependencies to lock, and is reported as empty instead
+            if (!ProjectUtils.isProjectEmpty(buildProject) && currentPackage.dependenciesToml().isEmpty()) {
                 String packageName = currentPackage.packageOrg().value() + "/" + currentPackage.packageName().value();
                 throw LauncherUtils.createLauncherException(
                         DiagnosticLog.error(DiagnosticCode.MISSING_DEPENDENCIES_TOML, packageName));
@@ -737,6 +739,17 @@ public final class ScanUtils {
     }
 
     /**
+     * Returns the path of a document as recorded in the issues reported for it.
+     *
+     * @param document the document
+     * @return the path of the document, or its name when it has no path
+     */
+    public static String getReportFilePath(Document document) {
+        return document.module().project().documentPath(document.documentId())
+                .orElse(Path.of(document.name())).toString();
+    }
+
+    /**
      * Returns the name used to identify a document in scan results. Documents of workspace
      * packages are prefixed with their module name so that files across packages stay distinct.
      *
@@ -1045,19 +1058,23 @@ public final class ScanUtils {
             ruleTable.get("include").ifPresent(loadRules(scanTomlFile, true));
             ruleTable.get("exclude").ifPresent(loadRules(scanTomlFile, false));
         });
+        // Written in any other form, such as [[suppression]], the settings would not be read at all
+        TopLevelNode suppressionNode = scanTomlDocumentContent.rootNode().entries().get(SUPPRESSION_TABLE);
+        if (suppressionNode != null && suppressionNode.kind() != TomlType.TABLE) {
+            throw LauncherUtils.createLauncherException(DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_TABLE));
+        }
         Optional<Toml> suppressionTable = scanTomlDocumentContent.getTable(SUPPRESSION_TABLE);
         if (suppressionTable.isPresent()) {
             Toml table = suppressionTable.get();
             validateSuppressionSettings(table);
-            scanTomlFile.setSuppressionEnabled(!isFalse(table, SUPPRESSION_ENABLED));
-            scanTomlFile.setSuppressionReasonRequired(isTrue(table, SUPPRESSION_REQUIRE_REASON));
-            scanTomlFile.setSuppressionRuleIdRequired(isTrue(table, SUPPRESSION_REQUIRE_RULE_ID));
+            scanTomlFile.setSuppressionEnabled(booleanSetting(table, SUPPRESSION_ENABLED, true));
+            scanTomlFile.setSuppressionReasonRequired(booleanSetting(table, SUPPRESSION_REQUIRE_REASON, false));
+            scanTomlFile.setSuppressionRuleIdRequired(booleanSetting(table, SUPPRESSION_REQUIRE_RULE_ID, false));
         }
         return Optional.of(scanTomlFile);
     }
 
-    // A misspelled key or a quoted "true" would otherwise read as unset and silently turn a requirement off, so
-    // both fail the scan instead of skipping the package.
+    // A misspelled key or a quoted "true" would otherwise read as unset and silently turn a requirement off
     private static void validateSuppressionSettings(Toml suppressionTable) {
         List<String> keys = List.of(SUPPRESSION_ENABLED, SUPPRESSION_REQUIRE_REASON, SUPPRESSION_REQUIRE_RULE_ID);
         for (String key : suppressionTable.toMap().keySet()) {
@@ -1176,12 +1193,9 @@ public final class ScanUtils {
     }
 
 
-    private static boolean isTrue(Toml table, String key) {
-        return table.get(key).map(TomlValueNode::toNativeValue).map(Boolean.TRUE::equals).orElse(false);
-    }
-
-    private static boolean isFalse(Toml table, String key) {
-        return table.get(key).map(TomlValueNode::toNativeValue).map(Boolean.FALSE::equals).orElse(false);
+    // Called after validateSuppressionSettings, so a present value is a boolean
+    private static boolean booleanSetting(Toml table, String key, boolean defaultValue) {
+        return table.get(key).map(value -> (Boolean) value.toNativeValue()).orElse(defaultValue);
     }
 
     /**

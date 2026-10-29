@@ -84,7 +84,9 @@ public class ScanLanguageServerTool {
                 dependentPackageIssuesFound = hasDependentPackageIssues(project, projectPath, buildOptionsMap);
             } catch (Throwable e) {
                 String errorMsg;
-                if (e.getCause() != null) {
+                if (e instanceof BLauncherException launcherException) {
+                    errorMsg = launcherMessage(launcherException);
+                } else if (e.getCause() != null) {
                     errorMsg = e.getCause().getClass().getName() + ": " + e.getCause().getMessage();
                 } else {
                     errorMsg = e.getClass().getName() + ": " + e.getMessage();
@@ -109,15 +111,19 @@ public class ScanLanguageServerTool {
         } catch (Exception e) {
             JsonObject errorObject = new JsonObject();
             errorObject.addProperty("success", false);
-            // A launcher exception, such as from an invalid Scan.toml, carries its message in its message list
             String errorMsg = e instanceof BLauncherException launcherException
-                    ? String.join(System.lineSeparator(), launcherException.getMessages()) : e.getMessage();
+                    ? launcherMessage(launcherException) : e.getMessage();
             errorObject.addProperty("error", errorMsg != null && !errorMsg.trim().isEmpty() ? errorMsg : e.toString());
             addEmptyIssueArrays(errorObject);
             return GSON.toJson(errorObject);
         }
     }
 
+
+    // A launcher exception, such as from an invalid Scan.toml, carries its message in its message list
+    private static String launcherMessage(BLauncherException exception) {
+        return String.join(System.lineSeparator(), exception.getMessages());
+    }
 
     /**
      * Adds a rule ID to the global {@code [rule]} section in {@link Constants#SCAN_FILE}.
