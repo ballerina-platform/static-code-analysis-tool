@@ -218,6 +218,22 @@ public class ScanUtilsTest extends BaseTest {
                 List.of("error: " + DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, "requireReason")));
     }
 
+    @Test(description = "test method for loading a Scan.toml file whose suppression settings are not a table")
+    void testLoadScanTomlConfigurationsWithSuppressionTableArray() {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-suppression-table-array");
+        Project project = ProjectLoader.loadProject(ballerinaProject);
+        System.setProperty("user.dir", ballerinaProject.toString());
+        try {
+            BLauncherException exception = Assert.expectThrows(BLauncherException.class,
+                    () -> ScanUtils.loadScanTomlConfigurations(project, printStream));
+            Assert.assertEquals(exception.getMessages(),
+                    List.of("error: " + DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_TABLE)));
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
+    }
+
     @Test(description = "test method for loading a Scan.toml file with an unknown suppression setting")
     void testLoadScanTomlConfigurationsWithUnknownSuppressionSetting() {
         Path ballerinaProject = testResources.resolve("test-resources")

@@ -124,9 +124,12 @@ public class SuppressionTest extends BaseTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         System.setProperty("user.dir", suppressionsProject.toString());
-        new ScanCmd(new PrintStream(out, true, StandardCharsets.UTF_8),
-                new PrintStream(err, true, StandardCharsets.UTF_8)).execute();
-        System.setProperty("user.dir", userDir);
+        try {
+            new ScanCmd(new PrintStream(out, true, StandardCharsets.UTF_8),
+                    new PrintStream(err, true, StandardCharsets.UTF_8)).execute();
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
 
         String stdout = out.toString(StandardCharsets.UTF_8);
         String stderr = err.toString(StandardCharsets.UTF_8).replace("\r\n", "\n").trim();
@@ -156,16 +159,15 @@ public class SuppressionTest extends BaseTest {
             Assert.assertTrue(console.contains(location), console);
         }
         Assert.assertEquals(console.split(Pattern.quote(warning), -1).length - 1, 3, console);
-        Assert.assertTrue(console.contains("1 issue(s)"), console);
+        // A suppression on a declaration does not reach the members of the object it constructs
+        Assert.assertTrue(console.contains("\"startLine\": 34"), console);
+        Assert.assertTrue(console.contains("2 issue(s)"), console);
         Assert.assertFalse(console.contains("suppressed"), console);
     }
 
     @Test(description = "test an invalid suppression with several errors is counted once")
     void testInvalidSuppressionIsCountedOnce() throws IOException {
-        System.setProperty("user.dir", unknownRulesAndRequirementsProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
-        System.setProperty("user.dir", userDir);
+        BLauncherException exception = scanFails(unknownRulesAndRequirementsProject);
         String console = readOutput(true);
         Assert.assertTrue(console.contains("unknown rule 'ballerina:998'"), console);
         Assert.assertTrue(console.contains("unknown rule 'ballerina:999'"), console);
@@ -178,13 +180,27 @@ public class SuppressionTest extends BaseTest {
     void testInvalidSuppressionSettingsFailTheScan() {
         for (String projectName : List.of("bal-project-with-invalid-suppression-settings",
                 "bal-project-with-unknown-suppression-setting")) {
-            System.setProperty("user.dir", testResources.resolve("test-resources").resolve(projectName).toString());
-            ScanCmd scanCmd = new ScanCmd(printStream);
-            BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
-            System.setProperty("user.dir", userDir);
+            BLauncherException exception = scanFails(testResources.resolve("test-resources").resolve(projectName));
             Assert.assertTrue(exception.getMessages().get(0).contains("in the [suppression] table"),
                     exception.getMessages().toString());
         }
+    }
+
+    @Test(description = "test malformed, unknown and empty rule lists fail the scan, and the others still apply")
+    void testInvalidSuppressionsFailTheScan() throws IOException {
+        BLauncherException exception = scanFails(invalidSuppressionsProject);
+        String console = readOutput(true);
+        String file = "bal_project_with_invalid_suppressions/main.bal";
+        for (String error : List.of("(25:29,25:44)] unknown rule 'ballerina:999'",
+                "(27:29,27:41)] unknown rule 'ballerina:999'", "(29:29,29:37)] invalid rule ID 'http:1'",
+                "(39:28,39:37)] invalid rule ID 'http:1'", "(37:5,37:58)] empty rule list")) {
+            Assert.assertTrue(console.contains("ERROR [" + file + ":" + error), console);
+        }
+        Assert.assertTrue(console.contains("WARNING [" + file + ":(31:29,31:42)] cannot verify rule 'acme/lint:1'"),
+                console);
+        Assert.assertTrue(exception.getDetailedMessages().get(0).contains("5 suppression(s) are invalid"),
+                exception.getDetailedMessages().toString());
+        assertNothingReported(invalidSuppressionsProject, console);
     }
 
     @Test(description = "test the HTML report lists suppressed issues with their suppression")
@@ -282,7 +298,8 @@ public class SuppressionTest extends BaseTest {
                 + "suppression of 'ballerina:1' did not match any issue"), "the included parameter: " + console);
         Assert.assertTrue(console.contains("WARNING [bal_project_with_part_suppressions/main.bal:(29:61,29:74)] "
                 + "suppression of 'ballerina:1' did not match any issue"), "the anonymous function: " + console);
-        Assert.assertTrue(console.contains("1 issue(s), 1 suppressed"), "the escaped rules field applies: " + console);
+        Assert.assertTrue(console.contains("1 issue(s), 2 suppressed"),
+                "the escaped rules field and a document named like the generated one apply: " + console);
     }
 
     @Test(description = "test rules and reasons are read from the compiler-resolved annotation value")
@@ -347,11 +364,7 @@ public class SuppressionTest extends BaseTest {
 
     @Test(description = "test a suppression of an unknown rule fails the scan even when the rule is not included")
     void testUnknownRuleFailsTheScanWhenNotIncluded() throws IOException {
-        System.setProperty("user.dir", unknownCoreRuleProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        new CommandLine(scanCmd).parseArgs("--include-rules=ballerina:1");
-        Assert.expectThrows(BLauncherException.class, scanCmd::execute);
-        System.setProperty("user.dir", userDir);
+        scanFails(unknownCoreRuleProject, "--include-rules=ballerina:1");
 
         String console = readOutput(true);
         Assert.assertTrue(console.contains("unknown rule 'ballerina:999'"), console);
@@ -360,11 +373,7 @@ public class SuppressionTest extends BaseTest {
     @Test(description = "test the command-line requirement fails the scan before anything is reported")
     void testRequireReasonFromCommandLine() throws IOException {
         deleteTarget(suppressionsProject);
-        System.setProperty("user.dir", suppressionsProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        new CommandLine(scanCmd).parseArgs("--require-suppression-reason");
-        BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
-        System.setProperty("user.dir", userDir);
+        BLauncherException exception = scanFails(suppressionsProject, "--require-suppression-reason");
 
         Assert.assertTrue(exception.getDetailedMessages().get(0)
                 .contains("1 suppression(s) are invalid or do not meet the configured suppression requirements"));
@@ -377,11 +386,7 @@ public class SuppressionTest extends BaseTest {
     @Test(description = "test the Scan.toml requirements fail the scan before anything is reported")
     void testRequirementsFromScanToml() throws IOException {
         deleteTarget(requirementsProject);
-        System.setProperty("user.dir", requirementsProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        new CommandLine(scanCmd).parseArgs("--scan-report");
-        BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
-        System.setProperty("user.dir", userDir);
+        BLauncherException exception = scanFails(requirementsProject, "--scan-report");
 
         Assert.assertTrue(exception.getDetailedMessages().get(0)
                 .contains("2 suppression(s) are invalid or do not meet the configured suppression requirements"));
@@ -396,10 +401,7 @@ public class SuppressionTest extends BaseTest {
     @Test(description = "test the scan tool rejects a rule it does not know before anything is reported")
     void testUnknownRulesFailTheScan() throws IOException {
         deleteTarget(unknownCoreRuleProject);
-        System.setProperty("user.dir", unknownCoreRuleProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
-        System.setProperty("user.dir", userDir);
+        BLauncherException exception = scanFails(unknownCoreRuleProject);
 
         Assert.assertTrue(exception.getDetailedMessages().get(0)
                 .contains("1 suppression(s) are invalid or do not meet the configured suppression requirements"));
@@ -431,10 +433,7 @@ public class SuppressionTest extends BaseTest {
                 .count();
         Assert.assertEquals(buildDiagnostics, 0, "a build checks only the form of the rule IDs");
 
-        System.setProperty("user.dir", analyzerSuppressionsProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        Assert.expectThrows(BLauncherException.class, scanCmd::execute);
-        System.setProperty("user.dir", userDir);
+        scanFails(analyzerSuppressionsProject);
 
         String console = readOutput(true);
         Assert.assertTrue(console.contains("unknown rule 'exampleOrg/example_module_static_code_analyzer:99': "
@@ -443,13 +442,28 @@ public class SuppressionTest extends BaseTest {
                 console);
     }
 
+    // user.dir is restored even when the scan fails, so that a failure does not move later tests to this project
     private String runScan(Path project, String... args) throws IOException {
         System.setProperty("user.dir", project.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-        System.setProperty("user.dir", userDir);
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
         return readOutput(true);
+    }
+
+    private BLauncherException scanFails(Path project, String... args) {
+        System.setProperty("user.dir", project.toString());
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            new CommandLine(scanCmd).parseArgs(args);
+            return Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
     }
 
     private static void assertNothingReported(Path project, String console) {

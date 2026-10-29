@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 
 const REACT_REPORT_OFFSET = 1;
 function SingleFileContent({ issues, fileContent }) {
-    const [issueLines, setIssueLines] = useState([])
-    const [suppressedLines, setSuppressedLines] = useState([])
+    const [issueLines, setIssueLines] = useState(new Set())
+    const [suppressedLines, setSuppressedLines] = useState(new Set())
 
     useEffect(() => {
         if (issues?.length !== 0) {
@@ -25,11 +25,11 @@ function SingleFileContent({ issues, fileContent }) {
                     { length: issueEndLine - issueStartLine + 1 }, (_, i) => issueStartLine + i);
                 (issue.suppression ? allSuppressedLines : allIssueLines).push(...issueLineRange);
             });
-            setIssueLines(allIssueLines);
-            setSuppressedLines(allSuppressedLines);
+            setIssueLines(new Set(allIssueLines));
+            setSuppressedLines(new Set(allSuppressedLines));
         } else {
-            setIssueLines([]);
-            setSuppressedLines([]);
+            setIssueLines(new Set());
+            setSuppressedLines(new Set());
         }
     }, [issues])
 
@@ -40,10 +40,10 @@ function SingleFileContent({ issues, fileContent }) {
 
 // A line with an active issue stays red; a line with only suppressed issues is shown in gray.
 const lineColor = (lineNumber, issueLines, suppressedLines) => {
-    if (issueLines.includes(lineNumber)) {
+    if (issueLines.has(lineNumber)) {
         return "#F74B5A";
     }
-    return suppressedLines.includes(lineNumber) ? "#CFD8DC" : "#f5f5f5";
+    return suppressedLines.has(lineNumber) ? "#CFD8DC" : "#f5f5f5";
 }
 
 const ContentMapper = ({ fileContent, issueLines, suppressedLines }) => {

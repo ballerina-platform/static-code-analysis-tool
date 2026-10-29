@@ -18,7 +18,6 @@
 
 package io.ballerina.scan.internal;
 
-import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
@@ -51,7 +50,6 @@ import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 import static io.ballerina.scan.utils.DiagnosticCode.EMPTY_PACKAGE;
-import static io.ballerina.scan.utils.DiagnosticCode.MISSING_DEPENDENCIES_TOML;
 import static io.ballerina.scan.utils.DiagnosticLog.error;
 
 /**
@@ -585,25 +583,6 @@ public class ScanCmdTest extends BaseTest {
                 .resolve("scan_results.sarif");
         Assert.assertTrue(Files.exists(sarifReport), "SARIF report file should be created in custom directory");
         removeFile(validBalProject.resolve("custom-results"));
-    }
-
-    @Test(description = "test a package whose dependencies are not locked is neither scanned nor has its rules listed")
-    void testScanCommandRequiresDependenciesToml() throws IOException {
-        Path ballerinaProject = testResources.resolve("test-resources").resolve(UNLOCKED_PROJECT);
-        Files.deleteIfExists(ballerinaProject.resolve("Dependencies.toml"));
-        String expected = "error: "
-                + error(MISSING_DEPENDENCIES_TOML, "ballerina/bal_project_without_dependencies_toml");
-        for (String[] args : List.of(new String[0], new String[]{"--list-rules"})) {
-            System.setProperty("user.dir", ballerinaProject.toString());
-            ScanCmd scanCmd = new ScanCmd(printStream);
-            new CommandLine(scanCmd).parseArgs(args);
-            BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
-            System.setProperty("user.dir", userDir);
-            Assert.assertEquals(exception.getMessages(), List.of(expected));
-        }
-        Assert.assertFalse(Files.exists(ballerinaProject.resolve("Dependencies.toml")),
-                "The scan should not resolve the dependencies itself");
-        Assert.assertFalse(Files.exists(ballerinaProject.resolve("target").resolve("report")));
     }
 
     @Test(description = "test scan command default format behavior")

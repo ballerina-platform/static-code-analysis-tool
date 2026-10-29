@@ -35,18 +35,23 @@ import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.DistinctTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
+import io.ballerina.compiler.syntax.tree.ExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExternalFunctionBodyNode;
 import io.ballerina.compiler.syntax.tree.ImportDeclarationNode;
 import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
+import io.ballerina.compiler.syntax.tree.IntersectionTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.ListenerDeclarationNode;
 import io.ballerina.compiler.syntax.tree.MappingFieldNode;
 import io.ballerina.compiler.syntax.tree.MemberTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.MetadataNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
+import io.ballerina.compiler.syntax.tree.ModuleVariableDeclarationNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
+import io.ballerina.compiler.syntax.tree.ObjectConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.ObjectTypeDescriptorNode;
+import io.ballerina.compiler.syntax.tree.ParenthesisedTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.ReturnTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
@@ -54,6 +59,7 @@ import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
 import io.ballerina.compiler.syntax.tree.Token;
 import io.ballerina.compiler.syntax.tree.TupleTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
+import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
@@ -65,7 +71,6 @@ import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 import io.ballerina.tools.text.LineRange;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -77,6 +82,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.IMPORT_GENERATOR_FILE;
 
 /**
@@ -87,7 +93,9 @@ import static io.ballerina.scan.internal.ScanToolConstants.IMPORT_GENERATOR_FILE
  */
 final class SuppressionCollector {
 
-    private static final String SCAN_ORG = "ballerina";
+    // The imports document ProjectAnalyzer adds, named <IMPORT_GENERATOR_FILE>-<UUID>.bal
+    private static final Pattern IMPORT_GENERATOR_DOCUMENT = Pattern.compile(Pattern.quote(IMPORT_GENERATOR_FILE)
+            + "-\\p{XDigit}{8}-\\p{XDigit}{4}-\\p{XDigit}{4}-\\p{XDigit}{4}-\\p{XDigit}{12}\\.bal");
     private static final String SCAN_PACKAGE = "scan";
     private static final String ANNOTATION_NAME = "Suppress";
     private static final String RULES_FIELD = "rules";
@@ -124,7 +132,7 @@ final class SuppressionCollector {
             Module module = currentPackage.module(moduleId);
             SemanticModel semanticModel = module.getCompilation().getSemanticModel();
             Stream.concat(module.documentIds().stream(), module.testDocumentIds().stream())
-                    .forEach(documentId -> collect(project, module, documentId, semanticModel, collected));
+                    .forEach(documentId -> collect(module, documentId, semanticModel, collected));
         });
         return new Collected(List.copyOf(collected.suppressions()), List.copyOf(collected.ignored()));
     }
@@ -132,7 +140,7 @@ final class SuppressionCollector {
     private static boolean dependsOnScanPackage(Package currentPackage) {
         for (ResolvedPackageDependency dependency : currentPackage.getResolution().allDependencies()) {
             Package dependencyPackage = dependency.packageInstance();
-            if (SCAN_ORG.equals(dependencyPackage.packageOrg().value())
+            if (BALLERINA_ORG.equals(dependencyPackage.packageOrg().value())
                     && SCAN_PACKAGE.equals(dependencyPackage.packageName().value())) {
                 return true;
             }
@@ -140,10 +148,10 @@ final class SuppressionCollector {
         return false;
     }
 
-    private static void collect(Project project, Module module, DocumentId documentId, SemanticModel semanticModel,
+    private static void collect(Module module, DocumentId documentId, SemanticModel semanticModel,
                                 Collected collected) {
         Document document = module.document(documentId);
-        if (document.name().startsWith(IMPORT_GENERATOR_FILE)
+        if (IMPORT_GENERATOR_DOCUMENT.matcher(document.name()).matches()
                 || !(document.syntaxTree().rootNode() instanceof ModulePartNode modulePart)) {
             return;
         }
@@ -151,9 +159,8 @@ final class SuppressionCollector {
         if (scanPrefixes.isEmpty()) {
             return;
         }
-        // Derived exactly as the reporter derives an issue's file path, so that the two can be compared
-        String filePath = project.documentPath(documentId).orElse(Path.of(document.name())).toString();
-        String fileName = module.moduleName() + "/" + document.name();
+        String filePath = ReporterImpl.reportFilePath(document);
+        String fileName = ReporterImpl.reportFileName(document);
         modulePart.accept(new NodeVisitor() {
             @Override
             public void visit(AnnotationNode annotation) {
@@ -202,7 +209,8 @@ final class SuppressionCollector {
     private static Set<String> scanPrefixes(ModulePartNode modulePart) {
         Set<String> prefixes = new HashSet<>();
         for (ImportDeclarationNode importNode : modulePart.imports()) {
-            boolean scanModule = importNode.orgName().map(org -> org.orgName().text().equals(SCAN_ORG)).orElse(false)
+            boolean scanModule = importNode.orgName()
+                    .map(org -> org.orgName().text().equals(BALLERINA_ORG)).orElse(false)
                     && importNode.moduleName().size() == 1
                     && importNode.moduleName().get(0).text().equals(SCAN_PACKAGE);
             if (scanModule) {
@@ -329,7 +337,7 @@ final class SuppressionCollector {
     private static boolean isSuppress(AnnotationAttachmentSymbol attachment) {
         AnnotationSymbol annotation = attachment.typeDescriptor();
         return annotation.getName().filter(ANNOTATION_NAME::equals).isPresent()
-                && annotation.getModule().map(module -> SCAN_ORG.equals(module.id().orgName())
+                && annotation.getModule().map(module -> BALLERINA_ORG.equals(module.id().orgName())
                 && SCAN_PACKAGE.equals(module.id().moduleName())).orElse(false);
     }
 
@@ -338,22 +346,31 @@ final class SuppressionCollector {
     }
 
     private static List<LineRange> memberRanges(Node construct) {
-        Iterable<Node> members = switch (construct) {
-            case ServiceDeclarationNode service -> service.members();
-            case ClassDefinitionNode classDefinition -> classDefinition.members();
+        Stream<Node> members = switch (construct) {
+            case ServiceDeclarationNode service -> service.members().stream();
+            case ClassDefinitionNode classDefinition -> classDefinition.members().stream();
             case TypeDefinitionNode typeDefinition -> objectTypeMembers(typeDefinition.typeDescriptor());
-            default -> List.of();
+            case VariableDeclarationNode variable -> objectConstructorMembers(variable.initializer());
+            case ModuleVariableDeclarationNode variable -> objectConstructorMembers(variable.initializer());
+            default -> Stream.empty();
         };
-        List<LineRange> ranges = new ArrayList<>();
-        members.forEach(member -> ranges.add(member.lineRange()));
-        return ranges;
+        return members.map(Node::lineRange).toList();
     }
 
-    private static Iterable<Node> objectTypeMembers(Node typeDescriptor) {
+    private static Stream<Node> objectTypeMembers(Node typeDescriptor) {
         return switch (typeDescriptor) {
-            case ObjectTypeDescriptorNode objectType -> objectType.members();
+            case ObjectTypeDescriptorNode objectType -> objectType.members().stream();
             case DistinctTypeDescriptorNode distinctType -> objectTypeMembers(distinctType.typeDescriptor());
-            default -> List.of();
+            case ParenthesisedTypeDescriptorNode parenthesised -> objectTypeMembers(parenthesised.typedesc());
+            case IntersectionTypeDescriptorNode intersection -> Stream.concat(
+                    objectTypeMembers(intersection.leftTypeDesc()), objectTypeMembers(intersection.rightTypeDesc()));
+            default -> Stream.empty();
         };
+    }
+
+    private static Stream<Node> objectConstructorMembers(Optional<ExpressionNode> initializer) {
+        return initializer.filter(ObjectConstructorExpressionNode.class::isInstance)
+                .map(constructor -> ((ObjectConstructorExpressionNode) constructor).members().stream())
+                .orElse(Stream.empty());
     }
 }

@@ -40,8 +40,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Applies the {@code @scan:Suppress} annotations of a package to its issues. Shared by the command line and the
- * language server entry points, so that both suppress the same issues.
+ * Applies the {@code @scan:Suppress} annotations of a package to its issues.
  *
  * @since 0.11.1
  */
@@ -77,14 +76,21 @@ final class SuppressionFilter {
 
         KnownRules knownRules = new KnownRules(rules);
         List<SuppressionDiagnostic> diagnostics = new ArrayList<>(collected.ignored());
-        diagnostics.addAll(unknownRules(suppressions, knownRules));
+        diagnostics.addAll(invalidRules(suppressions, knownRules));
         diagnostics.addAll(requirementViolations(suppressions, options));
+        // An invalid suppression fails the scan, so it is not applied either
+        Set<SuppressionAnnotation> invalid = diagnostics.stream().filter(SuppressionDiagnostic::isError)
+                .map(SuppressionDiagnostic::suppression).collect(Collectors.toSet());
+        List<SuppressionAnnotation> valid = suppressions.stream().filter(suppression -> !invalid.contains(suppression))
+                .toList();
+        Map<String, List<SuppressionAnnotation>> suppressionsByFile = valid.stream()
+                .collect(Collectors.groupingBy(SuppressionAnnotation::filePath));
 
         List<Issue> activeIssues = new ArrayList<>();
         List<SuppressedIssue> suppressedIssues = new ArrayList<>();
         Map<SuppressionAnnotation, Set<String>> matchedRules = new HashMap<>();
         for (Issue issue : issues) {
-            SuppressionAnnotation suppression = innermostSuppression(issue, suppressions);
+            SuppressionAnnotation suppression = innermostSuppression(issue, suppressionsByFile);
             if (suppression == null) {
                 activeIssues.add(issue);
                 continue;
@@ -93,18 +99,18 @@ final class SuppressionFilter {
             suppressedIssues.add(new SuppressedIssue(issue, suppression.rules(),
                     suppression.justification().orElse(null)));
         }
-        diagnostics.addAll(unusedSuppressions(suppressions, matchedRules, knownRules, selection));
+        diagnostics.addAll(unusedSuppressions(valid, matchedRules, knownRules, selection));
         return new SuppressionOutcome(activeIssues, suppressedIssues, diagnostics);
     }
 
-    private static SuppressionAnnotation innermostSuppression(Issue issue, List<SuppressionAnnotation> suppressions) {
+    private static SuppressionAnnotation innermostSuppression(Issue issue,
+                                                              Map<String, List<SuppressionAnnotation>> byFile) {
         if (!(issue instanceof IssueImpl issueImpl)) {
             return null;
         }
         SuppressionAnnotation innermost = null;
-        for (SuppressionAnnotation suppression : suppressions) {
-            if (!suppression.filePath().equals(issueImpl.filePath())
-                    || !suppression.appliesTo(issue.rule().id())
+        for (SuppressionAnnotation suppression : byFile.getOrDefault(issueImpl.filePath(), List.of())) {
+            if (!suppression.appliesTo(issue.rule().id())
                     || !suppression.covers(issue.location().lineRange())) {
                 continue;
             }
@@ -123,14 +129,23 @@ final class SuppressionFilter {
         return !candidate.blanket() && current.blanket();
     }
 
-    // The ballerina/scan compiler plugin checks only the format of a rule ID; whether it exists is known only here.
-    private static List<SuppressionDiagnostic> unknownRules(List<SuppressionAnnotation> suppressions,
+    // Whether a rule exists is known only here. The compiler plugin of ballerina/scan reports a malformed rule ID as
+    // well, but a malformed one is also reported here so that it can never pass as a suppression of no rule.
+    private static List<SuppressionDiagnostic> invalidRules(List<SuppressionAnnotation> suppressions,
                                                             KnownRules knownRules) {
         List<SuppressionDiagnostic> unknown = new ArrayList<>();
         for (SuppressionAnnotation suppression : suppressions) {
+            if (!suppression.blanket() && suppression.rules().isEmpty()) {
+                unknown.add(error(suppression, DiagnosticLog.error(DiagnosticCode.EMPTY_RULE_LIST)));
+            }
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
                 Matcher matcher = RULE_ID.matcher(rule);
-                if (!matcher.matches() || knownRules.ids().contains(rule)) {
+                if (!matcher.matches()) {
+                    unknown.add(error(suppression, suppression.ruleLocation(rule),
+                            DiagnosticLog.error(DiagnosticCode.INVALID_RULE_ID, rule)));
+                    continue;
+                }
+                if (knownRules.ids().contains(rule)) {
                     continue;
                 }
                 String provider = matcher.group(1);

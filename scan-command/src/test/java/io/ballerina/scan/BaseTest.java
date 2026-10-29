@@ -19,11 +19,8 @@
 package io.ballerina.scan;
 
 import io.ballerina.cli.utils.OsUtils;
-import io.ballerina.projects.directory.BuildProject;
-import io.ballerina.projects.util.ProjectConstants;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.BeforeSuite;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -32,8 +29,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.stream.Stream;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
@@ -44,29 +39,10 @@ import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
  * @since 0.1.0
  */
 public abstract class BaseTest {
-    protected static final String UNLOCKED_PROJECT = "bal-project-without-dependencies-toml";
     protected final Path testResources = Paths.get("src", "test", "resources");
     private ByteArrayOutputStream console;
     protected PrintStream printStream;
     protected final String userDir = System.getProperty("user.dir");
-
-    // A scan requires the dependencies to be locked, so each package is locked as `bal build` would lock it
-    @BeforeSuite
-    protected void lockTestProjectDependencies() throws IOException {
-        List<Path> packageRoots;
-        try (Stream<Path> files = Files.walk(testResources.resolve("test-resources"))) {
-            packageRoots = files.filter(file -> file.endsWith(ProjectConstants.BALLERINA_TOML))
-                    .map(Path::getParent)
-                    .filter(root -> !root.endsWith(UNLOCKED_PROJECT))
-                    .filter(root -> !Files.exists(root.resolve(ProjectConstants.DEPENDENCIES_TOML)))
-                    .toList();
-        }
-        for (Path root : packageRoots) {
-            BuildProject project = BuildProject.load(root);
-            project.currentPackage().getResolution();
-            project.save();
-        }
-    }
 
     @BeforeMethod
     protected void setup() {
