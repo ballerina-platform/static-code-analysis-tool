@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.utils;
 
+import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
@@ -205,16 +206,29 @@ public class ScanUtilsTest extends BaseTest {
     }
 
     @Test(description = "test method for loading a Scan.toml file with a suppression setting that is not a boolean")
-    void testLoadScanTomlConfigurationsWithNonBooleanSuppressionSetting() throws IOException {
+    void testLoadScanTomlConfigurationsWithNonBooleanSuppressionSetting() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-suppression-settings");
         Project project = ProjectLoader.loadProject(ballerinaProject);
         System.setProperty("user.dir", ballerinaProject.toString());
-        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
+        BLauncherException exception = Assert.expectThrows(BLauncherException.class,
+                () -> ScanUtils.loadScanTomlConfigurations(project, printStream));
         System.setProperty("user.dir", userDir);
-        Assert.assertNull(scanTomlFile);
-        String expected = DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, "requireReason");
-        Assert.assertTrue(readOutput(true).contains(expected));
+        Assert.assertEquals(exception.getMessages(),
+                List.of("error: " + DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, "requireReason")));
+    }
+
+    @Test(description = "test method for loading a Scan.toml file with an unknown suppression setting")
+    void testLoadScanTomlConfigurationsWithUnknownSuppressionSetting() {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-unknown-suppression-setting");
+        Project project = ProjectLoader.loadProject(ballerinaProject);
+        System.setProperty("user.dir", ballerinaProject.toString());
+        BLauncherException exception = Assert.expectThrows(BLauncherException.class,
+                () -> ScanUtils.loadScanTomlConfigurations(project, printStream));
+        System.setProperty("user.dir", userDir);
+        Assert.assertEquals(exception.getMessages(),
+                List.of("error: " + DiagnosticLog.error(DiagnosticCode.UNKNOWN_SUPPRESSION_SETTING, "requireReasons")));
     }
 
     @Test(description = "test method for loading configurations from an external configuration file")

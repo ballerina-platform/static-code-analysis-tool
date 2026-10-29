@@ -66,12 +66,19 @@ public class SuppressionTest extends BaseTest {
             .resolve("bal-project-with-unknown-core-rule");
     private final Path partSuppressionsProject = testResources.resolve("test-resources")
             .resolve("bal-project-with-part-suppressions");
+    private final Path testSuppressionsProject = testResources.resolve("test-resources")
+            .resolve("bal-project-with-test-suppressions");
+    private final Path ignoredSuppressionsProject = testResources.resolve("test-resources")
+            .resolve("bal-project-with-ignored-suppressions");
+    private final Path unknownRulesAndRequirementsProject = testResources.resolve("test-resources")
+            .resolve("bal-project-with-unknown-rules-and-requirements");
 
     @AfterClass
     void cleanup() {
         for (Path project : List.of(suppressionsProject, requirementsProject, invalidSuppressionsProject,
                 analyzerSuppressionsProject, disabledSuppressionsProject, sameConstructSuppressionsProject,
-                unresolvedSuppressionsProject, unknownCoreRuleProject, partSuppressionsProject)) {
+                unresolvedSuppressionsProject, unknownCoreRuleProject, partSuppressionsProject,
+                testSuppressionsProject, ignoredSuppressionsProject, unknownRulesAndRequirementsProject)) {
             Path target = project.resolve("target");
             if (Files.exists(target)) {
                 ProjectUtils.deleteDirectory(target);
@@ -128,6 +135,56 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(stderr.contains("did not match any issue"), stderr);
         Assert.assertTrue(stderr.contains("View scan results at:"), stderr);
         Assert.assertTrue(stderr.endsWith("\n1 issue(s), 2 suppressed"), "the summary is the last line: " + stderr);
+    }
+
+    @Test(description = "test suppressions in test documents apply to the issues reported there")
+    void testSuppressionsInTestDocuments() throws IOException {
+        String console = runScan(testSuppressionsProject);
+        Assert.assertTrue(console.contains("1 issue(s), 1 suppressed"), console);
+        JsonArray issues = readReport(testSuppressionsProject, "scan_results.json").getAsJsonArray();
+        List<Boolean> suppressed = new ArrayList<>();
+        issues.forEach(issue -> suppressed.add(issue.getAsJsonObject().has("suppressions")));
+        Assert.assertEquals(suppressed, List.of(true, false), issues.toString());
+    }
+
+    @Test(description = "test a suppression that cannot be applied is reported instead of being dropped")
+    void testIgnoredSuppressionsAreReported() throws IOException {
+        String console = runScan(ignoredSuppressionsProject);
+        String warning = "] suppression could not be applied to this construct and is ignored";
+        for (int line : List.of(19, 22, 25)) {
+            String location = "WARNING [bal_project_with_ignored_suppressions/main.bal:(" + line + ":";
+            Assert.assertTrue(console.contains(location), console);
+        }
+        Assert.assertEquals(console.split(Pattern.quote(warning), -1).length - 1, 3, console);
+        Assert.assertTrue(console.contains("1 issue(s)"), console);
+        Assert.assertFalse(console.contains("suppressed"), console);
+    }
+
+    @Test(description = "test an invalid suppression with several errors is counted once")
+    void testInvalidSuppressionIsCountedOnce() throws IOException {
+        System.setProperty("user.dir", unknownRulesAndRequirementsProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+        System.setProperty("user.dir", userDir);
+        String console = readOutput(true);
+        Assert.assertTrue(console.contains("unknown rule 'ballerina:998'"), console);
+        Assert.assertTrue(console.contains("unknown rule 'ballerina:999'"), console);
+        Assert.assertTrue(console.contains("suppression has no reason"), console);
+        Assert.assertTrue(exception.getDetailedMessages().get(0).contains("1 suppression(s) are invalid"),
+                exception.getDetailedMessages().toString());
+    }
+
+    @Test(description = "test an invalid or unknown setting in the [suppression] table fails the scan")
+    void testInvalidSuppressionSettingsFailTheScan() {
+        for (String projectName : List.of("bal-project-with-invalid-suppression-settings",
+                "bal-project-with-unknown-suppression-setting")) {
+            System.setProperty("user.dir", testResources.resolve("test-resources").resolve(projectName).toString());
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+            System.setProperty("user.dir", userDir);
+            Assert.assertTrue(exception.getMessages().get(0).contains("in the [suppression] table"),
+                    exception.getMessages().toString());
+        }
     }
 
     @Test(description = "test the HTML report lists suppressed issues with their suppression")

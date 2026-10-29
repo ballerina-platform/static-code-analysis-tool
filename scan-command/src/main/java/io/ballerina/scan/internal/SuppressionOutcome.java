@@ -43,12 +43,11 @@ record SuppressionOutcome(List<Issue> activeIssues, List<SuppressedIssue> suppre
         diagnostics = List.copyOf(diagnostics);
     }
 
-    // A suppression can have several errors, such as a missing reason and a missing rule ID; it is counted once
+    // A suppression can have several errors, such as a missing reason and an unknown rule; it is counted once
     long invalidSuppressionCount() {
         return diagnostics.stream()
                 .filter(SuppressionDiagnostic::isError)
-                .map(diagnostic -> List.of(diagnostic.fileName(), diagnostic.location().startLine().line(),
-                        diagnostic.location().startLine().offset()))
+                .map(SuppressionDiagnostic::suppression)
                 .distinct()
                 .count();
     }

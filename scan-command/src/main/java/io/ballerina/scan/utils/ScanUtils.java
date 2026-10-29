@@ -22,7 +22,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.ballerina.cli.launcher.LauncherUtils;
 import io.ballerina.projects.BallerinaToml;
+import io.ballerina.projects.Package;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.TomlDocument;
@@ -136,6 +138,24 @@ import static java.util.Locale.ROOT;
  */
 public final class ScanUtils {
     private ScanUtils() {
+    }
+
+    /**
+     * Fails unless the package has its dependencies locked in {@code Dependencies.toml}. The scan uses the locked
+     * versions and does not resolve the dependencies of a package itself; {@code bal build} does.
+     *
+     * @param project the project to scan
+     */
+    public static void requireLockedDependencies(Project project) {
+        if (project.kind() != ProjectKind.BUILD_PROJECT) {
+            return;
+        }
+        Package currentPackage = project.currentPackage();
+        if (currentPackage.dependenciesToml().isEmpty()) {
+            String packageName = currentPackage.packageOrg().value() + "/" + currentPackage.packageName().value();
+            throw LauncherUtils.createLauncherException(
+                    DiagnosticLog.error(DiagnosticCode.MISSING_DEPENDENCIES_TOML, packageName));
+        }
     }
 
     /**
@@ -794,9 +814,7 @@ public final class ScanUtils {
         Optional<Toml> suppressionTable = scanTomlDocumentContent.getTable(SUPPRESSION_TABLE);
         if (suppressionTable.isPresent()) {
             Toml table = suppressionTable.get();
-            if (hasNonBooleanSetting(table, outputStream)) {
-                return Optional.empty();
-            }
+            validateSuppressionSettings(table);
             scanTomlFile.setSuppressionEnabled(!isFalse(table, SUPPRESSION_ENABLED));
             scanTomlFile.setSuppressionReasonRequired(isTrue(table, SUPPRESSION_REQUIRE_REASON));
             scanTomlFile.setSuppressionRuleIdRequired(isTrue(table, SUPPRESSION_REQUIRE_RULE_ID));
@@ -804,16 +822,23 @@ public final class ScanUtils {
         return Optional.of(scanTomlFile);
     }
 
-    // A quoted "true" would otherwise read as unset and silently turn a requirement off.
-    private static boolean hasNonBooleanSetting(Toml suppressionTable, PrintStream outputStream) {
-        for (String key : List.of(SUPPRESSION_ENABLED, SUPPRESSION_REQUIRE_REASON, SUPPRESSION_REQUIRE_RULE_ID)) {
-            Optional<TomlValueNode> value = suppressionTable.get(key);
-            if (value.isPresent() && value.get().kind() != TomlType.BOOLEAN) {
-                outputStream.println(DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, key));
-                return true;
+    // A misspelled key or a quoted "true" would otherwise read as unset and silently turn a requirement off, so
+    // both fail the scan instead of skipping the package.
+    private static void validateSuppressionSettings(Toml suppressionTable) {
+        List<String> keys = List.of(SUPPRESSION_ENABLED, SUPPRESSION_REQUIRE_REASON, SUPPRESSION_REQUIRE_RULE_ID);
+        for (String key : suppressionTable.toMap().keySet()) {
+            if (!keys.contains(key)) {
+                throw LauncherUtils.createLauncherException(
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_SUPPRESSION_SETTING, key));
             }
         }
-        return false;
+        for (String key : keys) {
+            Optional<TomlValueNode> value = suppressionTable.get(key);
+            if (value.isPresent() && value.get().kind() != TomlType.BOOLEAN) {
+                throw LauncherUtils.createLauncherException(
+                        DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, key));
+            }
+        }
     }
 
     private static boolean isTrue(Toml table, String key) {

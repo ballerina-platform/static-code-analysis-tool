@@ -36,6 +36,7 @@ import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.DistinctTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExternalFunctionBodyNode;
+import io.ballerina.compiler.syntax.tree.ImportDeclarationNode;
 import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.ListenerDeclarationNode;
@@ -46,6 +47,7 @@ import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.ObjectTypeDescriptorNode;
+import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.ReturnTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
 import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
@@ -58,14 +60,19 @@ import io.ballerina.projects.Module;
 import io.ballerina.projects.Package;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ResolvedPackageDependency;
+import io.ballerina.scan.utils.DiagnosticCode;
+import io.ballerina.scan.utils.DiagnosticLog;
+import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 import io.ballerina.tools.text.LineRange;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -92,25 +99,34 @@ final class SuppressionCollector {
     }
 
     /**
+     * The suppressions of a package, and a warning for each one that could not be applied and is ignored.
+     *
+     * @param suppressions the suppressions in source order of each document
+     * @param ignored      warnings about the suppressions that are ignored
+     */
+    record Collected(List<SuppressionAnnotation> suppressions, List<SuppressionDiagnostic> ignored) {
+    }
+
+    /**
      * Returns the suppressions declared in the given project's current package. A package that does not depend on
      * {@code ballerina/scan} cannot declare any, so its documents are not visited.
      *
      * @param project the project being scanned
-     * @return the suppressions in source order of each document
+     * @return the suppressions, and warnings about those that are ignored
      */
-    static List<SuppressionAnnotation> collect(Project project) {
+    static Collected collect(Project project) {
         Package currentPackage = project.currentPackage();
         if (!dependsOnScanPackage(currentPackage)) {
-            return List.of();
+            return new Collected(List.of(), List.of());
         }
-        List<SuppressionAnnotation> suppressions = new ArrayList<>();
+        Collected collected = new Collected(new ArrayList<>(), new ArrayList<>());
         currentPackage.moduleIds().forEach(moduleId -> {
             Module module = currentPackage.module(moduleId);
             SemanticModel semanticModel = module.getCompilation().getSemanticModel();
             Stream.concat(module.documentIds().stream(), module.testDocumentIds().stream())
-                    .forEach(documentId -> collect(project, module, documentId, semanticModel, suppressions));
+                    .forEach(documentId -> collect(project, module, documentId, semanticModel, collected));
         });
-        return suppressions;
+        return new Collected(List.copyOf(collected.suppressions()), List.copyOf(collected.ignored()));
     }
 
     private static boolean dependsOnScanPackage(Package currentPackage) {
@@ -125,10 +141,14 @@ final class SuppressionCollector {
     }
 
     private static void collect(Project project, Module module, DocumentId documentId, SemanticModel semanticModel,
-                                List<SuppressionAnnotation> suppressions) {
+                                Collected collected) {
         Document document = module.document(documentId);
         if (document.name().startsWith(IMPORT_GENERATOR_FILE)
                 || !(document.syntaxTree().rootNode() instanceof ModulePartNode modulePart)) {
+            return;
+        }
+        Set<String> scanPrefixes = scanPrefixes(modulePart);
+        if (scanPrefixes.isEmpty()) {
             return;
         }
         // Derived exactly as the reporter derives an issue's file path, so that the two can be compared
@@ -137,20 +157,33 @@ final class SuppressionCollector {
         modulePart.accept(new NodeVisitor() {
             @Override
             public void visit(AnnotationNode annotation) {
-                resolve(semanticModel, annotation).ifPresent(value ->
-                        suppressions.add(toSuppression(annotation, value, filePath, fileName)));
+                if (refersToSuppress(annotation, scanPrefixes)) {
+                    Optional<SuppressionAnnotation> suppression = resolve(semanticModel, annotation)
+                            .flatMap(value -> toSuppression(annotation, value, filePath, fileName));
+                    if (suppression.isPresent()) {
+                        collected.suppressions().add(suppression.get());
+                    } else {
+                        collected.ignored().add(new SuppressionDiagnostic(DiagnosticSeverity.WARNING,
+                                DiagnosticLog.warning(DiagnosticCode.IGNORED_SUPPRESSION), fileName,
+                                annotation.lineRange(), null));
+                    }
+                }
                 // A construct inside another annotation's value can carry suppressions of its own
                 annotation.annotValue().ifPresent(value -> value.accept(this));
             }
         });
     }
 
-    private static SuppressionAnnotation toSuppression(AnnotationNode annotation, Map<?, ?> value, String filePath,
-                                                       String fileName) {
+    // Unreadable rules make the suppression ignored rather than a suppression of every rule
+    private static Optional<SuppressionAnnotation> toSuppression(AnnotationNode annotation, Map<?, ?> value,
+                                                                 String filePath, String fileName) {
         Node construct = annotation.parent() instanceof MetadataNode ? annotation.parent().parent()
                 : annotation.parent();
         List<String> rules = null;
-        if (unwrap(value.get(RULES_FIELD)) instanceof List<?> members) {
+        if (value.containsKey(RULES_FIELD)) {
+            if (!(unwrap(value.get(RULES_FIELD)) instanceof List<?> members)) {
+                return Optional.empty();
+            }
             rules = new ArrayList<>();
             for (Object member : members) {
                 // Members are compiler-internal values whose string form is the member's value
@@ -159,10 +192,30 @@ final class SuppressionCollector {
             }
         }
         String reason = unwrap(value.get(REASON_FIELD)) instanceof String text && !text.isBlank() ? text : null;
-        return new SuppressionAnnotation(filePath, fileName, annotation.lineRange(), construct.lineRange(),
+        return Optional.of(new SuppressionAnnotation(filePath, fileName, annotation.lineRange(), construct.lineRange(),
                 construct.textRange().length(), memberRanges(construct), rules == null,
                 rules == null ? List.of() : rules, rules == null ? List.of() : ruleLocations(annotation, rules.size()),
-                reason);
+                reason));
+    }
+
+    // The prefixes under which the document imports ballerina/scan, including an alias
+    private static Set<String> scanPrefixes(ModulePartNode modulePart) {
+        Set<String> prefixes = new HashSet<>();
+        for (ImportDeclarationNode importNode : modulePart.imports()) {
+            boolean scanModule = importNode.orgName().map(org -> org.orgName().text().equals(SCAN_ORG)).orElse(false)
+                    && importNode.moduleName().size() == 1
+                    && importNode.moduleName().get(0).text().equals(SCAN_PACKAGE);
+            if (scanModule) {
+                prefixes.add(importNode.prefix().map(prefix -> prefix.prefix().text()).orElse(SCAN_PACKAGE));
+            }
+        }
+        return prefixes;
+    }
+
+    private static boolean refersToSuppress(AnnotationNode annotation, Set<String> scanPrefixes) {
+        return annotation.annotReference() instanceof QualifiedNameReferenceNode reference
+                && scanPrefixes.contains(reference.modulePrefix().text())
+                && reference.identifier().text().equals(ANNOTATION_NAME);
     }
 
     // A list written in place locates each rule at its member; a constant locates them all at its reference

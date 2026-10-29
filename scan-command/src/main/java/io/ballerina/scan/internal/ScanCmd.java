@@ -361,6 +361,12 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     protected Optional<Project> getProject() {
+        Optional<Project> project = loadProject();
+        project.ifPresent(ScanUtils::requireLockedDependencies);
+        return project;
+    }
+
+    private Optional<Project> loadProject() {
         try {
             if (projectPath.toFile().isDirectory()) {
                 // The scan never updates Dependencies.toml, so it uses the locked versions instead of looking for

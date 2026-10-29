@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "bal_project_without_dependencies_toml"
+version = "0.1.0"
