@@ -144,6 +144,8 @@ public class ScanCmd implements BLauncherCmd {
     private final Map<Issue, SuppressedIssue> allSuppressions = new IdentityHashMap<>();
     private long invalidSuppressions;
     private final List<Runnable> pendingReports = new ArrayList<>();
+    private final List<Issue> workspaceConsoleIssues = new ArrayList<>();
+    private boolean printWorkspaceIssues;
     private boolean scanningWorkspace;
 
     public ScanCmd() {
@@ -244,14 +246,13 @@ public class ScanCmd implements BLauncherCmd {
                 return;
             }
             failOnSuppressionErrors(invalidSuppressions);
-            boolean printIssues = platforms.isEmpty() && !platformTriggered;
             pendingReports.forEach(Runnable::run);
-            // The issues of every package are printed as one document, so that standard output stays valid JSON
-            List<Issue> activeIssues = allIssues.stream().filter(issue -> !allSuppressions.containsKey(issue)).toList();
-            if (printIssues) {
-                ScanUtils.printToConsole(activeIssues, outputStream, ReportFormat.SARIF.equals(format),
+            // The packages' issues are printed as one document, so that standard output stays valid JSON
+            if (printWorkspaceIssues) {
+                ScanUtils.printToConsole(workspaceConsoleIssues, outputStream, ReportFormat.SARIF.equals(format),
                         workspaceProject);
             }
+            List<Issue> activeIssues = allIssues.stream().filter(issue -> !allSuppressions.containsKey(issue)).toList();
             errorStream.println();
             accumulateWorkspaceReports(workspaceProject);
             if (scanReport) {
@@ -349,6 +350,8 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
+        // Each package has its own list, since a workspace reports its packages only after scanning all of them
+        List<String> projectPlatforms = new ArrayList<>(platforms);
         List<String> externalJarFilePaths = new ArrayList<>();
         Map<String, PlatformPluginContext> platformContexts = new HashMap<>();
         scanTomlFile.get().getPlatforms().forEach(platform -> {
@@ -357,8 +360,8 @@ public class ScanCmd implements BLauncherCmd {
             Map<String, String> platformArgs = new HashMap<>();
             platform.arguments().forEach((key, value) -> platformArgs.put(key, value.toString()));
             platformContexts.put(platformName, new PlatformPluginContextImpl(platformArgs, platformTriggered));
-            if (!platformTriggered || platforms.size() != 1 || !platforms.contains(platformName)) {
-                platforms.add(platformName);
+            if (!platformTriggered || projectPlatforms.size() != 1 || !projectPlatforms.contains(platformName)) {
+                projectPlatforms.add(platformName);
             }
         });
 
@@ -366,7 +369,7 @@ public class ScanCmd implements BLauncherCmd {
         ServiceLoader<StaticCodeAnalysisPlatformPlugin> scannerPlatformPlugins = ServiceLoader.load(
                 StaticCodeAnalysisPlatformPlugin.class, ucl);
         scannerPlatformPlugins.forEach(staticCodeAnalysisPlatformPlugin -> {
-            if (platforms.contains(staticCodeAnalysisPlatformPlugin.platform())) {
+            if (projectPlatforms.contains(staticCodeAnalysisPlatformPlugin.platform())) {
                 PlatformPluginContext platformPluginContext = platformContexts.get(staticCodeAnalysisPlatformPlugin
                         .platform());
                 staticCodeAnalysisPlatformPlugin.init(platformPluginContext);
@@ -406,19 +409,24 @@ public class ScanCmd implements BLauncherCmd {
         // Nothing is reported until every scanned package meets the suppression requirements
         if (scanningWorkspace) {
             invalidSuppressions += suppressionOutcome.invalidSuppressionCount();
-            pendingReports.add(() -> report(project, issues, activeIssues, suppressions, scannerPlatformPlugins));
+            pendingReports.add(() -> report(project, issues, activeIssues, suppressions, scannerPlatformPlugins,
+                    projectPlatforms));
             return;
         }
         failOnSuppressionErrors(suppressionOutcome.invalidSuppressionCount());
-        report(project, issues, activeIssues, suppressions, scannerPlatformPlugins);
+        report(project, issues, activeIssues, suppressions, scannerPlatformPlugins, projectPlatforms);
     }
 
     private void report(Project project, List<Issue> issues, List<Issue> activeIssues,
                         Map<Issue, SuppressedIssue> suppressions,
-                        ServiceLoader<StaticCodeAnalysisPlatformPlugin> scannerPlatformPlugins) {
-        if (platforms.isEmpty() && !platformTriggered) {
+                        ServiceLoader<StaticCodeAnalysisPlatformPlugin> scannerPlatformPlugins,
+                        List<String> projectPlatforms) {
+        if (projectPlatforms.isEmpty() && !platformTriggered) {
             boolean isSarifFormat = ReportFormat.SARIF.equals(format);
-            if (!scanningWorkspace) {
+            if (scanningWorkspace) {
+                workspaceConsoleIssues.addAll(activeIssues);
+                printWorkspaceIssues = true;
+            } else {
                 ScanUtils.printToConsole(activeIssues, outputStream, isSarifFormat, project);
             }
             if (project.kind().equals(ProjectKind.BUILD_PROJECT)) {
@@ -445,14 +453,15 @@ public class ScanCmd implements BLauncherCmd {
             }
         }
 
+        List<String> unreportedPlatforms = new ArrayList<>(projectPlatforms);
         scannerPlatformPlugins.forEach(staticCodeAnalysisPlatformPlugin -> {
-            if (platforms.contains(staticCodeAnalysisPlatformPlugin.platform())) {
+            if (unreportedPlatforms.contains(staticCodeAnalysisPlatformPlugin.platform())) {
                 errorStream.println("Reporting issues to: " + staticCodeAnalysisPlatformPlugin.platform());
                 staticCodeAnalysisPlatformPlugin.onScan(activeIssues);
-                platforms.removeAll(Collections.singleton(staticCodeAnalysisPlatformPlugin.platform()));
+                unreportedPlatforms.removeAll(Collections.singleton(staticCodeAnalysisPlatformPlugin.platform()));
             }
         });
-        platforms.forEach(remainingPlatform -> {
+        unreportedPlatforms.forEach(remainingPlatform -> {
             errorStream.println();
             errorStream.println("The specified platform '" + remainingPlatform + "' is not available.");
             errorStream.println("Please ensure that the required platform plugin path is specified in 'Scan.toml'.");

@@ -1,0 +1,7 @@
+target
+generated
+Config.toml
+Dependencies.toml
+Scan.toml
+analysis-issues.json
+platform-arguments.json

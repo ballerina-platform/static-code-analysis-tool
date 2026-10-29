@@ -1011,6 +1011,58 @@ public class ScanCmdTest extends BaseTest {
         }
     }
 
+    @Test(description = "test each package of a workspace reports to the platforms of its own Scan.toml")
+    void testScanCommandInWorkspaceReportsEachPackageToItsPlatforms() throws IOException {
+        Path workspacePath = testResources.resolve("test-resources").resolve("workspace-with-platforms");
+        Path rootProject = Path.of(System.getProperty("user.dir")).getParent();
+        Assert.assertNotNull(rootProject);
+        Path platformPluginPath = rootProject.resolve("test-static-code-analysis-platform-plugins")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin").resolve("build").resolve("libs")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
+        String platformConfiguration = Files.readString(testResources.resolve("test-resources")
+                        .resolve("platform-plugin-configurations.txt"))
+                .replace("__platform_name__", "examplePlatform")
+                .replace("__platform_plugin_path__", platformPluginPath.toString().replace("\\", "\\\\"));
+        Path firstScanToml = workspacePath.resolve("first-package").resolve("Scan.toml");
+        Path secondScanToml = workspacePath.resolve("second-package").resolve("Scan.toml");
+        try {
+            Files.writeString(firstScanToml, platformConfiguration);
+
+            // Both packages report to the platform
+            Files.writeString(secondScanToml, platformConfiguration);
+            String[] streams = scanWorkspace(workspacePath);
+            Assert.assertEquals(streams[1].split("Reporting issues to: examplePlatform", -1).length - 1, 2, streams[1]);
+            Assert.assertFalse(streams[1].contains("is not available"), streams[1]);
+            Assert.assertEquals(streams[0].trim(), "", "no package prints its issues to the console");
+
+            // Only the first package reports to the platform; the second prints its issues
+            Files.writeString(secondScanToml, "");
+            streams = scanWorkspace(workspacePath);
+            Assert.assertEquals(streams[1].split("Reporting issues to: examplePlatform", -1).length - 1, 1, streams[1]);
+            Assert.assertFalse(streams[1].contains("is not available"), streams[1]);
+            JsonArray consoleIssues = JsonParser.parseString(streams[0]).getAsJsonArray();
+            Assert.assertEquals(consoleIssues.size(), 1, streams[0]);
+            Assert.assertTrue(consoleIssues.get(0).getAsJsonObject().get("filePath").getAsString()
+                    .contains("second-package"), streams[0]);
+        } finally {
+            Files.deleteIfExists(firstScanToml);
+            Files.deleteIfExists(secondScanToml);
+            Files.deleteIfExists(workspacePath.resolve("analysis-issues.json"));
+            Files.deleteIfExists(workspacePath.resolve("platform-arguments.json"));
+        }
+    }
+
+    // Runs a scan of the workspace and returns its standard output and standard error
+    private String[] scanWorkspace(Path workspacePath) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        System.setProperty("user.dir", workspacePath.toString());
+        new ScanCmd(new PrintStream(out, true, StandardCharsets.UTF_8),
+                new PrintStream(err, true, StandardCharsets.UTF_8)).execute();
+        System.setProperty("user.dir", userDir);
+        return new String[]{out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8)};
+    }
+
     @Test(description = "test scan command default format behavior")
     void testScanCommandDefaultFormatBehavior() throws IOException {
         System.setProperty("user.dir", validBalProject.toString());
