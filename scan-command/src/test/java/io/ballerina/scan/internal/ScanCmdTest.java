@@ -21,6 +21,7 @@ package io.ballerina.scan.internal;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
@@ -42,7 +43,9 @@ import org.testng.annotations.Test;
 import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
 import picocli.CommandLine;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,6 +63,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 import static io.ballerina.scan.utils.DiagnosticCode.COMPILATION_CONTAINS_ERRORS;
 import static io.ballerina.scan.utils.DiagnosticCode.EMPTY_PACKAGE;
+import static io.ballerina.scan.utils.DiagnosticCode.MISSING_DEPENDENCIES_TOML;
 import static io.ballerina.scan.utils.DiagnosticLog.error;
 
 /**
@@ -956,6 +960,55 @@ public class ScanCmdTest extends BaseTest {
         Path jsonReport = ballerinaProject.resolve("target").resolve("report").resolve("scan_results.json");
         Assert.assertFalse(Files.exists(jsonReport),
                 "No scan report should be generated when compilation contains errors");
+    }
+
+    @Test(description = "test a package whose dependencies are not locked is neither scanned nor has its rules listed")
+    void testScanCommandRequiresDependenciesToml() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources").resolve(UNLOCKED_PROJECT);
+        Files.deleteIfExists(ballerinaProject.resolve("Dependencies.toml"));
+        String expected = "error: "
+                + error(MISSING_DEPENDENCIES_TOML, "ballerina/bal_project_without_dependencies_toml");
+        for (String[] args : List.of(new String[0], new String[]{"--list-rules"})) {
+            System.setProperty("user.dir", ballerinaProject.toString());
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            new CommandLine(scanCmd).parseArgs(args);
+            BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+            System.setProperty("user.dir", userDir);
+            Assert.assertEquals(exception.getMessages(), List.of(expected));
+        }
+        Assert.assertFalse(Files.exists(ballerinaProject.resolve("Dependencies.toml")),
+                "The scan should not resolve the dependencies itself");
+        Assert.assertFalse(Files.exists(ballerinaProject.resolve("target").resolve("report")));
+
+        JsonObject result = JsonParser.parseString(ScanLanguageServerTool.runScan(
+                ballerinaProject.toAbsolutePath().toString(), Map.of())).getAsJsonObject();
+        Assert.assertFalse(result.get("success").getAsBoolean());
+        Assert.assertEquals(result.get("error").getAsString(), expected);
+    }
+
+    @Test(description = "test a workspace prints the issues of all its packages as one document on standard output")
+    void testScanCommandInWorkspacePrintsOneDocument() {
+        Path workspacePath = testResources.resolve("test-resources").resolve("workspace-project");
+        for (String format : List.of("json", "sarif")) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ByteArrayOutputStream err = new ByteArrayOutputStream();
+            System.setProperty("user.dir", workspacePath.toString());
+            ScanCmd scanCmd = new ScanCmd(new PrintStream(out, true, StandardCharsets.UTF_8),
+                    new PrintStream(err, true, StandardCharsets.UTF_8));
+            new CommandLine(scanCmd).parseArgs("--format=" + format, "--include-rules=ballerina:1");
+            scanCmd.execute();
+            System.setProperty("user.dir", userDir);
+
+            JsonElement document = JsonParser.parseString(out.toString(StandardCharsets.UTF_8));
+            JsonArray issues = format.equals("json") ? document.getAsJsonArray()
+                    : document.getAsJsonObject().getAsJsonArray("runs").get(0).getAsJsonObject()
+                            .getAsJsonArray("results");
+            String stderr = err.toString(StandardCharsets.UTF_8).replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR)
+                    .trim();
+            Assert.assertTrue(stderr.endsWith("\n" + issues.size() + " issue(s)"),
+                    "one summary for the workspace is the last line: " + stderr);
+            Assert.assertTrue(issues.size() > 1, "the issues of both packages are printed: " + issues);
+        }
     }
 
     @Test(description = "test scan command default format behavior")

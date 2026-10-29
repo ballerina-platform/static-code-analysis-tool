@@ -49,13 +49,16 @@ public enum DiagnosticCode {
     SUPPRESSION_REQUIREMENTS_NOT_MET("STATIC_ANALYSIS_ERROR_023", "suppression.requirements.not.met"),
     UNKNOWN_RULE("STATIC_ANALYSIS_ERROR_024", "unknown.rule"),
     INVALID_SUPPRESSION_SETTING("STATIC_ANALYSIS_ERROR_025", "invalid.suppression.setting"),
+    UNKNOWN_SUPPRESSION_SETTING("STATIC_ANALYSIS_ERROR_026", "unknown.suppression.setting"),
+    MISSING_DEPENDENCIES_TOML("STATIC_ANALYSIS_ERROR_027", "missing.dependencies.toml"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
     UNMATCHED_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_004", "unmatched.blanket.suppression"),
     UNKNOWN_RULE_PROVIDER("STATIC_ANALYSIS_WARNING_006", "unknown.rule.provider"),
     DUPLICATE_SUPPRESSION_RULE("STATIC_ANALYSIS_WARNING_007", "duplicate.suppression.rule"),
-    DUPLICATE_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_008", "duplicate.blanket.suppression");
+    DUPLICATE_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_008", "duplicate.blanket.suppression"),
+    IGNORED_SUPPRESSION("STATIC_ANALYSIS_WARNING_009", "ignored.suppression");
 
     private final String diagnosticId;
     private final String messageKey;

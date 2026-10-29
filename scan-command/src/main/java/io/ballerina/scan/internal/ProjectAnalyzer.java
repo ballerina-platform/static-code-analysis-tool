@@ -320,6 +320,13 @@ public class ProjectAnalyzer {
         return externalIssues;
     }
 
+    // Every rule the scan can report, before rule selection
+    static List<Rule> rules(List<Rule> coreRules, Map<String, List<Rule>> externalAnalyzers) {
+        List<Rule> rules = new ArrayList<>(coreRules);
+        externalAnalyzers.values().forEach(rules::addAll);
+        return rules;
+    }
+
     protected ScannerContext getScannerContext(List<Rule> rules) {
         return new ScannerContextImpl(rules);
     }

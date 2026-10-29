@@ -69,13 +69,15 @@ final class SuppressionFilter {
         if (options.ignoreSuppressions()) {
             return new SuppressionOutcome(issues, List.of(), List.of());
         }
-        List<SuppressionAnnotation> suppressions = SuppressionCollector.collect(project);
+        SuppressionCollector.Collected collected = SuppressionCollector.collect(project);
+        List<SuppressionAnnotation> suppressions = collected.suppressions();
         if (suppressions.isEmpty()) {
-            return new SuppressionOutcome(issues, List.of(), List.of());
+            return new SuppressionOutcome(issues, List.of(), collected.ignored());
         }
 
         KnownRules knownRules = new KnownRules(rules);
-        List<SuppressionDiagnostic> diagnostics = new ArrayList<>(unknownRules(suppressions, knownRules));
+        List<SuppressionDiagnostic> diagnostics = new ArrayList<>(collected.ignored());
+        diagnostics.addAll(unknownRules(suppressions, knownRules));
         diagnostics.addAll(requirementViolations(suppressions, options));
 
         List<Issue> activeIssues = new ArrayList<>();
@@ -199,7 +201,8 @@ final class SuppressionFilter {
     }
 
     private static SuppressionDiagnostic error(SuppressionAnnotation suppression, LineRange location, String message) {
-        return new SuppressionDiagnostic(DiagnosticSeverity.ERROR, message, suppression.fileName(), location);
+        return new SuppressionDiagnostic(DiagnosticSeverity.ERROR, message, suppression.fileName(), location,
+                suppression);
     }
 
     private static SuppressionDiagnostic warning(SuppressionAnnotation suppression, String message) {
@@ -208,7 +211,8 @@ final class SuppressionFilter {
 
     private static SuppressionDiagnostic warning(SuppressionAnnotation suppression, LineRange location,
                                                  String message) {
-        return new SuppressionDiagnostic(DiagnosticSeverity.WARNING, message, suppression.fileName(), location);
+        return new SuppressionDiagnostic(DiagnosticSeverity.WARNING, message, suppression.fileName(), location,
+                suppression);
     }
 
     private record KnownRules(Set<String> ids, Set<String> providers) {

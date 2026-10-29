@@ -20,6 +20,7 @@ package io.ballerina.scan.utils;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
@@ -230,14 +231,25 @@ public class ScanUtilsTest extends BaseTest {
     }
 
     @Test(description = "test method for loading a Scan.toml file with a suppression setting that is not a boolean")
-    void testLoadScanTomlConfigurationsWithNonBooleanSuppressionSetting() throws IOException {
+    void testLoadScanTomlConfigurationsWithNonBooleanSuppressionSetting() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-suppression-settings");
         Project project = ProjectLoader.load(ballerinaProject).project();
-        ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
-        Assert.assertNull(scanTomlFile);
-        String expected = DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, "requireReason");
-        Assert.assertTrue(readOutput(true).contains(expected));
+        BLauncherException exception = Assert.expectThrows(BLauncherException.class,
+                () -> ScanUtils.loadScanTomlConfigurations(project, printStream));
+        Assert.assertEquals(exception.getMessages(),
+                List.of("error: " + DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, "requireReason")));
+    }
+
+    @Test(description = "test method for loading a Scan.toml file with an unknown suppression setting")
+    void testLoadScanTomlConfigurationsWithUnknownSuppressionSetting() {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-unknown-suppression-setting");
+        Project project = ProjectLoader.load(ballerinaProject).project();
+        BLauncherException exception = Assert.expectThrows(BLauncherException.class,
+                () -> ScanUtils.loadScanTomlConfigurations(project, printStream));
+        Assert.assertEquals(exception.getMessages(),
+                List.of("error: " + DiagnosticLog.error(DiagnosticCode.UNKNOWN_SUPPRESSION_SETTING, "requireReasons")));
     }
 
     @Test(description = "test method for loading configurations from an external configuration file")

@@ -244,7 +244,14 @@ public class ScanCmd implements BLauncherCmd {
                 return;
             }
             failOnSuppressionErrors(invalidSuppressions);
+            boolean printIssues = platforms.isEmpty() && !platformTriggered;
             pendingReports.forEach(Runnable::run);
+            // The issues of every package are printed as one document, so that standard output stays valid JSON
+            List<Issue> activeIssues = allIssues.stream().filter(issue -> !allSuppressions.containsKey(issue)).toList();
+            if (printIssues) {
+                ScanUtils.printToConsole(activeIssues, outputStream, ReportFormat.SARIF.equals(format),
+                        workspaceProject);
+            }
             errorStream.println();
             accumulateWorkspaceReports(workspaceProject);
             if (scanReport) {
@@ -254,6 +261,7 @@ public class ScanCmd implements BLauncherCmd {
                 errorStream.println("View scan report at:");
                 errorStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
             }
+            printSummary(activeIssues.size(), allSuppressions.size());
             return;
         }
         if (ProjectUtils.isProjectEmpty(project.get())) {
@@ -385,9 +393,8 @@ public class ScanCmd implements BLauncherCmd {
         RuleSelection ruleSelection = new RuleSelection(projectIncludeRules, projectExcludeRules);
         issues.removeIf(issue -> !ruleSelection.selects(issue.rule().id()));
 
-        List<Rule> projectRules = new ArrayList<>(coreRules);
-        externalAnalyzers.values().forEach(projectRules::addAll);
-        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, issues, projectRules, ruleSelection,
+        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, issues,
+                ProjectAnalyzer.rules(coreRules, externalAnalyzers), ruleSelection,
                 SuppressionOptions.of(scanTomlFile.get(), ignoreSuppressions, requireSuppressionReason,
                         requireSuppressionRuleId));
         List<Issue> activeIssues = suppressionOutcome.activeIssues();
@@ -411,7 +418,9 @@ public class ScanCmd implements BLauncherCmd {
                         ServiceLoader<StaticCodeAnalysisPlatformPlugin> scannerPlatformPlugins) {
         if (platforms.isEmpty() && !platformTriggered) {
             boolean isSarifFormat = ReportFormat.SARIF.equals(format);
-            ScanUtils.printToConsole(activeIssues, outputStream, isSarifFormat, project);
+            if (!scanningWorkspace) {
+                ScanUtils.printToConsole(activeIssues, outputStream, isSarifFormat, project);
+            }
             if (project.kind().equals(ProjectKind.BUILD_PROJECT)) {
                 Path reportPath;
                 if (isSarifFormat) {
@@ -448,7 +457,9 @@ public class ScanCmd implements BLauncherCmd {
             errorStream.println("The specified platform '" + remainingPlatform + "' is not available.");
             errorStream.println("Please ensure that the required platform plugin path is specified in 'Scan.toml'.");
         });
-        printSummary(activeIssues.size(), suppressions.size());
+        if (!scanningWorkspace) {
+            printSummary(activeIssues.size(), suppressions.size());
+        }
     }
 
     private void printSuppressionDiagnostics(List<SuppressionDiagnostic> diagnostics) {
@@ -497,6 +508,12 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     protected Optional<Project> getProject() {
+        Optional<Project> project = loadProject();
+        project.ifPresent(ScanUtils::requireLockedDependencies);
+        return project;
+    }
+
+    private Optional<Project> loadProject() {
         try {
             if (!isBallerinaProjectPath()) {
                 Optional<Path> packageRoot = getEnclosingPackageRoot();

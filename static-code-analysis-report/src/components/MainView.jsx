@@ -4,7 +4,6 @@ import MainTable from "./MainTable";
 import { useMemo } from "react";
 import { countActiveFilters, countByKind, countSuppressed, isSuppressed, matchesFilters, matchesStatus } from "../issueMeta";
 
-// The cards count active issues only; suppressed ones are counted on their own.
 function retrieveAllStats(analyzedFiles) {
     const issues = (analyzedFiles ?? []).flatMap((analyzedFile) => analyzedFile.issues ?? [])
     return {

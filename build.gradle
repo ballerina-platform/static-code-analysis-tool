@@ -31,7 +31,6 @@ abstract class ExecOperationsHolder {
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
     maven {
         url = 'https://maven.pkg.github.com/ballerina-platform/*'

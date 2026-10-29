@@ -24,13 +24,15 @@ import io.ballerina.tools.text.LineRange;
 /**
  * A diagnostic about a {@code @scan:Suppress} annotation, such as one that matched no issue.
  *
- * @param severity severity of the diagnostic
- * @param message  description of the problem
- * @param fileName name of the document containing the annotation
- * @param location location of the annotation
+ * @param severity    severity of the diagnostic
+ * @param message     description of the problem
+ * @param fileName    name of the document containing the annotation
+ * @param location    location of the annotation, or of the rule the diagnostic is about
+ * @param suppression the annotation the diagnostic is about, or {@code null} when it could not be read
  * @since 0.13.0
  */
-record SuppressionDiagnostic(DiagnosticSeverity severity, String message, String fileName, LineRange location) {
+record SuppressionDiagnostic(DiagnosticSeverity severity, String message, String fileName, LineRange location,
+                             SuppressionAnnotation suppression) {
 
     boolean isError() {
         return severity == DiagnosticSeverity.ERROR;

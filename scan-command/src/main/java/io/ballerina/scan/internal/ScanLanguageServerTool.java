@@ -21,6 +21,7 @@ package io.ballerina.scan.internal;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.BuildOptions;
 import io.ballerina.projects.DependencyGraph;
 import io.ballerina.projects.Project;
@@ -108,7 +109,9 @@ public class ScanLanguageServerTool {
         } catch (Exception e) {
             JsonObject errorObject = new JsonObject();
             errorObject.addProperty("success", false);
-            String errorMsg = e.getMessage();
+            // A launcher exception, such as from an invalid Scan.toml, carries its message in its message list
+            String errorMsg = e instanceof BLauncherException launcherException
+                    ? String.join(System.lineSeparator(), launcherException.getMessages()) : e.getMessage();
             errorObject.addProperty("error", errorMsg != null && !errorMsg.trim().isEmpty() ? errorMsg : e.toString());
             addEmptyIssueArrays(errorObject);
             return GSON.toJson(errorObject);
@@ -274,6 +277,7 @@ public class ScanLanguageServerTool {
     }
 
     private static LsScanResult runLsScan(Project project) throws IOException {
+        ScanUtils.requireLockedDependencies(project);
         // Load Constants.SCAN_FILE configurations
         Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, System.err);
 
@@ -331,37 +335,22 @@ public class ScanLanguageServerTool {
 
         List<Issue> activeIssues = new ArrayList<>();
         List<ExcludedIssue> excludedIssues = new ArrayList<>();
-
+        RuleSelection ruleSelection = new RuleSelection(includeRules, excludeRules);
         for (Issue issue : issues) {
-            boolean isExcluded;
+            String ruleId = issue.rule() != null ? issue.rule().id() : "";
+            if (ruleSelection.selects(ruleId)) {
+                activeIssues.add(issue);
+                continue;
+            }
             String issueFileName = issue.location() != null && issue.location().lineRange() != null
                     ? issue.location().lineRange().fileName() : "";
-            String ruleId = issue.rule() != null ? issue.rule().id() : "";
-
-            boolean isExcludedByGlobal = false;
-
-            if (!includeRules.isEmpty() && !includeRules.contains(ruleId)) {
-                isExcludedByGlobal = true;
-            }
-
-            if (!excludeRules.isEmpty() && excludeRules.contains(ruleId)) {
-                isExcludedByGlobal = true;
-            }
-
-            isExcluded = isExcludedByGlobal;
-
-            if (isExcluded) {
-                excludedIssues.add(new ExcludedIssue(issue, ruleId, issueFileName, true));
-            } else {
-                activeIssues.add(issue);
-            }
+            excludedIssues.add(new ExcludedIssue(issue, ruleId, issueFileName, true));
         }
 
         // The same suppression filter as the command line, applied after rule selection as it is there
-        List<Rule> projectRules = new ArrayList<>(coreRules);
-        externalAnalyzers.values().forEach(projectRules::addAll);
-        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, activeIssues, projectRules,
-                new RuleSelection(includeRules, excludeRules), SuppressionOptions.of(scanToml, false, false, false));
+        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, activeIssues,
+                ProjectAnalyzer.rules(coreRules, externalAnalyzers), ruleSelection,
+                SuppressionOptions.of(scanToml, false, false, false));
         return new LsScanResult(new ScanResult(suppressionOutcome.activeIssues(), excludedIssues,
                 suppressionOutcome.suppressedIssues()), suppressionOutcome.diagnostics());
     }

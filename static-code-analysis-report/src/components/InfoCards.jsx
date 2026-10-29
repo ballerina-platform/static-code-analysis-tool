@@ -36,7 +36,6 @@ const StatCard = ({ value, label, color, Icon }) => (
     </Card>
 )
 
-// The suppressed card only appears when the scan accepted issues with `@scan:Suppress`.
 function InfoCards({ statistics }) {
     const showSuppressed = statistics.suppressed > 0
     return (
