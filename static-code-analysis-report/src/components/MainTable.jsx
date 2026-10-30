@@ -1,7 +1,8 @@
 import {
     BugReportOutlined,
     CodeOffOutlined,
-    LockOpenOutlined
+    LockOpenOutlined,
+    VisibilityOffOutlined
 } from '@mui/icons-material';
 import {
     Typography,
@@ -84,6 +85,23 @@ const columns = [
     },
 ];
 
+const suppressedColumn = {
+    field: 'suppressed',
+    renderHeader: () => {
+        return (
+            <Box>
+                <IconButton disabled>
+                    <VisibilityOffOutlined fontSize="large" sx={{ color: "#78909C" }} />
+                </IconButton>
+                <strong>Suppressed</strong>
+            </Box>
+        )
+    },
+    width: 245,
+    headerAlign: "right",
+    align: "right",
+};
+
 function MainTable({ toggleSingleFileView, fileRecords }) {
     const [rows, setRows] = useState([])
 
@@ -95,7 +113,8 @@ function MainTable({ toggleSingleFileView, fileRecords }) {
                     fileName: fileRecord.fileName,
                     codeSmells: fileRecord.codeSmells,
                     bugs: fileRecord.bugs,
-                    vulnerabilities: fileRecord.vulnerabilities
+                    vulnerabilities: fileRecord.vulnerabilities,
+                    suppressed: fileRecord.suppressed
                 }
 
                 setRows(prevRows => [...prevRows, newRow]);
@@ -121,7 +140,8 @@ function MainTable({ toggleSingleFileView, fileRecords }) {
                     border: "1px solid var(--primary-color)"
                 }}
                 rows={rows}
-                columns={columns}
+                columns={fileRecords?.some((fileRecord) => fileRecord.suppressed > 0)
+                    ? [...columns, suppressedColumn] : columns}
                 initialState={{
                     pagination: {
                         paginationModel: {

@@ -19,7 +19,6 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.projects.Document;
-import io.ballerina.projects.Module;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Reporter;
 import io.ballerina.scan.Rule;
@@ -69,11 +68,6 @@ public class ReporterImpl implements Reporter {
     }
 
     private Issue createIssue(Document reportedDocument, Location location, Rule rule) {
-        String documentName = reportedDocument.name();
-        Module module = reportedDocument.module();
-        String moduleName = module.moduleName().toString();
-        Path issuesFilePath = module.project().documentPath(reportedDocument.documentId())
-                .orElse(Path.of(documentName));
         String fullyQualifiedRuleId = rule.id();
         String[] parts = fullyQualifiedRuleId.split(":");
 
@@ -90,8 +84,19 @@ public class ReporterImpl implements Reporter {
                 source = Source.EXTERNAL;
             }
         }
-        return new IssueImpl(location, rule, source, moduleName + FORWARD_SLASH + documentName,
-                issuesFilePath.toString());
+        return new IssueImpl(location, rule, source, reportFileName(reportedDocument),
+                reportFilePath(reportedDocument));
+    }
+
+    // The path of a document as recorded in the issues reported for it
+    static String reportFilePath(Document document) {
+        return document.module().project().documentPath(document.documentId())
+                .orElse(Path.of(document.name())).toString();
+    }
+
+    // The name of a document as shown in scan results
+    static String reportFileName(Document document) {
+        return document.module().moduleName() + FORWARD_SLASH + document.name();
     }
 
     protected List<Issue> getIssues() {

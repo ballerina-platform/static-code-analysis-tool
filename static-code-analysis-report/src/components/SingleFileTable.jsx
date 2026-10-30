@@ -93,6 +93,37 @@ const columns = [
     }
 ];
 
+// Added when the file has issues accepted with `@scan:Suppress`: the status next to the rule ID, and the
+// justification after the description.
+const statusColumn = {
+    field: 'status',
+    renderHeader: () => {
+        return (
+            <strong>Status</strong>
+        )
+    },
+    width: 120,
+    headerAlign: "left",
+    align: "left",
+    renderCell: (cell) => cell.value === "Suppressed"
+        ? <strong style={{ color: "#78909C" }}>{cell.value}</strong>
+        : cell.value
+};
+
+const justificationColumn = {
+    field: 'justification',
+    renderHeader: () => {
+        return (
+            <strong>Justification</strong>
+        )
+    },
+    width: 300,
+    headerAlign: "left",
+    align: "left",
+};
+
+const columnsWithSuppressions = [columns[0], statusColumn, ...columns.slice(1), justificationColumn];
+
 function SingleFileTable({ issues }) {
     const [rows, setRows] = useState([])
     const REACT_REPORT_OFFSET = 1;
@@ -107,7 +138,9 @@ function SingleFileTable({ issues }) {
                     ruleID: issue.ruleID,
                     issueSeverity: issue.issueSeverity,
                     lineRange: `(${issue.textRange.startLine + REACT_REPORT_OFFSET}:${issue.textRange.startLineOffset}, ${issue.textRange.endLine + REACT_REPORT_OFFSET}:${issue.textRange.endLineOffset})`,
-                    description: issue.message
+                    description: issue.message,
+                    status: issue.suppression ? "Suppressed" : "Active",
+                    justification: issue.suppression?.justification ?? ""
                 }
 
                 issuesArray.push(newRow);
@@ -129,7 +162,7 @@ function SingleFileTable({ issues }) {
                     border: "1px solid var(--primary-color)"
                 }}
                 rows={rows}
-                columns={columns}
+                columns={issues?.some((issue) => issue.suppression) ? columnsWithSuppressions : columns}
                 initialState={{
                     pagination: {
                         paginationModel: {

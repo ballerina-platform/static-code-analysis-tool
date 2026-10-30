@@ -55,6 +55,24 @@ bal scan [OPTIONS] [<package>|<source-file>]
 --platforms=<platformName1, ...>
 ```
 
+- Disregard `@scan:Suppress` annotations and report every issue, to audit the unsuppressed results. Rule inclusion and exclusion still apply. Same as `enabled = false` in the `[suppression]` table of `Scan.toml`. See [Suppressing issues](#suppressing-issues).
+
+```text
+--ignore-suppressions
+```
+
+- Fail the scan when a `@scan:Suppress` annotation does not give a reason. Same as `requireReason = true` in `Scan.toml`. Has no effect with `--ignore-suppressions` or `enabled = false`.
+
+```text
+--require-suppression-reason
+```
+
+- Fail the scan when a `@scan:Suppress` annotation does not name the rules it suppresses. Same as `requireRuleId = true` in `Scan.toml`. Has no effect with `--ignore-suppressions` or `enabled = false`.
+
+```text
+--require-suppression-rule-id
+```
+
 ## Examples
 
 - Run analysis against all Ballerina documents in the current package, print results to the console, and save results in JSON file format in the target directory.
@@ -127,6 +145,50 @@ bal scan --platforms=sonarqube
 
 ```bash
 bal scan --platforms="sonarqube, semgrep, codeql"
+```
+
+- Run analysis reporting every issue, including those suppressed with `@scan:Suppress`.
+
+```bash
+bal scan --ignore-suppressions
+```
+
+- Run analysis and fail if any `@scan:Suppress` annotation lacks a reason.
+
+```bash
+bal scan --require-suppression-reason
+```
+
+Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON, or SARIF with `--format=sarif`. Progress messages, warnings, report paths and the closing summary, such as `3 issue(s)`, are written to standard error.
+
+## Suppressing issues
+
+An individual issue can be accepted in the source with the `@scan:Suppress` annotation from the `ballerina/scan` package. Unlike excluding a rule, which turns it off for the whole project, a suppression applies only to the construct it is attached to and records why the issue is accepted:
+
+```ballerina
+import ballerina/crypto;
+import ballerina/scan;
+
+function hashPassword(string password) returns string|error {
+    @scan:Suppress {rules: ["ballerina/crypto:2"], reason: "Legacy hash kept for the migration window, SEC-1042"}
+    string hashed = check crypto:hashBcrypt(password, 4);
+    return hashed;
+}
+```
+
+- **Placement.** The annotation applies to issues reported within the construct it is attached to: a variable or constant declaration, a function, method or resource, a parameter, a return type, a field, a type, a class, a service, a listener, a worker or an `external` function body. A suppression on a service, class, object type or object constructor does not reach issues inside its members. An issue in a statement that is not a declaration can be suppressed by turning the statement into one, for example `var _ = check f();` instead of `check f();`. A suppression the scan cannot apply, such as one on a destructuring declaration or on the return type of a function type, is reported as a warning and ignored.
+- **Fields.** Both fields are optional. Without `rules`, every issue in the construct is suppressed; without `reason`, the issue is suppressed without a justification. The annotation can be attached more than once to give each rule its own reason. See the [`ballerina/scan` package documentation](https://github.com/ballerina-platform/module-ballerina-scan/blob/main/ballerina/README.md) for examples of each option, the checks done during `bal build` and the editor's code actions.
+- **Rule ID validation.** The compiler plugin of `ballerina/scan` reports a malformed rule ID or an empty rule list as a compile error, and `bal scan` reports them as errors too, so that such a suppression never passes as one of no rule. `bal scan` checks that each rule exists, among the core rules and the rules of every analyzer it engages, and fails before reporting anything when one does not. A rule of an analyzer the scan does not engage cannot be verified and is reported as a warning.
+- **Results.** Suppressed issues are not printed to the console or sent to platforms, and the closing summary counts them, such as `3 issue(s), 2 suppressed`. They remain in the saved JSON and SARIF reports with a `suppressions` entry of kind `inSource` carrying the reason, so every accepted issue stays reviewable. The HTML report counts them separately from the active issues, and lists them with a `Suppressed` status and their justification.
+- **Unmatched suppressions.** A suppression that matches no issue is reported as a warning, for example when the issue was fixed. A suppression is not reported for a rule left out by `--include-rules`, `--exclude-rules` or `Scan.toml`, and one without `rules` is only reported when every rule is scanned, since whether it is still needed cannot be told from a narrowed scan. An unknown rule still fails the scan, before anything is reported. A rule that an earlier annotation on the same construct already names is reported as already suppressed instead, since that annotation is the one that applies. Likewise, a second annotation without `rules` on a construct is reported as suppressing rules that are already suppressed.
+- **Requirements.** A project can require every suppression to give a reason or name its rules, with `requireReason` and `requireRuleId` in the `[suppression]` table of `Scan.toml`, or with the matching command-line options. The requirements have no effect when suppressions are disabled, since every issue is then reported. A suppression that does not meet a requirement fails the scan before anything is reported: the errors are printed, and no issues are printed, saved to the target directory or sent to platforms.
+- **Audit.** `--ignore-suppressions` reports every issue as though no suppression existed. To disregard suppressions for every run of a project, for example from a shared `Scan.toml`, set `enabled = false` in the `[suppression]` table.
+
+```toml
+[suppression]
+enabled = true        # false reports every issue, same as --ignore-suppressions
+requireReason = true  # same as --require-suppression-reason
+requireRuleId = true  # same as --require-suppression-rule-id
 ```
 
 ## Rules

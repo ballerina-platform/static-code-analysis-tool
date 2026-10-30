@@ -2,7 +2,8 @@ import {
     AssignmentOutlined,
     BugReportOutlined,
     CodeOffOutlined,
-    LockOpenOutlined
+    LockOpenOutlined,
+    VisibilityOffOutlined
 } from "@mui/icons-material"
 import {
     Box,
@@ -120,6 +121,34 @@ function InfoCards({ statistics }) {
                     <Typography variant="h5">Vulnerabilities</Typography>
                 </Box>
             </Card>
+            {/* Shown only when the scan accepted issues with @scan:Suppress */}
+            {statistics.totalSuppressed > 0 &&
+                <Card sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    padding: "0.5rem",
+                    bgcolor: "#78909C",
+                    width: "15rem",
+                    height: "100%",
+                    color: "#ffffff",
+                    borderRadius: "0.5rem"
+                }}>
+                    <IconButton disabled sx={{ flex: "0.5" }}>
+                        <VisibilityOffOutlined color="white" sx={{ fontSize: "4rem" }} />
+                    </IconButton>
+                    <Box sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        flex: "1"
+                    }}>
+                        <Typography variant="h2">{statistics.totalSuppressed}</Typography>
+                        <Typography variant="h5">Suppressed</Typography>
+                    </Box>
+                </Card>
+            }
         </Box>
     )
 }
