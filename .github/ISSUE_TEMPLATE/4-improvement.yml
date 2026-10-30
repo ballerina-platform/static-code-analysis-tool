@@ -1,0 +1,38 @@
+name: "🚀 Improvement Request"
+description: Suggest an improvement to existing `bal scan` behavior. For a change to a rule, use "Report a Rule Issue".
+labels: ["Type/Improvement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - Configuration
+        - Reports
+        - Core
+        - Build
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: limitation
+    attributes:
+      label: Current Limitation
+      description: Describe the current limitation.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: Describe the improvement you suggest.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `scan` version shown by `bal tool list`.
+    validations:
+      required: false

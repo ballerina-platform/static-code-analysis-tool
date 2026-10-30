@@ -1,0 +1,64 @@
+name: "🎯 Report a Rule Issue"
+description: Report a core rule that reports code it should not, misses code it should report, or reports the wrong message or location.
+labels: ["Type/Bug", "Area/Rules"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for core rules, whose IDs start with `ballerina:`. Report issues with library rules, such as `ballerina/http:1`, in [ballerina-library](https://github.com/ballerina-platform/ballerina-library/issues/new/choose).
+
+        Please include the rule ID in the title, e.g. "False positive for `ballerina:14` when a secret-named parameter defaults to nil".
+  - type: input
+    id: rule
+    attributes:
+      label: Rule ID
+      placeholder: ballerina:14
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Issue
+      options:
+        - False positive (reported, but should not be)
+        - False negative (not reported, but should be)
+        - Wrong message or location
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code Sample
+      description: The smallest code that shows the issue.
+      render: ballerina
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should `bal scan` report for this code, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Output
+      description: The relevant part of the `bal scan` output, if any.
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: ballerina-version
+    attributes:
+      label: Ballerina Version
+      description: Output of `bal version`.
+    validations:
+      required: true
+  - type: input
+    id: scan-version
+    attributes:
+      label: Scan Tool Version
+      description: The `scan` version shown by `bal tool list`.
+    validations:
+      required: true

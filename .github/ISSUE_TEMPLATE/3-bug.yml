@@ -1,0 +1,66 @@
+name: "🐞 Report a Bug"
+description: Report something in `bal scan` that does not work as expected. For a rule that reports the wrong code, use "Report a Rule Issue".
+labels: ["Type/Bug"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - Configuration
+        - Reports
+        - Core
+        - Build
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: Description
+      description: A clear and concise description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: The `bal scan` command you ran and a minimal project, `Scan.toml`, or code to reproduce the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Output
+      description: The relevant output or error.
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: ballerina-version
+    attributes:
+      label: Ballerina Version
+      description: Output of `bal version`.
+    validations:
+      required: true
+  - type: input
+    id: scan-version
+    attributes:
+      label: Scan Tool Version
+      description: The `scan` version shown by `bal tool list`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, and the CI system or IDE if relevant.
+    validations:
+      required: false
