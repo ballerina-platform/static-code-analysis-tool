@@ -160,4 +160,11 @@ public class Rule014Test extends StaticCodeAnalyzerTest {
                 List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()));
         Assert.assertEquals(issues, List.of());
     }
+
+    @Test
+    void testNonSecretValueTypes() {
+        List<Issue> issues = analyze("rule014_non_secret_value_types.bal",
+                List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()));
+        Assert.assertEquals(issues, List.of());
+    }
 }
