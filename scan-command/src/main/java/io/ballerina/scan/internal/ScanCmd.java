@@ -411,7 +411,7 @@ public class ScanCmd implements BLauncherCmd {
             writeWorkspaceReports(workspaceProject);
         } catch (RuntimeException ex) {
             if (failures.isEmpty()) {
-                throw ex;
+                throw ScanFailure.from(ex);
             }
             // The packages' failures are still reported, so a failed workspace report does not hide them
             ScanFailure.from(ex).reportLines().forEach(errorStream::println);
