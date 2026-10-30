@@ -29,7 +29,7 @@ public enum DiagnosticCode {
     MISSING_CONFIG_FIELD("STATIC_ANALYSIS_ERROR_003", "missing.config.field"),
     LOADING_REMOTE_CONFIG_FILE("STATIC_ANALYSIS_ERROR_004", "loading.remote.config.file"),
     READING_CONFIG_FILE("STATIC_ANALYSIS_ERROR_005", "reading.config.file"),
-    LOADING_REMOTE_PLATFORM_FILE("STATIC_ANALYSIS_ERROR_006", "loading.remote.platform.file"),
+    PLATFORM_FILE_NOT_FOUND("STATIC_ANALYSIS_ERROR_006", "platform.file.not.found"),
     DOWNLOADING_REMOTE_JAR_FILE("STATIC_ANALYSIS_ERROR_007", "downloading.remote.jar.file"),
     FAILED_TO_LOAD_COMPILER_PLUGIN("STATIC_ANALYSIS_ERROR_008", "loading.compiler.plugin"),
     READING_RULES_FILE("STATIC_ANALYSIS_ERROR_009", "reading.rules.file"),
@@ -63,11 +63,13 @@ public enum DiagnosticCode {
     INVALID_CONFIG_VALUE("STATIC_ANALYSIS_ERROR_037", "invalid.config.value"),
     UNKNOWN_CONFIG_KEY("STATIC_ANALYSIS_ERROR_038", "unknown.config.key"),
     PLATFORM_NOT_AVAILABLE("STATIC_ANALYSIS_ERROR_039", "platform.not.available"),
-    PLATFORM_FAILED("STATIC_ANALYSIS_ERROR_040", "platform.failed"),
-    FAILED_TO_WRITE_REPORT("STATIC_ANALYSIS_ERROR_041", "failed.to.write.report"),
-    GATE_FAILED("STATIC_ANALYSIS_ERROR_042", "gate.failed"),
-    PACKAGES_FAILED_GATE("STATIC_ANALYSIS_ERROR_043", "packages.failed.gate"),
-    PACKAGES_FAILED("STATIC_ANALYSIS_ERROR_044", "packages.failed"),
+    FAILED_TO_WRITE_REPORT("STATIC_ANALYSIS_ERROR_040", "failed.to.write.report"),
+    GATE_FAILED("STATIC_ANALYSIS_ERROR_041", "gate.failed"),
+    PACKAGES_FAILED_GATE("STATIC_ANALYSIS_ERROR_042", "packages.failed.gate"),
+    PACKAGES_FAILED("STATIC_ANALYSIS_ERROR_043", "packages.failed"),
+    WORKSPACE_PLATFORM_NOT_ALLOWED("STATIC_ANALYSIS_ERROR_044", "workspace.platform.not.allowed"),
+    INVALID_CONFIG_TABLE("STATIC_ANALYSIS_ERROR_045", "invalid.config.table"),
+    INVALID_ANALYZER_LIST("STATIC_ANALYSIS_ERROR_046", "invalid.analyzer.list"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
@@ -76,10 +78,11 @@ public enum DiagnosticCode {
     DUPLICATE_SUPPRESSION_RULE("STATIC_ANALYSIS_WARNING_007", "duplicate.suppression.rule"),
     DUPLICATE_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_008", "duplicate.blanket.suppression"),
     IGNORED_SUPPRESSION("STATIC_ANALYSIS_WARNING_009", "ignored.suppression"),
-    GATE_SETTING_OVERRIDDEN("STATIC_ANALYSIS_WARNING_010", "gate.setting.overridden"),
-    PACKAGE_GATE_IGNORED("STATIC_ANALYSIS_WARNING_011", "package.gate.ignored"),
-    WORKSPACE_CONFIG_IGNORED("STATIC_ANALYSIS_WARNING_012", "workspace.config.ignored"),
-    EMPTY_PACKAGE_SKIPPED("STATIC_ANALYSIS_WARNING_013", "empty.package.skipped");
+    SETTING_OVERRIDDEN("STATIC_ANALYSIS_WARNING_010", "setting.overridden"),
+    EMPTY_PACKAGE_SKIPPED("STATIC_ANALYSIS_WARNING_011", "empty.package.skipped"),
+    PLATFORM_FAILED("STATIC_ANALYSIS_WARNING_012", "platform.failed"),
+    EXCLUDE_TESTS_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_013", "exclude.tests.not.supported"),
+    WORKSPACE_RULE_NOT_AVAILABLE("STATIC_ANALYSIS_WARNING_014", "workspace.rule.not.available");
 
     private final String diagnosticId;
     private final String messageKey;

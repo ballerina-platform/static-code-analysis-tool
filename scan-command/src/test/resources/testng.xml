@@ -29,6 +29,7 @@ under the License.
             <class name="io.ballerina.scan.internal.SuppressionTest"/>
             <class name="io.ballerina.scan.internal.GateTest"/>
             <class name="io.ballerina.scan.internal.QualityGateTest"/>
+            <class name="io.ballerina.scan.internal.ExcludeTestsTest"/>
             <class name="io.ballerina.scan.internal.RuleImplTest"/>
             <class name="io.ballerina.scan.internal.IssueImplTest"/>
             <class name="io.ballerina.scan.internal.ReporterImplTest"/>
@@ -50,6 +51,7 @@ under the License.
             <class name="io.ballerina.scan.internal.RegionConversionTest"/>
             <class name="io.ballerina.scan.utils.ScanUtilsTest"/>
             <class name="io.ballerina.scan.utils.ScanTomlWriterTest"/>
+            <class name="io.ballerina.scan.utils.ScanTomlFileTest"/>
             <class name="io.ballerina.scan.utils.DiagnosticLogTest"/>
         </classes>
     </test>

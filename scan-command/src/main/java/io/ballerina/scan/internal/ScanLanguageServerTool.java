@@ -316,15 +316,12 @@ public class ScanLanguageServerTool {
         List<String> includeRules = new ArrayList<>();
         List<String> excludeRules = new ArrayList<>();
 
-        if (scanToml != null) {
-            scanToml.getRulesToInclude().stream()
-                    .map(ScanTomlFile.RuleToFilter::id)
-                    .forEach(includeRules::add);
-
-            scanToml.getRulesToExclude().stream()
-                    .map(ScanTomlFile.RuleToFilter::id)
-                    .forEach(excludeRules::add);
-        }
+        scanToml.getRulesToInclude().stream()
+                .map(ScanTomlFile.RuleToFilter::id)
+                .forEach(includeRules::add);
+        scanToml.getRulesToExclude().stream()
+                .map(ScanTomlFile.RuleToFilter::id)
+                .forEach(excludeRules::add);
 
         if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
             throw new IllegalArgumentException("Invalid " + Constants.SCAN_FILE

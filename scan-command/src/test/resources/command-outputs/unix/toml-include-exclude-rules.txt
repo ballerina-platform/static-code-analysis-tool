@@ -1,2 +1,3 @@
 Loading scan tool configurations from <ABS_SOURCE_ROOT>/Scan.toml
-bal scan: error: cannot include and exclude rules at the same time
+bal scan: error: Scan.toml has 1 error
+Scan.toml:17:1: error: cannot include and exclude rules at the same time

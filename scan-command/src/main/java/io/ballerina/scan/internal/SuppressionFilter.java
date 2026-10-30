@@ -69,7 +69,7 @@ final class SuppressionFilter {
         if (options.ignoreSuppressions()) {
             return new SuppressionOutcome(issues, List.of(), List.of());
         }
-        SuppressionCollector.Collected collected = SuppressionCollector.collect(project);
+        SuppressionCollector.Collected collected = SuppressionCollector.collect(project, options.excludeTests());
         List<SuppressionAnnotation> suppressions = collected.suppressions();
         if (suppressions.isEmpty()) {
             return new SuppressionOutcome(issues, List.of(), collected.ignored());

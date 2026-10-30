@@ -177,10 +177,7 @@ public class ScanUtilsTest extends BaseTest {
         ruleToInclude = ruleToIncludeList.get(3);
         Assert.assertEquals(ruleToInclude.id(), "ballerinax/example_module_static_code_analyzer:1");
         Set<ScanTomlFile.RuleToFilter> rulesToExclude = scanTomlFile.getRulesToExclude();
-        List<ScanTomlFile.RuleToFilter> ruleToExcludeList = new ArrayList<>(rulesToExclude);
-        Assert.assertEquals(ruleToExcludeList.size(), 1);
-        ScanTomlFile.RuleToFilter ruleToExclude = ruleToExcludeList.get(0);
-        Assert.assertEquals(ruleToExclude.id(), "ballerina:1");
+        Assert.assertTrue(rulesToExclude.isEmpty());
         Set<ScanTomlFile.Platform> platforms = scanTomlFile.getPlatforms();
         Assert.assertEquals(platforms.size(), 0);
     }

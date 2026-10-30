@@ -1,2 +1,2 @@
 Loading scan tool configurations from <ABS_SOURCE_ROOT>\Scan.toml
-failed to retrieve remote platform file: no protocol: www.example.com/example-platform-analyzer-1.0.jar
+'path' of platform 'examplePlatform' is not a file or a URL: www.example.com/example-platform-analyzer-1.0.jar

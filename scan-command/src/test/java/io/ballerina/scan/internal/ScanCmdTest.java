@@ -1055,6 +1055,81 @@ public class ScanCmdTest extends BaseTest {
         }
     }
 
+    @Test(description = "test a platform that fails warns and lets the other packages of a workspace report")
+    void testPlatformFailureIsAWarning() throws IOException {
+        Path workspacePath = testResources.resolve("test-resources").resolve("workspace-with-platforms");
+        String platformConfiguration = platformConfiguration("");
+        Path firstScanToml = workspacePath.resolve("first-package").resolve("Scan.toml");
+        Path secondScanToml = workspacePath.resolve("second-package").resolve("Scan.toml");
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        try {
+            Files.writeString(firstScanToml, platformConfiguration);
+            Files.writeString(secondScanToml, platformConfiguration);
+            System.setProperty("user.dir", workspacePath.toString());
+            ScanCmd scanCmd = new ScanCmd(printStream, new PrintStream(err, true, StandardCharsets.UTF_8));
+            // The test platform writes to the working directory, so a missing one makes it fail
+            System.setProperty("user.dir", workspacePath.resolve("missing-directory").toString());
+            scanCmd.execute();
+            Assert.assertEquals(scanCmd.exitCode(), 0);
+        } finally {
+            System.setProperty("user.dir", userDir);
+            Files.deleteIfExists(firstScanToml);
+            Files.deleteIfExists(secondScanToml);
+        }
+        String stderr = err.toString(StandardCharsets.UTF_8);
+        for (String packageName : List.of("first-package", "second-package")) {
+            Assert.assertTrue(stderr.contains("bal scan: warning: " + packageName + ": platform 'examplePlatform' "
+                    + "failed and the issues were not reported to it: Error occurred while writing platform "
+                    + "arguments to file"), stderr);
+        }
+    }
+
+    @Test(description = "test platform paths are resolved relative to the Scan.toml file that sets them")
+    void testPlatformPathsRelativeToScanToml() throws IOException {
+        Path workspacePath = testResources.resolve("test-resources").resolve("workspace-with-platforms");
+        Path firstPackage = workspacePath.resolve("first-package").toAbsolutePath();
+        Path firstScanToml = firstPackage.resolve("Scan.toml");
+        String relativeJarPath = firstPackage.relativize(platformPluginPath()).toString().replace("\\", "/");
+        try {
+            Files.writeString(firstScanToml, """
+                    [[platform]]
+                    name = "examplePlatform"
+                    path = "__relative_path__"
+                    propertiesPath = "Ballerina.toml"
+                    """.replace("__relative_path__", relativeJarPath));
+            String[] streams = scanWorkspace(workspacePath);
+            Assert.assertTrue(streams[1].contains("Reporting issues to: examplePlatform"), streams[1]);
+            String platformArguments = Files.readString(workspacePath.resolve("platform-arguments.json"),
+                    StandardCharsets.UTF_8);
+            Assert.assertEquals(JsonParser.parseString(platformArguments).getAsJsonObject().get("propertiesPath")
+                    .getAsString(), firstPackage.resolve("Ballerina.toml").normalize().toString());
+
+            Files.writeString(firstScanToml, platformConfiguration("propertiesPath = \"missing.properties\""));
+            streams = scanWorkspace(workspacePath);
+            Assert.assertTrue(streams[1].contains("first-package: error: 'propertiesPath' of platform "
+                    + "'examplePlatform' is not a file or a URL: missing.properties"), streams[1]);
+        } finally {
+            Files.deleteIfExists(firstScanToml);
+            Files.deleteIfExists(workspacePath.resolve("analysis-issues.json"));
+            Files.deleteIfExists(workspacePath.resolve("platform-arguments.json"));
+        }
+    }
+
+    private Path platformPluginPath() {
+        Path rootProject = Path.of(System.getProperty("user.dir")).toAbsolutePath().getParent();
+        Assert.assertNotNull(rootProject);
+        return rootProject.resolve("test-static-code-analysis-platform-plugins")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin").resolve("build").resolve("libs")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
+    }
+
+    private String platformConfiguration(String extraArgument) throws IOException {
+        return Files.readString(testResources.resolve("test-resources").resolve("platform-plugin-configurations.txt"))
+                .replace("__platform_name__", "examplePlatform")
+                .replace("__platform_plugin_path__", platformPluginPath().toString().replace("\\", "\\\\"))
+                + System.lineSeparator() + extraArgument + System.lineSeparator();
+    }
+
     // Runs a scan of the workspace and returns its standard output and standard error
     private String[] scanWorkspace(Path workspacePath) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();

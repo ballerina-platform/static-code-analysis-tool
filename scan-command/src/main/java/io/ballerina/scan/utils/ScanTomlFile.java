@@ -40,6 +40,15 @@ public class ScanTomlFile {
     private boolean suppressionRuleIdRequired;
     private String failOnSeverity;
     private Integer failOnCount;
+    private boolean excludeTests;
+    private boolean ruleTableSet;
+    private boolean analyzerListSet;
+    private boolean suppressionTableSet;
+    private boolean gateTableSet;
+    private boolean analysisTableSet;
+    private boolean ruleTableInherited;
+    private ScanTomlFile ruleSource = this;
+    private ScanTomlFile gateSource = this;
     private Path path;
     private String remoteLocation;
 
@@ -60,6 +69,127 @@ public class ScanTomlFile {
 
     void setPath(Path path) {
         this.path = path;
+    }
+
+    void markRuleTableSet() {
+        ruleTableSet = true;
+    }
+
+    void markAnalyzerListSet() {
+        analyzerListSet = true;
+    }
+
+    void markSuppressionTableSet() {
+        suppressionTableSet = true;
+    }
+
+    void markGateTableSet() {
+        gateTableSet = true;
+    }
+
+    void markAnalysisTableSet() {
+        analysisTableSet = true;
+    }
+
+    /**
+     * Sets whether the test sources are left out of the scan, as {@code [analysis] excludeTests} does. The command
+     * line overrides it either way for a single run.
+     *
+     * @param excludeTests true to leave the test sources out of the scan, false to scan them
+     * @since 0.13.0
+     */
+    public void setExcludeTests(boolean excludeTests) {
+        this.excludeTests = excludeTests;
+    }
+
+    /**
+     * Returns whether the test sources are left out of the scan, as set by {@code [analysis] excludeTests}.
+     *
+     * @return true if the test sources are not scanned
+     * @since 0.13.0
+     */
+    public boolean isExcludeTests() {
+        return excludeTests;
+    }
+
+    /**
+     * Returns the configurations of a workspace package, with the workspace Scan.toml as the default. Each of the
+     * {@code [rule]}, {@code [suppression]}, {@code [gate]} and {@code [analysis]} tables and the {@code [[analyzer]]}
+     * list that this file sets replaces the workspace one as a whole, even when it is empty. The platforms are always
+     * this file's own, since a workspace Scan.toml cannot set them.
+     *
+     * @param workspace the configurations of the workspace Scan.toml
+     * @return the merged configurations
+     * @since 0.13.0
+     */
+    public ScanTomlFile inherit(ScanTomlFile workspace) {
+        ScanTomlFile merged = new ScanTomlFile();
+        merged.path = path;
+        merged.remoteLocation = remoteLocation;
+        merged.platforms.addAll(platforms);
+
+        ScanTomlFile ruleTable = ruleTableSet ? this : workspace;
+        merged.rulesToInclude.addAll(ruleTable.rulesToInclude);
+        merged.rulesToExclude.addAll(ruleTable.rulesToExclude);
+        merged.ruleTableSet = ruleTable.ruleTableSet;
+        merged.ruleTableInherited = !ruleTableSet && workspace.ruleTableSet;
+        merged.ruleSource = ruleTableSet ? merged : workspace.ruleSource;
+
+        ScanTomlFile analyzerList = analyzerListSet ? this : workspace;
+        merged.analyzers.addAll(analyzerList.analyzers);
+        merged.analyzerListSet = analyzerList.analyzerListSet;
+
+        ScanTomlFile suppression = suppressionTableSet ? this : workspace;
+        merged.suppressionEnabled = suppression.suppressionEnabled;
+        merged.suppressionReasonRequired = suppression.suppressionReasonRequired;
+        merged.suppressionRuleIdRequired = suppression.suppressionRuleIdRequired;
+        merged.suppressionTableSet = suppression.suppressionTableSet;
+
+        ScanTomlFile gate = gateTableSet ? this : workspace;
+        merged.failOnSeverity = gate.failOnSeverity;
+        merged.failOnCount = gate.failOnCount;
+        merged.gateTableSet = gate.gateTableSet;
+        merged.gateSource = gateTableSet ? merged : workspace.gateSource;
+
+        ScanTomlFile analysis = analysisTableSet ? this : workspace;
+        merged.excludeTests = analysis.excludeTests;
+        merged.analysisTableSet = analysis.analysisTableSet;
+        return merged;
+    }
+
+    /**
+     * Returns whether the {@code [rule]} table comes from the workspace Scan.toml, because the package does not set
+     * one.
+     *
+     * @return true if the rules to include or exclude are inherited from the workspace
+     * @since 0.13.0
+     */
+    public boolean isRuleTableInherited() {
+        return ruleTableInherited;
+    }
+
+    /**
+     * Returns the location of the file the {@code [rule]} table was read from, as shown to the user. It is the
+     * workspace Scan.toml for a package that inherits the table.
+     *
+     * @param root the directory a local path is shown relative to
+     * @return the location, or empty when no Scan.toml file was read
+     * @since 0.13.0
+     */
+    public Optional<String> getRuleTableDisplayPath(Path root) {
+        return ruleSource.getDisplayPath(root);
+    }
+
+    /**
+     * Returns the location of the file the {@code [gate]} table was read from, as shown to the user. It is the
+     * workspace Scan.toml for a package that inherits the table.
+     *
+     * @param root the directory a local path is shown relative to
+     * @return the location, or empty when no Scan.toml file was read
+     * @since 0.13.0
+     */
+    public Optional<String> getGateDisplayPath(Path root) {
+        return gateSource.getDisplayPath(root);
     }
 
     /**
