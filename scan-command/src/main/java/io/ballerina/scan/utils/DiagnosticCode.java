@@ -54,6 +54,20 @@ public enum DiagnosticCode {
     INVALID_SUPPRESSION_TABLE("STATIC_ANALYSIS_ERROR_028", "invalid.suppression.table"),
     INVALID_RULE_ID("STATIC_ANALYSIS_ERROR_029", "invalid.rule.id"),
     EMPTY_RULE_LIST("STATIC_ANALYSIS_ERROR_030", "empty.rule.list"),
+    INVALID_OPTION_VALUE("STATIC_ANALYSIS_ERROR_031", "invalid.option.value"),
+    UNKNOWN_RULE_OPTION("STATIC_ANALYSIS_ERROR_032", "unknown.rule.option"),
+    INVALID_PROJECT_PATH("STATIC_ANALYSIS_ERROR_033", "invalid.project.path"),
+    FILE_IN_PACKAGE("STATIC_ANALYSIS_ERROR_034", "file.in.package"),
+    PROJECT_LOAD_FAILED("STATIC_ANALYSIS_ERROR_035", "project.load.failed"),
+    CONFIG_FILE_HAS_ERRORS("STATIC_ANALYSIS_ERROR_036", "config.file.has.errors"),
+    INVALID_CONFIG_VALUE("STATIC_ANALYSIS_ERROR_037", "invalid.config.value"),
+    UNKNOWN_CONFIG_KEY("STATIC_ANALYSIS_ERROR_038", "unknown.config.key"),
+    PLATFORM_NOT_AVAILABLE("STATIC_ANALYSIS_ERROR_039", "platform.not.available"),
+    PLATFORM_FAILED("STATIC_ANALYSIS_ERROR_040", "platform.failed"),
+    FAILED_TO_WRITE_REPORT("STATIC_ANALYSIS_ERROR_041", "failed.to.write.report"),
+    GATE_FAILED("STATIC_ANALYSIS_ERROR_042", "gate.failed"),
+    PACKAGES_FAILED_GATE("STATIC_ANALYSIS_ERROR_043", "packages.failed.gate"),
+    PACKAGES_FAILED("STATIC_ANALYSIS_ERROR_044", "packages.failed"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
@@ -61,7 +75,11 @@ public enum DiagnosticCode {
     UNKNOWN_RULE_PROVIDER("STATIC_ANALYSIS_WARNING_006", "unknown.rule.provider"),
     DUPLICATE_SUPPRESSION_RULE("STATIC_ANALYSIS_WARNING_007", "duplicate.suppression.rule"),
     DUPLICATE_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_008", "duplicate.blanket.suppression"),
-    IGNORED_SUPPRESSION("STATIC_ANALYSIS_WARNING_009", "ignored.suppression");
+    IGNORED_SUPPRESSION("STATIC_ANALYSIS_WARNING_009", "ignored.suppression"),
+    GATE_SETTING_OVERRIDDEN("STATIC_ANALYSIS_WARNING_010", "gate.setting.overridden"),
+    PACKAGE_GATE_IGNORED("STATIC_ANALYSIS_WARNING_011", "package.gate.ignored"),
+    WORKSPACE_CONFIG_IGNORED("STATIC_ANALYSIS_WARNING_012", "workspace.config.ignored"),
+    EMPTY_PACKAGE_SKIPPED("STATIC_ANALYSIS_WARNING_013", "empty.package.skipped");
 
     private final String diagnosticId;
     private final String messageKey;

@@ -1,8 +1,4 @@
 Loading scan tool configurations from <ABS_SOURCE_ROOT>/Scan.toml
 
 Running Scans
-
-The specified platform 'invalidExamplePlatform' is not available.
-Please ensure that the required platform plugin path is specified in 'Scan.toml'.
-
-1 issue(s)
+bal scan: error: platform 'invalidExamplePlatform' is not available; add its plugin to the [[platform]] table of Scan.toml

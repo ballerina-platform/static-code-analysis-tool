@@ -46,6 +46,19 @@ OPTIONS
         --require-suppression-rule-id
                 Fail the scan when a @scan:Suppress annotation names no rule.
 
+        --fail-on-severity=<BLOCKER|HIGH|MEDIUM|LOW|INFO|NONE>
+                Fail the scan when the number of issues at or above this severity reaches
+                --fail-on-count, or 1 if the count is not set. NONE turns the gate off. The value is
+                case-insensitive. Overrides 'failOnSeverity' in the [gate] table of Scan.toml.
+
+        --fail-on-count=<n>
+                Fail the scan when there are n or more issues at or above --fail-on-severity, or of
+                any severity if it is not set. A whole number of 1 or more. Overrides 'failOnCount'
+                in the [gate] table of Scan.toml.
+
+                The gate counts the issues left after rule selection and suppressions, and only
+                changes the exit code. Reports always hold every issue. By default no gate is set.
+
 EXAMPLES
         Run analysis against all Ballerina documents in the current package, print results to the
         console, and save results in JSON file format in the target directory.
@@ -93,3 +106,9 @@ EXAMPLES
 
         Run analysis and fail if any @scan:Suppress annotation lacks a reason.
                 $ bal scan --require-suppression-reason
+
+        Run analysis and fail on one or more BLOCKER or HIGH issues.
+                $ bal scan --fail-on-severity=HIGH
+
+        Run analysis and fail on 5 or more BLOCKER, HIGH or MEDIUM issues.
+                $ bal scan --fail-on-severity=MEDIUM --fail-on-count=5

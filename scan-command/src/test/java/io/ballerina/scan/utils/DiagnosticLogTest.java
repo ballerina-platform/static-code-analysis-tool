@@ -32,9 +32,18 @@ import java.io.IOException;
 public class DiagnosticLogTest extends BaseTest {
     @Test(description = "Test error diagnostic message")
     public void testErrorDiagnostic() throws IOException {
-        String expected = "invalid number of arguments, expected one argument received 0";
-        String result = DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, 0);
+        String expected = "too many arguments: expected one package or source file, but received 2: main.bal extra";
+        String result = DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, 2, "main.bal extra");
         Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "Test error diagnostic message for one and many missing platforms")
+    public void testPlatformNotAvailableDiagnostic() {
+        Assert.assertEquals(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, 1, "'sonarqube'"),
+                "platform 'sonarqube' is not available; add its plugin to the [[platform]] table of Scan.toml");
+        Assert.assertEquals(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, 2, "'sonarqube' and 'semgrep'"),
+                "platforms 'sonarqube' and 'semgrep' are not available; add their plugins to the [[platform]] table "
+                        + "of Scan.toml");
     }
 
     @Test(description = "Test warning diagnostic message")

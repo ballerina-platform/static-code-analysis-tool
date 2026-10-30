@@ -7,6 +7,7 @@
 - [Configuration for Static Code Analyzer Plugins](#configuration-for-static-code-analyzer-plugins)
 - [Configuration for Static Code Analyzer Rules](#configuration-for-static-code-analyzer-rules)
 - [Configuration for Suppressions](#configuration-for-suppressions)
+- [Configuration for the Gate](#configuration-for-the-gate)
 - [References](#references)
 
 # Overview
@@ -110,3 +111,22 @@ requireRuleId = true
 - `requireRuleId` - Fail the scan when a suppression does not name the rules it suppresses. Defaults to `false`. Same as `--require-suppression-rule-id`. Has no effect with `--ignore-suppressions` or `enabled = false`.
 
 The settings must be written as a `[suppression]` table. Each setting must be a TOML boolean, and the table accepts no other keys; a value such as `"true"` or an unknown key such as `requireReasons` stops the scan with an error, since it would otherwise leave a requirement off without notice. A suppression that does not meet a requirement fails the scan before any issue is printed, saved or sent to a platform, and the error gives the suppression's location. The command-line options can disable suppressions or switch a requirement on for a single run, but cannot undo the `Scan.toml` settings.
+
+# Configuration for the Gate
+
+The gate fails the scan, with exit code `1`, when the number of issues at or above a severity reaches a count. Users can set it by defining the `[gate]` table in a `Scan.toml` file:
+
+```toml
+[gate]
+failOnSeverity = "MEDIUM"        # BLOCKER | HIGH | MEDIUM | LOW | INFO | NONE
+failOnCount = 5                  # 1 or more
+```
+
+- `failOnSeverity` - Count the issues at or above this severity. The value is case-insensitive, and `NONE` turns the gate off. Same as `--fail-on-severity`.
+- `failOnCount` - Fail when this many counted issues are found. A count of `5` fails on the fifth issue and allows four. Same as `--fail-on-count`.
+
+With neither setting, there is no gate and findings never fail the scan. A count without a severity counts every severity, and a severity without a count fails on the first issue at or above it. The gate counts the issues left after rule selection and `@scan:Suppress` annotations, and a rule without a severity counts by its kind: `BUG` as `HIGH`, `VULNERABILITY` as `MEDIUM` and `CODE_SMELL` as `LOW`. The gate only changes the exit code; the console output, reports and platforms always receive every issue.
+
+Each setting is resolved on its own, and a command-line option overrides the same setting in `Scan.toml` with a warning when the values differ. For example, `--fail-on-severity=NONE` turns off a gate set in `Scan.toml`, and `--fail-on-count` turns on a gate that `failOnSeverity = "NONE"` turns off, counting every severity. An invalid value or an unknown key in the `[gate]` table stops the scan with an error that gives its line and column.
+
+In a workspace, a `Scan.toml` at the workspace root can hold a `[gate]` table, which sets one gate for the issues of all packages together. Any other section in the workspace `Scan.toml` is ignored with a warning. When the command line or the workspace `Scan.toml` sets a gate, the `[gate]` tables of the packages are ignored with a warning. Otherwise each package is checked against the gate in its own `Scan.toml`.

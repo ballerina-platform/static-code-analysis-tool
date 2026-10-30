@@ -18,9 +18,11 @@
 
 package io.ballerina.scan.utils;
 
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -36,8 +38,83 @@ public class ScanTomlFile {
     private boolean suppressionEnabled = true;
     private boolean suppressionReasonRequired;
     private boolean suppressionRuleIdRequired;
+    private String failOnSeverity;
+    private Integer failOnCount;
+    private Path path;
+    private String remoteLocation;
 
     ScanTomlFile() {
+    }
+
+    void setRemoteLocation(String remoteLocation) {
+        this.remoteLocation = remoteLocation;
+    }
+
+    void setFailOnSeverity(String severity) {
+        failOnSeverity = severity;
+    }
+
+    void setFailOnCount(Integer count) {
+        failOnCount = count;
+    }
+
+    void setPath(Path path) {
+        this.path = path;
+    }
+
+    /**
+     * Returns the severity set by {@code [gate] failOnSeverity}, in upper case.
+     *
+     * @return a severity name or {@code NONE}, or empty when not set
+     * @since 0.13.0
+     */
+    public Optional<String> getFailOnSeverity() {
+        return Optional.ofNullable(failOnSeverity);
+    }
+
+    /**
+     * Returns the count set by {@code [gate] failOnCount}.
+     *
+     * @return a count of 1 or more, or empty when not set
+     * @since 0.13.0
+     */
+    public Optional<Integer> getFailOnCount() {
+        return Optional.ofNullable(failOnCount);
+    }
+
+    /**
+     * Returns whether the {@code [gate]} table sets either setting.
+     *
+     * @return true if {@code failOnSeverity} or {@code failOnCount} is set
+     * @since 0.13.0
+     */
+    public boolean hasGate() {
+        return failOnSeverity != null || failOnCount != null;
+    }
+
+    /**
+     * Returns the path of the file the configurations were read from, which is the cached copy for a remote file.
+     *
+     * @return the path, or empty when no Scan.toml file was read
+     * @since 0.13.0
+     */
+    public Optional<Path> getPath() {
+        return Optional.ofNullable(path);
+    }
+
+    /**
+     * Returns the location of the file as shown to the user: the URL of a remote file, or the path relative to a
+     * root.
+     *
+     * @param root the directory a local path is shown relative to
+     * @return the location, or empty when no Scan.toml file was read
+     * @since 0.13.0
+     */
+    public Optional<String> getDisplayPath(Path root) {
+        if (remoteLocation != null) {
+            return Optional.of(remoteLocation);
+        }
+        return getPath().map(file -> ScanUtils.displayPath(root, file));
     }
 
     void setPlatform(Platform platform) {
