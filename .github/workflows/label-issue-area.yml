@@ -2,24 +2,53 @@ name: Label Issue Area
 
 on:
   issues:
-    types: [opened]
+    types: [opened, edited]
 
 permissions:
   issues: write
 
 jobs:
   label:
+    # The bug, improvement and new feature forms start the body with the Area field
+    if: github.repository_owner == 'ballerina-platform' && startsWith(github.event.issue.body, '### Area')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const match = /^### Area\s+(\w+)/m.exec(context.payload.issue.body ?? '');
-            const areas = ['CLI', 'Configuration', 'Reports', 'Core', 'Build'];
-            if (match && areas.includes(match[1])) {
-              await github.rest.issues.addLabels({
-                ...context.repo,
-                issue_number: context.issue.number,
-                labels: [`Area/${match[1]}`],
-              });
+            const areaOf = (body) => /^### Area\r?\n\r?\n(.+)/.exec(body ?? '')?.[1].trim();
+            const labelOf = async (body) => {
+              const area = areaOf(body);
+              if (!area || area === 'Not sure') {
+                return undefined;
+              }
+              try {
+                await github.rest.issues.getLabel({ ...context.repo, name: `Area/${area}` });
+                return `Area/${area}`;
+              } catch (error) {
+                if (error.status === 404) {
+                  return undefined;
+                }
+                throw error;
+              }
+            };
+
+            const issue = { ...context.repo, issue_number: context.issue.number };
+            if (context.payload.action === 'edited') {
+              const previousBody = context.payload.changes?.body?.from;
+              if (previousBody === undefined || areaOf(previousBody) === areaOf(context.payload.issue.body)) {
+                return;
+              }
+              const previous = await labelOf(previousBody);
+              if (previous) {
+                await github.rest.issues.removeLabel({ ...issue, name: previous }).catch((error) => {
+                  if (error.status !== 404) {
+                    throw error;
+                  }
+                });
+              }
+            }
+            const current = await labelOf(context.payload.issue.body);
+            if (current) {
+              await github.rest.issues.addLabels({ ...issue, labels: [current] });
             }

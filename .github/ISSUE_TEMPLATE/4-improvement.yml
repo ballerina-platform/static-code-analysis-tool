@@ -1,5 +1,5 @@
 name: "🚀 Improvement Request"
-description: Suggest an improvement to existing `bal scan` behavior. For a change to a rule, use "Report a Rule Issue".
+description: Suggest an improvement to existing `bal scan` behavior, including an existing rule. For a rule that reports the wrong code, use "Report a Rule Issue".
 labels: ["Type/Improvement"]
 body:
   - type: dropdown
@@ -8,6 +8,7 @@ body:
       label: Area
       options:
         - CLI
+        - Rules
         - Configuration
         - Reports
         - Core

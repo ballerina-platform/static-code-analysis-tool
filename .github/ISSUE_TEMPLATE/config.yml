@@ -1,6 +1,6 @@
 blank_issues_enabled: false
 contact_links:
-- name: '📚 Library Rule Issue'
+- name: '📦 Library Rule Issue'
   url: https://github.com/ballerina-platform/ballerina-library/issues/new/choose
   about: Report an issue with, or request, a rule provided by a library package, such as `ballerina/http:1`.
 - name: '📚 Documentation Issue'
