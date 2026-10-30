@@ -45,6 +45,7 @@ import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
+import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.diagnostics.Diagnostic;
 
 import java.io.BufferedReader;
@@ -59,6 +60,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -114,9 +116,22 @@ public class ProjectAnalyzer {
         project.currentPackage().moduleIds().forEach(moduleId -> {
             Module module = project.currentPackage().module(moduleId);
             module.documentIds().forEach(analyzeDocument(module, scannerContext));
-            module.testDocumentIds().forEach(analyzeDocument(module, scannerContext));
+            if (!scanTomlFile.isExcludeTests()) {
+                module.testDocumentIds().forEach(analyzeDocument(module, scannerContext));
+            }
         });
         return scannerContext.getReporter().getIssues();
+    }
+
+    // The paths of the test documents, as issues report them
+    private Set<String> testFilePaths() {
+        Set<String> testFilePaths = new HashSet<>();
+        project.currentPackage().moduleIds().forEach(moduleId -> {
+            Module module = project.currentPackage().module(moduleId);
+            module.testDocumentIds().forEach(documentId ->
+                    testFilePaths.add(ScanUtils.getReportFilePath(module.document(documentId))));
+        });
+        return testFilePaths;
     }
 
     private Consumer<DocumentId> analyzeDocument(Module module, ScannerContextImpl scannerContext) {
@@ -308,11 +323,14 @@ public class ProjectAnalyzer {
         }
 
         project.currentPackage().getCompilation();
+        // Analyzers run as compiler plugins on every document, so the issues they report in tests are dropped here
+        Set<String> excludedFilePaths = scanTomlFile.isExcludeTests() ? testFilePaths() : Set.of();
         List<Issue> externalIssues = new ArrayList<>(scannerContextList.size());
         for (ScannerContext scannerContext : scannerContextList) {
             ReporterImpl reporter = (ReporterImpl) scannerContext.getReporter();
             for (Issue issue : reporter.getIssues()) {
-                if (!issue.location().lineRange().fileName().equals(pluginImportsDocumentName)) {
+                if (!issue.location().lineRange().fileName().equals(pluginImportsDocumentName)
+                        && !excludedFilePaths.contains(((IssueImpl) issue).filePath())) {
                     externalIssues.add(issue);
                 }
             }

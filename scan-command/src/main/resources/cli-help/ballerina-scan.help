@@ -29,10 +29,17 @@ OPTIONS
                 rules contributed by the project's dependencies.
 
         --include-rules=<rule1, ...>
-                Run analysis for a specific set of rules.
+                Run analysis for a specific set of rules. Replaces the whole [rule] table of
+                Scan.toml.
 
         --exclude-rules=<rule1, ...>
-                Exclude analysis for a specific set of rules.
+                Exclude analysis for a specific set of rules. Replaces the whole [rule] table of
+                Scan.toml.
+
+        --exclude-tests[=<true|false>]
+                Leave the test sources of each package out of the scan, so that their issues and
+                @scan:Suppress annotations are not reported. Written alone, it means true.
+                Overrides 'excludeTests' in the [analysis] table of Scan.toml either way.
 
         --platforms=<platformName1, ...>
                 Define platform(s) to report results. The user can define more than one platform.
@@ -45,6 +52,20 @@ OPTIONS
 
         --require-suppression-rule-id
                 Fail the scan when a @scan:Suppress annotation names no rule.
+
+        --fail-on-severity=<BLOCKER|HIGH|MEDIUM|LOW|INFO|NONE>
+                Fail the scan when the number of issues at or above this severity reaches
+                --fail-on-count, or 1 if the count is not set. NONE turns the gate off. The value is
+                case-insensitive.
+
+        --fail-on-count=<n>
+                Fail the scan when there are n or more issues at or above --fail-on-severity, or of
+                any severity if it is not set. A whole number of 1 or more.
+
+                Either gate option replaces the whole [gate] table of Scan.toml, so a setting that
+                is not given on the command line is not read from Scan.toml. The gate counts the
+                issues left after rule selection and suppressions, and only changes the exit code.
+                Reports always hold every issue. By default no gate is set.
 
 EXAMPLES
         Run analysis against all Ballerina documents in the current package, print results to the
@@ -93,3 +114,15 @@ EXAMPLES
 
         Run analysis and fail if any @scan:Suppress annotation lacks a reason.
                 $ bal scan --require-suppression-reason
+
+        Run analysis and fail on one or more BLOCKER or HIGH issues.
+                $ bal scan --fail-on-severity=HIGH
+
+        Run analysis and fail on 5 or more BLOCKER, HIGH or MEDIUM issues.
+                $ bal scan --fail-on-severity=MEDIUM --fail-on-count=5
+
+        Run analysis without the test sources of the package.
+                $ bal scan --exclude-tests
+
+        Run analysis with the test sources that Scan.toml leaves out.
+                $ bal scan --exclude-tests=false

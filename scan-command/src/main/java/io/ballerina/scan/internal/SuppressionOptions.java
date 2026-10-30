@@ -26,9 +26,11 @@ import io.ballerina.scan.utils.ScanTomlFile;
  * @param ignoreSuppressions disregard every suppression, reporting the unsuppressed picture
  * @param requireReason      report a suppression without a reason as an error
  * @param requireRuleId      report a suppression that names no rule as an error
+ * @param excludeTests       skip the suppressions in test sources, which are not scanned
  * @since 0.13.0
  */
-record SuppressionOptions(boolean ignoreSuppressions, boolean requireReason, boolean requireRuleId) {
+record SuppressionOptions(boolean ignoreSuppressions, boolean requireReason, boolean requireRuleId,
+                          boolean excludeTests) {
 
     /**
      * Combines the scan configuration with the command-line options. A command-line option can disable
@@ -38,6 +40,6 @@ record SuppressionOptions(boolean ignoreSuppressions, boolean requireReason, boo
                                  boolean requireRuleId) {
         return new SuppressionOptions(ignoreSuppressions || !scanTomlFile.isSuppressionEnabled(),
                 requireReason || scanTomlFile.isSuppressionReasonRequired(),
-                requireRuleId || scanTomlFile.isSuppressionRuleIdRequired());
+                requireRuleId || scanTomlFile.isSuppressionRuleIdRequired(), scanTomlFile.isExcludeTests());
     }
 }

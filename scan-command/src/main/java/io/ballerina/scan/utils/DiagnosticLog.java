@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.utils;
 
+import io.ballerina.tools.text.LineRange;
+
 import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.ResourceBundle;
@@ -43,5 +45,36 @@ public class DiagnosticLog {
     public static String warning(DiagnosticCode code, Object... args) {
         String msgKey = MESSAGES.getString(WARNING_PREFIX + "." + code.messageKey());
         return MessageFormat.format(msgKey, args);
+    }
+
+    /**
+     * Formats an error found in a file as {@code <path>:<line>:<col>: error: <message>}, with one-based positions.
+     *
+     * @param path      the path of the file, as shown to the user
+     * @param lineRange the range of the error in the file
+     * @param message   the error message
+     * @return the formatted error
+     * @since 0.13.0
+     */
+    public static String fileError(String path, LineRange lineRange, String message) {
+        return fileDiagnostic(path, lineRange, ERROR_PREFIX, message);
+    }
+
+    /**
+     * Formats a warning found in a file as {@code <path>:<line>:<col>: warning: <message>}, with one-based positions.
+     *
+     * @param path      the path of the file, as shown to the user
+     * @param lineRange the range of the warning in the file
+     * @param message   the warning message
+     * @return the formatted warning
+     * @since 0.13.0
+     */
+    public static String fileWarning(String path, LineRange lineRange, String message) {
+        return fileDiagnostic(path, lineRange, WARNING_PREFIX, message);
+    }
+
+    private static String fileDiagnostic(String path, LineRange lineRange, String severity, String message) {
+        return String.format("%s:%d:%d: %s: %s", path, lineRange.startLine().line() + 1,
+                lineRange.startLine().offset() + 1, severity, message);
     }
 }

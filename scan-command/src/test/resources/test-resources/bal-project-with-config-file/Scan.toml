@@ -22,7 +22,6 @@ include = [
     "ballerina/example_module_static_code_analyzer:1",
     "ballerinax/example_module_static_code_analyzer:1",
 ]
-exclude = ["ballerina:1"]
 
 # Invalid use cases which are filtered by scan tool
 [[analyzer]]

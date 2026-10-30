@@ -91,6 +91,12 @@ public class Constants {
     static final String SUPPRESSION_ENABLED = "enabled";
     static final String SUPPRESSION_REQUIRE_REASON = "requireReason";
     static final String SUPPRESSION_REQUIRE_RULE_ID = "requireRuleId";
+    static final String GATE_TABLE = "gate";
+    static final String GATE_FAIL_ON_SEVERITY = "failOnSeverity";
+    static final String GATE_FAIL_ON_COUNT = "failOnCount";
+    static final String ANALYSIS_TABLE = "analysis";
+    static final String ANALYSIS_EXCLUDE_TESTS = "excludeTests";
+    static final String PATH_ARGUMENT_SUFFIX = "Path";
     static final String EXCLUDE_KEY = "exclude";
     public static final String MODULE_LEVEL_SYMBOL = "<module>";
     static final String JAR_PREDICATE = ".jar";

@@ -120,10 +120,11 @@ final class SuppressionCollector {
      * Returns the suppressions declared in the given project's current package. A package that does not depend on
      * {@code ballerina/scan} cannot declare any, so its documents are not visited.
      *
-     * @param project the project being scanned
+     * @param project      the project being scanned
+     * @param excludeTests whether the test sources are left out of the scan, and so their suppressions too
      * @return the suppressions, and warnings about those that are ignored
      */
-    static Collected collect(Project project) {
+    static Collected collect(Project project, boolean excludeTests) {
         Package currentPackage = project.currentPackage();
         if (!dependsOnScanPackage(currentPackage)) {
             return new Collected(List.of(), List.of());
@@ -132,7 +133,8 @@ final class SuppressionCollector {
         currentPackage.moduleIds().forEach(moduleId -> {
             Module module = currentPackage.module(moduleId);
             SemanticModel semanticModel = module.getCompilation().getSemanticModel();
-            Stream.concat(module.documentIds().stream(), module.testDocumentIds().stream())
+            Stream.concat(module.documentIds().stream(),
+                            excludeTests ? Stream.empty() : module.testDocumentIds().stream())
                     .forEach(documentId -> collect(module, documentId, semanticModel, collected));
         });
         return new Collected(List.copyOf(collected.suppressions()), List.copyOf(collected.ignored()));
