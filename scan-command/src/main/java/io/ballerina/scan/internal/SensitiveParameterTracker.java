@@ -22,13 +22,14 @@ import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.syntax.tree.DefaultableParameterNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
+import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
 import io.ballerina.compiler.syntax.tree.MethodDeclarationNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.ParameterNode;
 import io.ballerina.compiler.syntax.tree.RequiredParameterNode;
+import io.ballerina.compiler.syntax.tree.RestParameterNode;
 import io.ballerina.compiler.syntax.tree.SeparatedNodeList;
-import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.Token;
 import io.ballerina.scan.ScannerContext;
@@ -85,7 +86,7 @@ public class SensitiveParameterTracker extends NodeVisitor {
         int position = 0;
         for (ParameterNode parameter : parameters) {
             String paramName = getParameterName(parameter);
-            if (SecretChecker.isSecretName(paramName)) {
+            if (SecretNameMatcher.isSecretName(paramName)) {
                 positions.add(position);
             }
             position++;
@@ -93,16 +94,16 @@ public class SensitiveParameterTracker extends NodeVisitor {
         return positions;
     }
 
-    private String getParameterName(ParameterNode parameter) {
-        if (parameter.kind() == SyntaxKind.DEFAULTABLE_PARAM) {
-            return ((DefaultableParameterNode) parameter).paramName().map(Token::text)
-                    .orElse(parameter.toSourceCode().trim());
-        }
-        if (parameter.kind() == SyntaxKind.REQUIRED_PARAM) {
-            return ((RequiredParameterNode) parameter).paramName().map(Token::text)
-                    .orElse(parameter.toSourceCode().trim());
-        }
-        return parameter.toSourceCode().trim();
+    // The parameter's name alone, without its type, annotations or a comment above it.
+    private static String getParameterName(ParameterNode parameter) {
+        Optional<Token> name = switch (parameter) {
+            case RequiredParameterNode requiredParameter -> requiredParameter.paramName();
+            case DefaultableParameterNode defaultableParameter -> defaultableParameter.paramName();
+            case RestParameterNode restParameter -> restParameter.paramName();
+            case IncludedRecordParameterNode includedRecordParameter -> includedRecordParameter.paramName();
+            default -> Optional.empty();
+        };
+        return name.map(Token::text).orElse("");
     }
 
     @Override
