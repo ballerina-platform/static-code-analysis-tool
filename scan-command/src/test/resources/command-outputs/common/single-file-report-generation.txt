@@ -3,3 +3,5 @@ generating reports is not supported with single bal files, ignoring the flag and
 Running Scans
 
 []
+
+0 issue(s)

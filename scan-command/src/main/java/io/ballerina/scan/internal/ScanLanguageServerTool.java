@@ -21,6 +21,7 @@ package io.ballerina.scan.internal;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.BuildOptions;
 import io.ballerina.projects.DependencyGraph;
 import io.ballerina.projects.Project;
@@ -29,11 +30,13 @@ import io.ballerina.projects.ProjectLoadResult;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.directory.WorkspaceProject;
+import io.ballerina.projects.environment.PackageLockingMode;
 import io.ballerina.projects.util.ProjectPaths;
 import io.ballerina.scan.ExcludedIssue;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScanResult;
+import io.ballerina.scan.SuppressedIssue;
 import io.ballerina.scan.utils.Constants;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanTomlWriter;
@@ -72,7 +75,8 @@ public class ScanLanguageServerTool {
             Project project = loadProjectForLs(projectPath, buildOptionsMap);
 
             // Run the scanner
-            ScanResult result = runScan(project);
+            LsScanResult lsResult = runLsScan(project);
+            ScanResult result = lsResult.result();
 
             // Check dependent workspace packages for issues
             boolean dependentPackageIssuesFound;
@@ -80,7 +84,9 @@ public class ScanLanguageServerTool {
                 dependentPackageIssuesFound = hasDependentPackageIssues(project, projectPath, buildOptionsMap);
             } catch (Throwable e) {
                 String errorMsg;
-                if (e.getCause() != null) {
+                if (e instanceof BLauncherException launcherException) {
+                    errorMsg = launcherMessage(launcherException);
+                } else if (e.getCause() != null) {
                     errorMsg = e.getCause().getClass().getName() + ": " + e.getCause().getMessage();
                 } else {
                     errorMsg = e.getClass().getName() + ": " + e.getMessage();
@@ -88,8 +94,7 @@ public class ScanLanguageServerTool {
                 JsonObject errorObject = new JsonObject();
                 errorObject.addProperty("success", false);
                 errorObject.addProperty("error", "Dependent Package Scan Error: " + errorMsg);
-                errorObject.add("activeIssues", new JsonArray());
-                errorObject.add("excludedIssues", new JsonArray());
+                addEmptyIssueArrays(errorObject);
                 return GSON.toJson(errorObject);
             }
 
@@ -98,20 +103,27 @@ public class ScanLanguageServerTool {
             jsonObject.addProperty("success", true);
             jsonObject.add("activeIssues", issuesToJsonArray(result.activeIssues()));
             jsonObject.add("excludedIssues", excludedIssuesToJsonArray(result.excludedIssues()));
+            jsonObject.add("suppressedIssues", suppressedIssuesToJsonArray(result.suppressedIssues()));
+            jsonObject.add("suppressionDiagnostics", suppressionDiagnosticsToJsonArray(lsResult.diagnostics()));
             jsonObject.addProperty("dependentPackageIssuesFound", dependentPackageIssuesFound);
             return GSON.toJson(jsonObject);
 
         } catch (Exception e) {
             JsonObject errorObject = new JsonObject();
             errorObject.addProperty("success", false);
-            String errorMsg = e.getMessage();
+            String errorMsg = e instanceof BLauncherException launcherException
+                    ? launcherMessage(launcherException) : e.getMessage();
             errorObject.addProperty("error", errorMsg != null && !errorMsg.trim().isEmpty() ? errorMsg : e.toString());
-            errorObject.add("activeIssues", new JsonArray());
-            errorObject.add("excludedIssues", new JsonArray());
+            addEmptyIssueArrays(errorObject);
             return GSON.toJson(errorObject);
         }
     }
 
+
+    // A launcher exception, such as from an invalid Scan.toml, carries its message in its message list
+    private static String launcherMessage(BLauncherException exception) {
+        return String.join(System.lineSeparator(), exception.getMessages());
+    }
 
     /**
      * Adds a rule ID to the global {@code [rule]} section in {@link Constants#SCAN_FILE}.
@@ -186,6 +198,7 @@ public class ScanLanguageServerTool {
         BuildOptions buildOptions = BuildOptions.builder()
                 .setOffline(isOffline)
                 .setSkipTests(isSkipTests)
+                .setLockingMode(PackageLockingMode.HARD)
                 .build();
 
         ProjectLoadResult loadResult = ProjectLoader.load(projectPath, buildOptions);
@@ -231,6 +244,7 @@ public class ScanLanguageServerTool {
                 BuildOptions wsBuildOptions = BuildOptions.builder()
                         .setOffline(isOffline)
                         .setSkipTests(isSkipTests)
+                        .setLockingMode(PackageLockingMode.HARD)
                         .build();
                 ProjectLoadResult wsResult = ProjectLoader.load(wsRoot.get(), wsBuildOptions);
                 if (wsResult.project().kind() == ProjectKind.WORKSPACE_PROJECT) {
@@ -265,6 +279,11 @@ public class ScanLanguageServerTool {
     }
 
     private static ScanResult runScan(Project project) throws IOException {
+        return runLsScan(project).result();
+    }
+
+    private static LsScanResult runLsScan(Project project) throws IOException {
+        ScanUtils.requireLockedDependencies(project);
         // Load Constants.SCAN_FILE configurations
         Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, System.err);
 
@@ -278,7 +297,7 @@ public class ScanLanguageServerTool {
         ProjectAnalyzer analyzer = new ProjectAnalyzer(project, scanToml.get());
 
         // Execute
-        return execute(analyzer, scanToml.get());
+        return execute(project, analyzer, scanToml.get());
     }
 
     /**
@@ -287,8 +306,8 @@ public class ScanLanguageServerTool {
      * @throws IllegalArgumentException when both include and exclude rule filters are configured,
      *                                  since they are mutually exclusive.
      */
-    private static ScanResult execute(ProjectAnalyzer projectAnalyzer,
-                                      ScanTomlFile scanToml) {
+    private static LsScanResult execute(Project project, ProjectAnalyzer projectAnalyzer,
+                                        ScanTomlFile scanToml) {
         // Gather all available Rules
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
@@ -322,33 +341,24 @@ public class ScanLanguageServerTool {
 
         List<Issue> activeIssues = new ArrayList<>();
         List<ExcludedIssue> excludedIssues = new ArrayList<>();
-
+        RuleSelection ruleSelection = new RuleSelection(includeRules, excludeRules);
         for (Issue issue : issues) {
-            boolean isExcluded;
+            String ruleId = issue.rule() != null ? issue.rule().id() : "";
+            if (ruleSelection.selects(ruleId)) {
+                activeIssues.add(issue);
+                continue;
+            }
             String issueFileName = issue.location() != null && issue.location().lineRange() != null
                     ? issue.location().lineRange().fileName() : "";
-            String ruleId = issue.rule() != null ? issue.rule().id() : "";
-
-            boolean isExcludedByGlobal = false;
-
-            if (!includeRules.isEmpty() && !includeRules.contains(ruleId)) {
-                isExcludedByGlobal = true;
-            }
-
-            if (!excludeRules.isEmpty() && excludeRules.contains(ruleId)) {
-                isExcludedByGlobal = true;
-            }
-
-            isExcluded = isExcludedByGlobal;
-
-            if (isExcluded) {
-                excludedIssues.add(new ExcludedIssue(issue, ruleId, issueFileName, true));
-            } else {
-                activeIssues.add(issue);
-            }
+            excludedIssues.add(new ExcludedIssue(issue, ruleId, issueFileName, true));
         }
 
-        return new ScanResult(activeIssues, excludedIssues);
+        // The same suppression filter as the command line, applied after rule selection as it is there
+        SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, activeIssues,
+                ProjectAnalyzer.rules(coreRules, externalAnalyzers), ruleSelection,
+                SuppressionOptions.of(scanToml, false, false, false));
+        return new LsScanResult(new ScanResult(suppressionOutcome.activeIssues(), excludedIssues,
+                suppressionOutcome.suppressedIssues()), suppressionOutcome.diagnostics());
     }
 
     // ===================================================================================
@@ -371,6 +381,46 @@ public class ScanLanguageServerTool {
             obj.addProperty("ruleId", ex.ruleId());
             obj.addProperty("isGlobalExclusion", ex.isGlobalExclusion());
             obj.add("issueContext", issueToJsonObject(ex.issue()));
+            jsonArray.add(obj);
+        }
+        return jsonArray;
+    }
+
+    private static void addEmptyIssueArrays(JsonObject errorObject) {
+        errorObject.add("activeIssues", new JsonArray());
+        errorObject.add("excludedIssues", new JsonArray());
+        errorObject.add("suppressedIssues", new JsonArray());
+        errorObject.add("suppressionDiagnostics", new JsonArray());
+    }
+
+    private static JsonArray suppressedIssuesToJsonArray(List<SuppressedIssue> suppressedIssues) {
+        JsonArray jsonArray = new JsonArray();
+        for (SuppressedIssue suppressed : suppressedIssues) {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("ruleId", suppressed.issue().rule().id());
+            suppressed.justification().ifPresent(reason -> obj.addProperty("justification", reason));
+            JsonArray rules = new JsonArray();
+            suppressed.rules().forEach(rules::add);
+            obj.add("suppressionRules", rules);
+            obj.add("issueContext", issueToJsonObject(suppressed.issue()));
+            jsonArray.add(obj);
+        }
+        return jsonArray;
+    }
+
+    private static JsonArray suppressionDiagnosticsToJsonArray(List<SuppressionDiagnostic> diagnostics) {
+        JsonArray jsonArray = new JsonArray();
+        for (SuppressionDiagnostic diagnostic : diagnostics) {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("severity", diagnostic.severity().toString());
+            obj.addProperty("message", diagnostic.message());
+            LineRange range = diagnostic.location();
+            // The document name, as issues report it; fileName() carries the module prefix of a workspace
+            obj.addProperty("filePath", range.fileName());
+            obj.addProperty("startLine", range.startLine().line());
+            obj.addProperty("startColumn", range.startLine().offset());
+            obj.addProperty("endLine", range.endLine().line());
+            obj.addProperty("endColumn", range.endLine().offset());
             jsonArray.add(obj);
         }
         return jsonArray;
@@ -411,4 +461,6 @@ public class ScanLanguageServerTool {
     }
 
     private record ScanMutationResponse(boolean success, String ruleId, String message) { }
+
+    private record LsScanResult(ScanResult result, List<SuppressionDiagnostic> diagnostics) { }
 }

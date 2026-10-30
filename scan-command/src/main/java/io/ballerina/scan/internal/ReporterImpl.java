@@ -19,7 +19,6 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.projects.Document;
-import io.ballerina.projects.Module;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Reporter;
 import io.ballerina.scan.Rule;
@@ -30,7 +29,6 @@ import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.diagnostics.Location;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -70,10 +68,6 @@ public class ReporterImpl implements Reporter {
     }
 
     private Issue createIssue(Document reportedDocument, Location location, Rule rule) {
-        String documentName = reportedDocument.name();
-        Module module = reportedDocument.module();
-        Path issuesFilePath = module.project().documentPath(reportedDocument.documentId())
-                .orElse(Path.of(documentName));
         String fullyQualifiedRuleId = rule.id();
         String[] parts = fullyQualifiedRuleId.split(":");
 
@@ -91,7 +85,7 @@ public class ReporterImpl implements Reporter {
             }
         }
         return new IssueImpl(location, rule, source, ScanUtils.getReportFileName(reportedDocument),
-                issuesFilePath.toString());
+                ScanUtils.getReportFilePath(reportedDocument));
     }
 
     protected List<Issue> getIssues() {

@@ -1,0 +1,3 @@
+[[analyzer]]
+org = "exampleOrg"
+name = "example_module_static_code_analyzer"

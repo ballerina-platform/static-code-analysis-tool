@@ -63,6 +63,8 @@ public class Constants {
     static final String SCAN_REPORT_ISSUE_TYPE = "issueType";
     static final String SCAN_REPORT_ISSUE_MESSAGE = "message";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE = "textRange";
+    static final String SCAN_REPORT_ISSUE_SUPPRESSION = "suppression";
+    static final String SCAN_REPORT_SUPPRESSION_RULES = "rules";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE = "startLine";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_START_LINE_OFFSET = "startLineOffset";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE = "endLine";
@@ -79,6 +81,16 @@ public class Constants {
     static final String ANALYZER_VERSION = "version";
     static final String ANALYZER_REPOSITORY = "repository";
     static final String RULES_TABLE = "rule";
+    static final String SUPPRESSION_TABLE = "suppression";
+    static final String SUPPRESSIONS = "suppressions";
+    static final String SUPPRESSION_KIND = "kind";
+    static final String SUPPRESSION_KIND_IN_SOURCE = "inSource";
+    static final String SUPPRESSION_STATUS = "status";
+    static final String SUPPRESSION_STATUS_ACCEPTED = "accepted";
+    static final String SUPPRESSION_JUSTIFICATION = "justification";
+    static final String SUPPRESSION_ENABLED = "enabled";
+    static final String SUPPRESSION_REQUIRE_REASON = "requireReason";
+    static final String SUPPRESSION_REQUIRE_RULE_ID = "requireRuleId";
     static final String EXCLUDE_KEY = "exclude";
     public static final String MODULE_LEVEL_SYMBOL = "<module>";
     static final String JAR_PREDICATE = ".jar";

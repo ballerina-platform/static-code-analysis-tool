@@ -2,7 +2,7 @@ import { Box, Fade, Tooltip, Typography, alpha, keyframes } from "@mui/material"
 import { CodeOutlined, TouchAppOutlined } from "@mui/icons-material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IssueSummaryCard } from "./IssueBadges";
-import { RULE_KINDS, getLineRange, getRuleKind } from "../issueMeta";
+import { getIssueColor, getLineRange } from "../issueMeta";
 import { tokenizeLines } from "../highlighter";
 
 // Used when an issue carries an unknown rule kind.
@@ -29,7 +29,7 @@ function SingleFileContent({ issues, fileContent, selectedIssue, focusRequest, o
             ...range,
             index,
             issue,
-            color: RULE_KINDS[getRuleKind(issue)]?.color ?? FALLBACK_HIGHLIGHT_COLOR,
+            color: getIssueColor(issue, FALLBACK_HIGHLIGHT_COLOR),
             // Smaller spans win when ranges overlap, so the innermost issue is the one that gets clicked.
             span: (range.endLine - range.startLine) * 100000 + (range.endColumn ?? 10000) - range.startColumn,
         }];

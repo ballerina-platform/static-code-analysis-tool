@@ -2,13 +2,14 @@ import { Alert, Box, Typography } from "@mui/material";
 import InfoCards from "./InfoCards";
 import MainTable from "./MainTable";
 import { useMemo } from "react";
-import { countActiveFilters, countByKind, matchesFilters } from "../issueMeta";
+import { countActiveFilters, countByKind, countSuppressed, isSuppressed, matchesFilters, matchesStatus } from "../issueMeta";
 
 function retrieveAllStats(analyzedFiles) {
-    const files = analyzedFiles ?? []
+    const issues = (analyzedFiles ?? []).flatMap((analyzedFile) => analyzedFile.issues ?? [])
     return {
-        filesScanned: files.length,
-        kindCounts: countByKind(files.flatMap((analyzedFile) => analyzedFile.issues ?? [])),
+        filesScanned: (analyzedFiles ?? []).length,
+        kindCounts: countByKind(issues.filter((issue) => !isSuppressed(issue))),
+        suppressed: countSuppressed(issues),
     }
 }
 
@@ -38,6 +39,10 @@ function MainView({ analyzedFiles, packages, workspace, onOpenFile, missingFile,
     const statistics = useMemo(() => retrieveAllStats(analyzedFiles), [analyzedFiles])
     const allIssues = useMemo(() => (analyzedFiles ?? []).flatMap((file) => file.issues ?? []), [analyzedFiles])
     const fileRecords = useMemo(() => buildFileRecords(analyzedFiles, filters), [analyzedFiles, filters])
+    // The kind chips and the filter dropdowns offer only what the selected status lists.
+    const statusIssues = useMemo(
+        () => allIssues.filter((issue) => matchesStatus(issue, filters.status)), [allIssues, filters.status])
+    const kindCounts = useMemo(() => countByKind(statusIssues), [statusIssues])
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -53,7 +58,8 @@ function MainView({ analyzedFiles, packages, workspace, onOpenFile, missingFile,
                     onOpenFile={onOpenFile}
                     fileRecords={fileRecords}
                     allIssues={allIssues}
-                    kindCounts={statistics.kindCounts}
+                    statusIssues={statusIssues}
+                    kindCounts={kindCounts}
                     filters={filters}
                     onFiltersChange={onFiltersChange}
                     packages={packages}

@@ -3,3 +3,5 @@ generating scan reports is not supported with single bal files, ignoring the fla
 Running Scans
 
 []
+
+0 issue(s)

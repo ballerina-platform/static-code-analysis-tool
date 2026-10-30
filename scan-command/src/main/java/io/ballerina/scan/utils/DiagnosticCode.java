@@ -44,8 +44,24 @@ public enum DiagnosticCode {
     FAILED_TO_LOAD_VERSION_PROPERTIES("STATIC_ANALYSIS_ERROR_018", "failed.to.load.version.properties"),
     COMPILATION_CONTAINS_ERRORS("STATIC_ANALYSIS_ERROR_019", "compilation.contains.errors"),
     INVALID_JSON_FORMAT_RULE_SEVERITY("STATIC_ANALYSIS_ERROR_020", "invalid.json.format.rule.severity"),
+    SUPPRESSION_MISSING_REASON("STATIC_ANALYSIS_ERROR_021", "suppression.missing.reason"),
+    SUPPRESSION_MISSING_RULE_ID("STATIC_ANALYSIS_ERROR_022", "suppression.missing.rule.id"),
+    SUPPRESSION_REQUIREMENTS_NOT_MET("STATIC_ANALYSIS_ERROR_023", "suppression.requirements.not.met"),
+    UNKNOWN_RULE("STATIC_ANALYSIS_ERROR_024", "unknown.rule"),
+    INVALID_SUPPRESSION_SETTING("STATIC_ANALYSIS_ERROR_025", "invalid.suppression.setting"),
+    UNKNOWN_SUPPRESSION_SETTING("STATIC_ANALYSIS_ERROR_026", "unknown.suppression.setting"),
+    MISSING_DEPENDENCIES_TOML("STATIC_ANALYSIS_ERROR_027", "missing.dependencies.toml"),
+    INVALID_SUPPRESSION_TABLE("STATIC_ANALYSIS_ERROR_028", "invalid.suppression.table"),
+    INVALID_RULE_ID("STATIC_ANALYSIS_ERROR_029", "invalid.rule.id"),
+    EMPTY_RULE_LIST("STATIC_ANALYSIS_ERROR_030", "empty.rule.list"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
-    SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported");
+    SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
+    UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
+    UNMATCHED_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_004", "unmatched.blanket.suppression"),
+    UNKNOWN_RULE_PROVIDER("STATIC_ANALYSIS_WARNING_006", "unknown.rule.provider"),
+    DUPLICATE_SUPPRESSION_RULE("STATIC_ANALYSIS_WARNING_007", "duplicate.suppression.rule"),
+    DUPLICATE_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_008", "duplicate.blanket.suppression"),
+    IGNORED_SUPPRESSION("STATIC_ANALYSIS_WARNING_009", "ignored.suppression");
 
     private final String diagnosticId;
     private final String messageKey;

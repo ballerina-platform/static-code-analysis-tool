@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "bal_project_with_suppression_table_array"
+version = "0.1.0"
