@@ -113,17 +113,23 @@ public class ProjectAnalyzer {
         ScannerContextImpl scannerContext = new ScannerContextImpl(inbuiltRules);
         project.currentPackage().moduleIds().forEach(moduleId -> {
             Module module = project.currentPackage().module(moduleId);
-            module.documentIds().forEach(analyzeDocument(module, scannerContext));
-            module.testDocumentIds().forEach(analyzeDocument(module, scannerContext));
+            SemanticModel semanticModel = module.getCompilation().getSemanticModel();
+            // The secret value resolver caches what it traces across the documents of a module.
+            SecretValueResolver secretValueResolver = new SecretValueResolver(semanticModel, module);
+            module.documentIds().forEach(analyzeDocument(module, semanticModel, secretValueResolver, scannerContext));
+            module.testDocumentIds().forEach(analyzeDocument(module, semanticModel, secretValueResolver,
+                    scannerContext));
         });
         return scannerContext.getReporter().getIssues();
     }
 
-    private Consumer<DocumentId> analyzeDocument(Module module, ScannerContextImpl scannerContext) {
-        SemanticModel semanticModel = module.getCompilation().getSemanticModel();
+    private static Consumer<DocumentId> analyzeDocument(Module module, SemanticModel semanticModel,
+                                                        SecretValueResolver secretValueResolver,
+                                                        ScannerContextImpl scannerContext) {
         return documentId -> {
             Document document = module.document(documentId);
-            StaticCodeAnalyzer analyzer = new StaticCodeAnalyzer(document, scannerContext, semanticModel);
+            StaticCodeAnalyzer analyzer = new StaticCodeAnalyzer(document, scannerContext, semanticModel,
+                    secretValueResolver);
             analyzer.analyze();
         };
     }
