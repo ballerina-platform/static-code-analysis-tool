@@ -198,8 +198,8 @@
     "name": "Hard-coded secrets are security-sensitive",
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-13",
     "severity": "HIGH",
-    "description": "A secret such as a password, API key, or token is embedded as a literal value in source code.",
-    "fullDescription": "Embedding secrets such as passwords, API keys, or tokens directly as literal values in source code exposes them to anyone with access to the codebase or its version history, and makes rotating a compromised secret require a code change and redeploy.",
+    "description": "A secret such as a password, API key, or token is written in source code as a literal or a constant.",
+    "fullDescription": "Writing secrets such as passwords, API keys, or tokens in source code, as a literal, a constant, an expression built only from them, or the default value of a configurable variable, exposes them to anyone with access to the codebase or its version history, and makes rotating a compromised secret require a code change and redeploy.",
     "tags": [
       "security",
       "secrets",
@@ -226,8 +226,8 @@
     "name": "Non configurable secrets are security-sensitive",
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-14",
     "severity": "MEDIUM",
-    "description": "A secret is assigned a fixed value instead of being exposed as a configurable one.",
-    "fullDescription": "A secret that is assigned a fixed value rather than being exposed as a configurable value forces the same secret to be reused across environments and prevents it from being rotated or overridden without modifying and redeploying the code.",
+    "description": "A secret is taken from a non-configurable variable that holds a fixed value.",
+    "fullDescription": "A secret taken from a non-configurable variable that holds a fixed value, such as a variable initialized with a literal and never assigned again, forces the same secret to be reused across environments and prevents it from being rotated or overridden without modifying and redeploying the code. Values computed at run time, such as the result of a function call, are not reported.",
     "tags": [
       "security",
       "secrets",

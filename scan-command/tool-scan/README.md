@@ -266,8 +266,8 @@ The language-level rules below are defined within this tool.
 | `ballerina:10` | [This variable is assigned to itself](https://ballerina.io/learn/scan-rules/#ballerina-10) | Code Smell | Low | A variable is assigned to itself, which has no effect and usually signals a mistake. |
 | `ballerina:11` | [Unused class private fields](https://ballerina.io/learn/scan-rules/#ballerina-11) | Code Smell | Low | A private class field is declared but never used. |
 | `ballerina:12` | [Invalid range expression](https://ballerina.io/learn/scan-rules/#ballerina-12) | Code Smell | Low | A range expression's bounds never produce any elements, making it dead code. |
-| `ballerina:13` | [Hard-coded secrets are security-sensitive](https://ballerina.io/learn/scan-rules/#ballerina-13) | Vulnerability | High | A secret such as a password, API key, or token is embedded as a literal value in source code. |
-| `ballerina:14` | [Non configurable secrets are security-sensitive](https://ballerina.io/learn/scan-rules/#ballerina-14) | Vulnerability | Medium | A secret is assigned a fixed value instead of being exposed as a configurable one. |
+| `ballerina:13` | [Hard-coded secrets are security-sensitive](https://ballerina.io/learn/scan-rules/#ballerina-13) | Vulnerability | High | A secret such as a password, API key, or token is written in source code as a literal or a constant. |
+| `ballerina:14` | [Non configurable secrets are security-sensitive](https://ballerina.io/learn/scan-rules/#ballerina-14) | Vulnerability | Medium | A secret is taken from a non-configurable variable that holds a fixed value. |
 
 ### Library tools
 

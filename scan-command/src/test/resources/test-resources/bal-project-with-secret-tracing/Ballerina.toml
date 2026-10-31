@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "secret_tracing"
+version = "0.1.0"
