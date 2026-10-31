@@ -33,6 +33,7 @@ import io.ballerina.compiler.api.symbols.TypeSymbol;
 import io.ballerina.compiler.api.symbols.UnionTypeSymbol;
 import io.ballerina.compiler.api.symbols.VariableSymbol;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
+import io.ballerina.compiler.syntax.tree.CaptureBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.ConstantDeclarationNode;
 import io.ballerina.compiler.syntax.tree.DefaultableParameterNode;
 import io.ballerina.compiler.syntax.tree.ExpressionNode;
@@ -56,6 +57,7 @@ import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.TemplateExpressionNode;
 import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.Rule;
@@ -65,7 +67,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -77,40 +78,11 @@ import static io.ballerina.scan.internal.CoreRule.NON_CONFIGURABLE_SECRET;
 import static io.ballerina.scan.internal.SensitiveParameterTracker.FUNCTIONS_WITH_SENSITIVE_PARAMETERS;
 
 public class SecretChecker extends NodeVisitor {
-    private static final Pattern SECRET_WORDS = Pattern.compile(buildSecretKeywordPattern(),
-            Pattern.CASE_INSENSITIVE);
     // Any scheme, including compound ones such as "mongodb+srv" and "jdbc:mysql", anywhere in the value.
     private static final Pattern URL_WITH_CREDENTIALS = Pattern.compile("(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*"
             + "(?::[A-Za-z][A-Za-z0-9+.-]*)?://(?<user>[^\\s:/@]*):(?<password>[^\\s/@]+)@");
     // An interpolated part of a URL template is not hard-coded, so it is treated as a template placeholder.
     private static final String INTERPOLATION_PLACEHOLDER = "${}";
-
-    private static String buildSecretKeywordPattern() {
-        String[] baseKeywords = {
-                "password", "passwd", "pwd", "passphrase", 
-                "secret", "auth", "apiKey", "token"
-        };
-
-        StringBuilder patternBuilder = new StringBuilder();
-        for (int i = 0; i < baseKeywords.length; i++) {
-            if (i > 0) {
-                patternBuilder.append("|");
-            }
-            String keyword = baseKeywords[i];
-            patternBuilder.append(keyword);
-            patternBuilder.append("|").append(toSnakeCase(keyword));
-            patternBuilder.append("|").append(toKebabCase(keyword));
-        }
-        return patternBuilder.toString();
-    }
-
-    private static String toSnakeCase(String keyword) {
-        return keyword.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase(Locale.ENGLISH);
-    }
-
-    private static String toKebabCase(String keyword) {
-        return keyword.replaceAll("([a-z])([A-Z])", "$1-$2").toLowerCase(Locale.ENGLISH);
-    }
 
     private final Document document;
     private final SyntaxTree syntaxTree;
@@ -140,7 +112,7 @@ public class SecretChecker extends NodeVisitor {
     }
 
     public static boolean isSecretName(String name) {
-        return SECRET_WORDS.matcher(name).find();
+        return SecretNameMatcher.isSecretName(name);
     }
 
     @Override
@@ -154,7 +126,7 @@ public class SecretChecker extends NodeVisitor {
 
     @Override
     public void visit(SpecificFieldNode specificFieldNode) {
-        if (isSecretName(specificFieldNode.fieldName().toSourceCode())) {
+        if (isSecretName(fieldNameText(specificFieldNode))) {
             if (specificFieldNode.valueExpr().isEmpty()) {
                 validateShorthandNotation(specificFieldNode);
             } else {
@@ -162,6 +134,16 @@ public class SecretChecker extends NodeVisitor {
             }
         }
         super.visit(specificFieldNode);
+    }
+
+    // The field name without its minutiae, so that a comment above the field is not read as part of its name.
+    static String fieldNameText(SpecificFieldNode specificFieldNode) {
+        Node fieldName = specificFieldNode.fieldName();
+        return switch (fieldName) {
+            case Token token -> token.text();
+            case BasicLiteralNode literal -> literal.literalToken().text();
+            default -> fieldName.toSourceCode().trim();
+        };
     }
 
     private void validateShorthandNotation(SpecificFieldNode specificFieldNode) {
@@ -205,13 +187,15 @@ public class SecretChecker extends NodeVisitor {
 
     @Override
     public void visit(TemplateExpressionNode templateExpressionNode) {
-        if (templateExpressionNode.kind() == SyntaxKind.STRING_TEMPLATE_EXPRESSION) {
-            String pattern = buildStringPattern(templateExpressionNode.content());
-            if (isUrlWithCredentials(pattern)) {
-                reportHardCodedSecret(templateExpressionNode);
-            }
+        if (isUrlTemplateWithCredentials(templateExpressionNode)) {
+            reportHardCodedSecret(templateExpressionNode);
         }
         super.visit(templateExpressionNode);
+    }
+
+    private boolean isUrlTemplateWithCredentials(TemplateExpressionNode templateExpressionNode) {
+        return templateExpressionNode.kind() == SyntaxKind.STRING_TEMPLATE_EXPRESSION
+                && isUrlWithCredentials(buildStringPattern(templateExpressionNode.content()));
     }
 
     private String buildStringPattern(NodeList<Node> content) {
@@ -228,16 +212,23 @@ public class SecretChecker extends NodeVisitor {
 
     @Override
     public void visit(ModuleVariableDeclarationNode moduleVariableDeclarationNode) {
-        if (isSecretName(moduleVariableDeclarationNode.typedBindingPattern().bindingPattern().toSourceCode())
+        if (isSecretName(variableName(moduleVariableDeclarationNode.typedBindingPattern()))
                 && moduleVariableDeclarationNode.initializer().isPresent()) {
             validateExpression(moduleVariableDeclarationNode.initializer().get());
         }
         super.visit(moduleVariableDeclarationNode);
     }
 
+    // The name of a variable declared on its own; a destructuring pattern declares no single secret-named variable.
+    private static String variableName(TypedBindingPatternNode typedBindingPattern) {
+        return typedBindingPattern.bindingPattern() instanceof CaptureBindingPatternNode captureBindingPattern
+                ? captureBindingPattern.variableName().text()
+                : "";
+    }
+
     @Override
     public void visit(VariableDeclarationNode variableDeclarationNode) {
-        if (isSecretName(variableDeclarationNode.typedBindingPattern().bindingPattern().toSourceCode())
+        if (isSecretName(variableName(variableDeclarationNode.typedBindingPattern()))
                 && variableDeclarationNode.initializer().isPresent()) {
             validateExpression(variableDeclarationNode.initializer().get());
         }
@@ -351,6 +342,7 @@ public class SecretChecker extends NodeVisitor {
         switch (expressionNode.kind()) {
             case SIMPLE_NAME_REFERENCE -> validateSimpleNameReference(expressionNode);
             case REQUIRED_EXPRESSION -> { }
+            case STRING_TEMPLATE_EXPRESSION -> validateStringTemplate((TemplateExpressionNode) expressionNode);
             default -> reportNonConfigurableSecret(expressionNode);
         }
     }
@@ -359,6 +351,20 @@ public class SecretChecker extends NodeVisitor {
         if (field instanceof SpecificFieldNode specificField) {
             specificField.valueExpr().ifPresentOrElse(this::validateExpression,
                     () -> validateShorthandNotation(specificField));
+        }
+    }
+
+    // A URL template with credentials is reported as ballerina:13 when the template itself is visited.
+    private void validateStringTemplate(TemplateExpressionNode templateExpressionNode) {
+        if (isUrlTemplateWithCredentials(templateExpressionNode)) {
+            return;
+        }
+        boolean hasInterpolation = templateExpressionNode.content().stream()
+                .anyMatch(node -> node.kind() == SyntaxKind.INTERPOLATION);
+        if (hasInterpolation) {
+            reportNonConfigurableSecret(templateExpressionNode);
+        } else if (!SecretValueFilter.isPlaceholder(buildStringPattern(templateExpressionNode.content()))) {
+            reportHardCodedSecret(templateExpressionNode);
         }
     }
 
