@@ -203,8 +203,6 @@ public class SecretValueTracingTest extends StaticCodeAnalyzerTest {
     private static List<Issue> analyzeDocument(Module module, Document document) {
         ScannerContextImpl scannerContext = new ScannerContextImpl(
                 List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()));
-        new SensitiveParameterTracker(document.syntaxTree(), scannerContext,
-                module.getCompilation().getSemanticModel()).scan();
         new StaticCodeAnalyzer(document, scannerContext, module.getCompilation().getSemanticModel()).analyze();
         return scannerContext.getReporter().getIssues();
     }

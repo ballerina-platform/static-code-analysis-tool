@@ -20,7 +20,12 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.ArrayTypeSymbol;
+import io.ballerina.compiler.api.symbols.ClassSymbol;
+import io.ballerina.compiler.api.symbols.FunctionSymbol;
+import io.ballerina.compiler.api.symbols.FunctionTypeSymbol;
 import io.ballerina.compiler.api.symbols.IntersectionTypeSymbol;
+import io.ballerina.compiler.api.symbols.ObjectFieldSymbol;
+import io.ballerina.compiler.api.symbols.ParameterSymbol;
 import io.ballerina.compiler.api.symbols.SingletonTypeSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.SymbolKind;
@@ -34,13 +39,16 @@ import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.CaptureBindingPatternNode;
+import io.ballerina.compiler.syntax.tree.ClientResourceAccessActionNode;
 import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.ConditionalExpressionNode;
 import io.ballerina.compiler.syntax.tree.DefaultableParameterNode;
+import io.ballerina.compiler.syntax.tree.ExplicitNewExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExpressionNode;
 import io.ballerina.compiler.syntax.tree.FieldAccessExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionArgumentNode;
 import io.ballerina.compiler.syntax.tree.FunctionCallExpressionNode;
+import io.ballerina.compiler.syntax.tree.ImplicitNewExpressionNode;
 import io.ballerina.compiler.syntax.tree.IndexedExpressionNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.MappingConstructorExpressionNode;
@@ -54,8 +62,10 @@ import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.NonTerminalNode;
 import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
+import io.ballerina.compiler.syntax.tree.ParenthesizedArgList;
 import io.ballerina.compiler.syntax.tree.PositionalArgumentNode;
 import io.ballerina.compiler.syntax.tree.RecordFieldWithDefaultValueNode;
+import io.ballerina.compiler.syntax.tree.RemoteMethodCallActionNode;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
@@ -68,11 +78,8 @@ import io.ballerina.projects.Document;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScannerContext;
 
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -81,7 +88,6 @@ import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.CoreRule.HARD_CODED_SECRET;
 import static io.ballerina.scan.internal.CoreRule.NON_CONFIGURABLE_SECRET;
-import static io.ballerina.scan.internal.SensitiveParameterTracker.FUNCTIONS_WITH_SENSITIVE_PARAMETERS;
 
 public class SecretChecker extends NodeVisitor {
     // Any scheme, including compound ones such as "mongodb+srv" and "jdbc:mysql", anywhere in the value.
@@ -94,7 +100,6 @@ public class SecretChecker extends NodeVisitor {
     private final SyntaxTree syntaxTree;
     private final ScannerContext scannerContext;
     private final SemanticModel semanticModel;
-    private final Map<Integer, FunctionWithSensitiveParams> functionsWithCredentialParams;
     private final SecretValueResolver valueResolver;
     private final Set<String> reportedIssueKeys = new HashSet<>();
 
@@ -104,15 +109,6 @@ public class SecretChecker extends NodeVisitor {
         this.scannerContext = scannerContext;
         this.semanticModel = semanticModel;
         this.valueResolver = new SecretValueResolver(semanticModel, document.module());
-        this.functionsWithCredentialParams = getFunctionsWithCredentialParams(scannerContext);
-    }
-
-    private Map<Integer, FunctionWithSensitiveParams> getFunctionsWithCredentialParams(ScannerContext scannerContext) {
-        @SuppressWarnings("unchecked")
-        Map<Integer, FunctionWithSensitiveParams> functionsWithCredentialParams =
-                (Map<Integer, FunctionWithSensitiveParams>) scannerContext.userData()
-                        .getOrDefault(FUNCTIONS_WITH_SENSITIVE_PARAMETERS, new HashMap<>());
-        return functionsWithCredentialParams;
     }
 
     public void analyze() {
@@ -308,40 +304,122 @@ public class SecretChecker extends NodeVisitor {
     }
 
     @Override
+    public void visit(RemoteMethodCallActionNode remoteMethodCallActionNode) {
+        validateFunctionCall(remoteMethodCallActionNode, remoteMethodCallActionNode.arguments());
+        super.visit(remoteMethodCallActionNode);
+    }
+
+    @Override
+    public void visit(ClientResourceAccessActionNode clientResourceAccessActionNode) {
+        clientResourceAccessActionNode.arguments().ifPresent(argList ->
+                validateFunctionCall(clientResourceAccessActionNode, argList.arguments()));
+        super.visit(clientResourceAccessActionNode);
+    }
+
+    @Override
+    public void visit(ImplicitNewExpressionNode implicitNewExpressionNode) {
+        implicitNewExpressionNode.parenthesizedArgList().ifPresent(argList ->
+                validateNewExpression(implicitNewExpressionNode, argList));
+        super.visit(implicitNewExpressionNode);
+    }
+
+    @Override
+    public void visit(ExplicitNewExpressionNode explicitNewExpressionNode) {
+        validateNewExpression(explicitNewExpressionNode, explicitNewExpressionNode.parenthesizedArgList());
+        super.visit(explicitNewExpressionNode);
+    }
+
+    @Override
     public void visit(MethodCallExpressionNode methodCallExpressionNode) {
         validateFunctionCall(methodCallExpressionNode, methodCallExpressionNode.arguments());
         super.visit(methodCallExpressionNode);
     }
 
     private void validateFunctionCall(Node functionNode, NodeList<FunctionArgumentNode> arguments) {
-        Optional<Symbol> functionSymbol = semanticModel.symbol(functionNode);
-        functionSymbol.map(Symbol::hashCode)
-                .filter(functionsWithCredentialParams::containsKey)
-                .ifPresent(hashCode -> validateFunctionArguments(arguments, functionsWithCredentialParams.get(hashCode)
-                        .sensitiveParamPositions()));
+        if (!hasPositionalArgument(arguments)) {
+            return;
+        }
+        Optional<Symbol> symbol = semanticModel.symbol(functionNode);
+        if (symbol.isEmpty()) {
+            return;
+        }
+        if (symbol.get() instanceof FunctionSymbol function) {
+            validatePositionalArguments(arguments, function.typeDescriptor(),
+                    isLangLibMethodCall(functionNode, function) ? 1 : 0);
+            return;
+        }
+        // A call through a function-typed variable, parameter or field, whose type may still name its parameters.
+        getFunctionType(symbol.get())
+                .ifPresent(functionType -> validatePositionalArguments(arguments, functionType, 0));
     }
 
-    private void validateFunctionArguments(NodeList<FunctionArgumentNode> arguments,
-                                           List<Integer> sensitiveParameterPositions) {
-        int currentPos = 0;
-        Iterator<Integer> targetPositions = sensitiveParameterPositions.iterator();
-        int targetPos = targetPositions.hasNext() ? targetPositions.next() : -1;
+    private static Optional<FunctionTypeSymbol> getFunctionType(Symbol symbol) {
+        TypeSymbol type = switch (symbol) {
+            case VariableSymbol variable -> variable.typeDescriptor();
+            case ParameterSymbol parameter -> parameter.typeDescriptor();
+            case ObjectFieldSymbol objectField -> objectField.typeDescriptor();
+            default -> null;
+        };
+        return type != null && unwrap(type) instanceof FunctionTypeSymbol functionType
+                ? Optional.of(functionType)
+                : Optional.empty();
+    }
 
-        for (FunctionArgumentNode arg : arguments) {
-            if (arg.kind() != SyntaxKind.POSITIONAL_ARG || targetPos == -1) {
+    // A lang library function called as a method, as in value.f(a), receives the value as its first parameter.
+    private static boolean isLangLibMethodCall(Node functionNode, FunctionSymbol function) {
+        return functionNode.kind() == SyntaxKind.METHOD_CALL && function.kind() != SymbolKind.METHOD;
+    }
+
+    private void validateNewExpression(Node newExpressionNode, ParenthesizedArgList argList) {
+        if (!hasPositionalArgument(argList.arguments())) {
+            return;
+        }
+        semanticModel.typeOf(newExpressionNode)
+                .flatMap(SecretChecker::getClassSymbol)
+                .flatMap(ClassSymbol::initMethod)
+                .ifPresent(initMethod -> validatePositionalArguments(argList.arguments(),
+                        initMethod.typeDescriptor(), 0));
+    }
+
+    private static boolean hasPositionalArgument(NodeList<FunctionArgumentNode> arguments) {
+        return !arguments.isEmpty() && arguments.get(0).kind() == SyntaxKind.POSITIONAL_ARG;
+    }
+
+    private static Optional<ClassSymbol> getClassSymbol(TypeSymbol typeSymbol) {
+        if (typeSymbol instanceof ClassSymbol classSymbol) {
+            return Optional.of(classSymbol);
+        }
+        if (typeSymbol instanceof TypeReferenceTypeSymbol typeReference) {
+            return typeReference.definition() instanceof ClassSymbol classSymbol
+                    ? Optional.of(classSymbol)
+                    : getClassSymbol(typeReference.typeDescriptor());
+        }
+        if (typeSymbol instanceof UnionTypeSymbol unionType) {
+            return unionType.memberTypeDescriptors().stream()
+                    .map(SecretChecker::getClassSymbol)
+                    .flatMap(Optional::stream)
+                    .findFirst();
+        }
+        return Optional.empty();
+    }
+
+    private void validatePositionalArguments(NodeList<FunctionArgumentNode> arguments,
+                                             FunctionTypeSymbol functionType, int firstParameter) {
+        List<ParameterSymbol> parameters = functionType.params().orElse(List.of());
+        Optional<ParameterSymbol> restParameter = functionType.restParam();
+        int position = firstParameter;
+        for (FunctionArgumentNode argument : arguments) {
+            if (argument.kind() != SyntaxKind.POSITIONAL_ARG) {
                 return;
             }
-
-            if (currentPos == targetPos) {
-                validateArgument((PositionalArgumentNode) arg);
-                targetPos = targetPositions.hasNext() ? targetPositions.next() : -1;
+            Optional<ParameterSymbol> parameter = position < parameters.size()
+                    ? Optional.of(parameters.get(position))
+                    : restParameter;
+            if (parameter.flatMap(ParameterSymbol::getName).filter(SecretChecker::isSecretName).isPresent()) {
+                validateExpression(((PositionalArgumentNode) argument).expression());
             }
-            currentPos++;
+            position++;
         }
-    }
-
-    private void validateArgument(PositionalArgumentNode argumentNode) {
-        validateExpression(argumentNode.expression());
     }
 
     private void validateExpression(ExpressionNode expressionNode) {
