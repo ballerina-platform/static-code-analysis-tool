@@ -24,7 +24,7 @@ public function main() {
     checker.checkStregth("sabthar", "secret");
     checker.checkStregth("sabthar", password = "secret");
 
-    Client 'client = new ("password", "secret"); // TODO: Find a way to capture this
+    Client 'client = new ("password", "secret");
     'client = new ("sabthar", password = "password");
 }
 

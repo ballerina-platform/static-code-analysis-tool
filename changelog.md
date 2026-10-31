@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- `ballerina:13` and `ballerina:14` check positional arguments to secret-named parameters in `bal scan`, including calls to library functions, remote methods, resource access actions and `new` expressions. Before, these arguments were only checked in the tests. ([#145](https://github.com/ballerina-platform/static-code-analysis-tool/pull/145))
 - `ballerina:2` and `ballerina:11` report the location of the parameter or field declaration instead of including its doc comment and annotations. ([#117](https://github.com/ballerina-platform/static-code-analysis-tool/pull/117), [#118](https://github.com/ballerina-platform/static-code-analysis-tool/pull/118))
 - The published tool package contains up-to-date tool TOML files. ([#123](https://github.com/ballerina-platform/static-code-analysis-tool/pull/123))
 
