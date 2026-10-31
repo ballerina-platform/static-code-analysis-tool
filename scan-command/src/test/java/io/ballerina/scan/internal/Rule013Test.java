@@ -95,12 +95,13 @@ public class Rule013Test extends StaticCodeAnalyzerTest {
     void testHardcodedSecretFunctionArgument() {
         String documentName = "rule013_hardcoded_secret_function_argument.bal";
         List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule()));
-        Assert.assertEquals(issues.size(), 7);
+        Assert.assertEquals(issues.size(), 8);
         List<Location> expectedIssueLocations = new ArrayList<>(List.of(
                 new Location(19, 38, 19, 48),
                 new Location(20, 49, 20, 57),
                 new Location(23, 36, 23, 44),
                 new Location(24, 47, 24, 55),
+                new Location(26, 38, 26, 46),
                 new Location(27, 41, 27, 51),
                 new Location(44, 37, 44, 45),
                 new Location(45, 59, 45, 67)));
@@ -157,6 +158,23 @@ public class Rule013Test extends StaticCodeAnalyzerTest {
                 new Location(26, 97, 26, 108),
                 new Location(27, 23, 27, 48),
                 new Location(28, 29, 28, 50)));
+        issues.forEach(issue -> assertIssue(issue, documentName,
+                expectedIssueLocations.remove(0), HARD_CODED_SECRET.rule()));
+    }
+
+    @Test
+    void testHardcodedSecretPositionalArgument() {
+        String documentName = "rule013_hardcoded_secret_positional_argument.bal";
+        List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule()));
+        Assert.assertEquals(issues.size(), 7);
+        List<Location> expectedIssueLocations = new ArrayList<>(List.of(
+                new Location(27, 81, 27, 95),
+                new Location(29, 32, 29, 49),
+                new Location(30, 16, 30, 26),
+                new Location(30, 28, 30, 38),
+                new Location(31, 51, 31, 70),
+                new Location(33, 41, 33, 60),
+                new Location(34, 37, 34, 56)));
         issues.forEach(issue -> assertIssue(issue, documentName,
                 expectedIssueLocations.remove(0), HARD_CODED_SECRET.rule()));
     }

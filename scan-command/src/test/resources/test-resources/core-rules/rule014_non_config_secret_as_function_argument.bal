@@ -23,10 +23,10 @@ public function main() {
     printPasswordStreanght("sabthar", password = defaultValue);
 
     PasswordStrengthChecker checker = new ();
-    checker.checkStregth("sabthar", defaultValue); // Can't get expression symbol for defaultValue
+    checker.checkStregth("sabthar", defaultValue);
     checker.checkStregth("sabthar", password = defaultValue);
 
-    Client 'client = new ("password", defaultValue); // TODO: Find a way to capture this
+    Client 'client = new ("password", defaultValue);
     'client = new ("sabthar", password = defaultValue);
 }
 
