@@ -1045,9 +1045,9 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the {@link Optional<ScanTomlFile>} representation of a local/remote
-     * Scan.toml file, with the Scan.toml of the enclosing workspace as the default. TOML syntax errors and invalid
-     * settings are ignored, as only {@code bal scan} rejects them.
+     * Returns the {@link Optional<ScanTomlFile>} representation of the Scan.toml file used for a package: its own
+     * local or remote file, or the Scan.toml of the enclosing workspace when it has none. The two are never merged.
+     * TOML syntax errors and invalid settings are ignored, as only {@code bal scan} rejects them.
      *
      * @param project      Ballerina project
      * @param outputStream print stream
@@ -1058,12 +1058,9 @@ public final class ScanUtils {
         try {
             ScanTomlFile scanTomlFile = readScanTomlConfigurations(project, outputStream, false);
             Optional<WorkspaceProject> workspaceProject = project.workspaceProject();
-            if (workspaceProject.isPresent()) {
-                Optional<ScanTomlFile> workspaceScanToml = readWorkspaceScanToml(workspaceProject.get(),
-                        outputStream, false);
-                if (workspaceScanToml.isPresent()) {
-                    scanTomlFile = scanTomlFile.inherit(workspaceScanToml.get());
-                }
+            if (scanTomlFile.getPath().isEmpty() && workspaceProject.isPresent()) {
+                return Optional.of(readWorkspaceScanToml(workspaceProject.get(), outputStream, false)
+                        .orElse(scanTomlFile));
             }
             return Optional.of(scanTomlFile);
         } catch (ScanToolException ex) {
@@ -1154,6 +1151,7 @@ public final class ScanUtils {
                 : Optional.of(sourceRoot.resolve(scanTomlPath));
 
         if (absPath.isPresent() && absPath.get().toFile().isFile()) {
+            outputStream.println("Loading scan tool configurations from " + absPath.get());
             return Optional.of(loadScanFile(targetDir, absPath.get(), displayPath(sourceRoot, absPath.get()),
                     absPath.get().toAbsolutePath().getParent(), outputStream, strict, workspace));
         }
@@ -1259,18 +1257,14 @@ public final class ScanUtils {
             }
         } else {
             for (Toml platformTable : scanTomlDocumentContent.getTables(PLATFORM_TABLE)) {
-                loadPlatform(platformTable, scanTomlFile, targetDir, baseDir, outputStream);
+                loadPlatform(platformTable, scanTomlFile, baseDir);
             }
         }
         TopLevelNode analyzerNode = entries.get(ANALYZER_TABLE);
         if (analyzerNode instanceof TomlTableArrayNode) {
-            scanTomlFile.markAnalyzerListSet();
             scanTomlDocumentContent.getTables(ANALYZER_TABLE).forEach(loadAnalyzer(scanTomlFile));
-        } else if (analyzerNode instanceof TomlKeyValueNode keyValue
-                && keyValue.value() instanceof TomlArrayValueNode array && array.elements().isEmpty()) {
-            // Written as analyzer = [], the list clears the analyzers of the workspace
-            scanTomlFile.markAnalyzerListSet();
-        } else if (analyzerNode != null) {
+        } else if (analyzerNode != null && !(analyzerNode instanceof TomlKeyValueNode keyValue
+                && keyValue.value() instanceof TomlArrayValueNode array && array.elements().isEmpty())) {
             errors.add(DiagnosticLog.fileError(displayPath, analyzerNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_ANALYZER_LIST)));
         }
@@ -1280,8 +1274,6 @@ public final class ScanUtils {
                     DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_TABLE, RULES_TABLE)));
         } else {
             scanTomlDocumentContent.getTable(RULES_TABLE).ifPresent(ruleTable -> {
-                // Written as an empty [rule], the table clears the rules of the workspace
-                scanTomlFile.markRuleTableSet();
                 loadRuleTable(ruleTable, scanTomlFile, displayPath, errors);
                 if (!scanTomlFile.getRulesToInclude().isEmpty() && !scanTomlFile.getRulesToExclude().isEmpty()) {
                     errors.add(DiagnosticLog.fileError(displayPath, ruleNode.location().lineRange(),
@@ -1298,10 +1290,9 @@ public final class ScanUtils {
         if (suppressionTable.isPresent()) {
             Toml table = suppressionTable.get();
             validateSuppressionSettings(table);
-            scanTomlFile.markSuppressionTableSet();
-            scanTomlFile.setSuppressionEnabled(booleanSetting(table, SUPPRESSION_ENABLED, true));
-            scanTomlFile.setSuppressionReasonRequired(booleanSetting(table, SUPPRESSION_REQUIRE_REASON, false));
-            scanTomlFile.setSuppressionRuleIdRequired(booleanSetting(table, SUPPRESSION_REQUIRE_RULE_ID, false));
+            booleanSetting(table, SUPPRESSION_ENABLED).ifPresent(scanTomlFile::setSuppressionEnabled);
+            booleanSetting(table, SUPPRESSION_REQUIRE_REASON).ifPresent(scanTomlFile::setSuppressionReasonRequired);
+            booleanSetting(table, SUPPRESSION_REQUIRE_RULE_ID).ifPresent(scanTomlFile::setSuppressionRuleIdRequired);
         }
 
         TopLevelNode gateNode = entries.get(GATE_TABLE);
@@ -1309,18 +1300,14 @@ public final class ScanUtils {
             errors.add(DiagnosticLog.fileError(displayPath, gateNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_TABLE, GATE_TABLE)));
         } else {
-            scanTomlDocumentContent.getTable(GATE_TABLE).ifPresent(gateTable -> {
-                // Written as an empty [gate], the table turns off the gate of the workspace
-                scanTomlFile.markGateTableSet();
-                loadGate(gateTable, scanTomlFile, displayPath, errors);
-            });
+            scanTomlDocumentContent.getTable(GATE_TABLE)
+                    .ifPresent(gateTable -> loadGate(gateTable, scanTomlFile, displayPath, errors));
         }
         TopLevelNode analysisNode = entries.get(ANALYSIS_TABLE);
         if (analysisNode != null && analysisNode.kind() != TomlType.TABLE) {
             errors.add(DiagnosticLog.fileError(displayPath, analysisNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_TABLE, ANALYSIS_TABLE)));
         } else if (analysisNode != null) {
-            scanTomlFile.markAnalysisTableSet();
             scanTomlDocumentContent.getTable(ANALYSIS_TABLE)
                     .ifPresent(analysisTable -> loadAnalysis(analysisTable, scanTomlFile, displayPath, errors));
         }
@@ -1397,7 +1384,7 @@ public final class ScanUtils {
         });
         analysisTable.get(ANALYSIS_EXCLUDE_TESTS).ifPresent(value -> {
             if (value.kind() == TomlType.BOOLEAN) {
-                scanTomlFile.setExcludeTests((Boolean) value.toNativeValue());
+                scanTomlFile.writeExcludeTests((Boolean) value.toNativeValue());
             } else {
                 errors.add(invalidConfigValue(displayPath, value, ANALYSIS_EXCLUDE_TESTS, "true or false"));
             }
@@ -1460,17 +1447,14 @@ public final class ScanUtils {
     }
 
     /**
-     * Loads a platform to the {@link ScanTomlFile} representation of the Scan.toml file, downloading its JAR when the
-     * path is a URL. A platform without a name or a path is skipped.
+     * Loads a platform to the {@link ScanTomlFile} representation of the Scan.toml file. A platform without a name or
+     * a path is skipped.
      *
      * @param scanTomlFile the in-memory representation of the Scan.toml file
-     * @param targetDir    the target directory
      * @param baseDir      the directory relative paths are resolved against
-     * @param outputStream the print stream
-     * @throws ScanToolException if the platform JAR cannot be loaded
+     * @throws ScanToolException if the path is neither a file nor a URL
      */
-    private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path targetDir, Path baseDir,
-                                     PrintStream outputStream) {
+    private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path baseDir) {
         Map<String, Object> properties = platformTable.toMap();
         Object platformName = properties.remove(PLATFORM_NAME);
         Optional<String> name = (platformName instanceof String) ? Optional.of(platformName.toString())
@@ -1483,16 +1467,14 @@ public final class ScanUtils {
             return;
         }
 
-        // Download remote JAR if the path is a URL and set the path to the downloaded
-        // JAR
+        // A remote JAR is downloaded only when the platform is selected, so its URL is kept as it is
         String jarPath;
         Optional<Path> localJar = resolveLocalPath(baseDir, path.get());
         if (localJar.isPresent()) {
             jarPath = localJar.get().toString();
         } else {
             try {
-                URL url = new URL(path.get());
-                jarPath = loadRemoteJAR(targetDir, name.get(), url, outputStream);
+                jarPath = new URL(path.get()).toString();
             } catch (MalformedURLException ex) {
                 throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.PLATFORM_FILE_NOT_FOUND, name.get(),
                         PLATFORM_PATH, path.get()));
@@ -1548,7 +1530,8 @@ public final class ScanUtils {
             errors.add(invalidConfigValue(displayPath, rules, key, RULE_LIST_VALUES));
             return;
         }
-        rulesArray.toNativeValue().stream().map(Object::toString).forEach(rule -> {
+        List<String> ruleIds = rulesArray.toNativeValue().stream().map(Object::toString).toList();
+        ruleIds.forEach(rule -> {
             ScanTomlFile.RuleToFilter ruleToFilter = new ScanTomlFile.RuleToFilter(rule);
             if (includeRules) {
                 scanTomlFile.setRuleToInclude(ruleToFilter);
@@ -1556,12 +1539,37 @@ public final class ScanUtils {
                 scanTomlFile.setRuleToExclude(ruleToFilter);
             }
         });
+        scanTomlFile.writeRules(includeRules, ruleIds);
     }
 
 
     // Called after validateSuppressionSettings, so a present value is a boolean
-    private static boolean booleanSetting(Toml table, String key, boolean defaultValue) {
-        return table.get(key).map(value -> (Boolean) value.toNativeValue()).orElse(defaultValue);
+    private static Optional<Boolean> booleanSetting(Toml table, String key) {
+        return table.get(key).map(value -> (Boolean) value.toNativeValue());
+    }
+
+    /**
+     * Returns the local JAR of a platform, downloading it into the target directory first when its path is a URL. A
+     * downloaded JAR is cached and reused.
+     *
+     * @param platform     the platform
+     * @param targetDir    the target directory the remote JAR is cached in
+     * @param outputStream the print stream for progress messages
+     * @return the absolute path of the local JAR
+     * @throws ScanToolException if the JAR cannot be downloaded
+     * @since 0.13.0
+     */
+    public static Path resolvePlatformJar(ScanTomlFile.Platform platform, Path targetDir, PrintStream outputStream) {
+        Optional<Path> localJar = convertConfigurationPath(platform.path()).filter(Files::isRegularFile);
+        if (localJar.isPresent()) {
+            return localJar.get().toAbsolutePath();
+        }
+        try {
+            return Path.of(loadRemoteJAR(targetDir, platform.name(), new URL(platform.path()), outputStream));
+        } catch (MalformedURLException ex) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.PLATFORM_FILE_NOT_FOUND, platform.name(),
+                    PLATFORM_PATH, platform.path()));
+        }
     }
 
     /**

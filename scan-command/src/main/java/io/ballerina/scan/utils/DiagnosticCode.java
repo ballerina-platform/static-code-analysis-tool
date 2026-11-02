@@ -70,6 +70,10 @@ public enum DiagnosticCode {
     WORKSPACE_PLATFORM_NOT_ALLOWED("STATIC_ANALYSIS_ERROR_044", "workspace.platform.not.allowed"),
     INVALID_CONFIG_TABLE("STATIC_ANALYSIS_ERROR_045", "invalid.config.table"),
     INVALID_ANALYZER_LIST("STATIC_ANALYSIS_ERROR_046", "invalid.analyzer.list"),
+    PLATFORMS_FAILED("STATIC_ANALYSIS_ERROR_047", "platforms.failed"),
+    PLATFORM_FAILED("STATIC_ANALYSIS_ERROR_048", "platform.failed"),
+    PLATFORM_NOT_PROVIDED("STATIC_ANALYSIS_ERROR_049", "platform.not.provided"),
+    RULE_OPTION_CONFLICT("STATIC_ANALYSIS_ERROR_050", "rule.option.conflict"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
@@ -80,9 +84,10 @@ public enum DiagnosticCode {
     IGNORED_SUPPRESSION("STATIC_ANALYSIS_WARNING_009", "ignored.suppression"),
     SETTING_OVERRIDDEN("STATIC_ANALYSIS_WARNING_010", "setting.overridden"),
     EMPTY_PACKAGE_SKIPPED("STATIC_ANALYSIS_WARNING_011", "empty.package.skipped"),
-    PLATFORM_FAILED("STATIC_ANALYSIS_WARNING_012", "platform.failed"),
     EXCLUDE_TESTS_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_013", "exclude.tests.not.supported"),
-    WORKSPACE_RULE_NOT_AVAILABLE("STATIC_ANALYSIS_WARNING_014", "workspace.rule.not.available");
+    WORKSPACE_RULE_NOT_AVAILABLE("STATIC_ANALYSIS_WARNING_014", "workspace.rule.not.available"),
+    PLATFORM_NOT_DECLARED("STATIC_ANALYSIS_WARNING_015", "platform.not.declared"),
+    SCAN_FILE_OVERRIDDEN("STATIC_ANALYSIS_WARNING_016", "scan.file.overridden");
 
     private final String diagnosticId;
     private final String messageKey;

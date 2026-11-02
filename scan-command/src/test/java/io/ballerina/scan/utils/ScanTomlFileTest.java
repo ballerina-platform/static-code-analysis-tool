@@ -21,93 +21,40 @@ package io.ballerina.scan.utils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * Tests for how a package Scan.toml inherits the tables of a workspace Scan.toml.
+ * Tests for how a Scan.toml file records the settings it writes.
  *
  * @since 0.13.0
  */
 public class ScanTomlFileTest {
 
-    @Test(description = "test a package inherits every table it does not set")
-    void testInheritsUnsetTables() {
-        ScanTomlFile workspace = workspaceScanToml();
-        ScanTomlFile merged = new ScanTomlFile().inherit(workspace);
+    @Test(description = "test only the settings a file writes are recorded, with their TOML values")
+    void testRecordsWrittenSettings() {
+        ScanTomlFile scanToml = new ScanTomlFile();
+        scanToml.writeRules(false, List.of("ballerina:1", "ballerina:2"));
+        scanToml.setAnalyzer(new ScanTomlFile.Analyzer("exampleOrg", "example_analyzer", "1.0.0", null));
+        scanToml.setSuppressionReasonRequired(true);
+        scanToml.setFailOnSeverity("HIGH");
+        scanToml.writeExcludeTests(true);
 
-        Assert.assertEquals(merged.getRulesToExclude(), Set.of(new ScanTomlFile.RuleToFilter("ballerina:1")));
-        Assert.assertEquals(merged.getAnalyzers().size(), 1);
-        Assert.assertTrue(merged.isSuppressionReasonRequired());
-        Assert.assertEquals(merged.getFailOnSeverity().orElseThrow(), "HIGH");
-        Assert.assertEquals(merged.getFailOnCount().orElseThrow(), 3);
-        Assert.assertTrue(merged.isExcludeTests());
-        Assert.assertTrue(merged.isRuleTableInherited());
-        Assert.assertEquals(merged.getRuleTableDisplayPath(Path.of(".")).orElseThrow(), "Scan.toml");
-        Assert.assertEquals(merged.getGateDisplayPath(Path.of(".")).orElseThrow(), "Scan.toml");
+        Assert.assertEquals(scanToml.getWrittenSettings(), Map.of(
+                ScanTomlFile.RULE_EXCLUDE, "[\"ballerina:1\", \"ballerina:2\"]",
+                "[[analyzer]] exampleOrg/example_analyzer:1.0.0", "",
+                ScanTomlFile.SUPPRESSION_REQUIRE_REASON, "true",
+                ScanTomlFile.GATE_FAIL_ON_SEVERITY, "\"HIGH\"",
+                ScanTomlFile.ANALYSIS_EXCLUDE_TESTS, "true"));
+        Assert.assertTrue(scanToml.getWrittenValue(ScanTomlFile.GATE_FAIL_ON_COUNT).isEmpty());
+        Assert.assertTrue(scanToml.isSuppressionEnabled(), "a setting not written keeps its default");
     }
 
-    @Test(description = "test the [rule] and [gate] tables a package sets replace the workspace ones as a whole")
-    void testReplacesRuleAndGateTables() {
-        ScanTomlFile pkg = new ScanTomlFile();
-        pkg.markRuleTableSet();
-        pkg.setRuleToInclude(new ScanTomlFile.RuleToFilter("ballerina:3"));
-        pkg.markGateTableSet();
-        pkg.setFailOnCount(5);
-
-        ScanTomlFile merged = pkg.inherit(workspaceScanToml());
-        Assert.assertEquals(merged.getRulesToInclude(), Set.of(new ScanTomlFile.RuleToFilter("ballerina:3")));
-        Assert.assertTrue(merged.getRulesToExclude().isEmpty(), "the workspace exclude is not inherited");
-        Assert.assertFalse(merged.isRuleTableInherited());
-        Assert.assertTrue(merged.getFailOnSeverity().isEmpty(), "the workspace severity is not inherited");
-        Assert.assertEquals(merged.getFailOnCount().orElseThrow(), 5);
-        Assert.assertTrue(merged.getRuleTableDisplayPath(Path.of(".")).isEmpty());
-        Assert.assertTrue(merged.getGateDisplayPath(Path.of(".")).isEmpty());
-    }
-
-    @Test(description = "test an empty table clears the inherited table")
-    void testEmptyTableClearsInheritedTable() {
-        ScanTomlFile pkg = new ScanTomlFile();
-        pkg.markRuleTableSet();
-        pkg.markGateTableSet();
-
-        ScanTomlFile merged = pkg.inherit(workspaceScanToml());
-        Assert.assertTrue(merged.getRulesToExclude().isEmpty());
-        Assert.assertFalse(merged.isRuleTableInherited());
-        Assert.assertFalse(merged.hasGate());
-    }
-
-    @Test(description = "test the other tables and the analyzer list a package sets replace the workspace ones")
-    void testReplacesOtherTables() {
-        ScanTomlFile workspace = workspaceScanToml();
-        ScanTomlFile pkg = new ScanTomlFile();
-        pkg.markAnalyzerListSet();
-        pkg.markSuppressionTableSet();
-        pkg.markAnalysisTableSet();
-        pkg.setPlatform(new ScanTomlFile.Platform("examplePlatform", "plugin.jar", Map.of()));
-
-        ScanTomlFile merged = pkg.inherit(workspace);
-        Assert.assertTrue(merged.getAnalyzers().isEmpty(), "analyzer = [] clears the analyzers");
-        Assert.assertFalse(merged.isSuppressionReasonRequired());
-        Assert.assertFalse(merged.isExcludeTests());
-        Assert.assertEquals(merged.getPlatforms().size(), 1);
-    }
-
-    private static ScanTomlFile workspaceScanToml() {
-        ScanTomlFile workspace = new ScanTomlFile();
-        workspace.setPath(Path.of("Scan.toml"));
-        workspace.markRuleTableSet();
-        workspace.setRuleToExclude(new ScanTomlFile.RuleToFilter("ballerina:1"));
-        workspace.markAnalyzerListSet();
-        workspace.setAnalyzer(new ScanTomlFile.Analyzer("exampleOrg", "example_analyzer", null, null));
-        workspace.markSuppressionTableSet();
-        workspace.setSuppressionReasonRequired(true);
-        workspace.markGateTableSet();
-        workspace.setFailOnSeverity("HIGH");
-        workspace.setFailOnCount(3);
-        workspace.markAnalysisTableSet();
-        workspace.setExcludeTests(true);
-        return workspace;
+    @Test(description = "test a command-line value for excludeTests does not count as written")
+    void testCommandLineExcludeTestsIsNotWritten() {
+        ScanTomlFile scanToml = new ScanTomlFile();
+        scanToml.setExcludeTests(true);
+        Assert.assertTrue(scanToml.isExcludeTests());
+        Assert.assertTrue(scanToml.getWrittenSettings().isEmpty());
     }
 }

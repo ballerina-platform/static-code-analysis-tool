@@ -346,6 +346,6 @@ public class ProjectAnalyzer {
     }
 
     protected ScannerContext getScannerContext(List<Rule> rules) {
-        return new ScannerContextImpl(rules);
+        return new ScannerContextImpl(rules, scanTomlFile.isExcludeTests());
     }
 }

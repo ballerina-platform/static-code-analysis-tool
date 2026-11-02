@@ -34,15 +34,17 @@ import java.util.List;
  */
 class TestProjectAnalyzer extends ProjectAnalyzer {
     private final List<TestReporter> reporters;
+    private final ScanTomlFile scanTomlFile;
 
     TestProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
         super(project, scanTomlFile);
         this.reporters = new ArrayList<>();
+        this.scanTomlFile = scanTomlFile;
     }
 
     @Override
     protected ScannerContext getScannerContext(List<Rule> rules) {
-        TestScannerContext scannerContext = new TestScannerContext(rules);
+        TestScannerContext scannerContext = new TestScannerContext(rules, scanTomlFile.isExcludeTests());
         reporters.add(scannerContext.getReporter());
         return scannerContext;
     }

@@ -37,6 +37,10 @@ public class ScanToolConstants {
     static final String RULE_DESCRIPTION = "description";
     static final String RULE_SEVERITY = "severity";
     static final String RUNNING_SCANS_LOG = "Running Scans";
+    static final String RUNNING_PACKAGE_SCANS_LOG = "Running scans on ";
+    static final String LOADING_CONFIGURATIONS_LOG = "Loading scan tool configurations for ";
+    static final String WORKSPACE_CONFIGURATIONS_LOG = "Using the workspace scan tool configurations for ";
+    static final String COMBINING_RESULTS_LOG = "Combining the results of ";
     static final String RESOLVING_WORKSPACE_DEPENDENCIES_LOG = "Resolving workspace dependencies";
     static final String RESOLVING_PACKAGE_SCAN_RULES_LOG = "Resolving scan rules from package dependencies";
     static final String RESOLVING_WORKSPACE_SCAN_RULES_LOG = "Resolving scan rules from workspace dependencies";

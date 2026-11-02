@@ -1,2 +1,0 @@
-Loading scan tool configurations from <ABS_SOURCE_ROOT>/Scan.toml
-failed to download remote jar file: 'examplePlatform.jar'

@@ -80,7 +80,7 @@ final class ScanFailure extends RuntimeException {
         return runtime(describe(exception));
     }
 
-    static String describe(RuntimeException exception) {
+    static String describe(Throwable exception) {
         String message = exception.getMessage();
         return message != null && !message.isBlank() ? message : exception.getClass().getName();
     }

@@ -19,11 +19,14 @@
 package io.ballerina.scan.utils;
 
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * {@code ScanTomlFile} contains an in-memory representation of the Scan.toml file.
@@ -31,24 +34,28 @@ import java.util.Set;
  * @since 0.1.0
  * */
 public class ScanTomlFile {
+    public static final String RULE_INCLUDE = "[rule] include";
+    public static final String RULE_EXCLUDE = "[rule] exclude";
+    public static final String SUPPRESSION_ENABLED = "[suppression] enabled";
+    public static final String SUPPRESSION_REQUIRE_REASON = "[suppression] requireReason";
+    public static final String SUPPRESSION_REQUIRE_RULE_ID = "[suppression] requireRuleId";
+    public static final String GATE_FAIL_ON_SEVERITY = "[gate] failOnSeverity";
+    public static final String GATE_FAIL_ON_COUNT = "[gate] failOnCount";
+    public static final String ANALYSIS_EXCLUDE_TESTS = "[analysis] excludeTests";
+    private static final String ANALYZER_SETTING = "[[analyzer]] ";
+
     private final Set<Platform> platforms = new LinkedHashSet<>();
     private final Set<Analyzer> analyzers = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToInclude = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToExclude = new LinkedHashSet<>();
+    // Each setting the file writes, keyed by its name, with its value as written in TOML
+    private final Map<String, String> writtenSettings = new LinkedHashMap<>();
     private boolean suppressionEnabled = true;
     private boolean suppressionReasonRequired;
     private boolean suppressionRuleIdRequired;
     private String failOnSeverity;
     private Integer failOnCount;
     private boolean excludeTests;
-    private boolean ruleTableSet;
-    private boolean analyzerListSet;
-    private boolean suppressionTableSet;
-    private boolean gateTableSet;
-    private boolean analysisTableSet;
-    private boolean ruleTableInherited;
-    private ScanTomlFile ruleSource = this;
-    private ScanTomlFile gateSource = this;
     private Path path;
     private String remoteLocation;
 
@@ -61,39 +68,30 @@ public class ScanTomlFile {
 
     void setFailOnSeverity(String severity) {
         failOnSeverity = severity;
+        writtenSettings.put(GATE_FAIL_ON_SEVERITY, "\"" + severity + "\"");
     }
 
     void setFailOnCount(Integer count) {
         failOnCount = count;
+        writtenSettings.put(GATE_FAIL_ON_COUNT, String.valueOf(count));
     }
 
     void setPath(Path path) {
         this.path = path;
     }
 
-    void markRuleTableSet() {
-        ruleTableSet = true;
+    void writeExcludeTests(boolean excludeTests) {
+        this.excludeTests = excludeTests;
+        writtenSettings.put(ANALYSIS_EXCLUDE_TESTS, String.valueOf(excludeTests));
     }
 
-    void markAnalyzerListSet() {
-        analyzerListSet = true;
-    }
-
-    void markSuppressionTableSet() {
-        suppressionTableSet = true;
-    }
-
-    void markGateTableSet() {
-        gateTableSet = true;
-    }
-
-    void markAnalysisTableSet() {
-        analysisTableSet = true;
+    void writeRules(boolean include, Collection<String> ruleIds) {
+        writtenSettings.put(include ? RULE_INCLUDE : RULE_EXCLUDE, quotedList(ruleIds));
     }
 
     /**
-     * Sets whether the test sources are left out of the scan, as {@code [analysis] excludeTests} does. The command
-     * line overrides it either way for a single run.
+     * Sets whether the test sources are left out of the scan for a single run, as {@code --exclude-tests} does. It
+     * does not change the settings the file writes.
      *
      * @param excludeTests true to leave the test sources out of the scan, false to scan them
      * @since 0.13.0
@@ -113,83 +111,27 @@ public class ScanTomlFile {
     }
 
     /**
-     * Returns the configurations of a workspace package, with the workspace Scan.toml as the default. Each of the
-     * {@code [rule]}, {@code [suppression]}, {@code [gate]} and {@code [analysis]} tables and the {@code [[analyzer]]}
-     * list that this file sets replaces the workspace one as a whole, even when it is empty. The platforms are always
-     * this file's own, since a workspace Scan.toml cannot set them.
+     * Returns each setting the file writes explicitly, in the order it was read. The key names the setting, such as
+     * {@link #GATE_FAIL_ON_COUNT} or {@code [[analyzer]] org/name}, and the value is as written in TOML, such as
+     * {@code 2} or {@code ["ballerina:1"]}; an analyzer entry has an empty value. A setting left at its default
+     * because the file does not write it is not included.
      *
-     * @param workspace the configurations of the workspace Scan.toml
-     * @return the merged configurations
+     * @return an unmodifiable map of the written settings
      * @since 0.13.0
      */
-    public ScanTomlFile inherit(ScanTomlFile workspace) {
-        ScanTomlFile merged = new ScanTomlFile();
-        merged.path = path;
-        merged.remoteLocation = remoteLocation;
-        merged.platforms.addAll(platforms);
-
-        ScanTomlFile ruleTable = ruleTableSet ? this : workspace;
-        merged.rulesToInclude.addAll(ruleTable.rulesToInclude);
-        merged.rulesToExclude.addAll(ruleTable.rulesToExclude);
-        merged.ruleTableSet = ruleTable.ruleTableSet;
-        merged.ruleTableInherited = !ruleTableSet && workspace.ruleTableSet;
-        merged.ruleSource = ruleTableSet ? merged : workspace.ruleSource;
-
-        ScanTomlFile analyzerList = analyzerListSet ? this : workspace;
-        merged.analyzers.addAll(analyzerList.analyzers);
-        merged.analyzerListSet = analyzerList.analyzerListSet;
-
-        ScanTomlFile suppression = suppressionTableSet ? this : workspace;
-        merged.suppressionEnabled = suppression.suppressionEnabled;
-        merged.suppressionReasonRequired = suppression.suppressionReasonRequired;
-        merged.suppressionRuleIdRequired = suppression.suppressionRuleIdRequired;
-        merged.suppressionTableSet = suppression.suppressionTableSet;
-
-        ScanTomlFile gate = gateTableSet ? this : workspace;
-        merged.failOnSeverity = gate.failOnSeverity;
-        merged.failOnCount = gate.failOnCount;
-        merged.gateTableSet = gate.gateTableSet;
-        merged.gateSource = gateTableSet ? merged : workspace.gateSource;
-
-        ScanTomlFile analysis = analysisTableSet ? this : workspace;
-        merged.excludeTests = analysis.excludeTests;
-        merged.analysisTableSet = analysis.analysisTableSet;
-        return merged;
+    public Map<String, String> getWrittenSettings() {
+        return Collections.unmodifiableMap(writtenSettings);
     }
 
     /**
-     * Returns whether the {@code [rule]} table comes from the workspace Scan.toml, because the package does not set
-     * one.
+     * Returns the value of a setting as written in the file.
      *
-     * @return true if the rules to include or exclude are inherited from the workspace
+     * @param setting the name of the setting, such as {@link #GATE_FAIL_ON_COUNT}
+     * @return the value as written in TOML, or empty when the file does not write the setting
      * @since 0.13.0
      */
-    public boolean isRuleTableInherited() {
-        return ruleTableInherited;
-    }
-
-    /**
-     * Returns the location of the file the {@code [rule]} table was read from, as shown to the user. It is the
-     * workspace Scan.toml for a package that inherits the table.
-     *
-     * @param root the directory a local path is shown relative to
-     * @return the location, or empty when no Scan.toml file was read
-     * @since 0.13.0
-     */
-    public Optional<String> getRuleTableDisplayPath(Path root) {
-        return ruleSource.getDisplayPath(root);
-    }
-
-    /**
-     * Returns the location of the file the {@code [gate]} table was read from, as shown to the user. It is the
-     * workspace Scan.toml for a package that inherits the table.
-     *
-     * @param root the directory a local path is shown relative to
-     * @return the location, or empty when no Scan.toml file was read
-     * @since 0.13.0
-     */
-    public Optional<String> getGateDisplayPath(Path root) {
-        return gateSource.getDisplayPath(root);
+    public Optional<String> getWrittenValue(String setting) {
+        return Optional.ofNullable(writtenSettings.get(setting));
     }
 
     /**
@@ -247,12 +189,26 @@ public class ScanTomlFile {
         return getPath().map(file -> ScanUtils.displayPath(root, file));
     }
 
+    /**
+     * Formats values as a TOML array of strings, such as {@code ["a", "b"]}.
+     *
+     * @param values the values
+     * @return the TOML array
+     * @since 0.13.0
+     */
+    public static String quotedList(Collection<String> values) {
+        return values.stream().map(value -> "\"" + value + "\"").collect(Collectors.joining(", ", "[", "]"));
+    }
+
     void setPlatform(Platform platform) {
         platforms.add(platform);
     }
 
     void setAnalyzer(Analyzer analyzer) {
         analyzers.add(analyzer);
+        String id = analyzer.org() + "/" + analyzer.name()
+                + (analyzer.version() == null ? "" : ":" + analyzer.version());
+        writtenSettings.put(ANALYZER_SETTING + id, "");
     }
 
     void setRuleToInclude(RuleToFilter rule) {
@@ -265,14 +221,17 @@ public class ScanTomlFile {
 
     void setSuppressionEnabled(boolean enabled) {
         suppressionEnabled = enabled;
+        writtenSettings.put(SUPPRESSION_ENABLED, String.valueOf(enabled));
     }
 
     void setSuppressionReasonRequired(boolean required) {
         suppressionReasonRequired = required;
+        writtenSettings.put(SUPPRESSION_REQUIRE_REASON, String.valueOf(required));
     }
 
     void setSuppressionRuleIdRequired(boolean required) {
         suppressionRuleIdRequired = required;
+        writtenSettings.put(SUPPRESSION_REQUIRE_RULE_ID, String.valueOf(required));
     }
 
     /**
@@ -349,7 +308,8 @@ public class ScanTomlFile {
      * Represents a static code analysis platform.
      *
      * @param name      in-memory representation of platform name
-     * @param path      in-memory representation of platform JAR path
+     * @param path      the absolute path of a local platform JAR, or the URL of a remote one, which is downloaded
+     *                  only when the platform is selected with {@code --platforms}
      * @param arguments in-memory representation of platform arguments
      */
     public record Platform(String name, String path, Map<String, Object> arguments) {

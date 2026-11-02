@@ -33,10 +33,12 @@ import java.util.Map;
 class TestScannerContext implements ScannerContext {
     private final TestReporter reporter;
     private final Map<String, Object> userData;
+    private final boolean excludeTests;
 
-    TestScannerContext(List<Rule> rules) {
+    TestScannerContext(List<Rule> rules, boolean excludeTests) {
         this.reporter = new TestReporter(rules);
         this.userData = new HashMap<>();
+        this.excludeTests = excludeTests;
     }
 
     /**
@@ -52,5 +54,10 @@ class TestScannerContext implements ScannerContext {
     @Override
     public Map<String, Object> userData() {
         return userData;
+    }
+
+    @Override
+    public boolean isExcludeTests() {
+        return excludeTests;
     }
 }

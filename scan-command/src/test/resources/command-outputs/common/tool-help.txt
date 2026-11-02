@@ -29,12 +29,12 @@ OPTIONS
                 rules contributed by the project's dependencies.
 
         --include-rules=<rule1, ...>
-                Run analysis for a specific set of rules. Replaces the whole [rule] table of
-                Scan.toml.
+                Run analysis for a specific set of rules. Replaces 'include' in the [rule] table of
+                Scan.toml; an 'exclude' set there still applies, and the two cannot be combined.
 
         --exclude-rules=<rule1, ...>
-                Exclude analysis for a specific set of rules. Replaces the whole [rule] table of
-                Scan.toml.
+                Exclude analysis for a specific set of rules. Replaces 'exclude' in the [rule] table
+                of Scan.toml; an 'include' set there still applies, and the two cannot be combined.
 
         --exclude-tests[=<true|false>]
                 Leave the test sources of each package out of the scan, so that their issues and
@@ -42,7 +42,10 @@ OPTIONS
                 Overrides 'excludeTests' in the [analysis] table of Scan.toml either way.
 
         --platforms=<platformName1, ...>
-                Define platform(s) to report results. The user can define more than one platform.
+                Report the results to these platforms, which must be declared in the [[platform]]
+                table of Scan.toml. No platform is reported to unless it is named here. The results
+                are printed and saved first; then every platform is run, and the scan fails if any
+                of them fails.
 
         --ignore-suppressions
                 Disregard @scan:Suppress annotations and report every issue.
@@ -62,10 +65,11 @@ OPTIONS
                 Fail the scan when there are n or more issues at or above --fail-on-severity, or of
                 any severity if it is not set. A whole number of 1 or more.
 
-                Either gate option replaces the whole [gate] table of Scan.toml, so a setting that
-                is not given on the command line is not read from Scan.toml. The gate counts the
-                issues left after rule selection and suppressions, and only changes the exit code.
-                Reports always hold every issue. By default no gate is set.
+                Each gate option replaces only its own setting in the [gate] table of Scan.toml, so
+                a setting that is not given on the command line is still read from Scan.toml. The
+                gate counts the issues left after rule selection and suppressions, and only changes
+                the exit code. It is checked last, after the platforms. Reports always hold every
+                issue. By default no gate is set.
 
 EXAMPLES
         Run analysis against all Ballerina documents in the current package, print results to the

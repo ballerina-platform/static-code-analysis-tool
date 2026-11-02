@@ -156,7 +156,7 @@ public class GateTest extends BaseTest {
         Assert.assertFalse(run.output().contains("warning"), run.output());
     }
 
-    @Test(description = "test the command-line gate options replace the whole [gate] table of Scan.toml")
+    @Test(description = "test each command-line gate option replaces only its own field of [gate] in Scan.toml")
     void testGatePrecedence() throws IOException {
         ScanRun run = scan(gateConfigProject, "--fail-on-severity=NONE");
         Assert.assertEquals(run.exitCode(), 0, run.output());
@@ -165,18 +165,22 @@ public class GateTest extends BaseTest {
 
         run = scan(gateConfigProject, "--fail-on-severity=high");
         Assert.assertEquals(run.exitCode(), 1, run.output());
-        Assert.assertFalse(run.output().contains("warning"), "the same gate gives no warning");
+        Assert.assertFalse(run.output().contains("warning"), "the same value gives no warning");
 
-        // The severity in Scan.toml is not read, so the count covers every severity
+        // The severity in Scan.toml is kept, and the count is not written there, so there is no warning
         run = scan(gateConfigProject, "--fail-on-count=2");
+        Assert.assertEquals(run.exitCode(), 0, "1 HIGH issue is below the count of 2: " + run.output());
+        Assert.assertFalse(run.output().contains("warning"), run.output());
+
+        run = scan(gateConfigProject, "--fail-on-severity=LOW", "--fail-on-count=2");
         Assert.assertEquals(run.exitCode(), 1, run.output());
-        Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-count=2 overrides "
-                + "[gate] failOnSeverity = \"HIGH\" in Scan.toml\n"), run.output());
-        Assert.assertTrue(run.errorReport().contains("at or above INFO, limit 2"), run.output());
+        Assert.assertEquals(run.output().split("bal scan: warning: ", -1).length - 1, 1, run.output());
+        Assert.assertTrue(run.errorReport().startsWith("bal scan: error: 6 issues at or above LOW, limit 2"),
+                run.output());
     }
 
-    @Test(description = "test a command-line count turns on a gate that Scan.toml turns off")
-    void testCountOverridesNoneInScanToml() throws IOException {
+    @Test(description = "test a command-line count keeps a gate that Scan.toml turns off with NONE turned off")
+    void testCountKeepsNoneInScanToml() throws IOException {
         Path scanToml = gateConfigProject.resolve("Scan.toml");
         String original = Files.readString(scanToml, StandardCharsets.UTF_8);
         Files.writeString(scanToml, """
@@ -185,11 +189,13 @@ public class GateTest extends BaseTest {
                 """);
         try {
             ScanRun run = scan(gateConfigProject, "--fail-on-count=1");
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertFalse(run.output().contains("warning"), run.output());
+
+            run = scan(gateConfigProject, "--fail-on-severity=INFO", "--fail-on-count=1");
             Assert.assertEquals(run.exitCode(), 1, run.output());
-            Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-count=1 overrides "
+            Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-severity=INFO overrides "
                     + "[gate] failOnSeverity = \"NONE\" in Scan.toml\n"), run.output());
-            Assert.assertTrue(run.errorReport().startsWith("bal scan: error: 6 issues at or above INFO, limit 1"),
-                    run.output());
         } finally {
             Files.writeString(scanToml, original);
         }
@@ -345,18 +351,19 @@ public class GateTest extends BaseTest {
         // pkg-a has 1 HIGH issue and pkg-b has 2 LOW issues, so no package reaches a count of 3 on its own
         ScanRun run = scan(gatedWorkspace, "--fail-on-count=3");
         Assert.assertEquals(run.exitCode(), 0, run.output());
-        Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-count=3 overrides [gate] "
-                + "failOnSeverity = \"HIGH\" in pkg-a/Scan.toml\n"), run.output());
+        Assert.assertFalse(run.output().contains("in pkg-a/Scan.toml"), "pkg-a does not write failOnCount: "
+                + run.output());
         Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-count=3 overrides [gate] "
                 + "failOnCount = 5 in pkg-b/Scan.toml\n"), run.output());
 
-        // pkg-b does not keep failOnCount = 5 from its own Scan.toml, so both packages fail on their first issue
+        // pkg-b keeps failOnCount = 5 from its own Scan.toml, so only pkg-a fails
         run = scan(gatedWorkspace, "--fail-on-severity=LOW");
         Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-severity=LOW overrides [gate] "
+                + "failOnSeverity = \"HIGH\" in pkg-a/Scan.toml\n"), run.output());
         Assert.assertEquals(run.errorReport(), """
-                bal scan: error: 2 packages failed the gate
-                pkg-a: error: 1 issue at or above LOW, limit 1 (HIGH: 1)
-                pkg-b: error: 2 issues at or above LOW, limit 1 (LOW: 2)""");
+                bal scan: error: 1 package failed the gate
+                pkg-a: error: 1 issue at or above LOW, limit 1 (HIGH: 1)""");
 
         run = scan(gatedWorkspace, "--fail-on-severity=LOW", "--fail-on-count=1");
         Assert.assertEquals(run.exitCode(), 1, run.output());
@@ -366,51 +373,77 @@ public class GateTest extends BaseTest {
                 pkg-b: error: 2 issues at or above LOW, limit 1 (LOW: 2)""");
     }
 
-    @Test(description = "test the workspace [gate] table is the default of the packages, as a whole")
-    void testWorkspaceGateDefault() throws IOException {
+    @Test(description = "test a package uses its own Scan.toml as a whole, or the workspace one when it has none")
+    void testWorkspaceScanTomlIsUsedAsAWhole() throws IOException {
         Path packageScanToml = gatedWorkspace.resolve("pkg-b").resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        String notApplied = "bal scan: warning: pkg-b/Scan.toml overrides Scan.toml for pkg-b; not applied: "
+                + "[gate] failOnSeverity = \"LOW\"\n";
         try {
             writeWorkspaceScanToml("""
                     [gate]
                     failOnSeverity = "LOW"
                     """);
-            Files.writeString(packageScanToml, "");
+            // pkg-b has no Scan.toml, so it uses the workspace one; pkg-a uses its own
+            Files.delete(packageScanToml);
             ScanRun run = scan(gatedWorkspace);
             Assert.assertEquals(run.exitCode(), 1, run.output());
             Assert.assertEquals(run.errorReport(), """
                     bal scan: error: 2 packages failed the gate
                     pkg-a: error: 1 issue at or above HIGH, limit 1 (HIGH: 1)
                     pkg-b: error: 2 issues at or above LOW, limit 1 (LOW: 2)""");
+            Assert.assertTrue(run.output().contains("bal scan: warning: pkg-a/Scan.toml overrides Scan.toml for "
+                    + "pkg-a; not applied: [gate] failOnSeverity = \"LOW\"\n"), run.output());
+            // Progress lines name the package each file and scan is for
+            for (String line : List.of("Loading scan tool configurations for the workspace from Scan.toml\n",
+                    "Loading scan tool configurations for pkg-a from pkg-a/Scan.toml\n",
+                    "Using the workspace scan tool configurations for pkg-b\n", "Running scans on pkg-a\n",
+                    "Running scans on pkg-b\n", "\nCombining the results of 2 packages\n")) {
+                Assert.assertTrue(run.output().contains(line), line + " in " + run.output());
+            }
+            Assert.assertFalse(run.output().contains("Loading scan tool configurations from"), run.output());
+            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
 
             run = scan(gatedWorkspace, "--fail-on-severity=BLOCKER");
             Assert.assertEquals(run.exitCode(), 0, run.output());
             Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-severity=BLOCKER overrides "
-                    + "[gate] failOnSeverity = \"LOW\" in Scan.toml\n"),
-                    "an inherited gate names the workspace Scan.toml");
+                    + "[gate] failOnSeverity = \"LOW\" in Scan.toml\n"), "names the workspace Scan.toml");
+            Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-severity=BLOCKER overrides "
+                    + "[gate] failOnSeverity = \"HIGH\" in pkg-a/Scan.toml\n"), run.output());
 
-            // pkg-b sets only the count, so the workspace severity is not inherited and every severity counts
+            // pkg-b's own file sets only the count, so the workspace severity does not apply
             Files.writeString(packageScanToml, """
                     [gate]
                     failOnCount = 2
                     """);
             run = scan(gatedWorkspace);
             Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.output().contains(notApplied), run.output());
             Assert.assertTrue(run.errorReport().endsWith("pkg-b: error: 2 issues at or above INFO, limit 2 (LOW: 2)"),
                     run.output());
 
             run = scan(gatedWorkspace, "--fail-on-severity=BLOCKER", "--fail-on-count=3");
             Assert.assertEquals(run.exitCode(), 0, run.output());
-            Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-severity=BLOCKER --fail-on-count=3 "
-                    + "overrides [gate] failOnCount = 2 in pkg-b/Scan.toml\n"), run.output());
+            Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-count=3 overrides [gate] "
+                    + "failOnCount = 2 in pkg-b/Scan.toml\n"), run.output());
+            Assert.assertFalse(run.output().contains("--fail-on-severity=BLOCKER overrides [gate] failOnSeverity "
+                    + "= \"LOW\""), "the workspace file is not used by any package: " + run.output());
 
-            // An empty table turns off the inherited gate
-            Files.writeString(packageScanToml, """
-                    [gate]
-                    """);
+            // An empty file of its own turns the gate off for pkg-b
+            Files.writeString(packageScanToml, "");
             run = scan(gatedWorkspace);
             Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.output().contains(notApplied), run.output());
             Assert.assertFalse(run.errorReport().contains("pkg-b"), run.output());
+
+            // Repeating every workspace setting gives no warning
+            Files.writeString(packageScanToml, """
+                    [gate]
+                    failOnSeverity = "LOW"
+                    failOnCount = 5
+                    """);
+            run = scan(gatedWorkspace);
+            Assert.assertFalse(run.output().contains("overrides Scan.toml for pkg-b"), run.output());
         } finally {
             Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
             Files.writeString(packageScanToml, original);
@@ -428,16 +461,19 @@ public class GateTest extends BaseTest {
             ScanRun run = scan(gatedWorkspace);
             Assert.assertNotEquals(run.exitCode(), 0, run.output());
             Assert.assertTrue(run.output().contains("Scan.toml:1:1: error: 'analyzer' must be written as "
-                    + "[[analyzer]] tables, or as analyzer = [] to clear the workspace analyzers"), run.output());
+                    + "[[analyzer]] tables, or as analyzer = []\n"), run.output());
         } finally {
             Files.writeString(packageScanToml, original);
         }
     }
 
-    @Test(description = "test the packages inherit the workspace [rule] table they do not set")
+    @Test(description = "test a package without a Scan.toml uses the workspace [rule] table")
     void testWorkspaceRuleDefault() throws IOException {
+        Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
+        String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
         try {
-            // pkg-a sets only [gate], so it inherits the exclusion of its HIGH issue
+            // pkg-a has no Scan.toml, so it uses the workspace exclusion of its HIGH issue
+            Files.delete(packageScanToml);
             writeWorkspaceScanToml("""
                     [rule]
                     exclude = ["ballerina:13"]
@@ -452,9 +488,10 @@ public class GateTest extends BaseTest {
             run = scan(gatedWorkspace);
             Assert.assertTrue(run.output().contains("bal scan: warning: 'exampleOrg/example_module_static_code_"
                     + "analyzer:1' in [rule] of Scan.toml is not a rule of pkg-a\n"), run.output());
-            Assert.assertTrue(run.output().contains("is not a rule of pkg-b\n"), run.output());
+            Assert.assertFalse(run.output().contains("is not a rule of pkg-b"), "pkg-b uses its own file: "
+                    + run.output());
 
-            // The command-line rules replace the inherited [rule] table, so pkg-a reports its HIGH issue again
+            // --exclude-rules replaces the exclude field, so pkg-a reports its HIGH issue again
             writeWorkspaceScanToml("""
                     [rule]
                     exclude = ["ballerina:13"]
@@ -465,10 +502,37 @@ public class GateTest extends BaseTest {
                     + "[rule] exclude = [\"ballerina:13\"] in Scan.toml\n"), run.output());
         } finally {
             Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
+            Files.writeString(packageScanToml, original);
         }
     }
 
-    @Test(description = "test a package [rule] table replaces the workspace one as a whole")
+    @Test(description = "test a rule option that leaves both include and exclude set is a usage error")
+    void testRuleOptionConflictsWithScanToml() throws IOException {
+        Path scanToml = gateConfigProject.resolve("Scan.toml");
+        String original = Files.readString(scanToml, StandardCharsets.UTF_8);
+        try {
+            Files.writeString(scanToml, original + """
+
+                    [rule]
+                    include = ["ballerina:13"]
+                    """);
+            ScanRun run = scan(gateConfigProject, "--exclude-rules=ballerina:1");
+            Assert.assertEquals(run.exitCode(), 2, run.output());
+            Assert.assertTrue(run.errorReport().startsWith("bal scan: error: --exclude-rules=ballerina:1 cannot be "
+                    + "combined with [rule] include = [\"ballerina:13\"] in Scan.toml"), run.output());
+            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+
+            // Replacing the same field is not a conflict
+            run = scan(gateConfigProject, "--include-rules=ballerina:1", "--fail-on-severity=NONE");
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertTrue(run.output().contains("bal scan: warning: --include-rules=ballerina:1 overrides "
+                    + "[rule] include = [\"ballerina:13\"] in Scan.toml\n"), run.output());
+        } finally {
+            Files.writeString(scanToml, original);
+        }
+    }
+
+    @Test(description = "test a package Scan.toml is used instead of the workspace one, [rule] included")
     void testPackageRuleTableReplacesWorkspaceTable() throws IOException {
         Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
@@ -478,7 +542,10 @@ public class GateTest extends BaseTest {
                     include = ["ballerina:13"]
                     """);
             ScanRun run = scan(gatedWorkspace, "--fail-on-severity=HIGH");
-            Assert.assertEquals(run.exitCode(), 1, "pkg-a inherits the include of its HIGH issue: " + run.output());
+            Assert.assertEquals(run.exitCode(), 1, "pkg-a uses its own file, which selects every rule: "
+                    + run.output());
+            Assert.assertTrue(run.output().contains("not applied: [rule] include = [\"ballerina:13\"]"),
+                    run.output());
 
             Files.writeString(packageScanToml, original + """
 
@@ -530,7 +597,7 @@ public class GateTest extends BaseTest {
                     run.output());
             Assert.assertTrue(run.errorReport().endsWith("error: [[platform]] cannot be set in a workspace "
                     + "Scan.toml; set it in the Scan.toml of each package"), run.output());
-            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+            Assert.assertFalse(run.output().contains("Running scans on"), run.output());
         } finally {
             Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
         }

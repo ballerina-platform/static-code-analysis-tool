@@ -191,10 +191,13 @@ public class ScanUtilsTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
-        Assert.assertNull(scanTomlFile);
-        String expected = getExpectedOutput("scan-toml-invalid-platform-jar.txt")
-                .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString());
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        // The JAR is downloaded only when the platform is selected, so loading Scan.toml succeeds
+        Assert.assertNotNull(scanTomlFile);
+        ScanTomlFile.Platform platform = scanTomlFile.getPlatforms().iterator().next();
+        Assert.assertEquals(platform.path(), "https://example.com/example-platform-analyzer-1.0.jar");
+        ScanToolException exception = Assert.expectThrows(ScanToolException.class,
+                () -> ScanUtils.resolvePlatformJar(platform, project.targetDir(), printStream));
+        Assert.assertEquals(exception.getMessage(), "failed to download remote jar file: 'examplePlatform.jar'");
     }
 
     @Test(description =
