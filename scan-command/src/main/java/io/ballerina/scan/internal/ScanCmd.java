@@ -60,9 +60,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -101,6 +103,8 @@ public class ScanCmd implements BLauncherCmd {
     // Records the exit code instead of exiting, so that tests can assert it
     private Consumer<ScanFailure> exitHandler = this::recordExitCode;
     private int exitCode;
+    // Rule tests run through the test runner inspect the issues, so a gate in their fixtures must not fail them
+    private boolean gateEnabled = true;
 
     // Collects every positional argument, so that extra ones exit as a usage error instead of a launcher error
     @CommandLine.Parameters
@@ -199,6 +203,12 @@ public class ScanCmd implements BLauncherCmd {
         this.allIssues = new ArrayList<>();
     }
 
+    /**
+     * Creates a scan command for test runners. The quality gate is off, so the issues of a fixture can be inspected
+     * whatever its {@code [gate]} settings, and a failure is thrown as a {@link ScanToolException}, carrying the
+     * problems that caused it in {@link ScanToolException#diagnostics()}, instead of exiting the JVM.
+     * Before 0.13.0, failures were thrown as {@code BLauncherException}.
+     */
     protected ScanCmd(
             Path projectPath,
             PrintStream outputStream,
@@ -225,6 +235,7 @@ public class ScanCmd implements BLauncherCmd {
         this.excludeRules.addAll(excludeRules.stream().map(Rule::id).toList());
         this.platforms.addAll(platforms);
         this.allIssues = new ArrayList<>();
+        this.gateEnabled = false;
         // Test runners run the scan in their own JVM, so a failure is thrown instead of exiting it
         this.exitHandler = failure -> {
             throw new ScanToolException(failure.getMessage(), failure.details());
@@ -344,7 +355,7 @@ public class ScanCmd implements BLauncherCmd {
 
         // Every package is prepared before any is scanned, so that rule IDs are checked against all their rules
         Map<BuildProject, ScanFailure> failures = new LinkedHashMap<>();
-        List<PackageScan> packageScans = new ArrayList<>();
+        Deque<PackageScan> packageScans = new ArrayDeque<>();
         for (BuildProject buildProject : workspaceProject.getResolution().dependencyGraph()
                 .toTopologicallySortedList()) {
             if (ProjectUtils.isProjectEmpty(buildProject)) {
@@ -377,8 +388,10 @@ public class ScanCmd implements BLauncherCmd {
         packageScans.forEach(packageScan -> packageGates.put(packageScan.project(),
                 resolveGate(packageScan.scanToml(), workspaceProject.sourceRoot())));
 
-        List<PackageResult> results = new ArrayList<>();
-        for (PackageScan packageScan : packageScans) {
+        // Each package's analyzer and rules are released once it is scanned, and its result once it is reported
+        Deque<PackageResult> results = new ArrayDeque<>();
+        while (!packageScans.isEmpty()) {
+            PackageScan packageScan = packageScans.poll();
             BuildProject buildProject = (BuildProject) packageScan.project();
             try {
                 PackageResult result = scanPackage(packageScan);
@@ -394,12 +407,20 @@ public class ScanCmd implements BLauncherCmd {
         failOnPackageFailures(workspaceProject, failures);
 
         // A package that cannot report to its platforms does not stop the others from reporting
-        for (PackageResult result : results) {
+        int activeIssueCount = 0;
+        List<String> gateFailures = new ArrayList<>();
+        while (!results.isEmpty()) {
+            PackageResult result = results.poll();
+            Project packageProject = result.project();
             try {
                 report(result);
             } catch (RuntimeException ex) {
-                failures.put((BuildProject) result.packageScan().project(), ScanFailure.from(ex));
+                failures.put((BuildProject) packageProject, ScanFailure.from(ex));
             }
+            activeIssueCount += result.activeIssues().size();
+            // Errors win over the gate, so a failure is only thrown after the package failures are checked
+            packageGates.getOrDefault(packageProject, QualityGate.OFF).evaluate(result.activeIssues())
+                    .ifPresent(message -> gateFailures.add(packageError(workspaceProject, packageProject, message)));
         }
         // The packages' issues are printed as one document, so that standard output stays valid JSON
         if (printWorkspaceIssues) {
@@ -417,19 +438,12 @@ public class ScanCmd implements BLauncherCmd {
             ScanFailure.from(ex).reportLines().forEach(errorStream::println);
             failOnPackageFailures(workspaceProject, failures);
         }
-        printSummary(results.stream().mapToInt(result -> result.activeIssues().size()).sum(),
-                allSuppressions.size());
+        printSummary(activeIssueCount, allSuppressions.size());
         failOnPackageFailures(workspaceProject, failures);
 
-        List<String> gateFailures = new ArrayList<>();
-        for (PackageResult result : results) {
-            Project packageProject = result.packageScan().project();
-            packageGates.getOrDefault(packageProject, QualityGate.OFF).evaluate(result.activeIssues())
-                    .ifPresent(message -> gateFailures.add(packageError(workspaceProject, packageProject, message)));
-        }
         if (!gateFailures.isEmpty()) {
-            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PACKAGES_FAILED_GATE, gateFailures.size(),
-                    String.valueOf(gateFailures.size())), gateFailures);
+            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PACKAGES_FAILED_GATE, gateFailures.size()),
+                    gateFailures);
         }
     }
 
@@ -472,8 +486,8 @@ public class ScanCmd implements BLauncherCmd {
                 exitCode = ExitCode.INVALID_TARGET;
             }
         }
-        throw ScanFailure.of(exitCode, DiagnosticLog.error(DiagnosticCode.PACKAGES_FAILED, failures.size(),
-                String.valueOf(failures.size())), diagnostics);
+        throw ScanFailure.of(exitCode, DiagnosticLog.error(DiagnosticCode.PACKAGES_FAILED, failures.size()),
+                diagnostics);
     }
 
     private static String packageError(WorkspaceProject workspaceProject, Project packageProject, String message) {
@@ -649,7 +663,7 @@ public class ScanCmd implements BLauncherCmd {
     // The gate options replace the whole [gate] table, so a setting left off the command line is not read from
     // Scan.toml. A platform that triggers the scan applies its own quality gate, so the tool gate is off
     private QualityGate resolveGate(ScanTomlFile scanTomlFile, Path root) {
-        if (platformTriggered) {
+        if (platformTriggered || !gateEnabled) {
             return QualityGate.OFF;
         }
         String tomlSeverity = scanTomlFile.getFailOnSeverity().orElse(null);
@@ -730,13 +744,13 @@ public class ScanCmd implements BLauncherCmd {
                 SuppressionOptions.of(packageScan.scanToml(), ignoreSuppressions, requireSuppressionReason,
                         requireSuppressionRuleId));
         printSuppressionWarnings(suppressionOutcome.diagnostics());
-        return new PackageResult(packageScan, issues, suppressionOutcome.activeIssues(),
+        return new PackageResult(project, issues, suppressionOutcome.activeIssues(),
                 suppressionOutcome.suppressionsByIssue(), scannerPlatformPlugins, packagePlatforms, failedPlatforms,
                 suppressionFailure(suppressionOutcome));
     }
 
     private void report(PackageResult result) {
-        Project project = result.packageScan().project();
+        Project project = result.project();
         List<Issue> activeIssues = result.activeIssues();
         Map<Issue, SuppressedIssue> suppressions = result.suppressions();
         allIssues.addAll(result.issues());
@@ -831,7 +845,7 @@ public class ScanCmd implements BLauncherCmd {
                         diagnostic.message()))
                 .toList();
         return ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.SUPPRESSION_REQUIREMENTS_NOT_MET,
-                invalidSuppressionCount, String.valueOf(invalidSuppressionCount)), diagnostics);
+                invalidSuppressionCount), diagnostics);
     }
 
     private static String formatDiagnostic(Diagnostic diagnostic) {
@@ -999,7 +1013,8 @@ public class ScanCmd implements BLauncherCmd {
                                RuleSelection ruleSelection) {
     }
 
-    private record PackageResult(PackageScan packageScan, List<Issue> issues, List<Issue> activeIssues,
+    // Holds the project, not the PackageScan, so that the analyzer and rules can be released after the scan
+    private record PackageResult(Project project, List<Issue> issues, List<Issue> activeIssues,
                                  Map<Issue, SuppressedIssue> suppressions,
                                  ServiceLoader<StaticCodeAnalysisPlatformPlugin> platformPlugins,
                                  List<String> platforms, Set<String> failedPlatforms,

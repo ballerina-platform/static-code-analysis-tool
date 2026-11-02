@@ -32,8 +32,8 @@ All options are optional. Rule filters and platforms can also be configured in a
 | `--ignore-suppressions` | Disregard `@scan:Suppress` annotations and report every issue, to audit the unsuppressed results. Rule inclusion and exclusion still apply. Same as `enabled = false` in `Scan.toml`. See [Suppressing issues](#suppressing-issues). |
 | `--require-suppression-reason` | Fail the scan when a `@scan:Suppress` annotation does not give a reason. Same as `requireReason = true` in `Scan.toml`. Has no effect with `--ignore-suppressions` or `enabled = false`. |
 | `--require-suppression-rule-id` | Fail the scan when a `@scan:Suppress` annotation does not name the rules it suppresses. Same as `requireRuleId = true` in `Scan.toml`. Has no effect with `--ignore-suppressions` or `enabled = false`. |
-| `--fail-on-severity=<BLOCKER\|HIGH\|MEDIUM\|LOW\|INFO\|NONE>` | Fail the scan when the number of issues at or above this severity reaches `--fail-on-count`, or `1` if the count is not set. `NONE` turns the gate off. Overrides `failOnSeverity` in `Scan.toml`. See [Exit codes and the gate](#exit-codes-and-the-gate). |
-| `--fail-on-count=<n>` | Fail the scan when there are `n` or more issues at or above `--fail-on-severity`, or of any severity if it is not set. Overrides `failOnCount` in `Scan.toml`. |
+| `--fail-on-severity=<BLOCKER\|HIGH\|MEDIUM\|LOW\|INFO\|NONE>` | Fail the scan when the number of issues at or above this severity reaches `--fail-on-count`, or `1` if the count is not set. `NONE` turns the gate off. Either gate option replaces the whole `[gate]` table of `Scan.toml`. See [Exit codes and the gate](#exit-codes-and-the-gate). |
+| `--fail-on-count=<n>` | Fail the scan when there are `n` or more issues at or above `--fail-on-severity`, or of any severity if it is not set. Either gate option replaces the whole `[gate]` table of `Scan.toml`. |
 
 ## Examples
 
@@ -216,9 +216,9 @@ failOnSeverity = "MEDIUM"
 failOnCount = 5
 ```
 
-Rules specified in `Scan.toml` are combined with those passed via `--include-rules` and `--exclude-rules`. Including and excluding rules at the same time is not allowed.
+`--include-rules` or `--exclude-rules` replaces the whole `[rule]` table of `Scan.toml` for that run, with a warning when the rules differ. Including and excluding rules at the same time is not allowed.
 
-Each `[[platform]]` entry requires both a `name` and a `path`. The `path` must point to the platform plugin JAR, either as a local file path (resolved relative to the current working directory) or as a URL to download it from. A platform declared in `Scan.toml` is reported to automatically, and `--platforms` can only reference platforms declared there. When results are reported to a platform, they are not printed to the console or saved to the target directory.
+Each `[[platform]]` entry requires both a `name` and a `path`. The `path` must point to the platform plugin JAR, either as a local file path (resolved relative to the folder of the `Scan.toml` file) or as a URL to download it from. A path that is neither an existing file nor a URL stops the scan with an error. A platform declared in `Scan.toml` is reported to automatically, and `--platforms` can only reference platforms declared there. When results are reported to a platform, they are not printed to the console or saved to the target directory.
 
 See [Scan file configurations](https://github.com/ballerina-platform/static-code-analysis-tool/blob/main/docs/static-code-analysis-tool/ScanFileConfigurations.md) for all available options.
 
@@ -231,7 +231,7 @@ See [Scan file configurations](https://github.com/ballerina-platform/static-code
 | `0` | The scan completed, and no gate is set or the gate was not tripped. |
 | `1` | The gate was tripped, or the scan could not be completed, for example because of an invalid `Scan.toml`, a compilation error, an empty package (an empty workspace member is skipped with a warning), a plugin failure, an invalid suppression or a report that cannot be written. |
 | `2` | Invalid command-line input, such as an invalid option value, both `--include-rules` and `--exclude-rules`, or an unknown rule ID. |
-| `3` | The path is not a valid Ballerina project, or is a `.bal` file inside a package. |
+| `3` | The path is not a valid Ballerina package or standalone file, for example because it is not a Ballerina project or the project cannot be loaded, or is a `.bal` file inside a package. |
 | `130` | The scan was interrupted. |
 
 Every failure other than an interrupt is reported on standard error as `bal scan: error: <message>`, followed by the problems that caused it, such as `Scan.toml:2:18: error: <message>`. Warnings are reported as `bal scan: warning: <message>` and never change the exit code.
@@ -246,9 +246,9 @@ By default no gate is set, so findings never fail the scan. The gate is set with
 | `X` | `n` | There are `n` or more issues at or above `X`. |
 | `NONE` | Any | Never. The gate is off. |
 
-A command-line option overrides the same setting in `Scan.toml`, and `--fail-on-count` also turns on a gate that `failOnSeverity = "NONE"` in `Scan.toml` turns off.
+Either command-line option replaces the whole `[gate]` table of `Scan.toml` for that run, so a setting left off the command line is not read from `Scan.toml`. For example, `--fail-on-count=2` with `failOnSeverity = "HIGH"` in `Scan.toml` counts issues of every severity.
 
-The gate counts the issues left after rule selection and suppressions, and runs after the reports are written, so a failing scan still leaves a full report. An error always wins over a tripped gate. In a workspace, a command-line gate or a `[gate]` table in a `Scan.toml` at the workspace root applies to the issues of all packages together; otherwise each package is checked against the gate in its own `Scan.toml`.
+The gate counts the issues left after rule selection and suppressions, and runs after the reports are written, so a failing scan still leaves a full report. An error always wins over a tripped gate. In a workspace, each package is checked against its gate with the issues of that package only, whether the gate comes from the command line, the workspace `Scan.toml` or the package `Scan.toml`.
 
 ## Suppressing issues
 

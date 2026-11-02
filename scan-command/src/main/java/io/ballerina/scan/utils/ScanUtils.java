@@ -101,10 +101,12 @@ import static io.ballerina.scan.utils.Constants.ANALYZER_REPOSITORY;
 import static io.ballerina.scan.utils.Constants.ANALYZER_TABLE;
 import static io.ballerina.scan.utils.Constants.ANALYZER_VERSION;
 import static io.ballerina.scan.utils.Constants.CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN;
+import static io.ballerina.scan.utils.Constants.EXCLUDE_KEY;
 import static io.ballerina.scan.utils.Constants.GATE_FAIL_ON_COUNT;
 import static io.ballerina.scan.utils.Constants.GATE_FAIL_ON_SEVERITY;
 import static io.ballerina.scan.utils.Constants.GATE_TABLE;
 import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
+import static io.ballerina.scan.utils.Constants.INCLUDE_KEY;
 import static io.ballerina.scan.utils.Constants.JAR_PREDICATE;
 import static io.ballerina.scan.utils.Constants.PATH_ARGUMENT_SUFFIX;
 import static io.ballerina.scan.utils.Constants.PLATFORM_NAME;
@@ -201,6 +203,8 @@ public final class ScanUtils {
      * @since 0.13.0
      */
     public static final String GATE_COUNT_VALUES = "a whole number of 1 or more";
+
+    private static final String RULE_LIST_VALUES = "an array of rule IDs, such as [\"ballerina:1\"]";
 
     private ScanUtils() {
     }
@@ -886,13 +890,15 @@ public final class ScanUtils {
     }
 
     // Uses forward slashes regardless of OS so the report can split paths into folders; null when outside root.
+    // Returns the path relative to the root with forward slashes, or null when the path is outside the root
     private static String toRelativePath(Path root, Path path) {
-        Path relativePath = root.relativize(path.toAbsolutePath().normalize());
-        if (relativePath.startsWith("..")) {
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        Path normalizedPath = path.toAbsolutePath().normalize();
+        if (!normalizedPath.startsWith(normalizedRoot)) {
             return null;
         }
         List<String> segments = new ArrayList<>();
-        relativePath.forEach(segment -> segments.add(segment.toString()));
+        normalizedRoot.relativize(normalizedPath).forEach(segment -> segments.add(segment.toString()));
         return String.join("/", segments);
     }
 
@@ -1166,14 +1172,7 @@ public final class ScanUtils {
      * @since 0.13.0
      */
     public static String displayPath(Path root, Path file) {
-        Path normalizedRoot = root.toAbsolutePath().normalize();
-        Path normalizedFile = file.toAbsolutePath().normalize();
-        if (!normalizedFile.startsWith(normalizedRoot)) {
-            return file.toString();
-        }
-        List<String> segments = new ArrayList<>();
-        normalizedRoot.relativize(normalizedFile).forEach(segment -> segments.add(segment.toString()));
-        return String.join("/", segments);
+        return Optional.ofNullable(toRelativePath(root, file)).orElse(file.toString());
     }
 
     /**
@@ -1260,7 +1259,7 @@ public final class ScanUtils {
             }
         } else {
             for (Toml platformTable : scanTomlDocumentContent.getTables(PLATFORM_TABLE)) {
-                loadPlatform(platformTable, scanTomlFile, targetDir, baseDir, outputStream, strict);
+                loadPlatform(platformTable, scanTomlFile, targetDir, baseDir, outputStream);
             }
         }
         TopLevelNode analyzerNode = entries.get(ANALYZER_TABLE);
@@ -1275,16 +1274,21 @@ public final class ScanUtils {
             errors.add(DiagnosticLog.fileError(displayPath, analyzerNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_ANALYZER_LIST)));
         }
-        scanTomlDocumentContent.getTable(RULES_TABLE).ifPresent(ruleTable -> {
-            // Written as an empty [rule], the table clears the rules of the workspace
-            scanTomlFile.markRuleTableSet();
-            ruleTable.get("include").ifPresent(loadRules(scanTomlFile, true));
-            ruleTable.get("exclude").ifPresent(loadRules(scanTomlFile, false));
-            if (!scanTomlFile.getRulesToInclude().isEmpty() && !scanTomlFile.getRulesToExclude().isEmpty()) {
-                errors.add(DiagnosticLog.fileError(displayPath, entries.get(RULES_TABLE).location().lineRange(),
-                        DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE)));
-            }
-        });
+        TopLevelNode ruleNode = entries.get(RULES_TABLE);
+        if (ruleNode != null && ruleNode.kind() != TomlType.TABLE) {
+            errors.add(DiagnosticLog.fileError(displayPath, ruleNode.location().lineRange(),
+                    DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_TABLE, RULES_TABLE)));
+        } else {
+            scanTomlDocumentContent.getTable(RULES_TABLE).ifPresent(ruleTable -> {
+                // Written as an empty [rule], the table clears the rules of the workspace
+                scanTomlFile.markRuleTableSet();
+                loadRuleTable(ruleTable, scanTomlFile, displayPath, errors);
+                if (!scanTomlFile.getRulesToInclude().isEmpty() && !scanTomlFile.getRulesToExclude().isEmpty()) {
+                    errors.add(DiagnosticLog.fileError(displayPath, ruleNode.location().lineRange(),
+                            DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE)));
+                }
+            });
+        }
         // Written in any other form, such as [[suppression]], the settings would not be read at all
         TopLevelNode suppressionNode = scanTomlDocumentContent.rootNode().entries().get(SUPPRESSION_TABLE);
         if (suppressionNode != null && suppressionNode.kind() != TomlType.TABLE) {
@@ -1300,11 +1304,17 @@ public final class ScanUtils {
             scanTomlFile.setSuppressionRuleIdRequired(booleanSetting(table, SUPPRESSION_REQUIRE_RULE_ID, false));
         }
 
-        scanTomlDocumentContent.getTable(GATE_TABLE).ifPresent(gateTable -> {
-            // Written as an empty [gate], the table turns off the gate of the workspace
-            scanTomlFile.markGateTableSet();
-            loadGate(gateTable, scanTomlFile, displayPath, errors);
-        });
+        TopLevelNode gateNode = entries.get(GATE_TABLE);
+        if (gateNode != null && gateNode.kind() != TomlType.TABLE) {
+            errors.add(DiagnosticLog.fileError(displayPath, gateNode.location().lineRange(),
+                    DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_TABLE, GATE_TABLE)));
+        } else {
+            scanTomlDocumentContent.getTable(GATE_TABLE).ifPresent(gateTable -> {
+                // Written as an empty [gate], the table turns off the gate of the workspace
+                scanTomlFile.markGateTableSet();
+                loadGate(gateTable, scanTomlFile, displayPath, errors);
+            });
+        }
         TopLevelNode analysisNode = entries.get(ANALYSIS_TABLE);
         if (analysisNode != null && analysisNode.kind() != TomlType.TABLE) {
             errors.add(DiagnosticLog.fileError(displayPath, analysisNode.location().lineRange(),
@@ -1342,7 +1352,7 @@ public final class ScanUtils {
     private static void failOnConfigErrors(String displayPath, List<String> errors) {
         if (!errors.isEmpty()) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath,
-                    errors.size(), String.valueOf(errors.size())), errors);
+                    errors.size()), errors);
         }
     }
 
@@ -1457,11 +1467,10 @@ public final class ScanUtils {
      * @param targetDir    the target directory
      * @param baseDir      the directory relative paths are resolved against
      * @param outputStream the print stream
-     * @param strict       whether a path argument that does not exist fails the load
      * @throws ScanToolException if the platform JAR cannot be loaded
      */
     private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path targetDir, Path baseDir,
-                                     PrintStream outputStream, boolean strict) {
+                                     PrintStream outputStream) {
         Map<String, Object> properties = platformTable.toMap();
         Object platformName = properties.remove(PLATFORM_NAME);
         Optional<String> name = (platformName instanceof String) ? Optional.of(platformName.toString())
@@ -1490,17 +1499,11 @@ public final class ScanUtils {
             }
         }
 
-        // Arguments named <name>Path, such as sonarProjectPropertiesPath, are files next to the Scan.toml file
+        // An argument named <name>Path that names an existing file next to the Scan.toml file is passed as an absolute
+        // path. Other values, such as URLs or files the plugin creates, belong to the plugin and are passed unchanged
         for (Map.Entry<String, Object> argument : properties.entrySet()) {
-            if (!argument.getKey().endsWith(PATH_ARGUMENT_SUFFIX) || !(argument.getValue() instanceof String value)) {
-                continue;
-            }
-            Optional<Path> file = resolveLocalPath(baseDir, value);
-            if (file.isPresent()) {
-                argument.setValue(file.get().toString());
-            } else if (strict) {
-                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.PLATFORM_FILE_NOT_FOUND, name.get(),
-                        argument.getKey(), value));
+            if (argument.getKey().endsWith(PATH_ARGUMENT_SUFFIX) && argument.getValue() instanceof String value) {
+                resolveLocalPath(baseDir, value).ifPresent(file -> argument.setValue(file.toString()));
             }
         }
 
@@ -1516,26 +1519,43 @@ public final class ScanUtils {
     }
 
     /**
-     * Loads rules to the {@link ScanTomlFile} representation of the Scan.toml file.
+     * Loads the rules of the [rule] table to the {@link ScanTomlFile} representation of the Scan.toml file, adding an
+     * error for an unknown key or a value that is not an array of rule IDs.
      *
+     * @param ruleTable    the [rule] table
      * @param scanTomlFile the in-memory representation of the Scan.toml file
-     * @param includeRules whether to include/exclude the rules
+     * @param displayPath  the path of the file as shown to the user
+     * @param errors       the errors found in the file
      */
-    private static Consumer<TomlValueNode> loadRules(ScanTomlFile scanTomlFile, boolean includeRules) {
-        return rules -> {
-            if (!rules.kind().equals(TomlType.ARRAY)) {
-                return;
+    private static void loadRuleTable(Toml ruleTable, ScanTomlFile scanTomlFile, String displayPath,
+                                      List<String> errors) {
+        ruleTable.rootNode().entries().forEach((key, node) -> {
+            if (!key.equals(INCLUDE_KEY) && !key.equals(EXCLUDE_KEY)) {
+                errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_KEY, key, RULES_TABLE,
+                                INCLUDE_KEY + " or " + EXCLUDE_KEY)));
             }
-            TomlArrayValueNode rulesArray = (TomlArrayValueNode) rules;
-            rulesArray.toNativeValue().stream().map(Object::toString).forEach(rule -> {
-                ScanTomlFile.RuleToFilter ruleToFilter = new ScanTomlFile.RuleToFilter(rule);
-                if (includeRules) {
-                    scanTomlFile.setRuleToInclude(ruleToFilter);
-                } else {
-                    scanTomlFile.setRuleToExclude(ruleToFilter);
-                }
-            });
-        };
+        });
+        ruleTable.get(INCLUDE_KEY).ifPresent(rules -> loadRules(rules, scanTomlFile, true, displayPath, errors));
+        ruleTable.get(EXCLUDE_KEY).ifPresent(rules -> loadRules(rules, scanTomlFile, false, displayPath, errors));
+    }
+
+    private static void loadRules(TomlValueNode rules, ScanTomlFile scanTomlFile, boolean includeRules,
+                                  String displayPath, List<String> errors) {
+        String key = includeRules ? INCLUDE_KEY : EXCLUDE_KEY;
+        if (!(rules instanceof TomlArrayValueNode rulesArray)
+                || !rulesArray.elements().stream().allMatch(rule -> rule.kind() == TomlType.STRING)) {
+            errors.add(invalidConfigValue(displayPath, rules, key, RULE_LIST_VALUES));
+            return;
+        }
+        rulesArray.toNativeValue().stream().map(Object::toString).forEach(rule -> {
+            ScanTomlFile.RuleToFilter ruleToFilter = new ScanTomlFile.RuleToFilter(rule);
+            if (includeRules) {
+                scanTomlFile.setRuleToInclude(ruleToFilter);
+            } else {
+                scanTomlFile.setRuleToExclude(ruleToFilter);
+            }
+        });
     }
 
 

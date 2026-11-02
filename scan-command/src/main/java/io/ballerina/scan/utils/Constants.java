@@ -97,6 +97,7 @@ public class Constants {
     static final String ANALYSIS_TABLE = "analysis";
     static final String ANALYSIS_EXCLUDE_TESTS = "excludeTests";
     static final String PATH_ARGUMENT_SUFFIX = "Path";
+    static final String INCLUDE_KEY = "include";
     static final String EXCLUDE_KEY = "exclude";
     public static final String MODULE_LEVEL_SYMBOL = "<module>";
     static final String JAR_PREDICATE = ".jar";

@@ -1104,10 +1104,18 @@ public class ScanCmdTest extends BaseTest {
             Assert.assertEquals(JsonParser.parseString(platformArguments).getAsJsonObject().get("propertiesPath")
                     .getAsString(), firstPackage.resolve("Ballerina.toml").normalize().toString());
 
-            Files.writeString(firstScanToml, platformConfiguration("propertiesPath = \"missing.properties\""));
+            Files.writeString(firstScanToml, platformConfiguration("""
+                    outputPath = "out/report.json"
+                    rulesPath = "https://example.com/rules.json"
+                    contextPath = "/api"
+                    """));
             streams = scanWorkspace(workspacePath);
-            Assert.assertTrue(streams[1].contains("first-package: error: 'propertiesPath' of platform "
-                    + "'examplePlatform' is not a file or a URL: missing.properties"), streams[1]);
+            Assert.assertTrue(streams[1].contains("Reporting issues to: examplePlatform"), streams[1]);
+            JsonObject arguments = JsonParser.parseString(Files.readString(
+                    workspacePath.resolve("platform-arguments.json"), StandardCharsets.UTF_8)).getAsJsonObject();
+            Assert.assertEquals(arguments.get("outputPath").getAsString(), "out/report.json");
+            Assert.assertEquals(arguments.get("rulesPath").getAsString(), "https://example.com/rules.json");
+            Assert.assertEquals(arguments.get("contextPath").getAsString(), "/api");
         } finally {
             Files.deleteIfExists(firstScanToml);
             Files.deleteIfExists(workspacePath.resolve("analysis-issues.json"));

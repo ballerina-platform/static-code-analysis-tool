@@ -59,7 +59,7 @@ path = "path/to/sonar_platform_plugin.jar"
 sonarProjectPropertiesPath = "sonar-project.properties"
 ```
 
-An argument whose name ends with `Path`, such as `sonarProjectPropertiesPath`, is a file path. It is resolved relative to the folder of the `Scan.toml` file and passed to the plugin as an absolute path, and the scan stops with an error when the file does not exist.
+An argument whose name ends with `Path`, such as `sonarProjectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file is passed to the plugin as the absolute path of that file. Any other value, such as a URL or a file the plugin creates, is passed to the plugin unchanged.
 
 A platform that fails while reporting the issues does not fail the scan. The scan prints a warning and goes on, so that a failed upload does not hide the results; a CI job that must fail on it can check the output for the warning. A platform that is not available, because no `[[platform]]` entry provides it, still fails the scan. In a workspace, platforms can be set only in the `Scan.toml` of each package.
 

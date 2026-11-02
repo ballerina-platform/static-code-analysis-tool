@@ -249,6 +249,43 @@ public class GateTest extends BaseTest {
         Assert.assertTrue(readOutput(true).contains("\"$schema\""), "the report format is applied");
     }
 
+    @Test(description = "test [gate] and [rule] written in another form, or with invalid rule settings, are errors")
+    void testInvalidGateAndRuleTables() throws IOException {
+        Path scanToml = gateIssuesProject.resolve("Scan.toml");
+        try {
+            Files.writeString(scanToml, """
+                    [[gate]]
+                    failOnSeverity = "HIGH"
+                    """);
+            ScanRun run = scan(gateIssuesProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.errorReport().contains("Scan.toml:1:1: error: 'gate' must be a table, written as "
+                    + "[gate]"), run.output());
+
+            Files.writeString(scanToml, """
+                    [rule]
+                    includes = ["ballerina:1"]
+                    exclude = "ballerina:1"
+                    """);
+            run = scan(gateIssuesProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            String report = run.errorReport();
+            Assert.assertTrue(report.startsWith("bal scan: error: Scan.toml has 2 errors\n"), report);
+            Assert.assertTrue(report.contains("Scan.toml:2:1: error: unknown key 'includes' in [rule]; expected "
+                    + "include or exclude"), report);
+            Assert.assertTrue(report.contains("Scan.toml:3:11: error: invalid value 'ballerina:1' for 'exclude'; "
+                    + "expected an array of rule IDs, such as [\"ballerina:1\"]"), report);
+        } finally {
+            Files.deleteIfExists(scanToml);
+        }
+    }
+
+    @Test(description = "test the test-runner constructor ignores the [gate] table of the fixture")
+    void testGateOffForTestRunnerConstructor() throws IOException {
+        new PlatformScanCmd(gateConfigProject, printStream, ReportFormat.BALLERINA).execute();
+        Assert.assertFalse(readOutput(true).contains("bal scan: error:"));
+    }
+
     @Test(description = "test invalid gate settings in Scan.toml are reported at their location")
     void testInvalidGateInScanToml() throws IOException {
         ScanRun run = scan(invalidGateConfigProject, "--fail-on-severity=NONE");

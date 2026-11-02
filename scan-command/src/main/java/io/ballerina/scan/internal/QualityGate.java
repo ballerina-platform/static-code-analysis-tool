@@ -91,7 +91,6 @@ final class QualityGate {
         String breakdown = counts.entrySet().stream()
                 .map(entry -> entry.getKey() + ": " + entry.getValue())
                 .collect(Collectors.joining(", "));
-        return Optional.of(DiagnosticLog.error(DiagnosticCode.GATE_FAILED, total, threshold, String.valueOf(limit),
-                breakdown, String.valueOf(total)));
+        return Optional.of(DiagnosticLog.error(DiagnosticCode.GATE_FAILED, total, threshold, limit, breakdown));
     }
 }
