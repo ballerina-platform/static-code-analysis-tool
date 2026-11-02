@@ -1,13 +1,12 @@
 name: "🎯 Report a Rule Issue"
 description: Report a core rule that reports code it should not, misses code it should report, or reports the wrong message or location.
+title: "ballerina:"
 labels: ["Type/Bug", "Area/Rules"]
 body:
   - type: markdown
     attributes:
       value: |
         This form is for core rules, whose IDs start with `ballerina:`. Report issues with library rules, such as `ballerina/http:1`, in [ballerina-library](https://github.com/ballerina-platform/ballerina-library/issues/new/choose).
-
-        Please include the rule ID in the title, e.g. "False positive for `ballerina:14` when a secret-named parameter defaults to nil".
   - type: input
     id: rule
     attributes:

@@ -57,10 +57,10 @@ body:
       description: The `scan` version shown by `bal tool list`.
     validations:
       required: true
-  - type: input
+  - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: OS, and the CI system or IDE if relevant.
+      description: OS and Java version, and the CI system or IDE if relevant.
     validations:
       required: false
