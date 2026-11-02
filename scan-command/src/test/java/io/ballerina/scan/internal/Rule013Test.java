@@ -139,6 +139,37 @@ public class Rule013Test extends StaticCodeAnalyzerTest {
     }
 
     @Test
+    void testHardcodedSecretNames() {
+        String documentName = "rule013_hardcoded_secret_names.bal";
+        List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule()));
+        Assert.assertEquals(issues.size(), 14);
+        List<Location> expectedIssueLocations = new ArrayList<>(List.of(
+                new Location(17, 26, 17, 43),
+                new Location(18, 19, 18, 32),
+                new Location(19, 22, 19, 30),
+                new Location(20, 24, 20, 39),
+                new Location(21, 23, 21, 37),
+                new Location(22, 23, 22, 37),
+                new Location(23, 20, 23, 36),
+                new Location(24, 24, 24, 39),
+                new Location(25, 23, 25, 37),
+                new Location(26, 44, 26, 59),
+                new Location(26, 74, 26, 85),
+                new Location(26, 97, 26, 108),
+                new Location(27, 23, 27, 48),
+                new Location(28, 29, 28, 50)));
+        issues.forEach(issue -> assertIssue(issue, documentName,
+                expectedIssueLocations.remove(0), HARD_CODED_SECRET.rule()));
+    }
+
+    @Test
+    void testNonSecretNames() {
+        List<Issue> issues = analyze("rule013_non_secret_names.bal",
+                List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()));
+        Assert.assertEquals(issues, List.of());
+    }
+
+    @Test
     void testHardcodedSecretObjectFields() {
         String documentName = "rule013_hardcoded_secret_object_field.bal";
         List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule()));

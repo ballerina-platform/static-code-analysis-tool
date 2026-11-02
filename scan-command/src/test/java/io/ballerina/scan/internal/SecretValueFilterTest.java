@@ -34,7 +34,8 @@ public class SecretValueFilterTest {
                 {""}, {"   "}, {"${DB_PASSWORD}"}, {"{{api_key}}"}, {"<token>"}, {"<your password>"},
                 {"$DB_PASSWORD"}, {"%DB_PASSWORD%"}, {"changeme"}, {"CHANGEIT"}, {"change_me"}, {"dummy"},
                 {"placeholder"}, {"redacted"}, {"your-client-secret"}, {"YOUR_API_KEY"}, {"yourPassword"},
-                {"your-api-key-here"}, {"xxxxxxxx"}, {"********"}
+                {"your-api-key-here"}, {"xxxxxxxx"}, {"********"}, {"your-passcode-here"}, {"your-creds-here"},
+                {"YOUR_AUTHORIZATION_HERE"}, {"your-bearer-token"}
         };
     }
 

@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * {@code SecretValueFilter} recognizes literal values that cannot be real secrets, such as empty strings,
@@ -37,8 +38,9 @@ final class SecretValueFilter {
     // A template reference inside a larger value, such as "Bearer {{token}}", also makes it a placeholder.
     private static final Pattern EMBEDDED_TEMPLATE = Pattern.compile("\\$\\{[^}]*}|\\{\\{[^}]*}}");
     private static final Pattern REPEATED_CHARACTER = Pattern.compile("(.)\\1*");
-    private static final Pattern YOUR_PREFIX = Pattern.compile(
-            "(?i)your[-_ a-z]*(key|password|passwd|pwd|passphrase|secret|token|credentials?)s?([-_ ]?here)?");
+    private static final Pattern YOUR_PREFIX = Pattern.compile("(?i)your[-_ a-z]*(key|"
+            + String.join("|", Stream.concat(SecretNameMatcher.EMBEDDED_KEYWORDS.stream(),
+            SecretNameMatcher.WORD_KEYWORDS.stream()).toList()) + ")s?([-_ ]?here)?");
     private static final Set<String> DUMMY_VALUES = Set.of("changeme", "change_me", "change-me", "changeit",
             "dummy", "placeholder", "example", "sample", "redacted", "todo", "tbd");
 
