@@ -44,6 +44,7 @@ import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.text.LineRange;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -51,6 +52,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * {@code ScanTool} LANGUAGE SERVER ENTRY POINT
@@ -60,6 +62,8 @@ import java.util.Optional;
  */
 public class ScanLanguageServerTool {
     private static final Gson GSON = new Gson();
+    private static final String REMOTE_SCAN_FILE_MESSAGE = "The " + Constants.SCAN_FILE + " file of this package "
+            + "is a URL set by 'configPath' in Ballerina.toml, so the rule cannot be changed from the editor";
 
     /**
      * Runs a scan for the given project path.
@@ -142,8 +146,12 @@ public class ScanLanguageServerTool {
 
         try {
             Path projectPath = Paths.get(projectPathStr);
-            Path scanTomlPath = projectPath.resolve(Constants.SCAN_FILE);
-            ScanTomlWriter.addGlobalExclusion(scanTomlPath, normalizedRuleId);
+            Optional<Path> scanTomlPath = ScanUtils.packageScanTomlPath(projectPath);
+            if (scanTomlPath.isEmpty()) {
+                return GSON.toJson(new ScanMutationResponse(false, null, REMOTE_SCAN_FILE_MESSAGE));
+            }
+            copyWorkspaceScanToml(projectPath, scanTomlPath.get(), workspaceFile -> true);
+            ScanTomlWriter.addGlobalExclusion(scanTomlPath.get(), normalizedRuleId);
 
             return GSON.toJson(new ScanMutationResponse(true, normalizedRuleId,
                     "Global exclusion added successfully for rule '" + normalizedRuleId + "'"));
@@ -173,8 +181,15 @@ public class ScanLanguageServerTool {
         }
 
         try {
-            Path scanTomlPath = Paths.get(projectPathStr).resolve(Constants.SCAN_FILE);
-            ScanTomlWriter.removeGlobalExclusion(scanTomlPath, normalizedRuleId);
+            Path projectPath = Paths.get(projectPathStr);
+            Optional<Path> scanTomlPath = ScanUtils.packageScanTomlPath(projectPath);
+            if (scanTomlPath.isEmpty()) {
+                return GSON.toJson(new ScanMutationResponse(false, null, REMOTE_SCAN_FILE_MESSAGE));
+            }
+            ScanTomlFile.RuleToFilter rule = new ScanTomlFile.RuleToFilter(normalizedRuleId);
+            copyWorkspaceScanToml(projectPath, scanTomlPath.get(),
+                    workspaceFile -> workspaceFile.getRulesToExclude().contains(rule));
+            ScanTomlWriter.removeGlobalExclusion(scanTomlPath.get(), normalizedRuleId);
 
             return GSON.toJson(new ScanMutationResponse(true, normalizedRuleId,
                     "Global exclusion removed successfully."));
@@ -185,6 +200,32 @@ public class ScanLanguageServerTool {
             return GSON.toJson(new ScanMutationResponse(false, null,
                     "Failed to remove global exclusion due to unexpected error: " + e.getMessage()));
         }
+    }
+
+    /**
+     * Copies the workspace Scan.toml file to a package that has none of its own, before the package file is written.
+     * A package file replaces the workspace file as a whole, so writing a new one alone would drop every workspace
+     * setting the package used.
+     *
+     * @param projectPath  the root of the package
+     * @param scanTomlPath the Scan.toml file of the package
+     * @param needed       whether the change needs the workspace file, given its settings
+     * @throws IOException if the workspace file cannot be copied
+     */
+    private static void copyWorkspaceScanToml(Path projectPath, Path scanTomlPath, Predicate<ScanTomlFile> needed)
+            throws IOException {
+        if (Files.exists(scanTomlPath)) {
+            return;
+        }
+        Optional<ScanTomlFile> workspaceFile = ScanUtils.readEnclosingWorkspaceScanToml(projectPath);
+        if (workspaceFile.isEmpty() || workspaceFile.get().getPath().isEmpty() || !needed.test(workspaceFile.get())) {
+            return;
+        }
+        Path parent = scanTomlPath.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Files.copy(workspaceFile.get().getPath().get(), scanTomlPath);
     }
 
     // ===================================================================================
@@ -353,7 +394,7 @@ public class ScanLanguageServerTool {
         // The same suppression filter as the command line, applied after rule selection as it is there
         SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, activeIssues,
                 ProjectAnalyzer.rules(coreRules, externalAnalyzers), ruleSelection,
-                SuppressionOptions.of(scanToml, false, false, false));
+                SuppressionOptions.of(scanToml, projectAnalyzer.analyzedSources(), false, false, false));
         return new LsScanResult(new ScanResult(suppressionOutcome.activeIssues(), excludedIssues,
                 suppressionOutcome.suppressedIssues()), suppressionOutcome.diagnostics());
     }

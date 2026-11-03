@@ -63,7 +63,8 @@ OPTIONS
 
         --fail-on-count=<n>
                 Fail the scan when there are n or more issues at or above --fail-on-severity, or of
-                any severity if it is not set. A whole number of 1 or more.
+                any severity if it is not set. A whole number of 1 or more. Has no effect when the
+                severity is NONE.
 
                 Each gate option replaces only its own setting in the [gate] table of Scan.toml, so
                 a setting that is not given on the command line is still read from Scan.toml. The

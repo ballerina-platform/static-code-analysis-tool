@@ -85,6 +85,7 @@ public enum DiagnosticCode {
     IGNORED_SUPPRESSION("STATIC_ANALYSIS_WARNING_009", "ignored.suppression"),
     SETTING_OVERRIDDEN("STATIC_ANALYSIS_WARNING_010", "setting.overridden"),
     EMPTY_PACKAGE_SKIPPED("STATIC_ANALYSIS_WARNING_011", "empty.package.skipped"),
+    GATE_COUNT_IGNORED("STATIC_ANALYSIS_WARNING_012", "gate.count.ignored"),
     EXCLUDE_TESTS_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_013", "exclude.tests.not.supported"),
     WORKSPACE_RULE_NOT_AVAILABLE("STATIC_ANALYSIS_WARNING_014", "workspace.rule.not.available"),
     PLATFORM_NOT_DECLARED("STATIC_ANALYSIS_WARNING_015", "platform.not.declared"),

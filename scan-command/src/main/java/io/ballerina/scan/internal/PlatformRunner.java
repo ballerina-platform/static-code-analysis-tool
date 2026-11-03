@@ -25,14 +25,10 @@ import io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Runs platform plugins at the same time, each on its own thread, and waits for all of them.
+ * Runs platform plugins one after another, so that plugins written for sequential calls do not race over shared
+ * state, working directories or the console. A failing plugin does not stop the others.
  *
  * @since 0.13.0
  */
@@ -42,49 +38,29 @@ final class PlatformRunner {
     }
 
     /**
-     * Initializes each plugin and reports the issues to it.
+     * Initializes each plugin and reports the issues to it. Each plugin gets its own copy of the issues, so that a
+     * plugin that changes the list does not affect another plugin or the quality gate.
      *
      * @param tasks the plugins to run
      * @return the failure reason of each task, in the order of the tasks, empty for a task that succeeded
      */
     static List<Optional<String>> runAll(List<Task> tasks) {
-        List<Optional<String>> outcomes = new ArrayList<>();
-        if (tasks.isEmpty()) {
-            return outcomes;
-        }
-        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-        AtomicInteger threadCount = new AtomicInteger();
-        ExecutorService executor = Executors.newFixedThreadPool(tasks.size(), runnable -> {
-            Thread thread = new Thread(runnable, "bal-scan-platform-" + threadCount.incrementAndGet());
-            thread.setDaemon(true);
-            thread.setContextClassLoader(contextClassLoader);
-            return thread;
-        });
-        try {
-            List<Future<?>> futures = new ArrayList<>();
-            for (Task task : tasks) {
-                futures.add(executor.submit(() -> {
-                    task.plugin().init(task.context());
-                    task.plugin().onScan(task.issues());
-                }));
-            }
-            for (Future<?> future : futures) {
-                outcomes.add(await(future));
-            }
-        } finally {
-            executor.shutdownNow();
+        List<Optional<String>> outcomes = new ArrayList<>(tasks.size());
+        for (Task task : tasks) {
+            outcomes.add(run(task));
         }
         return outcomes;
     }
 
-    private static Optional<String> await(Future<?> future) {
+    /**
+     * Initializes a plugin and reports the issues to it, catching its failure so that the other plugins still run.
+     */
+    private static Optional<String> run(Task task) {
         try {
-            future.get();
+            task.plugin().init(task.context());
+            task.plugin().onScan(new ArrayList<>(task.issues()));
             return Optional.empty();
-        } catch (ExecutionException ex) {
-            return Optional.of(ScanFailure.describe(ex.getCause() == null ? ex : ex.getCause()));
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
+        } catch (RuntimeException | LinkageError ex) {
             return Optional.of(ScanFailure.describe(ex));
         }
     }

@@ -828,6 +828,36 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(platformArgumentsOutput, expected);
     }
 
+    @Test(description = "test a platform-triggered scan reports to the declared platforms when none is named")
+    void testPlatformTriggeredScanReportsToDeclaredPlatforms() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-platform-configurations");
+        Path rootProject = Path.of(System.getProperty("user.dir")).getParent();
+        Assert.assertNotNull(rootProject);
+        Path platformPluginPath = rootProject.resolve("test-static-code-analysis-platform-plugins")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin").resolve("build").resolve("libs")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
+        String tomlConfigurations = Files.readString(testResources.resolve("test-resources")
+                        .resolve("platform-plugin-configurations.txt"))
+                .replace("__platform_name__", "examplePlatform")
+                .replace("__platform_plugin_path__", platformPluginPath.toString().replace("\\", "\\\\"));
+        Files.writeString(ballerinaProject.resolve("Scan.toml"), tomlConfigurations,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+        new CommandLine(scanCmd).parseArgs("--platform-triggered");
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String output = readOutput(true);
+        Assert.assertEquals(scanCmd.exitCode(), 0, output);
+        Assert.assertTrue(output.contains("Reporting issues to: examplePlatform"), output);
+        Path result = ballerinaProject.resolve("analysis-issues.json");
+        Assert.assertTrue(Files.exists(result), "the declared platform received the issues");
+        removeFile(result);
+        removeFile(ballerinaProject.resolve("platform-arguments.json"));
+    }
+
     @Test(description = "test scan command with invalid platform plugin configurations")
     void testScanCommandWithInvalidPlatformPluginConfigurations() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")

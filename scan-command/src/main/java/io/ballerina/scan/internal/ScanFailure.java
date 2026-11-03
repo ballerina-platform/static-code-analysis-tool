@@ -65,6 +65,9 @@ final class ScanFailure extends RuntimeException {
         return new ScanFailure(exitCode, message, diagnostics);
     }
 
+    /**
+     * Converts an exception into a failure, keeping the exit code and diagnostics it carries.
+     */
     static ScanFailure from(RuntimeException exception) {
         if (exception instanceof ScanFailure failure) {
             return failure;
@@ -80,6 +83,9 @@ final class ScanFailure extends RuntimeException {
         return runtime(describe(exception));
     }
 
+    /**
+     * Returns the message of an exception, or its class name when it has none.
+     */
     static String describe(Throwable exception) {
         String message = exception.getMessage();
         return message != null && !message.isBlank() ? message : exception.getClass().getName();
@@ -101,6 +107,9 @@ final class ScanFailure extends RuntimeException {
         return details;
     }
 
+    /**
+     * Returns the lines that report the failure: the error, its diagnostics, and the usage hint for a usage error.
+     */
     List<String> reportLines() {
         List<String> lines = new ArrayList<>();
         lines.add(error(getMessage()));

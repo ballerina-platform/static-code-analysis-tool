@@ -37,9 +37,11 @@ import io.ballerina.scan.ReportFormat;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
 import io.ballerina.scan.SuppressedIssue;
+import io.ballerina.scan.utils.AnalyzedSources;
 import io.ballerina.scan.utils.Constants;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
+import io.ballerina.scan.utils.GateSeverity;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
@@ -59,6 +61,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
@@ -76,9 +79,11 @@ import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.Stack;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_RULE_PREFIX;
 import static io.ballerina.scan.internal.ScanToolConstants.COMBINING_RESULTS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.LOADING_CONFIGURATIONS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG;
@@ -100,6 +105,7 @@ import static io.ballerina.scan.utils.ScanUtils.convertIssuesToSarifString;
 public class ScanCmd implements BLauncherCmd {
     private static final String FAIL_ON_SEVERITY_OPTION = "--fail-on-severity";
     private static final String FAIL_ON_COUNT_OPTION = "--fail-on-count";
+    private static final String EXCLUDE_TESTS_OPTION = "--exclude-tests";
     private static final String LIST_RULES_HINT = "  Run 'bal scan --list-rules' to see the available rules.";
 
     private final PrintStream outputStream;
@@ -170,9 +176,11 @@ public class ScanCmd implements BLauncherCmd {
             description = "Fail the scan when the number of issues at or above --fail-on-severity reaches the count")
     private String failOnCount;
 
-    // Written alone, the option means true; a value overrides [analysis] excludeTests either way
-    @CommandLine.Option(names = "--exclude-tests", arity = "0..1", fallbackValue = "true",
+    // Written alone, the option means true; a value overrides [analysis] excludeTests either way. Validated when the
+    // command runs, so that an invalid value exits as a usage error
+    @CommandLine.Option(names = EXCLUDE_TESTS_OPTION, arity = "0..1", preprocessor = OptionalBooleanValue.class,
             description = "Leave the test sources out of the scan (true/false). Default is false")
+    private String excludeTestsOption;
     private Boolean excludeTests;
 
     private final List<Rule> allRules = new ArrayList<>();
@@ -183,13 +191,17 @@ public class ScanCmd implements BLauncherCmd {
     private boolean printWorkspaceIssues;
     private boolean scanningWorkspace;
     private ReportFormat reportFormat = ReportFormat.BALLERINA;
-    private String gateSeverity;
+    private GateSeverity gateSeverity;
     private Integer gateCount;
     // The defaults of the packages of a workspace, read once for all of them; null when the workspace has none
     private ScanTomlFile workspaceDefaults;
     private boolean workspaceDefaultsRead;
     private final Set<String> printedWarnings = new HashSet<>();
-    private final Set<Path> testsExcludedPackages = new HashSet<>();
+    // The sources each package is scanned with, keyed by its root, for the workspace HTML report
+    private final Map<Path, AnalyzedSources> packageSources = new HashMap<>();
+    // Each platform JAR is downloaded and loaded once for every package, and its loader is closed at the end
+    private final Map<String, Path> platformJars = new HashMap<>();
+    private final Map<Path, URLClassLoader> platformLoaders = new LinkedHashMap<>();
     // The --platforms names that at least one package declares
     private final Set<String> declaredPlatforms = new HashSet<>();
     // In a workspace the files are read quietly, so that each loading line can name the package it is for
@@ -238,8 +250,8 @@ public class ScanCmd implements BLauncherCmd {
         this.platformTriggered = platformTriggered;
         this.targetDir = targetDir;
         this.scanReport = scanReport;
-        this.format = format.getFormat();
-        this.reportFormat = format;
+        this.reportFormat = format == null ? ReportFormat.BALLERINA : format;
+        this.format = this.reportFormat.getFormat();
         this.listRules = listRules;
         this.includeRules.addAll(includeRules.stream().map(Rule::id).toList());
         this.excludeRules.addAll(excludeRules.stream().map(Rule::id).toList());
@@ -273,13 +285,33 @@ public class ScanCmd implements BLauncherCmd {
         // As there are no sub-commands for the scan command, this method is left empty
     }
 
+    /**
+     * Runs the scan, reports a failure with its exit code, and releases the platform plugins.
+     */
     @Override
     public void execute() {
         try {
             run();
         } catch (RuntimeException ex) {
             fail(ScanFailure.from(ex));
+        } finally {
+            closePlatformLoaders();
         }
+    }
+
+    /**
+     * Closes the class loaders of the platform plugins. A loader keeps its JAR open, which on Windows locks the file
+     * until the loader is closed.
+     */
+    private void closePlatformLoaders() {
+        for (URLClassLoader loader : platformLoaders.values()) {
+            try {
+                loader.close();
+            } catch (IOException ex) {
+                // The scan is already over, and the JAR is released when the JVM exits
+            }
+        }
+        platformLoaders.clear();
     }
 
     int exitCode() {
@@ -301,13 +333,18 @@ public class ScanCmd implements BLauncherCmd {
         errorStream.println(ScanFailure.warning(message));
     }
 
-    // Packages of a workspace can share a setting, so each warning about it is printed once
+    /**
+     * Prints a warning unless it was already printed, since packages of a workspace can share a setting.
+     */
     private void warnOnce(String message) {
         if (printedWarnings.add(message)) {
             warn(message);
         }
     }
 
+    /**
+     * Loads the target and scans it as a workspace, a package or a single file.
+     */
     private void run() {
         if (helpFlag) {
             StringBuilder builder = helpMessage();
@@ -316,8 +353,7 @@ public class ScanCmd implements BLauncherCmd {
         }
 
         resolveOptions();
-        Project project = getProject().orElseThrow(() -> ScanFailure.invalidTarget(
-                DiagnosticLog.error(DiagnosticCode.INVALID_PROJECT_PATH, projectPath), List.of()));
+        Project project = getProject();
         if (project.kind() == ProjectKind.WORKSPACE_PROJECT) {
             executeWorkspace((WorkspaceProject) project);
             return;
@@ -328,13 +364,28 @@ public class ScanCmd implements BLauncherCmd {
         executeProject(project);
     }
 
+    /**
+     * Validates the command-line arguments, so that invalid input exits as a usage error before anything is loaded.
+     */
     private void resolveOptions() {
         if (targets.size() > 1) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, targets.size(),
                     String.join(" ", targets)));
         }
         if (!targets.isEmpty()) {
-            projectPath = Paths.get(targets.get(0));
+            try {
+                projectPath = Paths.get(targets.get(0));
+            } catch (InvalidPathException ex) {
+                throw ScanFailure.invalidTarget(DiagnosticLog.error(DiagnosticCode.INVALID_PROJECT_PATH,
+                        targets.get(0)), List.of());
+            }
+        }
+        if (excludeTestsOption != null) {
+            if (!excludeTestsOption.equalsIgnoreCase("true") && !excludeTestsOption.equalsIgnoreCase("false")) {
+                throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, excludeTestsOption,
+                        EXCLUDE_TESTS_OPTION, "true or false"));
+            }
+            excludeTests = Boolean.parseBoolean(excludeTestsOption);
         }
         try {
             reportFormat = ReportFormat.fromString(format);
@@ -345,9 +396,9 @@ public class ScanCmd implements BLauncherCmd {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
         }
         if (failOnSeverity != null) {
-            gateSeverity = ScanUtils.parseGateSeverity(failOnSeverity).orElseThrow(() -> ScanFailure.usage(
+            gateSeverity = GateSeverity.parse(failOnSeverity).orElseThrow(() -> ScanFailure.usage(
                     DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, failOnSeverity, FAIL_ON_SEVERITY_OPTION,
-                            ScanUtils.GATE_SEVERITY_VALUES)));
+                            GateSeverity.VALUES)));
         }
         if (failOnCount != null) {
             gateCount = ScanUtils.parseGateCount(failOnCount).orElseThrow(() -> ScanFailure.usage(
@@ -356,6 +407,11 @@ public class ScanCmd implements BLauncherCmd {
         }
     }
 
+    /**
+     * Scans every package of a workspace. Every package's configuration is resolved before any is scanned, each
+     * package's analyzers are loaded only while it is scanned, nothing is reported until all of them are scanned, and
+     * each package is gated on its own issues.
+     */
     private void executeWorkspace(WorkspaceProject workspaceProject) {
         errorStream.println();
         errorStream.println(listRules ? RESOLVING_WORKSPACE_SCAN_RULES_LOG : RESOLVING_WORKSPACE_DEPENDENCIES_LOG);
@@ -363,7 +419,6 @@ public class ScanCmd implements BLauncherCmd {
         // Read before the packages, so that an error in it is reported once instead of for every package
         workspaceDefaults(workspaceProject);
 
-        // Every package is prepared before any is scanned, so that rule IDs are checked against all their rules
         Map<BuildProject, ScanFailure> failures = new LinkedHashMap<>();
         Deque<PackageScan> packageScans = new ArrayDeque<>();
         for (BuildProject buildProject : workspaceProject.getResolution().dependencyGraph()
@@ -384,35 +439,28 @@ public class ScanCmd implements BLauncherCmd {
                 failures.put(buildProject, failure);
             }
         }
-        if (!listRules && failures.isEmpty()) {
-            failOnUndeclaredWorkspacePlatforms();
-        }
-        // A package that failed to prepare has no rules, so its rule IDs would be reported as unknown
-        if (failures.isEmpty()) {
-            failOnUnknownRuleOptions();
-        }
-
         if (listRules) {
-            if (!allRules.isEmpty()) {
-                errorStream.println();
-                ScanUtils.printRulesToConsole(allRules, outputStream);
-            }
-            failOnPackageFailures(workspaceProject, failures);
+            listWorkspaceRules(workspaceProject, packageScans, failures);
             return;
         }
+        if (failures.isEmpty()) {
+            failOnUndeclaredWorkspacePlatforms();
+        }
+        // The analyzer rules are known only once each package is loaded, so only core rule IDs are checked up front
+        addRules(CoreRule.rules());
+        failOnUnknownRuleOptions(true);
+        // The run fails anyway, so the other packages are not compiled and scanned
+        failOnPackageFailures(workspaceProject, failures);
 
-        // Each package is gated on its own issues, by the [gate] of the Scan.toml it uses
-        Map<Project, QualityGate> packageGates = new LinkedHashMap<>();
-        packageScans.forEach(packageScan -> packageGates.put(packageScan.project(),
-                resolveGate(packageScan.scanToml(), workspaceProject.sourceRoot())));
-
-        // Each package's analyzer and rules are released once it is scanned, and its result once it is reported
+        // Each package's analyzers are loaded just before it is scanned and released after it, and its result once it
+        // is reported
         Deque<PackageResult> results = new ArrayDeque<>();
         while (!packageScans.isEmpty()) {
             PackageScan packageScan = packageScans.poll();
             BuildProject buildProject = (BuildProject) packageScan.project();
             try {
-                PackageResult result = scanPackage(packageScan);
+                printRunningScans(buildProject);
+                PackageResult result = scanPackage(packageScan, loadRules(packageScan));
                 results.add(result);
                 if (result.suppressionFailure() != null) {
                     failures.put(buildProject, result.suppressionFailure());
@@ -420,6 +468,10 @@ public class ScanCmd implements BLauncherCmd {
             } catch (RuntimeException ex) {
                 failures.put(buildProject, ScanFailure.from(ex));
             }
+        }
+        // A package that failed to load has no rules, so the analyzer rule IDs are complete only without failures
+        if (failures.isEmpty()) {
+            failOnUnknownRuleOptions(false);
         }
         // Nothing is reported until every package is scanned without an error
         failOnPackageFailures(workspaceProject, failures);
@@ -441,8 +493,8 @@ public class ScanCmd implements BLauncherCmd {
             result.platforms().forEach(platform ->
                     platformRuns.add(platformRun(packageProject, platform, result.activeIssues())));
             activeIssueCount += result.activeIssues().size();
-            // Errors win over the gate, so a failure is only thrown after the package failures are checked
-            packageGates.getOrDefault(packageProject, QualityGate.OFF).evaluate(result.activeIssues())
+            // Each package is gated on its own issues; errors win over the gate, so a failure is thrown last
+            result.gate().evaluate(result.activeIssues())
                     .ifPresent(message -> gateFailures.add(packageError(workspaceProject, packageProject, message)));
         }
         // The packages' issues are printed as one document, so that standard output stays valid JSON
@@ -463,7 +515,7 @@ public class ScanCmd implements BLauncherCmd {
         }
         printSummary(activeIssueCount, allSuppressions.size());
         failOnPackageFailures(workspaceProject, failures);
-        // Every package's platforms run together, after all the results are saved and before the gate
+        // Every package's platforms run one after another, after all the results are saved and before the gate
         reportToPlatforms(platformRuns);
 
         if (!gateFailures.isEmpty()) {
@@ -472,6 +524,29 @@ public class ScanCmd implements BLauncherCmd {
         }
     }
 
+    /**
+     * Lists the rules of every package of a workspace, loading and releasing the analyzers of one package at a time.
+     */
+    private void listWorkspaceRules(WorkspaceProject workspaceProject, Deque<PackageScan> packageScans,
+                                    Map<BuildProject, ScanFailure> failures) {
+        while (!packageScans.isEmpty()) {
+            PackageScan packageScan = packageScans.poll();
+            try {
+                loadRules(packageScan);
+            } catch (RuntimeException ex) {
+                failures.put((BuildProject) packageScan.project(), ScanFailure.from(ex));
+            }
+        }
+        if (!allRules.isEmpty()) {
+            errorStream.println();
+            ScanUtils.printRulesToConsole(allRules, outputStream);
+        }
+        failOnPackageFailures(workspaceProject, failures);
+    }
+
+    /**
+     * Returns the workspace Scan.toml file, read once for every package, or null when the workspace has none.
+     */
     private ScanTomlFile workspaceDefaults(WorkspaceProject workspaceProject) {
         if (!workspaceDefaultsRead) {
             workspaceDefaultsRead = true;
@@ -484,22 +559,32 @@ public class ScanCmd implements BLauncherCmd {
         return workspaceDefaults;
     }
 
+    /**
+     * Writes the combined results of a workspace, and its HTML report when asked for.
+     */
     private void writeWorkspaceReports(WorkspaceProject workspaceProject) {
         accumulateWorkspaceReports(workspaceProject);
         if (scanReport) {
             Path scanReportPath = ScanUtils.generateScanReport(allIssues, workspaceProject, targetDir,
-                    allSuppressions, this::testsExcluded);
+                    allSuppressions, this::analyzedSources);
             errorStream.println();
             errorStream.println("View scan report at:");
             errorStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
         }
     }
 
-    private boolean testsExcluded(Package analyzedPackage) {
-        return testsExcludedPackages.contains(analyzedPackage.project().sourceRoot().toAbsolutePath().normalize());
+    private AnalyzedSources analyzedSources(Package analyzedPackage) {
+        return packageSources.getOrDefault(packageKey(analyzedPackage.project()), AnalyzedSources.of(false));
     }
 
-    // Errors win over the gate, so this runs before the gate is evaluated
+    private static Path packageKey(Project project) {
+        return project.sourceRoot().toAbsolutePath().normalize();
+    }
+
+    /**
+     * Fails the scan with the errors of every package that failed. Errors win over the gate, so this runs before the
+     * gate is evaluated.
+     */
     private static void failOnPackageFailures(WorkspaceProject workspaceProject,
                                               Map<BuildProject, ScanFailure> failures) {
         if (failures.isEmpty()) {
@@ -527,6 +612,9 @@ public class ScanCmd implements BLauncherCmd {
         return ScanUtils.displayPath(workspaceProject.sourceRoot(), packageProject.sourceRoot());
     }
 
+    /**
+     * Writes the issues of every package of a workspace to one results file.
+     */
     private void accumulateWorkspaceReports(WorkspaceProject workspaceProject) {
         boolean isSarifFormat = ReportFormat.SARIF.equals(reportFormat);
         String reportFileName = isSarifFormat ? Constants.RESULTS_SARIF_FILE : Constants.RESULTS_JSON_FILE;
@@ -554,7 +642,8 @@ public class ScanCmd implements BLauncherCmd {
      */
     public void executeProject(Project project) {
         PackageScan packageScan = preparePackage(project);
-        failOnUnknownRuleOptions();
+        PackageRules rules = loadRules(packageScan);
+        failOnUnknownRuleOptions(false);
         if (listRules) {
             if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT) {
                 errorStream.println();
@@ -563,8 +652,8 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
 
-        QualityGate gate = resolveGate(packageScan.scanToml(), project.sourceRoot());
-        PackageResult result = scanPackage(packageScan);
+        printRunningScans(project);
+        PackageResult result = scanPackage(packageScan, rules);
         // Nothing is reported until the package meets the suppression requirements
         if (result.suppressionFailure() != null) {
             throw result.suppressionFailure();
@@ -574,57 +663,98 @@ public class ScanCmd implements BLauncherCmd {
         // The results are saved before the platforms run, and a failed platform wins over the gate
         reportToPlatforms(result.platforms().stream()
                 .map(platform -> platformRun(project, platform, result.activeIssues())).toList());
-        gate.evaluate(result.activeIssues()).ifPresent(message -> {
+        result.gate().evaluate(result.activeIssues()).ifPresent(message -> {
             throw ScanFailure.runtime(message);
         });
     }
 
+    /**
+     * Prepares a package for scanning: resolves its configuration and selects its platforms. Its analyzers are loaded
+     * separately, by {@link #loadRules}, so that a workspace holds the analyzers of one package at a time.
+     *
+     * @param project the package or single file project
+     * @return the prepared package
+     */
     private PackageScan preparePackage(Project project) {
-        Path root = scanningWorkspace ? project.workspaceProject().orElseThrow().sourceRoot() : project.sourceRoot();
         ScanTomlFile scanTomlFile = chooseScanToml(project);
-        boolean usesWorkspaceFile = scanTomlFile == workspaceDefaults && workspaceDefaults != null;
-        String scanTomlLabel = scanTomlFile.getDisplayPath(root).orElse(Constants.SCAN_FILE);
-
-        if (excludeTests != null) {
-            warnOverride(scanTomlFile, ScanTomlFile.ANALYSIS_EXCLUDE_TESTS, "--exclude-tests=" + excludeTests,
-                    String.valueOf(excludeTests), scanTomlLabel);
-            // Every package gets the same value, so setting it on a shared workspace file is safe
-            scanTomlFile.setExcludeTests(excludeTests);
-        }
-        if (scanTomlFile.isExcludeTests()) {
-            testsExcludedPackages.add(project.sourceRoot().toAbsolutePath().normalize());
-        }
-        if (!listRules) {
-            warnSuppressionOverrides(scanTomlFile, scanTomlLabel);
-        }
+        PackageConfig config = resolveConfig(project, scanTomlFile);
+        packageSources.put(packageKey(project), config.analyzedSources());
 
         if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && !listRules) {
             printUnsupportedSingleFileFlagWarnings();
         }
+        List<SelectedPlatform> selectedPlatforms = listRules ? List.of() : selectPlatforms(project, scanTomlFile);
+        return new PackageScan(project, scanTomlFile, config, selectedPlatforms);
+    }
+
+    /**
+     * Loads the analyzers of a package and adds their rules, with the core rules, to the rules of the scan.
+     *
+     * @param packageScan the prepared package
+     * @return the analyzer and rules of the package
+     */
+    private PackageRules loadRules(PackageScan packageScan) {
+        Project project = packageScan.project();
+        ScanTomlFile scanTomlFile = packageScan.scanTomlFile();
         if (listRules && project.kind() == ProjectKind.BUILD_PROJECT && !scanningWorkspace) {
             errorStream.println();
             errorStream.println(RESOLVING_PACKAGE_SCAN_RULES_LOG);
         }
 
-        ProjectAnalyzer projectAnalyzer = getProjectAnalyzer(project, scanTomlFile);
+        ProjectAnalyzer projectAnalyzer = getProjectAnalyzer(project, scanTomlFile,
+                packageScan.config().analyzedSources());
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
         addRules(coreRules);
         externalAnalyzers.values().forEach(this::addRules);
 
-        RuleSelection ruleSelection = resolveRules(scanTomlFile, scanTomlLabel);
+        boolean usesWorkspaceFile = scanningWorkspace && workspaceDefaults != null && scanTomlFile == workspaceDefaults;
         if (!listRules && usesWorkspaceFile) {
             warnUnavailableWorkspaceRules(project, scanTomlFile, ProjectAnalyzer.rules(coreRules, externalAnalyzers));
         }
-        List<SelectedPlatform> selectedPlatforms = listRules ? List.of() : selectPlatforms(project, scanTomlFile);
-        return new PackageScan(project, scanTomlFile, projectAnalyzer, coreRules, externalAnalyzers, ruleSelection,
-                selectedPlatforms);
+        return new PackageRules(projectAnalyzer, coreRules, externalAnalyzers);
     }
 
-    // Stage 1: a package uses its own Scan.toml as a whole, or the workspace one when it has none; nothing is merged
+    /**
+     * Applies the command-line options to the Scan.toml file a package uses, once, warning about each setting an
+     * option overrides. The analysis, suppressions, reports and gate of the package all use the result.
+     *
+     * @param project      the package or single file project
+     * @param scanTomlFile the Scan.toml file the package uses
+     * @return the effective configuration of the package
+     */
+    private PackageConfig resolveConfig(Project project, ScanTomlFile scanTomlFile) {
+        Path root = scanningWorkspace ? project.workspaceProject().orElseThrow().sourceRoot() : project.sourceRoot();
+        String scanTomlLabel = scanTomlFile.getDisplayPath(root).orElse(Constants.SCAN_FILE);
+
+        if (excludeTests != null) {
+            warnOverride(scanTomlFile, ScanTomlFile.ANALYSIS_EXCLUDE_TESTS_SETTING,
+                    EXCLUDE_TESTS_OPTION + "=" + excludeTests, String.valueOf(excludeTests), scanTomlLabel);
+        }
+        AnalyzedSources analyzedSources = AnalyzedSources.of(excludeTests != null ? excludeTests
+                : scanTomlFile.isExcludeTests());
+        if (!listRules) {
+            warnSuppressionOverrides(scanTomlFile, scanTomlLabel);
+        }
+        SuppressionOptions suppressionOptions = SuppressionOptions.of(scanTomlFile, analyzedSources,
+                ignoreSuppressions, requireSuppressionReason, requireSuppressionRuleId);
+        RuleSelection ruleSelection = resolveRules(scanTomlFile, scanTomlLabel);
+        QualityGate gate = listRules ? QualityGate.OFF : resolveGate(scanTomlFile, scanTomlLabel);
+        return new PackageConfig(analyzedSources, ruleSelection, suppressionOptions, gate);
+    }
+
+    /**
+     * Returns the Scan.toml file a package uses: its own file as a whole, or the workspace one when it has none. The
+     * two are never merged.
+     */
     private ScanTomlFile chooseScanToml(Project project) {
         if (!scanningWorkspace) {
-            return ScanUtils.readScanTomlConfigurations(project, errorStream);
+            ScanTomlFile packageFile = ScanUtils.readScanTomlConfigurations(project, errorStream);
+            // A workspace package scanned on its own uses the workspace file too, as it does in the editor
+            if (packageFile.getPath().isEmpty()) {
+                return ScanUtils.readEnclosingWorkspaceScanToml(project, errorStream).orElse(packageFile);
+            }
+            return packageFile;
         }
         WorkspaceProject workspace = project.workspaceProject().orElseThrow();
         String label = packageLabel(workspace, project);
@@ -648,11 +778,16 @@ public class ScanCmd implements BLauncherCmd {
         return packageFile;
     }
 
+    /**
+     * Warns about each workspace setting that a package's own Scan.toml leaves out, since the package file replaces the
+     * workspace one as a whole.
+     */
     private void warnWorkspaceFileOverridden(WorkspaceProject workspaceProject, Project project,
                                              ScanTomlFile packageFile, ScanTomlFile workspaceFile) {
+        // A setting the package writes itself is overridden on purpose, so only the ones it leaves out are listed
         Map<String, String> packageSettings = packageFile.getWrittenSettings();
         List<String> notApplied = workspaceFile.getWrittenSettings().entrySet().stream()
-                .filter(setting -> !setting.getValue().equals(packageSettings.get(setting.getKey())))
+                .filter(setting -> !packageSettings.containsKey(setting.getKey()))
                 .map(setting -> setting.getValue().isEmpty() ? setting.getKey()
                         : setting.getKey() + " = " + setting.getValue())
                 .toList();
@@ -675,22 +810,28 @@ public class ScanCmd implements BLauncherCmd {
                         setting + " = " + writtenValue, scanTomlLabel)));
     }
 
+    /**
+     * Warns about each suppression setting of the Scan.toml file that a command-line option overrides.
+     */
     private void warnSuppressionOverrides(ScanTomlFile scanTomlFile, String scanTomlLabel) {
         if (ignoreSuppressions) {
-            warnOverride(scanTomlFile, ScanTomlFile.SUPPRESSION_ENABLED, "--ignore-suppressions", "false",
+            warnOverride(scanTomlFile, ScanTomlFile.SUPPRESSION_ENABLED_SETTING, "--ignore-suppressions", "false",
                     scanTomlLabel);
         }
         if (requireSuppressionReason) {
-            warnOverride(scanTomlFile, ScanTomlFile.SUPPRESSION_REQUIRE_REASON, "--require-suppression-reason",
-                    "true", scanTomlLabel);
+            warnOverride(scanTomlFile, ScanTomlFile.SUPPRESSION_REQUIRE_REASON_SETTING,
+                    "--require-suppression-reason", "true", scanTomlLabel);
         }
         if (requireSuppressionRuleId) {
-            warnOverride(scanTomlFile, ScanTomlFile.SUPPRESSION_REQUIRE_RULE_ID, "--require-suppression-rule-id",
-                    "true", scanTomlLabel);
+            warnOverride(scanTomlFile, ScanTomlFile.SUPPRESSION_REQUIRE_RULE_ID_SETTING,
+                    "--require-suppression-rule-id", "true", scanTomlLabel);
         }
     }
 
-    // Each rule option replaces its own field, so an option and the other field of the file can conflict
+    /**
+     * Selects the rules of a package. Each rule option replaces its own setting, so an option and the other setting of
+     * the file can conflict.
+     */
     private RuleSelection resolveRules(ScanTomlFile scanTomlFile, String scanTomlLabel) {
         List<String> tomlIncludeRules = scanTomlFile.getRulesToInclude().stream()
                 .map(ScanTomlFile.RuleToFilter::id).toList();
@@ -704,26 +845,31 @@ public class ScanCmd implements BLauncherCmd {
         String includeOption = "--include-rules=" + String.join(",", includeRules);
         String excludeOption = "--exclude-rules=" + String.join(",", excludeRules);
         if (!includeRules.isEmpty() && !new HashSet<>(includeRules).equals(new HashSet<>(tomlIncludeRules))) {
-            warnOverride(scanTomlFile, ScanTomlFile.RULE_INCLUDE, includeOption,
+            warnOverride(scanTomlFile, ScanTomlFile.RULE_INCLUDE_SETTING, includeOption,
                     ScanTomlFile.quotedList(includeRules), scanTomlLabel);
         }
         if (!excludeRules.isEmpty() && !new HashSet<>(excludeRules).equals(new HashSet<>(tomlExcludeRules))) {
-            warnOverride(scanTomlFile, ScanTomlFile.RULE_EXCLUDE, excludeOption,
+            warnOverride(scanTomlFile, ScanTomlFile.RULE_EXCLUDE_SETTING, excludeOption,
                     ScanTomlFile.quotedList(excludeRules), scanTomlLabel);
         }
         // Both from the command line is caught earlier, and both from the file is a configuration error
         if (!include.isEmpty() && !exclude.isEmpty()) {
             String conflict = includeRules.isEmpty()
                     ? DiagnosticLog.error(DiagnosticCode.RULE_OPTION_CONFLICT, excludeOption,
-                    ScanTomlFile.RULE_INCLUDE + " = " + ScanTomlFile.quotedList(tomlIncludeRules), scanTomlLabel)
+                    ScanTomlFile.RULE_INCLUDE_SETTING + " = " + ScanTomlFile.quotedList(tomlIncludeRules),
+                    scanTomlLabel)
                     : DiagnosticLog.error(DiagnosticCode.RULE_OPTION_CONFLICT, includeOption,
-                    ScanTomlFile.RULE_EXCLUDE + " = " + ScanTomlFile.quotedList(tomlExcludeRules), scanTomlLabel);
+                    ScanTomlFile.RULE_EXCLUDE_SETTING + " = " + ScanTomlFile.quotedList(tomlExcludeRules),
+                    scanTomlLabel);
             throw ScanFailure.usage(conflict);
         }
         return new RuleSelection(new ArrayList<>(include), new ArrayList<>(exclude));
     }
 
-    // A rule in the workspace [rule] table may come from an analyzer that only some packages use
+    /**
+     * Warns about the rules of the workspace [rule] table that a package does not provide, since they may come from an
+     * analyzer that only some packages use.
+     */
     private void warnUnavailableWorkspaceRules(Project project, ScanTomlFile workspaceFile, List<Rule> packageRules) {
         Set<String> packageRuleIds = new HashSet<>();
         packageRules.forEach(rule -> packageRuleIds.add(rule.id()));
@@ -751,12 +897,14 @@ public class ScanCmd implements BLauncherCmd {
      * platform is never reported to unless it is named on the command line.
      */
     private List<SelectedPlatform> selectPlatforms(Project project, ScanTomlFile scanTomlFile) {
-        if (platforms.isEmpty()) {
-            return List.of();
-        }
         Map<String, ScanTomlFile.Platform> declared = new LinkedHashMap<>();
         scanTomlFile.getPlatforms().forEach(platform -> declared.putIfAbsent(platform.name(), platform));
-        List<String> requested = platforms.stream().distinct().toList();
+        // A platform that triggers the scan reports to the platforms the package declares, unless it names some
+        List<String> requested = platforms.isEmpty() && platformTriggered ? List.copyOf(declared.keySet())
+                : platforms.stream().distinct().toList();
+        if (requested.isEmpty()) {
+            return List.of();
+        }
         List<String> undeclared = requested.stream().filter(name -> !declared.containsKey(name))
                 .map(name -> "'" + name + "'").toList();
         if (!undeclared.isEmpty()) {
@@ -775,26 +923,24 @@ public class ScanCmd implements BLauncherCmd {
         }
         declaredPlatforms.addAll(selected.stream().map(ScanTomlFile.Platform::name).toList());
 
-        List<Path> jarPaths = new ArrayList<>();
-        for (ScanTomlFile.Platform platform : selected) {
-            jarPaths.add(ScanUtils.resolvePlatformJar(platform, project.targetDir(), errorStream));
-        }
-        Map<String, StaticCodeAnalysisPlatformPlugin> plugins = new HashMap<>();
-        try {
-            ServiceLoader.load(StaticCodeAnalysisPlatformPlugin.class, loadPlatformPlugins(jarPaths))
-                    .forEach(plugin -> plugins.putIfAbsent(plugin.platform(), plugin));
-        } catch (ServiceConfigurationError ex) {
-            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_FAILED,
-                    selected.get(0).name(), ScanFailure.describe(ex)));
-        }
-
+        // Each JAR is loaded on its own, so that a broken one is blamed on the platform that names it
+        Map<Path, Map<String, StaticCodeAnalysisPlatformPlugin>> pluginsByJar = new HashMap<>();
         List<SelectedPlatform> selectedPlatforms = new ArrayList<>();
-        for (int i = 0; i < selected.size(); i++) {
-            ScanTomlFile.Platform platform = selected.get(i);
+        for (ScanTomlFile.Platform platform : selected) {
+            Path jarPath = platformJars.get(platform.path());
+            if (jarPath == null) {
+                jarPath = ScanUtils.resolvePlatformJar(platform, project.targetDir(), errorStream);
+                platformJars.put(platform.path(), jarPath);
+            }
+            Map<String, StaticCodeAnalysisPlatformPlugin> plugins = pluginsByJar.get(jarPath);
+            if (plugins == null) {
+                plugins = loadPlatformPlugins(platform.name(), jarPath);
+                pluginsByJar.put(jarPath, plugins);
+            }
             StaticCodeAnalysisPlatformPlugin plugin = plugins.get(platform.name());
             if (plugin == null) {
                 throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_PROVIDED, platform.name(),
-                        jarPaths.get(i)));
+                        jarPath));
             }
             Map<String, String> platformArgs = new HashMap<>();
             platform.arguments().forEach((key, value) -> platformArgs.put(key, value.toString()));
@@ -804,7 +950,10 @@ public class ScanCmd implements BLauncherCmd {
         return selectedPlatforms;
     }
 
-    // In a workspace a package may leave out a named platform, but at least one package must declare it
+    /**
+     * Fails the scan when no package declares a platform named in --platforms. A package may leave out a named
+     * platform, but at least one package must declare it.
+     */
     private void failOnUndeclaredWorkspacePlatforms() {
         List<String> missing = platforms.stream().distinct().filter(name -> !declaredPlatforms.contains(name))
                 .map(name -> "'" + name + "'").toList();
@@ -815,7 +964,7 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * Reports the issues to every selected platform at the same time, and waits for all of them. Each failure is
+     * Reports the issues to every selected platform, one after another. Each failure is
      * collected, so that one failing platform does not hide another.
      */
     private void reportToPlatforms(List<PlatformRun> runs) {
@@ -844,12 +993,17 @@ public class ScanCmd implements BLauncherCmd {
         return new PlatformRun(platform, issues, label);
     }
 
-    private void failOnUnknownRuleOptions() {
+    /**
+     * Fails the scan when a rule named on the command line is not a rule of any scanned package. With coreRulesOnly,
+     * only the core rule IDs are checked, as the rules of a package that failed to prepare are not known.
+     */
+    private void failOnUnknownRuleOptions(boolean coreRulesOnly) {
         if (listRules) {
             return;
         }
         List<String> unknownRules = Stream.concat(includeRules.stream(), excludeRules.stream())
                 .filter(ruleId -> !allRuleIds.contains(ruleId))
+                .filter(ruleId -> !coreRulesOnly || ruleId.startsWith(BALLERINA_RULE_PREFIX))
                 .distinct()
                 .map(ruleId -> "'" + ruleId + "'")
                 .toList();
@@ -859,61 +1013,77 @@ public class ScanCmd implements BLauncherCmd {
         }
     }
 
-    // Each gate option replaces its own field. A platform that triggers the scan applies its own quality gate, so
-    // the tool gate is off
-    private QualityGate resolveGate(ScanTomlFile scanTomlFile, Path root) {
+    /**
+     * Returns the gate of a package. Each gate option replaces its own setting, and the gate is off when a platform
+     * triggers the scan, since the platform applies its own quality gate.
+     */
+    private QualityGate resolveGate(ScanTomlFile scanTomlFile, String scanTomlLabel) {
         if (platformTriggered || !gateEnabled) {
             return QualityGate.OFF;
         }
-        String scanTomlLabel = scanTomlFile.getDisplayPath(root).orElse(Constants.SCAN_FILE);
         if (gateSeverity != null) {
-            warnOverride(scanTomlFile, ScanTomlFile.GATE_FAIL_ON_SEVERITY, FAIL_ON_SEVERITY_OPTION + "=" + gateSeverity,
-                    "\"" + gateSeverity + "\"", scanTomlLabel);
+            warnOverride(scanTomlFile, ScanTomlFile.GATE_FAIL_ON_SEVERITY_SETTING,
+                    FAIL_ON_SEVERITY_OPTION + "=" + gateSeverity, "\"" + gateSeverity + "\"", scanTomlLabel);
         }
         if (gateCount != null) {
-            warnOverride(scanTomlFile, ScanTomlFile.GATE_FAIL_ON_COUNT, FAIL_ON_COUNT_OPTION + "=" + gateCount,
+            warnOverride(scanTomlFile, ScanTomlFile.GATE_FAIL_ON_COUNT_SETTING, FAIL_ON_COUNT_OPTION + "=" + gateCount,
                     String.valueOf(gateCount), scanTomlLabel);
         }
-        String severity = gateSeverity != null ? gateSeverity : scanTomlFile.getFailOnSeverity().orElse(null);
+        GateSeverity severity = gateSeverity != null ? gateSeverity : scanTomlFile.getFailOnSeverity().orElse(null);
         Integer count = gateCount != null ? gateCount : scanTomlFile.getFailOnCount().orElse(null);
+        if (gateCount != null && severity == GateSeverity.NONE) {
+            String turnedOffBy = gateSeverity != null ? FAIL_ON_SEVERITY_OPTION + "=" + gateSeverity
+                    : ScanTomlFile.GATE_FAIL_ON_SEVERITY_SETTING + " = \"" + severity + "\" in " + scanTomlLabel;
+            warnOnce(DiagnosticLog.warning(DiagnosticCode.GATE_COUNT_IGNORED, FAIL_ON_COUNT_OPTION + "=" + gateCount,
+                    turnedOffBy));
+        }
         return QualityGate.of(severity, count);
     }
 
-    private PackageResult scanPackage(PackageScan packageScan) {
-        Project project = packageScan.project();
+    private void printRunningScans(Project project) {
         if (!scanningWorkspace) {
             errorStream.println();
             errorStream.println(RUNNING_SCANS_LOG);
-        } else {
-            // The packages' lines form one block, so that it reads as one list
-            if (!packageScansStarted) {
-                packageScansStarted = true;
-                errorStream.println();
-            }
-            errorStream.println(RUNNING_PACKAGE_SCANS_LOG
-                    + packageLabel(project.workspaceProject().orElseThrow(), project));
+            return;
         }
+        // The packages' lines form one block, so that it reads as one list
+        if (!packageScansStarted) {
+            packageScansStarted = true;
+            errorStream.println();
+        }
+        errorStream.println(RUNNING_PACKAGE_SCANS_LOG
+                + packageLabel(project.workspaceProject().orElseThrow(), project));
+    }
 
-        ProjectAnalyzer projectAnalyzer = packageScan.analyzer();
-        List<Issue> externalIssues = projectAnalyzer.runExternalAnalyzers(packageScan.externalAnalyzers());
+    /**
+     * Runs the analyzers on a prepared package, and applies its rule selection and suppressions.
+     */
+    private PackageResult scanPackage(PackageScan packageScan, PackageRules rules) {
+        Project project = packageScan.project();
+        ProjectAnalyzer projectAnalyzer = rules.analyzer();
+        List<Issue> externalIssues = projectAnalyzer.runExternalAnalyzers(rules.externalAnalyzers());
         failOnCompilationErrors(projectAnalyzer);
 
-        List<Issue> issues = projectAnalyzer.analyze(packageScan.coreRules());
+        List<Issue> issues = projectAnalyzer.analyze(rules.coreRules());
         issues.addAll(externalIssues);
 
-        RuleSelection ruleSelection = packageScan.ruleSelection();
+        PackageConfig config = packageScan.config();
+        RuleSelection ruleSelection = config.ruleSelection();
         issues.removeIf(issue -> !ruleSelection.selects(issue.rule().id()));
 
         SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, issues,
-                ProjectAnalyzer.rules(packageScan.coreRules(), packageScan.externalAnalyzers()), ruleSelection,
-                SuppressionOptions.of(packageScan.scanToml(), ignoreSuppressions, requireSuppressionReason,
-                        requireSuppressionRuleId));
+                ProjectAnalyzer.rules(rules.coreRules(), rules.externalAnalyzers()), ruleSelection,
+                config.suppressionOptions());
         printSuppressionWarnings(suppressionOutcome.diagnostics());
         return new PackageResult(project, issues, suppressionOutcome.activeIssues(),
-                suppressionOutcome.suppressionsByIssue(), packageScan.platforms(),
+                suppressionOutcome.suppressionsByIssue(), packageScan.platforms(), config.gate(),
                 suppressionFailure(suppressionOutcome));
     }
 
+    /**
+     * Prints the active issues of a package and saves its results and HTML report, unless a platform triggered the
+     * scan.
+     */
     private void report(PackageResult result) {
         Project project = result.project();
         List<Issue> activeIssues = result.activeIssues();
@@ -938,14 +1108,14 @@ public class ScanCmd implements BLauncherCmd {
                     reportPath = ScanUtils.saveToDirectory(result.issues(), project, targetDir, suppressions);
                 }
 
-                if (project.workspaceProject().isEmpty()) {
+                if (!scanningWorkspace) {
                     errorStream.println();
                     errorStream.println("View scan results at:");
                     errorStream.println("\t" + reportPath.toUri());
                     errorStream.println();
                     if (scanReport) {
                         Path scanReportPath = ScanUtils.generateScanReport(result.issues(), project, targetDir,
-                                suppressions, this::testsExcluded);
+                                suppressions, this::analyzedSources);
                         errorStream.println();
                         errorStream.println("View scan report at:");
                         errorStream.println("\t" + scanReportPath.toUri() + System.lineSeparator());
@@ -955,6 +1125,9 @@ public class ScanCmd implements BLauncherCmd {
         }
     }
 
+    /**
+     * Fails the scan when the package does not compile, as its issues would not be reliable.
+     */
     private static void failOnCompilationErrors(ProjectAnalyzer projectAnalyzer) {
         List<Diagnostic> compilationErrors = projectAnalyzer.getCompilationErrors();
         if (compilationErrors.isEmpty()) {
@@ -964,6 +1137,10 @@ public class ScanCmd implements BLauncherCmd {
                 compilationErrors.stream().map(ScanCmd::formatDiagnostic).toList());
     }
 
+    /**
+     * Returns the failure for the suppressions that do not meet the requirements, or null when every suppression meets
+     * them.
+     */
     private static ScanFailure suppressionFailure(SuppressionOutcome suppressionOutcome) {
         long invalidSuppressionCount = suppressionOutcome.invalidSuppressionCount();
         if (invalidSuppressionCount == 0) {
@@ -978,6 +1155,9 @@ public class ScanCmd implements BLauncherCmd {
                 invalidSuppressionCount), diagnostics);
     }
 
+    /**
+     * Formats a compiler diagnostic with its file and position, when it has them.
+     */
     private static String formatDiagnostic(Diagnostic diagnostic) {
         Location location = diagnostic.location();
         LineRange lineRange = location == null ? null : location.lineRange();
@@ -987,6 +1167,9 @@ public class ScanCmd implements BLauncherCmd {
         return DiagnosticLog.fileError(lineRange.fileName(), lineRange, diagnostic.message());
     }
 
+    /**
+     * Joins items as a list in prose, such as "a, b and c".
+     */
     private static String joinWithAnd(List<String> items) {
         if (items.size() == 1) {
             return items.get(0);
@@ -1008,6 +1191,9 @@ public class ScanCmd implements BLauncherCmd {
                 : activeIssueCount + " issue(s), " + suppressedIssueCount + " suppressed");
     }
 
+    /**
+     * Warns about each option that has no effect on a single Ballerina file.
+     */
     private void printUnsupportedSingleFileFlagWarnings() {
         if (targetDir != null) {
             warn(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
@@ -1048,12 +1234,16 @@ public class ScanCmd implements BLauncherCmd {
      * @throws RuntimeException if the path is not a valid Ballerina project, which exits as an invalid target, or
      *                          if the dependencies of a package are not locked
      */
-    protected Optional<Project> getProject() {
+    protected Project getProject() {
         Project project = loadProject();
         ScanUtils.requireLockedDependencies(project);
-        return Optional.of(project);
+        return project;
     }
 
+    /**
+     * Loads the package, workspace or file to scan, failing as an invalid target when the path is not one, and as a
+     * runtime error when it cannot be loaded.
+     */
     private Project loadProject() {
         if (!isBallerinaProjectPath()) {
             Optional<Path> packageRoot = getEnclosingPackageRoot();
@@ -1073,10 +1263,10 @@ public class ScanCmd implements BLauncherCmd {
             BuildOptions buildOptions = BuildOptions.builder().setLockingMode(PackageLockingMode.HARD).build();
             loadResult = ProjectLoader.load(projectPath, buildOptions);
         } catch (RuntimeException ex) {
-            throw ScanFailure.invalidTarget(loadFailure, List.of("error: " + ScanFailure.describe(ex)));
+            throw ScanFailure.runtime(loadFailure, List.of("error: " + ScanFailure.describe(ex)));
         }
         if (loadResult.diagnostics().hasErrors()) {
-            throw ScanFailure.invalidTarget(loadFailure,
+            throw ScanFailure.runtime(loadFailure,
                     loadResult.diagnostics().errors().stream().map(ScanCmd::formatDiagnostic).toList());
         }
         return loadResult.project();
@@ -1104,8 +1294,18 @@ public class ScanCmd implements BLauncherCmd {
         }
     }
 
-    protected ProjectAnalyzer getProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
-        return new ProjectAnalyzer(project, scanTomlFile);
+    /**
+     * Creates the analyzer of a package.
+     *
+     * @param project         the package or single file project
+     * @param scanTomlFile    the Scan.toml file the package uses
+     * @param analyzedSources the sources to analyze, with the command-line options applied
+     * @return the analyzer
+     * @since 0.13.0
+     */
+    protected ProjectAnalyzer getProjectAnalyzer(Project project, ScanTomlFile scanTomlFile,
+                                                 AnalyzedSources analyzedSources) {
+        return new ProjectAnalyzer(project, scanTomlFile, analyzedSources);
     }
 
     /**
@@ -1125,34 +1325,68 @@ public class ScanCmd implements BLauncherCmd {
         }
     }
 
-    private URLClassLoader loadPlatformPlugins(List<Path> jarPaths) {
-        List<URL> jarUrls = new ArrayList<>(jarPaths.size());
-        jarPaths.forEach(jarPath -> {
-            try {
-                jarUrls.add(jarPath.toUri().toURL());
-            } catch (MalformedURLException ex) {
-                throw new ScanToolException(ex.getMessage());
+    /**
+     * Loads the platform plugins a JAR provides, keyed by the platform each one reports to.
+     *
+     * @param platformName the platform that names the JAR, which a failure is reported for
+     * @param jarPath      the local JAR
+     * @return the plugins of the JAR
+     */
+    private Map<String, StaticCodeAnalysisPlatformPlugin> loadPlatformPlugins(String platformName, Path jarPath) {
+        Map<String, StaticCodeAnalysisPlatformPlugin> plugins = new HashMap<>();
+        try {
+            URLClassLoader classLoader = platformLoaders.get(jarPath);
+            if (classLoader == null) {
+                classLoader = new URLClassLoader(new URL[]{jarPath.toUri().toURL()}, getClass().getClassLoader());
+                platformLoaders.put(jarPath, classLoader);
             }
-        });
-        return new URLClassLoader(jarUrls.toArray(URL[]::new), this.getClass().getClassLoader());
+            // Each package gets its own plugin instances, so that a plugin can keep state for the package it reports
+            ServiceLoader.load(StaticCodeAnalysisPlatformPlugin.class, classLoader)
+                    .forEach(plugin -> plugins.putIfAbsent(plugin.platform(), plugin));
+        } catch (MalformedURLException | ServiceConfigurationError | LinkageError | RuntimeException ex) {
+            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_FAILED, platformName,
+                    ScanFailure.describe(ex)));
+        }
+        return plugins;
     }
 
-    private record PackageScan(Project project, ScanTomlFile scanToml, ProjectAnalyzer analyzer,
-                               List<Rule> coreRules, Map<String, List<Rule>> externalAnalyzers,
-                               RuleSelection ruleSelection, List<SelectedPlatform> platforms) {
+    private record PackageScan(Project project, ScanTomlFile scanTomlFile, PackageConfig config,
+                               List<SelectedPlatform> platforms) {
+    }
+
+    private record PackageRules(ProjectAnalyzer analyzer, List<Rule> coreRules,
+                                Map<String, List<Rule>> externalAnalyzers) {
+    }
+
+    /**
+     * The effective configuration of a package: the Scan.toml file it uses with the command-line options applied.
+     *
+     * @param analyzedSources    the sources to analyze
+     * @param ruleSelection      the rules to report
+     * @param suppressionOptions how suppressions are applied
+     * @param gate               the gate the package's issues are checked against
+     */
+    private record PackageConfig(AnalyzedSources analyzedSources, RuleSelection ruleSelection,
+                                 SuppressionOptions suppressionOptions, QualityGate gate) {
     }
 
     // Holds the project, not the PackageScan, so that the analyzer and rules can be released after the scan
     private record PackageResult(Project project, List<Issue> issues, List<Issue> activeIssues,
                                  Map<Issue, SuppressedIssue> suppressions, List<SelectedPlatform> platforms,
-                                 ScanFailure suppressionFailure) {
+                                 QualityGate gate, ScanFailure suppressionFailure) {
     }
 
     private record SelectedPlatform(String name, StaticCodeAnalysisPlatformPlugin plugin,
                                     PlatformPluginContext context) {
     }
 
-    // The package label is null outside a workspace
+    /**
+     * A platform to report the issues of a package to.
+     *
+     * @param platform     the platform
+     * @param issues       the active issues of the package
+     * @param packageLabel the package as shown to the user, or null outside a workspace
+     */
     private record PlatformRun(SelectedPlatform platform, List<Issue> issues, String packageLabel) {
         String label() {
             return packageLabel == null ? platform.name() : platform.name() + " (" + packageLabel + ")";
@@ -1161,6 +1395,34 @@ public class ScanCmd implements BLauncherCmd {
         String error(String reason) {
             return (packageLabel == null ? "" : packageLabel + ": ") + "error: "
                     + DiagnosticLog.error(DiagnosticCode.PLATFORM_FAILED, platform.name(), reason);
+        }
+    }
+
+    /**
+     * Reads the value of an option that takes an optional boolean, as picocli does for a boolean option: a separate
+     * argument is its value only when it is true or false, so that {@code --exclude-tests main.bal} scans
+     * {@code main.bal}. A value attached with {@code =} is kept as given, so that an invalid one is reported by the
+     * command instead of by picocli.
+     */
+    private static class OptionalBooleanValue implements CommandLine.IParameterPreprocessor {
+        /**
+         * Pushes the implicit true when the option is written alone or before an argument that is not a boolean.
+         */
+        @Override
+        public boolean preprocess(Stack<String> args, CommandLine.Model.CommandSpec commandSpec,
+                                  CommandLine.Model.ArgSpec argSpec, Map<String, Object> info) {
+            boolean attached = !" ".equals(info.get("separator"));
+            if (!attached && (args.isEmpty() || !isBoolean(args.peek()))) {
+                args.push("true");
+            }
+            return false;
+        }
+
+        /**
+         * Returns whether an argument is a boolean value, in any case.
+         */
+        private static boolean isBoolean(String value) {
+            return "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value);
         }
     }
 

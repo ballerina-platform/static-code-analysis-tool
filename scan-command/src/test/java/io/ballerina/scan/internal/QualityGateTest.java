@@ -23,6 +23,7 @@ import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Severity;
 import io.ballerina.scan.Source;
+import io.ballerina.scan.utils.GateSeverity;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
@@ -42,14 +43,14 @@ public class QualityGateTest {
     @Test(description = "test the gate is off when no setting is given or the severity is NONE")
     void testGateOff() {
         Assert.assertTrue(QualityGate.of(null, null).isOff());
-        Assert.assertTrue(QualityGate.of("NONE", 5).isOff());
-        Assert.assertEquals(QualityGate.of("NONE", null).evaluate(List.of(issue(Severity.BLOCKER))),
+        Assert.assertTrue(QualityGate.of(GateSeverity.NONE, 5).isOff());
+        Assert.assertEquals(QualityGate.of(GateSeverity.NONE, null).evaluate(List.of(issue(Severity.BLOCKER))),
                 Optional.empty());
     }
 
     @Test(description = "test a severity without a count fails on the first issue at or above it")
     void testSeverityWithoutCount() {
-        QualityGate gate = QualityGate.of("HIGH", null);
+        QualityGate gate = QualityGate.of(GateSeverity.HIGH, null);
         Assert.assertEquals(gate.evaluate(List.of(issue(Severity.MEDIUM), issue(Severity.LOW))), Optional.empty());
         Assert.assertEquals(gate.evaluate(List.of(issue(Severity.BLOCKER), issue(Severity.MEDIUM))),
                 Optional.of("1 issue at or above HIGH, limit 1 (BLOCKER: 1)"));
@@ -65,7 +66,7 @@ public class QualityGateTest {
 
     @Test(description = "test the gate counts only the issues at or above the severity")
     void testSeverityAndCount() {
-        QualityGate gate = QualityGate.of("MEDIUM", 2);
+        QualityGate gate = QualityGate.of(GateSeverity.MEDIUM, 2);
         List<Issue> issues = List.of(issue(Severity.MEDIUM), issue(Severity.LOW), issue(Severity.INFO));
         Assert.assertEquals(gate.evaluate(issues), Optional.empty());
         Assert.assertEquals(gate.evaluate(List.of(issue(Severity.MEDIUM), issue(Severity.HIGH), issue(Severity.LOW))),
@@ -75,9 +76,9 @@ public class QualityGateTest {
     @Test(description = "test a rule without a severity is gated by the severity its kind maps to")
     void testRulesWithoutSeverity() {
         List<Issue> issues = List.of(issue(RuleKind.BUG), issue(RuleKind.VULNERABILITY), issue(RuleKind.CODE_SMELL));
-        Assert.assertEquals(QualityGate.of("HIGH", null).evaluate(issues),
+        Assert.assertEquals(QualityGate.of(GateSeverity.HIGH, null).evaluate(issues),
                 Optional.of("1 issue at or above HIGH, limit 1 (HIGH: 1)"));
-        Assert.assertEquals(QualityGate.of("LOW", null).evaluate(issues),
+        Assert.assertEquals(QualityGate.of(GateSeverity.LOW, null).evaluate(issues),
                 Optional.of("3 issues at or above LOW, limit 1 (HIGH: 1, MEDIUM: 1, LOW: 1)"));
     }
 

@@ -37,24 +37,16 @@ public class ScanTomlFileTest {
         scanToml.writeRules(false, List.of("ballerina:1", "ballerina:2"));
         scanToml.setAnalyzer(new ScanTomlFile.Analyzer("exampleOrg", "example_analyzer", "1.0.0", null));
         scanToml.setSuppressionReasonRequired(true);
-        scanToml.setFailOnSeverity("HIGH");
+        scanToml.setFailOnSeverity(GateSeverity.HIGH);
         scanToml.writeExcludeTests(true);
 
         Assert.assertEquals(scanToml.getWrittenSettings(), Map.of(
-                ScanTomlFile.RULE_EXCLUDE, "[\"ballerina:1\", \"ballerina:2\"]",
+                ScanTomlFile.RULE_EXCLUDE_SETTING, "[\"ballerina:1\", \"ballerina:2\"]",
                 "[[analyzer]] exampleOrg/example_analyzer:1.0.0", "",
-                ScanTomlFile.SUPPRESSION_REQUIRE_REASON, "true",
-                ScanTomlFile.GATE_FAIL_ON_SEVERITY, "\"HIGH\"",
-                ScanTomlFile.ANALYSIS_EXCLUDE_TESTS, "true"));
-        Assert.assertTrue(scanToml.getWrittenValue(ScanTomlFile.GATE_FAIL_ON_COUNT).isEmpty());
+                ScanTomlFile.SUPPRESSION_REQUIRE_REASON_SETTING, "true",
+                ScanTomlFile.GATE_FAIL_ON_SEVERITY_SETTING, "\"HIGH\"",
+                ScanTomlFile.ANALYSIS_EXCLUDE_TESTS_SETTING, "true"));
+        Assert.assertTrue(scanToml.getWrittenValue(ScanTomlFile.GATE_FAIL_ON_COUNT_SETTING).isEmpty());
         Assert.assertTrue(scanToml.isSuppressionEnabled(), "a setting not written keeps its default");
-    }
-
-    @Test(description = "test a command-line value for excludeTests does not count as written")
-    void testCommandLineExcludeTestsIsNotWritten() {
-        ScanTomlFile scanToml = new ScanTomlFile();
-        scanToml.setExcludeTests(true);
-        Assert.assertTrue(scanToml.isExcludeTests());
-        Assert.assertTrue(scanToml.getWrittenSettings().isEmpty());
     }
 }

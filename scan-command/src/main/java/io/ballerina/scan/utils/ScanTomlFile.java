@@ -34,14 +34,14 @@ import java.util.stream.Collectors;
  * @since 0.1.0
  * */
 public class ScanTomlFile {
-    public static final String RULE_INCLUDE = "[rule] include";
-    public static final String RULE_EXCLUDE = "[rule] exclude";
-    public static final String SUPPRESSION_ENABLED = "[suppression] enabled";
-    public static final String SUPPRESSION_REQUIRE_REASON = "[suppression] requireReason";
-    public static final String SUPPRESSION_REQUIRE_RULE_ID = "[suppression] requireRuleId";
-    public static final String GATE_FAIL_ON_SEVERITY = "[gate] failOnSeverity";
-    public static final String GATE_FAIL_ON_COUNT = "[gate] failOnCount";
-    public static final String ANALYSIS_EXCLUDE_TESTS = "[analysis] excludeTests";
+    public static final String RULE_INCLUDE_SETTING = "[rule] include";
+    public static final String RULE_EXCLUDE_SETTING = "[rule] exclude";
+    public static final String SUPPRESSION_ENABLED_SETTING = "[suppression] enabled";
+    public static final String SUPPRESSION_REQUIRE_REASON_SETTING = "[suppression] requireReason";
+    public static final String SUPPRESSION_REQUIRE_RULE_ID_SETTING = "[suppression] requireRuleId";
+    public static final String GATE_FAIL_ON_SEVERITY_SETTING = "[gate] failOnSeverity";
+    public static final String GATE_FAIL_ON_COUNT_SETTING = "[gate] failOnCount";
+    public static final String ANALYSIS_EXCLUDE_TESTS_SETTING = "[analysis] excludeTests";
     private static final String ANALYZER_SETTING = "[[analyzer]] ";
 
     private final Set<Platform> platforms = new LinkedHashSet<>();
@@ -53,7 +53,7 @@ public class ScanTomlFile {
     private boolean suppressionEnabled = true;
     private boolean suppressionReasonRequired;
     private boolean suppressionRuleIdRequired;
-    private String failOnSeverity;
+    private GateSeverity failOnSeverity;
     private Integer failOnCount;
     private boolean excludeTests;
     private Path path;
@@ -66,14 +66,14 @@ public class ScanTomlFile {
         this.remoteLocation = remoteLocation;
     }
 
-    void setFailOnSeverity(String severity) {
+    void setFailOnSeverity(GateSeverity severity) {
         failOnSeverity = severity;
-        writtenSettings.put(GATE_FAIL_ON_SEVERITY, "\"" + severity + "\"");
+        writtenSettings.put(GATE_FAIL_ON_SEVERITY_SETTING, "\"" + severity + "\"");
     }
 
     void setFailOnCount(Integer count) {
         failOnCount = count;
-        writtenSettings.put(GATE_FAIL_ON_COUNT, String.valueOf(count));
+        writtenSettings.put(GATE_FAIL_ON_COUNT_SETTING, String.valueOf(count));
     }
 
     void setPath(Path path) {
@@ -82,22 +82,14 @@ public class ScanTomlFile {
 
     void writeExcludeTests(boolean excludeTests) {
         this.excludeTests = excludeTests;
-        writtenSettings.put(ANALYSIS_EXCLUDE_TESTS, String.valueOf(excludeTests));
-    }
-
-    void writeRules(boolean include, Collection<String> ruleIds) {
-        writtenSettings.put(include ? RULE_INCLUDE : RULE_EXCLUDE, quotedList(ruleIds));
+        writtenSettings.put(ANALYSIS_EXCLUDE_TESTS_SETTING, String.valueOf(excludeTests));
     }
 
     /**
-     * Sets whether the test sources are left out of the scan for a single run, as {@code --exclude-tests} does. It
-     * does not change the settings the file writes.
-     *
-     * @param excludeTests true to leave the test sources out of the scan, false to scan them
-     * @since 0.13.0
+     * Records the rule IDs of include or exclude as written in the file.
      */
-    public void setExcludeTests(boolean excludeTests) {
-        this.excludeTests = excludeTests;
+    void writeRules(boolean include, Collection<String> ruleIds) {
+        writtenSettings.put(include ? RULE_INCLUDE_SETTING : RULE_EXCLUDE_SETTING, quotedList(ruleIds));
     }
 
     /**
@@ -112,8 +104,8 @@ public class ScanTomlFile {
 
     /**
      * Returns each setting the file writes explicitly, in the order it was read. The key names the setting, such as
-     * {@link #GATE_FAIL_ON_COUNT} or {@code [[analyzer]] org/name}, and the value is as written in TOML, such as
-     * {@code 2} or {@code ["ballerina:1"]}; an analyzer entry has an empty value. A setting left at its default
+     * {@link #GATE_FAIL_ON_COUNT_SETTING} or {@code [[analyzer]] org/name}, and the value is as written in TOML,
+     * such as {@code 2} or {@code ["ballerina:1"]}; an analyzer entry has an empty value. A setting left at its default
      * because the file does not write it is not included.
      *
      * @return an unmodifiable map of the written settings
@@ -126,7 +118,7 @@ public class ScanTomlFile {
     /**
      * Returns the value of a setting as written in the file.
      *
-     * @param setting the name of the setting, such as {@link #GATE_FAIL_ON_COUNT}
+     * @param setting the name of the setting, such as {@link #GATE_FAIL_ON_COUNT_SETTING}
      * @return the value as written in TOML, or empty when the file does not write the setting
      * @since 0.13.0
      */
@@ -135,12 +127,12 @@ public class ScanTomlFile {
     }
 
     /**
-     * Returns the severity set by {@code [gate] failOnSeverity}, in upper case.
+     * Returns the severity set by {@code [gate] failOnSeverity}.
      *
-     * @return a severity name or {@code NONE}, or empty when not set
+     * @return the gate severity, or empty when not set
      * @since 0.13.0
      */
-    public Optional<String> getFailOnSeverity() {
+    public Optional<GateSeverity> getFailOnSeverity() {
         return Optional.ofNullable(failOnSeverity);
     }
 
@@ -152,16 +144,6 @@ public class ScanTomlFile {
      */
     public Optional<Integer> getFailOnCount() {
         return Optional.ofNullable(failOnCount);
-    }
-
-    /**
-     * Returns whether the {@code [gate]} table sets either setting.
-     *
-     * @return true if {@code failOnSeverity} or {@code failOnCount} is set
-     * @since 0.13.0
-     */
-    public boolean hasGate() {
-        return failOnSeverity != null || failOnCount != null;
     }
 
     /**
@@ -204,6 +186,9 @@ public class ScanTomlFile {
         platforms.add(platform);
     }
 
+    /**
+     * Adds an analyzer, and records it as written in the file.
+     */
     void setAnalyzer(Analyzer analyzer) {
         analyzers.add(analyzer);
         String id = analyzer.org() + "/" + analyzer.name()
@@ -221,17 +206,17 @@ public class ScanTomlFile {
 
     void setSuppressionEnabled(boolean enabled) {
         suppressionEnabled = enabled;
-        writtenSettings.put(SUPPRESSION_ENABLED, String.valueOf(enabled));
+        writtenSettings.put(SUPPRESSION_ENABLED_SETTING, String.valueOf(enabled));
     }
 
     void setSuppressionReasonRequired(boolean required) {
         suppressionReasonRequired = required;
-        writtenSettings.put(SUPPRESSION_REQUIRE_REASON, String.valueOf(required));
+        writtenSettings.put(SUPPRESSION_REQUIRE_REASON_SETTING, String.valueOf(required));
     }
 
     void setSuppressionRuleIdRequired(boolean required) {
         suppressionRuleIdRequired = required;
-        writtenSettings.put(SUPPRESSION_REQUIRE_RULE_ID, String.valueOf(required));
+        writtenSettings.put(SUPPRESSION_REQUIRE_RULE_ID_SETTING, String.valueOf(required));
     }
 
     /**

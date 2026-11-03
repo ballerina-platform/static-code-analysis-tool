@@ -20,10 +20,12 @@ package io.ballerina.scan.internal;
 
 import com.google.gson.JsonParser;
 import io.ballerina.projects.Project;
+import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.ReportFormat;
+import io.ballerina.scan.utils.GateSeverity;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
@@ -121,6 +123,8 @@ public class GateTest extends BaseTest {
                 {new String[]{"--fail-on-count=ten"},
                         "invalid value 'ten' for --fail-on-count; expected a whole number of 1 or more"},
                 {new String[]{"--format=xml"}, "invalid value 'xml' for --format; expected json or sarif"},
+                {new String[]{"--exclude-tests=yes"},
+                        "invalid value 'yes' for --exclude-tests; expected true or false"},
                 {new String[]{"--include-rules=ballerina:1", "--exclude-rules=ballerina:2"},
                         "cannot include and exclude rules at the same time"},
         };
@@ -179,7 +183,7 @@ public class GateTest extends BaseTest {
                 run.output());
     }
 
-    @Test(description = "test a command-line count keeps a gate that Scan.toml turns off with NONE turned off")
+    @Test(description = "test a command-line count warns that it does not turn on a gate that Scan.toml turns off")
     void testCountKeepsNoneInScanToml() throws IOException {
         Path scanToml = gateConfigProject.resolve("Scan.toml");
         String original = Files.readString(scanToml, StandardCharsets.UTF_8);
@@ -190,7 +194,8 @@ public class GateTest extends BaseTest {
         try {
             ScanRun run = scan(gateConfigProject, "--fail-on-count=1");
             Assert.assertEquals(run.exitCode(), 0, run.output());
-            Assert.assertFalse(run.output().contains("warning"), run.output());
+            Assert.assertTrue(run.output().contains("bal scan: warning: --fail-on-count=1 has no effect, as "
+                    + "[gate] failOnSeverity = \"NONE\" in Scan.toml turns the gate off\n"), run.output());
 
             run = scan(gateConfigProject, "--fail-on-severity=INFO", "--fail-on-count=1");
             Assert.assertEquals(run.exitCode(), 1, run.output());
@@ -214,7 +219,8 @@ public class GateTest extends BaseTest {
         Project project = ProjectLoader.load(invalidGateConfigProject).project();
         Optional<ScanTomlFile> scanToml = ScanUtils.loadScanTomlConfigurations(project, printStream);
         Assert.assertTrue(scanToml.isPresent());
-        Assert.assertFalse(scanToml.get().hasGate());
+        Assert.assertTrue(scanToml.get().getFailOnSeverity().isEmpty());
+        Assert.assertTrue(scanToml.get().getFailOnCount().isEmpty());
         Assert.assertThrows(ScanToolException.class,
                 () -> ScanUtils.readScanTomlConfigurations(project, printStream));
     }
@@ -290,6 +296,41 @@ public class GateTest extends BaseTest {
     void testGateOffForTestRunnerConstructor() throws IOException {
         new PlatformScanCmd(gateConfigProject, printStream, ReportFormat.BALLERINA).execute();
         Assert.assertFalse(readOutput(true).contains("bal scan: error:"));
+    }
+
+    @Test(description = "test the test-runner constructor defaults to the JSON format when none is given")
+    void testTestRunnerConstructorWithoutFormat() throws IOException {
+        new PlatformScanCmd(gateIssuesProject, printStream, null).execute();
+        String output = readOutput(true);
+        Assert.assertFalse(output.contains("bal scan: error:"), output);
+        Assert.assertFalse(output.contains("\"$schema\""), output);
+    }
+
+    @Test(description = "test a target that is not a valid path exits as an invalid target")
+    void testInvalidTargetPath() throws IOException {
+        ScanRun run = scan(gateIssuesProject, "invalid\u0000path");
+        Assert.assertEquals(run.exitCode(), 3, run.output());
+        Assert.assertTrue(run.errorReport().startsWith("bal scan: error: not a Ballerina package, workspace or "
+                + "source file: "), run.output());
+    }
+
+    @Test(description = "test a package that cannot be loaded exits as a runtime error, not an invalid target")
+    void testProjectLoadFailure() throws IOException {
+        Path brokenPackage = Files.createTempDirectory("broken-package");
+        try {
+            Files.writeString(brokenPackage.resolve("Ballerina.toml"), """
+                    [package]
+                    org = "ballerina"
+                    name = "broken
+                    """);
+            Files.writeString(brokenPackage.resolve("main.bal"), "public function main() {}\n");
+            ScanRun run = scan(brokenPackage);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.output().contains("bal scan: error: failed to load the project at "),
+                    run.output());
+        } finally {
+            ProjectUtils.deleteDirectory(brokenPackage);
+        }
     }
 
     @Test(description = "test invalid gate settings in Scan.toml are reported at their location")
@@ -392,8 +433,8 @@ public class GateTest extends BaseTest {
                     bal scan: error: 2 packages failed the gate
                     pkg-a: error: 1 issue at or above HIGH, limit 1 (HIGH: 1)
                     pkg-b: error: 2 issues at or above LOW, limit 1 (LOW: 2)""");
-            Assert.assertTrue(run.output().contains("bal scan: warning: pkg-a/Scan.toml overrides Scan.toml for "
-                    + "pkg-a; not applied: [gate] failOnSeverity = \"LOW\"\n"), run.output());
+            Assert.assertFalse(run.output().contains("overrides Scan.toml for pkg-a"),
+                    "pkg-a sets failOnSeverity itself: " + run.output());
             // Progress lines name the package each file and scan is for
             for (String line : List.of("Loading scan tool configurations for the workspace from Scan.toml\n",
                     "Loading scan tool configurations for pkg-a from pkg-a/Scan.toml\n",
@@ -444,6 +485,40 @@ public class GateTest extends BaseTest {
                     """);
             run = scan(gatedWorkspace);
             Assert.assertFalse(run.output().contains("overrides Scan.toml for pkg-b"), run.output());
+        } finally {
+            Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
+            Files.writeString(packageScanToml, original);
+        }
+    }
+
+    @Test(description = "test a workspace package uses the workspace Scan.toml when it has none, even when it is "
+            + "loaded without its workspace")
+    void testWorkspacePackageScannedOnItsOwn() throws IOException {
+        Path packageRoot = gatedWorkspace.resolve("pkg-b");
+        Path packageScanToml = packageRoot.resolve("Scan.toml");
+        String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        try {
+            writeWorkspaceScanToml("""
+                    [gate]
+                    failOnSeverity = "LOW"
+                    """);
+            Files.delete(packageScanToml);
+            // Scanning from inside a package loads its whole workspace
+            ScanRun run = scan(packageRoot);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.errorReport().endsWith("pkg-b: error: 2 issues at or above LOW, limit 1 (LOW: 2)"),
+                    run.output());
+
+            // A package loaded on its own finds the workspace file from its root
+            Project packageOnly = BuildProject.load(packageRoot);
+            Assert.assertTrue(packageOnly.workspaceProject().isEmpty(), "the package is loaded without the workspace");
+            Optional<ScanTomlFile> scanToml = ScanUtils.readEnclosingWorkspaceScanToml(packageOnly, printStream);
+            Assert.assertTrue(scanToml.isPresent());
+            Assert.assertEquals(scanToml.get().getFailOnSeverity(), Optional.of(GateSeverity.LOW));
+
+            Files.writeString(packageScanToml, original);
+            Assert.assertTrue(ScanUtils.readScanTomlConfigurations(packageOnly, printStream).getPath().isPresent(),
+                    "a Scan.toml of its own is used instead");
         } finally {
             Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
             Files.writeString(packageScanToml, original);
@@ -618,8 +693,8 @@ public class GateTest extends BaseTest {
         Assert.assertFalse(run.output().contains("warning"), run.output());
     }
 
-    @Test(description = "test a package that fails to load in a workspace is reported instead of unknown rule IDs")
-    void testPackageFailureWinsOverUnknownRules() throws IOException {
+    @Test(description = "test a package that fails to load in a workspace stops the scan before any is scanned")
+    void testPackageFailureInWorkspace() throws IOException {
         Path packageScanToml = gatedWorkspace.resolve("pkg-b").resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
         Files.writeString(packageScanToml, """
@@ -627,11 +702,20 @@ public class GateTest extends BaseTest {
                 failOnCount = 0
                 """);
         try {
+            // The core rules are known without the failed package, so an unknown one is still a usage error
             ScanRun run = scan(gatedWorkspace, "--include-rules=ballerina:99");
+            Assert.assertEquals(run.exitCode(), 2, run.output());
+            Assert.assertTrue(run.errorReport().startsWith("bal scan: error: unknown rule 'ballerina:99'\n"),
+                    run.output());
+            Assert.assertFalse(run.output().contains("Running scans on"), run.output());
+
+            // An analyzer rule could belong to the failed package, so the package failure is reported instead
+            run = scan(gatedWorkspace, "--include-rules=exampleOrg/example_module_static_code_analyzer:1");
             Assert.assertEquals(run.exitCode(), 1, run.output());
             Assert.assertTrue(run.errorReport().startsWith("bal scan: error: 1 package failed\n"
                     + "pkg-b: error: Scan.toml has 1 error\n"), run.output());
             Assert.assertFalse(run.output().contains("unknown rule"), run.output());
+            Assert.assertFalse(run.output().contains("Running scans on"), run.output());
         } finally {
             Files.writeString(packageScanToml, original);
         }

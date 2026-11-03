@@ -22,6 +22,7 @@ import io.ballerina.scan.Issue;
 import io.ballerina.scan.Severity;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
+import io.ballerina.scan.utils.GateSeverity;
 import io.ballerina.scan.utils.ScanUtils;
 
 import java.util.Collection;
@@ -51,15 +52,15 @@ final class QualityGate {
      * Returns the gate for the resolved settings. A count without a severity counts every severity, and a severity
      * without a count fails on the first issue.
      *
-     * @param severity a severity name, {@code NONE}, or {@code null} when not set
+     * @param severity the gate severity, or {@code null} when not set
      * @param count    a count of 1 or more, or {@code null} when not set
      * @return the gate, which is {@link #OFF} when neither is set or the severity is {@code NONE}
      */
-    static QualityGate of(String severity, Integer count) {
-        if (ScanUtils.GATE_SEVERITY_NONE.equals(severity) || (severity == null && count == null)) {
+    static QualityGate of(GateSeverity severity, Integer count) {
+        if (severity == GateSeverity.NONE || (severity == null && count == null)) {
             return OFF;
         }
-        return new QualityGate(severity == null ? Severity.INFO : Severity.valueOf(severity),
+        return new QualityGate(severity == null ? Severity.INFO : severity.severity().orElseThrow(),
                 count == null ? 1 : count);
     }
 

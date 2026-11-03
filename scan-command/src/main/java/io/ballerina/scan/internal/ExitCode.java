@@ -19,13 +19,13 @@
 package io.ballerina.scan.internal;
 
 /**
- * The exit codes of {@code bal scan}, which are the standard exit codes of Ballerina CLI tools. An interrupt exits
- * with {@code 130} through the JVM and needs no code here.
+ * The exit codes of a failed {@code bal scan}, which are the standard exit codes of Ballerina CLI tools. A scan that
+ * succeeds exits with {@code 0}, and an interrupt exits with {@code 130} through the JVM, so neither needs a code
+ * here.
  *
  * @since 0.13.0
  */
 enum ExitCode {
-    SUCCESS(0),
     RUNTIME_ERROR(1),
     USAGE_ERROR(2),
     INVALID_TARGET(3);

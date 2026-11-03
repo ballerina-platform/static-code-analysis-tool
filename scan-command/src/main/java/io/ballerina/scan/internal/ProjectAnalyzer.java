@@ -41,11 +41,11 @@ import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.Severity;
+import io.ballerina.scan.utils.AnalyzedSources;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
-import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.diagnostics.Diagnostic;
 
 import java.io.BufferedReader;
@@ -60,7 +60,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -88,12 +87,34 @@ import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
 public class ProjectAnalyzer {
     private final Project project;
     private final ScanTomlFile scanTomlFile;
+    private final AnalyzedSources analyzedSources;
     private final Gson gson = new Gson();
     private String pluginImportsDocumentName;
+    private Set<String> excludedFilePaths;
 
+    /**
+     * Creates an analyzer that scans the sources selected by {@code [analysis] excludeTests} in the Scan.toml file.
+     *
+     * @param project      the project to analyze
+     * @param scanTomlFile the Scan.toml configurations of the project
+     */
     protected ProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
+        this(project, scanTomlFile, AnalyzedSources.of(scanTomlFile.isExcludeTests()));
+    }
+
+    /**
+     * Creates an analyzer that scans the given sources, such as when a command-line option overrides the Scan.toml
+     * file.
+     *
+     * @param project         the project to analyze
+     * @param scanTomlFile    the Scan.toml configurations of the project
+     * @param analyzedSources the sources of the project to analyze
+     * @since 0.13.0
+     */
+    protected ProjectAnalyzer(Project project, ScanTomlFile scanTomlFile, AnalyzedSources analyzedSources) {
         this.project = project;
         this.scanTomlFile = scanTomlFile;
+        this.analyzedSources = analyzedSources;
         Module defaultModule = project.currentPackage().getDefaultModule();
         List<String> defaultModuleFiles = defaultModule.documentIds()
                 .stream()
@@ -118,24 +139,35 @@ public class ProjectAnalyzer {
             SemanticModel semanticModel = module.getCompilation().getSemanticModel();
             // The secret value resolver caches what it traces across the documents of a module.
             SecretValueResolver secretValueResolver = new SecretValueResolver(semanticModel, module);
-            module.documentIds().forEach(analyzeDocument(module, semanticModel, secretValueResolver, scannerContext));
-            if (!scanTomlFile.isExcludeTests()) {
-                module.testDocumentIds().forEach(analyzeDocument(module, semanticModel, secretValueResolver,
-                        scannerContext));
-            }
+            analyzedSources.documentIds(module)
+                    .forEach(analyzeDocument(module, semanticModel, secretValueResolver, scannerContext));
         });
         return scannerContext.getReporter().getIssues();
     }
 
-    // The paths of the test documents, as issues report them
-    private Set<String> testFilePaths() {
-        Set<String> testFilePaths = new HashSet<>();
-        project.currentPackage().moduleIds().forEach(moduleId -> {
-            Module module = project.currentPackage().module(moduleId);
-            module.testDocumentIds().forEach(documentId ->
-                    testFilePaths.add(ScanUtils.getReportFilePath(module.document(documentId))));
-        });
-        return testFilePaths;
+    /**
+     * Returns the sources of the project that this analyzer scans.
+     *
+     * @return the analyzed sources
+     * @since 0.13.0
+     */
+    protected AnalyzedSources analyzedSources() {
+        return analyzedSources;
+    }
+
+    /**
+     * Returns whether an issue that an analyzer reported is in a source this analyzer scans. Analyzers run as
+     * compiler plugins on every document, so an issue in an excluded test source is dropped after it is reported.
+     *
+     * @param issue an issue reported by an analyzer
+     * @return true if the issue is kept
+     * @since 0.13.0
+     */
+    protected boolean isAnalyzed(Issue issue) {
+        if (excludedFilePaths == null) {
+            excludedFilePaths = analyzedSources.excludedFilePaths(project.currentPackage());
+        }
+        return !(issue instanceof IssueImpl issueImpl) || !excludedFilePaths.contains(issueImpl.filePath());
     }
 
     private static Consumer<DocumentId> analyzeDocument(Module module, SemanticModel semanticModel,
@@ -314,6 +346,10 @@ public class ProjectAnalyzer {
         }
     }
 
+    /**
+     * Compiles the package with the analyzers engaged as compiler plugins, and returns the issues they report in the
+     * analyzed sources.
+     */
     List<Issue> runExternalAnalyzers(Map<String, List<Rule>> externalAnalyzers) {
         List<ScannerContext> scannerContextList = new ArrayList<>(externalAnalyzers.size());
         for (Map.Entry<String, List<Rule>> externalAnalyzer : externalAnalyzers.entrySet()) {
@@ -329,14 +365,11 @@ public class ProjectAnalyzer {
         }
 
         project.currentPackage().getCompilation();
-        // Analyzers run as compiler plugins on every document, so the issues they report in tests are dropped here
-        Set<String> excludedFilePaths = scanTomlFile.isExcludeTests() ? testFilePaths() : Set.of();
         List<Issue> externalIssues = new ArrayList<>(scannerContextList.size());
         for (ScannerContext scannerContext : scannerContextList) {
             ReporterImpl reporter = (ReporterImpl) scannerContext.getReporter();
             for (Issue issue : reporter.getIssues()) {
-                if (!issue.location().lineRange().fileName().equals(pluginImportsDocumentName)
-                        && !excludedFilePaths.contains(((IssueImpl) issue).filePath())) {
+                if (!issue.location().lineRange().fileName().equals(pluginImportsDocumentName) && isAnalyzed(issue)) {
                     externalIssues.add(issue);
                 }
             }
@@ -352,6 +385,6 @@ public class ProjectAnalyzer {
     }
 
     protected ScannerContext getScannerContext(List<Rule> rules) {
-        return new ScannerContextImpl(rules, scanTomlFile.isExcludeTests());
+        return new ScannerContextImpl(rules, analyzedSources.excludesTests());
     }
 }

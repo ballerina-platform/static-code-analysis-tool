@@ -19,9 +19,11 @@
 package io.ballerina.scan.test;
 
 import io.ballerina.projects.Project;
+import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.internal.ProjectAnalyzer;
+import io.ballerina.scan.utils.AnalyzedSources;
 import io.ballerina.scan.utils.ScanTomlFile;
 
 import java.util.ArrayList;
@@ -34,22 +36,28 @@ import java.util.List;
  */
 class TestProjectAnalyzer extends ProjectAnalyzer {
     private final List<TestReporter> reporters;
-    private final ScanTomlFile scanTomlFile;
 
-    TestProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
-        super(project, scanTomlFile);
+    TestProjectAnalyzer(Project project, ScanTomlFile scanTomlFile, AnalyzedSources analyzedSources) {
+        super(project, scanTomlFile, analyzedSources);
         this.reporters = new ArrayList<>();
-        this.scanTomlFile = scanTomlFile;
     }
 
     @Override
     protected ScannerContext getScannerContext(List<Rule> rules) {
-        TestScannerContext scannerContext = new TestScannerContext(rules, scanTomlFile.isExcludeTests());
+        TestScannerContext scannerContext = new TestScannerContext(rules, analyzedSources().excludesTests());
         reporters.add(scannerContext.getReporter());
         return scannerContext;
     }
 
     List<TestReporter> getReporters() {
         return reporters;
+    }
+
+    // Analyzers report issues in every source, so the ones in sources the scan leaves out are dropped, as bal scan does
+    List<Issue> getIssues() {
+        return reporters.stream()
+                .flatMap(reporter -> reporter.getIssues().stream())
+                .filter(this::isAnalyzed)
+                .toList();
     }
 }

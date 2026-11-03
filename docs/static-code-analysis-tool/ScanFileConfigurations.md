@@ -42,7 +42,9 @@ name = "sonarqube"
 path = "path/to/sonar_platform_plugin.jar"
 ```
 
-Both `name` and `path` are required. A platform entry without a `path` is ignored. The `path` can be a local file path, resolved relative to the folder of the `Scan.toml` file, or a URL, in which case the scan tool downloads the plugin JAR. A path that is neither an existing file nor a URL stops the scan with an error. The paths in a remote `Scan.toml` file are resolved relative to the package root.
+Both `name` and `path` are required. A platform entry without a `path` is ignored. The `path` can be a local file path, resolved relative to the folder of the `Scan.toml` file, or a URL, in which case the scan tool downloads the plugin JAR. The paths in a remote `Scan.toml` file are resolved relative to the package root.
+
+A declared platform is reported to only when it is named in `--platforms`, for example `bal scan --platforms=sonarqube`. A plain `bal scan` never reports to a platform. The plugin JAR is checked, or downloaded, only when its platform is named, so a `Scan.toml` can declare a platform whose JAR exists only on CI. A path of a named platform that is neither an existing file nor a URL stops the scan with an error.
 
 ```toml
 [[platform]]
@@ -61,7 +63,7 @@ sonarProjectPropertiesPath = "sonar-project.properties"
 
 An argument whose name ends with `Path`, such as `sonarProjectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file is passed to the plugin as the absolute path of that file. Any other value, such as a URL or a file the plugin creates, is passed to the plugin unchanged.
 
-A platform that fails while reporting the issues does not fail the scan. The scan prints a warning and goes on, so that a failed upload does not hide the results; a CI job that must fail on it can check the output for the warning. A platform that is not available, because no `[[platform]]` entry provides it, still fails the scan. In a workspace, platforms can be set only in the `Scan.toml` of each package.
+The results are always printed and saved before the platforms run, so a failed upload does not hide them. The named platforms then run one after another, and a platform that fails does not stop the others. If any platform fails, the scan lists every failure and exits with code `1`, and the gate is not checked, since an error wins over the gate. A name in `--platforms` that no `[[platform]]` entry declares also fails the scan. In a workspace, platforms can be set only in the `Scan.toml` of each package; a package that does not declare a named platform is skipped with a warning, and the scan fails only when no package declares it.
 
 # Configuration for Static Code Analyzer Plugins
 
@@ -103,7 +105,7 @@ exclude = ["ballerina:101", "ballerina/io:101"]
 
 Rules can be either included or excluded, not both: a `[rule]` table that sets both stops the scan with an error that gives its location, and so does using `--include-rules` together with `--exclude-rules`.
 
-The `[rule]` table is resolved as a whole. `--include-rules` or `--exclude-rules` replaces the whole `[rule]` table of `Scan.toml` for that run, with a warning that names the replaced settings. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes only `ballerina:2`.
+Each command-line option replaces only its own setting for that run: `--include-rules` replaces `include`, and `--exclude-rules` replaces `exclude`, with a warning when the rules differ. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes only `ballerina:2`. Since rules cannot be included and excluded at the same time, an option that conflicts with the other setting in `Scan.toml` stops the scan as a usage error (exit code `2`): with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` is an error.
 
 # Configuration for Suppressions
 
@@ -120,7 +122,7 @@ requireRuleId = true
 - `requireReason` - Fail the scan when a suppression does not give a reason. Defaults to `false`. Same as `--require-suppression-reason`. Has no effect with `--ignore-suppressions` or `enabled = false`.
 - `requireRuleId` - Fail the scan when a suppression does not name the rules it suppresses. Defaults to `false`. Same as `--require-suppression-rule-id`. Has no effect with `--ignore-suppressions` or `enabled = false`.
 
-The settings must be written as a `[suppression]` table. Each setting must be a TOML boolean, and the table accepts no other keys; a value such as `"true"` or an unknown key such as `requireReasons` stops the scan with an error, since it would otherwise leave a requirement off without notice. A suppression that does not meet a requirement fails the scan before any issue is printed, saved or sent to a platform, and the error gives the suppression's location. The command-line options can disable suppressions or switch a requirement on for a single run, but cannot undo the `Scan.toml` settings.
+The settings must be written as a `[suppression]` table. Each setting must be a TOML boolean, and the table accepts no other keys; a value such as `"true"` or an unknown key such as `requireReasons` stops the scan with an error that gives its line and column, since it would otherwise leave a requirement off without notice. A suppression that does not meet a requirement fails the scan before any issue is printed, saved or sent to a platform, and the error gives the suppression's location. The command-line options can disable suppressions or switch a requirement on for a single run, but cannot undo the `Scan.toml` settings.
 
 # Configuration for the Gate
 
@@ -137,7 +139,7 @@ failOnCount = 5                  # 1 or more
 
 With neither setting, there is no gate and findings never fail the scan. A count without a severity counts every severity, and a severity without a count fails on the first issue at or above it. The gate counts the issues left after rule selection and `@scan:Suppress` annotations, and a rule without a severity counts by its kind: `BUG` as `HIGH`, `VULNERABILITY` as `MEDIUM` and `CODE_SMELL` as `LOW`. The gate only changes the exit code; the console output, reports and platforms always receive every issue.
 
-The `[gate]` table is resolved as a whole. Either `--fail-on-severity` or `--fail-on-count` replaces the whole `[gate]` table of `Scan.toml` for that run, with a warning when the gate differs. A setting that is not given on the command line is not read from `Scan.toml`: with `failOnSeverity = "HIGH"` in `Scan.toml`, `--fail-on-count=10` fails on 10 issues of any severity, so give `--fail-on-severity=HIGH --fail-on-count=10` to keep the severity. `--fail-on-severity=NONE` turns off a gate set in `Scan.toml`. An invalid value or an unknown key in the `[gate]` table stops the scan with an error that gives its line and column.
+Each command-line option replaces only its own setting for that run, with a warning when the value differs from `Scan.toml`. A setting that is not given on the command line is still read from `Scan.toml`: with `failOnSeverity = "HIGH"` in `Scan.toml`, `--fail-on-count=10` fails on 10 issues at or above `HIGH`. `--fail-on-severity=NONE` turns off a gate set in `Scan.toml`. `--fail-on-count` does not turn on a gate that `failOnSeverity = "NONE"` turns off; the scan warns that the count has no effect, and `--fail-on-severity` turns the gate back on. An invalid value or an unknown key in the `[gate]` table stops the scan with an error that gives its line and column.
 
 The gate is checked after the issues are reported, so a scan that fails the gate still saves its reports and sends its issues to the platforms. In a workspace, each package is checked against its own gate with its own issues; see [Configuration for Workspaces](#configuration-for-workspaces).
 
@@ -156,7 +158,7 @@ When the test sources are excluded, they are not analyzed by the core rules, the
 
 # Configuration for Workspaces
 
-A workspace can have a `Scan.toml` of its own, which is found the same way as the `Scan.toml` of a package: at the workspace root, or at the `configPath` set in the `[scan]` table of the workspace `Ballerina.toml`. It sets the defaults for every package of the workspace, and accepts every table a package `Scan.toml` does except `[[platform]]`:
+A workspace can have a `Scan.toml` of its own, which is found the same way as the `Scan.toml` of a package: at the workspace root, or at the `configPath` set in the `[scan]` table of the workspace `Ballerina.toml`. It is used by every package of the workspace that has no `Scan.toml` of its own, and accepts every table a package `Scan.toml` does except `[[platform]]`:
 
 ```toml
 [rule]
@@ -177,14 +179,14 @@ failOnCount = 3
 excludeTests = true
 ```
 
-Every table is replaced as a whole: a package that sets `[rule]`, `[suppression]`, `[gate]` or `[analysis]` uses none of the settings of the same table in the workspace `Scan.toml`, and inherits each table it does not set. An empty table still replaces the inherited one, so a package clears the inherited rules with an empty `[rule]` and turns off the inherited gate with an empty `[gate]`. For example, with the workspace `Scan.toml` above, a package whose `Scan.toml` sets only `failOnCount = 5` in `[gate]` is gated on 5 issues of any severity, not 5 issues at or above `HIGH`. The `[[analyzer]]` entries are replaced as one list, and a package can use none of the workspace analyzers with `analyzer = []`.
+A package uses either its own `Scan.toml` or the workspace one, never both. A package without a `Scan.toml` of its own uses the workspace `Scan.toml`. A package with a `Scan.toml` of its own uses only that file, and none of the workspace settings, not even the tables the package file leaves out; the two files are never merged. For example, with the workspace `Scan.toml` above, a package whose `Scan.toml` sets only `failOnCount = 5` in `[gate]` is gated on 5 issues of any severity, does not exclude `ballerina:1`, does not require suppression reasons and scans its test sources. The scan warns about each workspace setting that the package file leaves out, so that a package does not drop the workspace settings without notice; a setting the package file writes itself is not listed. An empty package `Scan.toml` uses none of the workspace settings.
 
-The command-line options then apply to every package, in the order workspace `Scan.toml`, package `Scan.toml`, command line:
+The command-line options then apply to the file each package uses:
 
 | Table | Command-line options | How the options apply |
 |---|---|---|
-| `[rule]` | `--include-rules`, `--exclude-rules` | Replace the whole table |
-| `[gate]` | `--fail-on-severity`, `--fail-on-count` | Replace the whole table |
+| `[rule]` | `--include-rules`, `--exclude-rules` | Each one replaces its own setting; a conflict with the other setting in the file is a usage error |
+| `[gate]` | `--fail-on-severity`, `--fail-on-count` | Each one replaces its own setting, and the other setting is still read from the file |
 | `[suppression]` | `--ignore-suppressions`, `--require-suppression-reason`, `--require-suppression-rule-id` | Each one tightens its own setting, and cannot undo `Scan.toml` |
 | `[analysis]` | `--exclude-tests[=<true\|false>]` | Overrides `excludeTests` either way |
 

@@ -35,6 +35,7 @@ import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.WorkspaceProject;
 import io.ballerina.projects.internal.model.Target;
 import io.ballerina.projects.util.ProjectConstants;
+import io.ballerina.projects.util.ProjectPaths;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.OwaspCoverage;
@@ -73,21 +74,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
+import java.util.function.Function;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -182,20 +180,6 @@ import static io.ballerina.scan.utils.Constants.SUPPRESSION_TABLE;
  * @since 0.1.0
  */
 public final class ScanUtils {
-    /**
-     * The gate severity that turns the gate off.
-     *
-     * @since 0.13.0
-     */
-    public static final String GATE_SEVERITY_NONE = "NONE";
-
-    /**
-     * The values a gate severity can take, as listed in messages.
-     *
-     * @since 0.13.0
-     */
-    public static final String GATE_SEVERITY_VALUES = "BLOCKER, HIGH, MEDIUM, LOW, INFO or NONE";
-
     /**
      * The values a gate count can take, as described in messages.
      *
@@ -534,22 +518,6 @@ public final class ScanUtils {
     }
 
     /**
-     * Parses a gate severity, ignoring case.
-     *
-     * @param value the severity as given on the command line or in Scan.toml
-     * @return the severity name or {@code NONE} in upper case, or empty if the value is not a gate severity
-     * @since 0.13.0
-     */
-    public static Optional<String> parseGateSeverity(String value) {
-        String severity = value.trim().toUpperCase(Locale.ROOT);
-        if (GATE_SEVERITY_NONE.equals(severity)
-                || Arrays.stream(Severity.values()).anyMatch(known -> known.name().equals(severity))) {
-            return Optional.of(severity);
-        }
-        return Optional.empty();
-    }
-
-    /**
      * Parses a gate count.
      *
      * @param value the count as given on the command line
@@ -744,24 +712,25 @@ public final class ScanUtils {
      */
     public static Path generateScanReport(List<Issue> issues, Project project, String directoryName,
                                           Map<Issue, SuppressedIssue> suppressions) {
-        return generateScanReport(issues, project, directoryName, suppressions, analyzedPackage -> false);
+        return generateScanReport(issues, project, directoryName, suppressions,
+                analyzedPackage -> AnalyzedSources.of(false));
     }
 
     /**
-     * Returns the {@link Path} of the html analysis report where generated issues are saved, leaving out the test
-     * sources of the packages whose tests were not scanned.
+     * Returns the {@link Path} of the html analysis report where generated issues are saved, listing only the
+     * sources each package was scanned with.
      *
      * @param issues        generated issues, including suppressed ones
      * @param project       Ballerina project
      * @param directoryName target directory name
      * @param suppressions  the suppressed issues, keyed by the issue they suppress
-     * @param testsExcluded whether the test sources of a package were left out of the scan
+     * @param analyzedSources the sources each package was scanned with
      * @return path of the html analysis report where generated issues are saved
      * @since 0.13.0
      */
     public static Path generateScanReport(List<Issue> issues, Project project, String directoryName,
                                           Map<Issue, SuppressedIssue> suppressions,
-                                          Predicate<Package> testsExcluded) {
+                                          Function<Package, AnalyzedSources> analyzedSources) {
         JsonObject scannedProject = new JsonObject();
         String name;
         if (project.kind() == ProjectKind.WORKSPACE_PROJECT) {
@@ -789,7 +758,7 @@ public final class ScanUtils {
                     toRelativePath(reportRoot, analyzedPackage.project().sourceRoot()));
             scannedPackages.add(scannedPackage);
 
-            for (Document document : getAnalyzedDocuments(analyzedPackage, testsExcluded.test(analyzedPackage))) {
+            for (Document document : getAnalyzedDocuments(analyzedPackage, analyzedSources.apply(analyzedPackage))) {
                 // Documents that exist only in memory have no file to show; issues in them still get an entry below.
                 Optional<Path> optionalDocumentPath = document.module().project().documentPath(document.documentId());
                 if (optionalDocumentPath.isEmpty()) {
@@ -876,12 +845,14 @@ public final class ScanUtils {
         return List.of(project.currentPackage());
     }
 
-    private static List<Document> getAnalyzedDocuments(Package analyzedPackage, boolean testsExcluded) {
+    /**
+     * Returns the documents of a package that were scanned, leaving out the document that imports the analyzers.
+     */
+    private static List<Document> getAnalyzedDocuments(Package analyzedPackage, AnalyzedSources analyzedSources) {
         List<Document> documents = new ArrayList<>();
         for (ModuleId moduleId : analyzedPackage.moduleIds()) {
             Module module = analyzedPackage.module(moduleId);
-            Stream.concat(module.documentIds().stream(),
-                            testsExcluded ? Stream.empty() : module.testDocumentIds().stream())
+            analyzedSources.documentIds(module)
                     .map(module::document)
                     // Skip the in-memory document the analyzer adds to import external analyzer plugins
                     .filter(document -> !document.name().startsWith(IMPORT_GENERATOR_FILE))
@@ -890,8 +861,10 @@ public final class ScanUtils {
         return documents;
     }
 
-    // Uses forward slashes regardless of OS so the report can split paths into folders; null when outside root.
-    // Returns the path relative to the root with forward slashes, or null when the path is outside the root
+    /**
+     * Returns a path relative to a root, with forward slashes on every OS so that the report can split paths into
+     * folders, or null when the path is outside the root.
+     */
     private static String toRelativePath(Path root, Path path) {
         Path normalizedRoot = root.toAbsolutePath().normalize();
         Path normalizedPath = path.toAbsolutePath().normalize();
@@ -1058,10 +1031,8 @@ public final class ScanUtils {
     public static Optional<ScanTomlFile> loadScanTomlConfigurations(Project project, PrintStream outputStream) {
         try {
             ScanTomlFile scanTomlFile = readScanTomlConfigurations(project, outputStream, false);
-            Optional<WorkspaceProject> workspaceProject = project.workspaceProject();
-            if (scanTomlFile.getPath().isEmpty() && workspaceProject.isPresent()) {
-                return Optional.of(readWorkspaceScanToml(workspaceProject.get(), outputStream, false)
-                        .orElse(scanTomlFile));
+            if (scanTomlFile.getPath().isEmpty()) {
+                return Optional.of(readEnclosingWorkspaceScanToml(project, outputStream, false).orElse(scanTomlFile));
             }
             return Optional.of(scanTomlFile);
         } catch (ScanToolException ex) {
@@ -1086,6 +1057,10 @@ public final class ScanUtils {
         return readScanTomlConfigurations(project, outputStream, true);
     }
 
+    /**
+     * Reads the Scan.toml file of a package. When strict, syntax errors and invalid settings fail the load; otherwise
+     * they are ignored.
+     */
     private static ScanTomlFile readScanTomlConfigurations(Project project, PrintStream outputStream,
                                                            boolean strict) {
         if (!project.kind().equals(ProjectKind.BUILD_PROJECT) || project.currentPackage().ballerinaToml().isEmpty()) {
@@ -1116,7 +1091,107 @@ public final class ScanUtils {
 
     private static Optional<ScanTomlFile> readWorkspaceScanToml(WorkspaceProject workspaceProject,
                                                                 PrintStream outputStream, boolean strict) {
-        Path sourceRoot = workspaceProject.sourceRoot();
+        return readWorkspaceScanToml(workspaceProject.sourceRoot(), workspaceProject.targetDir(), outputStream,
+                strict);
+    }
+
+    /**
+     * Returns the Scan.toml file of the workspace a package belongs to, so that a package without a Scan.toml of its
+     * own uses the same file whether the workspace or the package alone is scanned.
+     *
+     * @param project      a package, which may have been loaded without its workspace
+     * @param outputStream print stream for progress messages
+     * @return the workspace Scan.toml file, or empty when the package is not in a workspace or the workspace has none
+     * @throws ScanToolException if the file cannot be loaded or has errors
+     * @since 0.13.0
+     */
+    public static Optional<ScanTomlFile> readEnclosingWorkspaceScanToml(Project project, PrintStream outputStream) {
+        return readEnclosingWorkspaceScanToml(project, outputStream, true);
+    }
+
+    /**
+     * Reads the Scan.toml file of the workspace a package belongs to, whether or not the package was loaded with its
+     * workspace.
+     */
+    private static Optional<ScanTomlFile> readEnclosingWorkspaceScanToml(Project project, PrintStream outputStream,
+                                                                         boolean strict) {
+        if (project.kind() != ProjectKind.BUILD_PROJECT) {
+            return Optional.empty();
+        }
+        Optional<WorkspaceProject> workspaceProject = project.workspaceProject();
+        if (workspaceProject.isPresent()) {
+            return readWorkspaceScanToml(workspaceProject.get(), outputStream, strict);
+        }
+        return enclosingWorkspaceRoot(project.sourceRoot()).flatMap(root -> readWorkspaceScanToml(root,
+                root.resolve(ProjectConstants.TARGET_DIR_NAME), outputStream, strict));
+    }
+
+    /**
+     * Returns the root of the workspace that lists a package, found from the package root.
+     *
+     * @param packageRoot the root of the package
+     * @return the workspace root, or empty when the package is not in a workspace
+     * @since 0.13.0
+     */
+    public static Optional<Path> enclosingWorkspaceRoot(Path packageRoot) {
+        try {
+            return ProjectPaths.workspaceRoot(packageRoot.toAbsolutePath().normalize());
+        } catch (RuntimeException ex) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Returns the Scan.toml file of the workspace a package belongs to, found from the package root. Invalid settings
+     * are ignored, as they are in the editor.
+     *
+     * @param packageRoot the root of the package
+     * @return the workspace Scan.toml file, or empty when the package is not in a workspace or the workspace has none
+     * @since 0.13.0
+     */
+    public static Optional<ScanTomlFile> readEnclosingWorkspaceScanToml(Path packageRoot) {
+        try (PrintStream quietStream = new PrintStream(OutputStream.nullOutputStream(), false,
+                StandardCharsets.UTF_8)) {
+            return enclosingWorkspaceRoot(packageRoot).flatMap(root -> readWorkspaceScanToml(root,
+                    root.resolve(ProjectConstants.TARGET_DIR_NAME), quietStream, false));
+        }
+    }
+
+    /**
+     * Returns the local Scan.toml file that holds the configurations of a package: the file at the {@code configPath}
+     * of the {@code [scan]} table of its Ballerina.toml, or Scan.toml at the package root.
+     *
+     * @param packageRoot the root of the package
+     * @return the path of the file, which may not exist yet, or empty when the {@code configPath} is a URL
+     * @throws ScanToolException if Ballerina.toml cannot be read
+     * @since 0.13.0
+     */
+    public static Optional<Path> packageScanTomlPath(Path packageRoot) {
+        Path root = packageRoot.toAbsolutePath().normalize();
+        Path ballerinaTomlPath = root.resolve(ProjectConstants.BALLERINA_TOML);
+        if (Files.isRegularFile(ballerinaTomlPath)) {
+            Toml ballerinaToml;
+            try {
+                ballerinaToml = Toml.read(ballerinaTomlPath);
+            } catch (IOException ex) {
+                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.READING_CONFIG_FILE, ex.getMessage()));
+            }
+            Optional<String> configPath = ballerinaToml.getTable(SCAN_TABLE)
+                    .flatMap(scanTable -> scanTable.<TomlValueNode>get(SCAN_FILE_FIELD))
+                    .map(value -> value.toNativeValue().toString());
+            if (configPath.isPresent()) {
+                return isUrl(configPath.get()) ? Optional.empty()
+                        : convertConfigurationPath(configPath.get()).map(path -> root.resolve(path).normalize());
+            }
+        }
+        return Optional.of(root.resolve(SCAN_FILE));
+    }
+
+    /**
+     * Reads the Scan.toml file of the workspace at a root, which cannot set platforms.
+     */
+    private static Optional<ScanTomlFile> readWorkspaceScanToml(Path sourceRoot, Path targetDir,
+                                                                PrintStream outputStream, boolean strict) {
         Path ballerinaTomlPath = sourceRoot.resolve(ProjectConstants.BALLERINA_TOML);
         Toml ballerinaToml;
         try {
@@ -1124,10 +1199,12 @@ public final class ScanUtils {
         } catch (IOException ex) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.READING_CONFIG_FILE, ex.getMessage()));
         }
-        return readScanFile(ballerinaToml, sourceRoot, workspaceProject.targetDir(), outputStream, strict, true);
+        return readScanFile(ballerinaToml, sourceRoot, targetDir, outputStream, strict, true);
     }
 
-    // Finds the Scan.toml file the [scan] table of a Ballerina.toml file points to, or the one at the root
+    /**
+     * Reads the Scan.toml file that the [scan] table of a Ballerina.toml file points to, or the one at the root.
+     */
     private static Optional<ScanTomlFile> readScanFile(Toml ballerinaToml, Path sourceRoot, Path targetDir,
                                                        PrintStream outputStream, boolean strict, boolean workspace) {
         if (ballerinaToml.getTable(SCAN_TABLE).isEmpty()) {
@@ -1283,17 +1360,13 @@ public final class ScanUtils {
             });
         }
         // Written in any other form, such as [[suppression]], the settings would not be read at all
-        TopLevelNode suppressionNode = scanTomlDocumentContent.rootNode().entries().get(SUPPRESSION_TABLE);
+        TopLevelNode suppressionNode = entries.get(SUPPRESSION_TABLE);
         if (suppressionNode != null && suppressionNode.kind() != TomlType.TABLE) {
-            throw LauncherUtils.createLauncherException(DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_TABLE));
-        }
-        Optional<Toml> suppressionTable = scanTomlDocumentContent.getTable(SUPPRESSION_TABLE);
-        if (suppressionTable.isPresent()) {
-            Toml table = suppressionTable.get();
-            validateSuppressionSettings(table);
-            booleanSetting(table, SUPPRESSION_ENABLED).ifPresent(scanTomlFile::setSuppressionEnabled);
-            booleanSetting(table, SUPPRESSION_REQUIRE_REASON).ifPresent(scanTomlFile::setSuppressionReasonRequired);
-            booleanSetting(table, SUPPRESSION_REQUIRE_RULE_ID).ifPresent(scanTomlFile::setSuppressionRuleIdRequired);
+            errors.add(DiagnosticLog.fileError(displayPath, suppressionNode.location().lineRange(),
+                    DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_TABLE)));
+        } else {
+            scanTomlDocumentContent.getTable(SUPPRESSION_TABLE)
+                    .ifPresent(table -> loadSuppression(table, scanTomlFile, displayPath, errors));
         }
 
         TopLevelNode gateNode = entries.get(GATE_TABLE);
@@ -1318,6 +1391,9 @@ public final class ScanUtils {
         return scanTomlFile;
     }
 
+    /**
+     * Parses a Scan.toml file. When strict, a syntax error fails the load with its position.
+     */
     private static Toml readTomlFile(Path scanTomlFilePath, String displayPath, boolean strict) {
         Toml scanTomlDocumentContent;
         try {
@@ -1337,6 +1413,9 @@ public final class ScanUtils {
         return scanTomlDocumentContent;
     }
 
+    /**
+     * Fails the load with every error found in the file, so that all of them are reported at once.
+     */
     private static void failOnConfigErrors(String displayPath, List<String> errors) {
         if (!errors.isEmpty()) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath,
@@ -1344,6 +1423,9 @@ public final class ScanUtils {
         }
     }
 
+    /**
+     * Loads the [gate] table, adding an error for an unknown key or an invalid value.
+     */
     private static void loadGate(Toml gateTable, ScanTomlFile scanTomlFile, String displayPath, List<String> errors) {
         gateTable.rootNode().entries().forEach((key, node) -> {
             if (!key.equals(GATE_FAIL_ON_SEVERITY) && !key.equals(GATE_FAIL_ON_COUNT)) {
@@ -1354,13 +1436,13 @@ public final class ScanUtils {
         });
 
         gateTable.get(GATE_FAIL_ON_SEVERITY).ifPresent(value -> {
-            Optional<String> severity = value.kind() == TomlType.STRING
-                    ? parseGateSeverity(value.toNativeValue().toString())
+            Optional<GateSeverity> severity = value.kind() == TomlType.STRING
+                    ? GateSeverity.parse(value.toNativeValue().toString())
                     : Optional.empty();
             if (severity.isPresent()) {
                 scanTomlFile.setFailOnSeverity(severity.get());
             } else {
-                errors.add(invalidConfigValue(displayPath, value, GATE_FAIL_ON_SEVERITY, GATE_SEVERITY_VALUES));
+                errors.add(invalidConfigValue(displayPath, value, GATE_FAIL_ON_SEVERITY, GateSeverity.VALUES));
             }
         });
 
@@ -1374,6 +1456,9 @@ public final class ScanUtils {
         });
     }
 
+    /**
+     * Loads the [analysis] table, adding an error for an unknown key or an invalid value.
+     */
     private static void loadAnalysis(Toml analysisTable, ScanTomlFile scanTomlFile, String displayPath,
                                      List<String> errors) {
         analysisTable.rootNode().entries().forEach((key, node) -> {
@@ -1398,21 +1483,32 @@ public final class ScanUtils {
                         expected));
     }
 
-    // A misspelled key or a quoted "true" would otherwise read as unset and silently turn a requirement off
-    private static void validateSuppressionSettings(Toml suppressionTable) {
+    /**
+     * Loads the [suppression] table, adding an error for an unknown key or a value that is not a boolean, since either
+     * would otherwise read as unset and silently turn a requirement off.
+     */
+    private static void loadSuppression(Toml suppressionTable, ScanTomlFile scanTomlFile, String displayPath,
+                                        List<String> errors) {
         List<String> keys = List.of(SUPPRESSION_ENABLED, SUPPRESSION_REQUIRE_REASON, SUPPRESSION_REQUIRE_RULE_ID);
-        for (String key : suppressionTable.toMap().keySet()) {
+        suppressionTable.rootNode().entries().forEach((key, node) -> {
             if (!keys.contains(key)) {
-                throw LauncherUtils.createLauncherException(
-                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_SUPPRESSION_SETTING, key));
+                errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_SUPPRESSION_SETTING, key)));
             }
-        }
+        });
+        Map<String, Consumer<Boolean>> setters = Map.of(
+                SUPPRESSION_ENABLED, scanTomlFile::setSuppressionEnabled,
+                SUPPRESSION_REQUIRE_REASON, scanTomlFile::setSuppressionReasonRequired,
+                SUPPRESSION_REQUIRE_RULE_ID, scanTomlFile::setSuppressionRuleIdRequired);
         for (String key : keys) {
-            Optional<TomlValueNode> value = suppressionTable.get(key);
-            if (value.isPresent() && value.get().kind() != TomlType.BOOLEAN) {
-                throw LauncherUtils.createLauncherException(
-                        DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, key));
-            }
+            suppressionTable.get(key).ifPresent(value -> {
+                if (value.kind() == TomlType.BOOLEAN) {
+                    setters.get(key).accept((Boolean) value.toNativeValue());
+                } else {
+                    errors.add(DiagnosticLog.fileError(displayPath, value.location().lineRange(),
+                            DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, key)));
+                }
+            });
         }
     }
 
@@ -1453,7 +1549,6 @@ public final class ScanUtils {
      *
      * @param scanTomlFile the in-memory representation of the Scan.toml file
      * @param baseDir      the directory relative paths are resolved against
-     * @throws ScanToolException if the path is neither a file nor a URL
      */
     private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path baseDir) {
         Map<String, Object> properties = platformTable.toMap();
@@ -1468,19 +1563,13 @@ public final class ScanUtils {
             return;
         }
 
-        // A remote JAR is downloaded only when the platform is selected, so its URL is kept as it is
-        String jarPath;
-        Optional<Path> localJar = resolveLocalPath(baseDir, path.get());
-        if (localJar.isPresent()) {
-            jarPath = localJar.get().toString();
-        } else {
-            try {
-                jarPath = new URL(path.get()).toString();
-            } catch (MalformedURLException ex) {
-                throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.PLATFORM_FILE_NOT_FOUND, name.get(),
-                        PLATFORM_PATH, path.get()));
-            }
-        }
+        // The JAR is checked, or downloaded, only when the platform is selected, so that a platform JAR that exists
+        // only on CI does not fail other scans
+        String jarPath = resolveLocalPath(baseDir, path.get())
+                .or(() -> isUrl(path.get()) ? Optional.empty()
+                        : convertConfigurationPath(path.get()).map(file -> baseDir.resolve(file).normalize()))
+                .map(Path::toString)
+                .orElse(path.get());
 
         // An argument named <name>Path that names an existing file next to the Scan.toml file is passed as an absolute
         // path. Other values, such as URLs or files the plugin creates, belong to the plugin and are passed unchanged
@@ -1492,6 +1581,18 @@ public final class ScanUtils {
 
         ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name.get(), jarPath, properties);
         scanTomlFile.setPlatform(platform);
+    }
+
+    /**
+     * Returns whether a path is written as a URL.
+     */
+    private static boolean isUrl(String path) {
+        try {
+            new URL(path);
+            return true;
+        } catch (MalformedURLException ex) {
+            return false;
+        }
     }
 
     // Returns the absolute path of an existing file, resolving a relative path against the base directory
@@ -1523,6 +1624,9 @@ public final class ScanUtils {
         ruleTable.get(EXCLUDE_KEY).ifPresent(rules -> loadRules(rules, scanTomlFile, false, displayPath, errors));
     }
 
+    /**
+     * Loads the rule IDs of include or exclude, adding an error when the value is not an array of strings.
+     */
     private static void loadRules(TomlValueNode rules, ScanTomlFile scanTomlFile, boolean includeRules,
                                   String displayPath, List<String> errors) {
         String key = includeRules ? INCLUDE_KEY : EXCLUDE_KEY;
@@ -1543,11 +1647,6 @@ public final class ScanUtils {
         scanTomlFile.writeRules(includeRules, ruleIds);
     }
 
-
-    // Called after validateSuppressionSettings, so a present value is a boolean
-    private static Optional<Boolean> booleanSetting(Toml table, String key) {
-        return table.get(key).map(value -> (Boolean) value.toNativeValue());
-    }
 
     /**
      * Returns the local JAR of a platform, downloading it into the target directory first when its path is a URL. A

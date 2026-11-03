@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.internal;
 
+import io.ballerina.scan.utils.AnalyzedSources;
 import io.ballerina.scan.utils.ScanTomlFile;
 
 /**
@@ -26,20 +27,20 @@ import io.ballerina.scan.utils.ScanTomlFile;
  * @param ignoreSuppressions disregard every suppression, reporting the unsuppressed picture
  * @param requireReason      report a suppression without a reason as an error
  * @param requireRuleId      report a suppression that names no rule as an error
- * @param excludeTests       skip the suppressions in test sources, which are not scanned
+ * @param analyzedSources    the sources whose suppressions are applied, which are the ones scanned
  * @since 0.13.0
  */
 record SuppressionOptions(boolean ignoreSuppressions, boolean requireReason, boolean requireRuleId,
-                          boolean excludeTests) {
+                          AnalyzedSources analyzedSources) {
 
     /**
      * Combines the scan configuration with the command-line options. A command-line option can disable
      * suppressions or switch a requirement on for a single run, but cannot undo the scan configuration.
      */
-    static SuppressionOptions of(ScanTomlFile scanTomlFile, boolean ignoreSuppressions, boolean requireReason,
-                                 boolean requireRuleId) {
+    static SuppressionOptions of(ScanTomlFile scanTomlFile, AnalyzedSources analyzedSources,
+                                 boolean ignoreSuppressions, boolean requireReason, boolean requireRuleId) {
         return new SuppressionOptions(ignoreSuppressions || !scanTomlFile.isSuppressionEnabled(),
                 requireReason || scanTomlFile.isSuppressionReasonRequired(),
-                requireRuleId || scanTomlFile.isSuppressionRuleIdRequired(), scanTomlFile.isExcludeTests());
+                requireRuleId || scanTomlFile.isSuppressionRuleIdRequired(), analyzedSources);
     }
 }
