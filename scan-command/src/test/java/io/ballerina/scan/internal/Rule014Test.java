@@ -146,11 +146,9 @@ public class Rule014Test extends StaticCodeAnalyzerTest {
     void testNonConfigValueInShortHandFieldNotation() {
         String documentName = "rule014_non_config_value_in_short_hand_field.bal";
         List<Issue> issues = analyze(documentName, List.of(NON_CONFIGURABLE_SECRET.rule()));
-        Assert.assertEquals(issues.size(), 2);
+        Assert.assertEquals(issues.size(), 1);
         assertIssue(issues.remove(0), documentName, new Location(16, 18, 16, 28),
                 HARD_CODED_SECRET.rule());
-        assertIssue(issues.remove(0), documentName, new Location(24, 50, 24, 58),
-                NON_CONFIGURABLE_SECRET.rule());
     }
 
     @Test
@@ -166,5 +164,45 @@ public class Rule014Test extends StaticCodeAnalyzerTest {
         List<Issue> issues = analyze("rule014_non_secret_value_types.bal",
                 List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()));
         Assert.assertEquals(issues, List.of());
+    }
+
+    @Test
+    void testTracedFixedSecrets() {
+        String documentName = "rule014_traced_fixed_secrets.bal";
+        List<Issue> issues = analyze(documentName, List.of(NON_CONFIGURABLE_SECRET.rule()));
+        Assert.assertEquals(issues.size(), 6);
+        assertIssue(issues.get(0), documentName, new Location(30, 23, 30, 31), HARD_CODED_SECRET.rule());
+        List<Location> expectedIssueLocations = new ArrayList<>(List.of(
+                new Location(31, 23, 31, 35),
+                new Location(32, 23, 32, 33),
+                new Location(37, 23, 37, 33),
+                new Location(38, 60, 38, 72),
+                new Location(40, 23, 40, 48)));
+        issues.subList(1, issues.size()).forEach(issue -> assertIssue(issue, documentName,
+                expectedIssueLocations.remove(0), NON_CONFIGURABLE_SECRET.rule()));
+    }
+
+    @Test
+    void testUntracedSecrets() {
+        List<Issue> issues = analyze("rule014_untraced_secrets.bal",
+                List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()));
+        Assert.assertEquals(issues, List.of());
+    }
+
+    @Test
+    void testTracedEdgeCases() {
+        String documentName = "rule014_traced_edge_cases.bal";
+        List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()))
+                .stream()
+                .filter(issue -> issue.rule().equals(HARD_CODED_SECRET.rule())
+                        || issue.rule().equals(NON_CONFIGURABLE_SECRET.rule()))
+                .toList();
+        Assert.assertEquals(issues.size(), 6);
+        assertIssue(issues.get(5), documentName, new Location(60, 39, 60, 56), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(0), documentName, new Location(48, 23, 48, 40), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(1), documentName, new Location(50, 23, 50, 36), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(2), documentName, new Location(52, 23, 52, 35), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(3), documentName, new Location(54, 23, 54, 35), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(4), documentName, new Location(56, 23, 56, 42), NON_CONFIGURABLE_SECRET.rule());
     }
 }
