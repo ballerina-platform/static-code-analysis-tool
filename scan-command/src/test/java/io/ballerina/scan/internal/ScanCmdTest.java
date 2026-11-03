@@ -22,7 +22,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
@@ -136,25 +135,26 @@ public class ScanCmdTest extends BaseTest {
         // An empty package has no dependencies to lock, so it is reported as empty even without Dependencies.toml
         Files.deleteIfExists(emptyBalProject.resolve("Dependencies.toml"));
         System.setProperty("user.dir", emptyBalProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = error(EMPTY_PACKAGE);
+        String expected = "bal scan: error: " + error(EMPTY_PACKAGE);
         String actual = readOutput(true).trim().split("\n")[0];
         Assert.assertEquals(actual, expected);
+        Assert.assertEquals(scanCmd.exitCode(), 1);
     }
 
     @Test(description = "test scan command with Ballerina project with single file as argument")
     void testScanCommandProjectWithArgument() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         String inputPath = validBalProject.resolve("main.bal").toString();
         String[] args = {inputPath};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String expected = "The specified file belongs to a Ballerina package: " + inputPath + ". Scanning "
-                + "individual files within a package is not supported. Please provide the package root path ("
-                + validBalProject.toAbsolutePath().normalize() + ") and try again.";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        String expected = "bal scan: error: cannot scan a file inside a package: " + inputPath + "; scan the "
+                + "package at " + validBalProject.toAbsolutePath().normalize();
+        Assert.assertEquals(readOutput(true).trim(), expected);
+        Assert.assertEquals(scanCmd.exitCode(), 3);
     }
 
     @Test(description = "test scan command with a file of a workspace package as argument")
@@ -162,14 +162,14 @@ public class ScanCmdTest extends BaseTest {
         Path projectRoot = testResources.resolve("test-resources").resolve("workspace-project")
                 .resolve("bal-project-with-analyzer-configurations");
         String inputPath = projectRoot.resolve("main.bal").toString();
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         String[] args = {inputPath};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String expected = "The specified file belongs to a Ballerina package: " + inputPath + ". Scanning "
-                + "individual files within a package is not supported. Please provide the package root path ("
-                + projectRoot.toAbsolutePath().normalize() + ") and try again.";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        String expected = "bal scan: error: cannot scan a file inside a package: " + inputPath + "; scan the "
+                + "package at " + projectRoot.toAbsolutePath().normalize();
+        Assert.assertEquals(readOutput(true).trim(), expected);
+        Assert.assertEquals(scanCmd.exitCode(), 3);
     }
 
     @Test(description = "test scan command with single file project with single file as argument")
@@ -186,26 +186,26 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with single file project with project directory as argument")
     void testScanCommandSingleFileProjectWithDirectoryAsArgument() throws IOException {
         Path parentDirectory = testResources.resolve("test-resources").toAbsolutePath();
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         String inputPath = parentDirectory.resolve("valid-single-file-project").toString();
         String[] args = {inputPath};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
-        String expected = "The specified path is not a valid Ballerina project: " + inputPath + ". Please "
-                + "provide a valid Ballerina project path and try again.";
+        String expected = "bal scan: error: not a Ballerina package, workspace or source file: " + inputPath;
         Assert.assertEquals(readOutput(true).trim(), expected);
+        Assert.assertEquals(scanCmd.exitCode(), 3);
     }
 
     @Test(description = "test scan command with single file project without arguments")
     void testScanCommandSingleFileProjectWithoutArgument() throws IOException {
         Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
         System.setProperty("user.dir", validBalProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = "The specified path is not a valid Ballerina project: " + validBalProject + ". Please "
-                + "provide a valid Ballerina project path and try again.";
+        String expected = "bal scan: error: not a Ballerina package, workspace or source file: " + validBalProject;
         Assert.assertEquals(readOutput(true).trim(), expected);
+        Assert.assertEquals(scanCmd.exitCode(), 3);
     }
 
     @Test(description = "test scan command with single file project with too many arguments")
@@ -214,15 +214,17 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", validBalProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
         String[] args = {"main.bal", "argument2"};
-        try {
-            new CommandLine(scanCmd).parseArgs(args);
-            Assert.fail("Expected CommandLine.UnmatchedArgumentException");
-        } catch (CommandLine.UnmatchedArgumentException e) {
-            String expected = "picocli.CommandLine$UnmatchedArgumentException: " +
-                    "Unmatched argument at index 1: 'argument2'";
-            Assert.assertEquals(e.toString(), expected);
-        }
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
         System.setProperty("user.dir", userDir);
+        String expected = String.join(LINUX_LINE_SEPARATOR,
+                "bal scan: error: too many arguments: expected one package or source file, but received 2: "
+                        + "main.bal argument2",
+                "Usage: bal scan [OPTIONS] [<package>|<source-file>]",
+                "Try 'bal scan --help' for more information.");
+        Assert.assertEquals(readOutput(true).trim().replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR),
+                expected);
+        Assert.assertEquals(scanCmd.exitCode(), 2);
     }
 
     @Test(description = "test scan command with method for saving results to file when analysis issues are present")
@@ -530,19 +532,19 @@ public class ScanCmdTest extends BaseTest {
     void testScanCommandWithListRulesFlagWithoutArgumentOutsideBallerinaProject() throws IOException {
         Path nonProjectPath = testResources.resolve("test-resources").toAbsolutePath();
         System.setProperty("user.dir", nonProjectPath.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         String[] args = {"--list-rules"};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
-        String expected = "The specified path is not a valid Ballerina project: " + nonProjectPath + ". Please "
-                + "provide a valid Ballerina project path and try again.";
+        String expected = "bal scan: error: not a Ballerina package, workspace or source file: " + nonProjectPath;
         Assert.assertEquals(readOutput(true).trim(), expected);
+        Assert.assertEquals(scanCmd.exitCode(), 3);
     }
 
     @Test(description = "test scan command with target directory flag on single file project")
     void testScanCommandWithTargetDirFlagOnSingleFileProject() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         Path singleFileProject = testResources.resolve("test-resources")
                 .resolve("valid-single-file-project").resolve("main.bal");
         String[] args = {singleFileProject.toString(), "--target-dir=results"};
@@ -554,7 +556,7 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with scan report flag on single file project")
     void testScanCommandWithScanReportFlagOnSingleFileProject() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         Path singleFileProject = testResources.resolve("test-resources")
                 .resolve("valid-single-file-project").resolve("main.bal");
         String[] args = {singleFileProject.toString(), "--scan-report"};
@@ -711,7 +713,7 @@ public class ScanCmdTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-analyzer-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
         new CommandLine(scanCmd).parseArgs(args);
         scanCmd.execute();
@@ -720,6 +722,7 @@ public class ScanCmdTest extends BaseTest {
                 ballerinaProject.toAbsolutePath().toString());
         String actual = readOutput(true).trim();
         Assert.assertEquals(actual, expected);
+        Assert.assertEquals(scanCmd.exitCode(), 2, "both options on the command line are a usage error");
     }
 
     @Test(description = "test scan command with include rules Scan.toml configurations")
@@ -761,15 +764,14 @@ public class ScanCmdTest extends BaseTest {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-include-exclude-rule-configurations");
         System.setProperty("user.dir", ballerinaProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--include-rules=ballerina:1", "--exclude-rules=ballerina:1"};
-        new CommandLine(scanCmd).parseArgs(args);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = getExpectedOutput("toml-include-exclude-rules.txt").replace("<ABS_SOURCE_ROOT>",
                 ballerinaProject.toAbsolutePath().toString());
         String actual = readOutput(true).trim();
         Assert.assertEquals(actual, expected);
+        Assert.assertEquals(scanCmd.exitCode(), 1, "both in Scan.toml is a configuration error");
     }
 
     @Test(description = "test scan command with platform plugin configurations")
@@ -794,9 +796,19 @@ public class ScanCmdTest extends BaseTest {
                 StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
 
         System.setProperty("user.dir", ballerinaProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        ScanCmd scanCmd = new ScanCmd(printStream, new PrintStream(err, true, StandardCharsets.UTF_8));
+        new CommandLine(scanCmd).parseArgs("--platforms=examplePlatform");
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
+        Assert.assertEquals(scanCmd.exitCode(), 0);
+
+        // The results are saved and summarised before the platform runs
+        String stderr = err.toString(StandardCharsets.UTF_8).replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        int resultsAt = stderr.indexOf("View scan results at:");
+        int summaryAt = stderr.indexOf(" issue(s)");
+        int platformAt = stderr.indexOf("Reporting issues to: examplePlatform");
+        Assert.assertTrue(resultsAt >= 0 && resultsAt < summaryAt && summaryAt < platformAt, stderr);
 
         Path result = ballerinaProject.resolve("analysis-issues.json");
         String platformIssuesOutput = Files.readString(result, StandardCharsets.UTF_8)
@@ -814,6 +826,36 @@ public class ScanCmdTest extends BaseTest {
         expected = getExpectedOutput("platform-plugin-arguments-output.txt").replace("<ABS_SOURCE_ROOT>",
                 ballerinaProject.toAbsolutePath().toString());
         Assert.assertEquals(platformArgumentsOutput, expected);
+    }
+
+    @Test(description = "test a platform-triggered scan reports to the declared platforms when none is named")
+    void testPlatformTriggeredScanReportsToDeclaredPlatforms() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-platform-configurations");
+        Path rootProject = Path.of(System.getProperty("user.dir")).getParent();
+        Assert.assertNotNull(rootProject);
+        Path platformPluginPath = rootProject.resolve("test-static-code-analysis-platform-plugins")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin").resolve("build").resolve("libs")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
+        String tomlConfigurations = Files.readString(testResources.resolve("test-resources")
+                        .resolve("platform-plugin-configurations.txt"))
+                .replace("__platform_name__", "examplePlatform")
+                .replace("__platform_plugin_path__", platformPluginPath.toString().replace("\\", "\\\\"));
+        Files.writeString(ballerinaProject.resolve("Scan.toml"), tomlConfigurations,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+        new CommandLine(scanCmd).parseArgs("--platform-triggered");
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String output = readOutput(true);
+        Assert.assertEquals(scanCmd.exitCode(), 0, output);
+        Assert.assertTrue(output.contains("Reporting issues to: examplePlatform"), output);
+        Path result = ballerinaProject.resolve("analysis-issues.json");
+        Assert.assertTrue(Files.exists(result), "the declared platform received the issues");
+        removeFile(result);
+        removeFile(ballerinaProject.resolve("platform-arguments.json"));
     }
 
     @Test(description = "test scan command with invalid platform plugin configurations")
@@ -837,13 +879,40 @@ public class ScanCmdTest extends BaseTest {
                 StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
 
         System.setProperty("user.dir", ballerinaProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+        scanCmd.execute();
+        String output = readOutput(true).trim();
+        Assert.assertEquals(scanCmd.exitCode(), 0, "a declared platform that is not named is never loaded: " + output);
+        Assert.assertFalse(output.contains("invalidExamplePlatform"), output);
+
+        scanCmd = new ScanCmd(printStream, printStream);
+        new CommandLine(scanCmd).parseArgs("--platforms=invalidExamplePlatform");
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = getExpectedOutput("invalid-platform-plugin-configurations.txt")
-                .replace("<ABS_SOURCE_ROOT>",
-                ballerinaProject.toAbsolutePath().toString());
+                .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString())
+                .replace("<PLUGIN_JAR>", platformPluginPath.toAbsolutePath().toString());
         Assert.assertEquals(readOutput(true).trim(), expected);
+        Assert.assertEquals(scanCmd.exitCode(), 1);
+    }
+
+    @Test(description = "test a platform named in --platforms must be declared in Scan.toml, checked before the scan")
+    void testUndeclaredPlatformFailsBeforeTheScan() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-platform-configurations");
+        Files.writeString(ballerinaProject.resolve("Scan.toml"), platformConfiguration(""),
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+        new CommandLine(scanCmd).parseArgs("--platforms=examplePlatform,unknown");
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String output = readOutput(true);
+        Assert.assertEquals(scanCmd.exitCode(), 1, output);
+        Assert.assertTrue(output.contains("bal scan: error: platform 'unknown' is not available; add its plugin to "
+                + "the [[platform]] table of Scan.toml"), output);
+        Assert.assertFalse(output.contains("Running Scans"), output);
+        Assert.assertFalse(Files.exists(ballerinaProject.resolve("analysis-issues.json")), output);
     }
 
     @Test(description = "test scan command with valid json format flag")
@@ -892,19 +961,18 @@ public class ScanCmdTest extends BaseTest {
     }
 
     @Test(description = "test scan command with invalid format flag")
-    void testScanCommandWithInvalidFormatFlag() {
+    void testScanCommandWithInvalidFormatFlag() throws IOException {
         System.setProperty("user.dir", validBalProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         String[] args = {"--format=xml"};
-        try {
-            new CommandLine(scanCmd).parseArgs(args);
-            Assert.fail("Expected ParameterException to be thrown for invalid format");
-        } catch (CommandLine.ParameterException e) {
-            Assert.assertTrue(e.getMessage().contains("xml"), "Error message should mention the invalid format");
-            Assert.assertTrue(e.getMessage().contains("Unknown report format"),
-                    "Error message should indicate unknown format");
-        }
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
         System.setProperty("user.dir", userDir);
+        Assert.assertEquals(readOutput(true).trim(), """
+                bal scan: error: invalid value 'xml' for --format; expected json or sarif
+                Usage: bal scan [OPTIONS] [<package>|<source-file>]
+                Try 'bal scan --help' for more information.""");
+        Assert.assertEquals(scanCmd.exitCode(), 2);
     }
 
     @Test(description = "test scan command with format flag case insensitive")
@@ -951,14 +1019,12 @@ public class ScanCmdTest extends BaseTest {
                 .resolve("bal-project-with-compilation-errors");
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream, printStream);
-        BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+        scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String output = readOutput(true);
-        Assert.assertTrue(output.contains("ERROR [main.bal:(18:17,18:33)] incompatible types: expected 'int', " +
-                        "found 'string'"),
-                "Compilation errors should be reported in the same format as the Ballerina compiler");
-        Assert.assertEquals(exception.getMessages(), List.of("error: " + error(COMPILATION_CONTAINS_ERRORS)),
-                "Scan should fail with a launcher exception reporting that compilation contains errors");
+        Assert.assertTrue(output.contains("bal scan: error: " + error(COMPILATION_CONTAINS_ERRORS) + "\n"
+                + "main.bal:18:17: error: incompatible types: expected 'int', found 'string'"), output);
+        Assert.assertEquals(scanCmd.exitCode(), 1);
         Path jsonReport = ballerinaProject.resolve("target").resolve("report").resolve("scan_results.json");
         Assert.assertFalse(Files.exists(jsonReport),
                 "No scan report should be generated when compilation contains errors");
@@ -968,15 +1034,16 @@ public class ScanCmdTest extends BaseTest {
     void testScanCommandRequiresDependenciesToml() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources").resolve(UNLOCKED_PROJECT);
         Files.deleteIfExists(ballerinaProject.resolve("Dependencies.toml"));
-        String expected = "error: "
-                + error(MISSING_DEPENDENCIES_TOML, "ballerina/bal_project_without_dependencies_toml");
+        String message = error(MISSING_DEPENDENCIES_TOML, "ballerina/bal_project_without_dependencies_toml");
+        String expected = "bal scan: error: " + message;
         for (String[] args : List.of(new String[0], new String[]{"--list-rules"})) {
             System.setProperty("user.dir", ballerinaProject.toString());
             ScanCmd scanCmd = new ScanCmd(printStream);
             new CommandLine(scanCmd).parseArgs(args);
-            BLauncherException exception = Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+            scanCmd.execute();
             System.setProperty("user.dir", userDir);
-            Assert.assertEquals(exception.getMessages(), List.of(expected));
+            Assert.assertEquals(scanCmd.exitCode(), 1);
+            Assert.assertEquals(readOutput(true).trim(), expected);
         }
         Assert.assertFalse(Files.exists(ballerinaProject.resolve("Dependencies.toml")),
                 "The scan should not resolve the dependencies itself");
@@ -985,7 +1052,7 @@ public class ScanCmdTest extends BaseTest {
         JsonObject result = JsonParser.parseString(ScanLanguageServerTool.runScan(
                 ballerinaProject.toAbsolutePath().toString(), Map.of())).getAsJsonObject();
         Assert.assertFalse(result.get("success").getAsBoolean());
-        Assert.assertEquals(result.get("error").getAsString(), expected);
+        Assert.assertEquals(result.get("error").getAsString(), "error: " + message);
     }
 
     @Test(description = "test a workspace prints the issues of all its packages as one document on standard output")
@@ -1030,22 +1097,34 @@ public class ScanCmdTest extends BaseTest {
         try {
             Files.writeString(firstScanToml, platformConfiguration);
 
-            // Both packages report to the platform
             Files.writeString(secondScanToml, platformConfiguration);
+            // A declared platform is not reported to unless it is named
             String[] streams = scanWorkspace(workspacePath);
-            Assert.assertEquals(streams[1].split("Reporting issues to: examplePlatform", -1).length - 1, 2, streams[1]);
-            Assert.assertFalse(streams[1].contains("is not available"), streams[1]);
-            Assert.assertEquals(streams[0].trim(), "", "no package prints its issues to the console");
+            Assert.assertFalse(streams[1].contains("Reporting issues to"), streams[1]);
 
-            // Only the first package reports to the platform; the second prints its issues
+            // Both packages report to the platform, and still print their issues
+            streams = scanWorkspace(workspacePath, "--platforms=examplePlatform");
+            Assert.assertTrue(streams[1].contains("Reporting issues to: examplePlatform (first-package)"),
+                    streams[1]);
+            Assert.assertTrue(streams[1].contains("Reporting issues to: examplePlatform (second-package)"),
+                    streams[1]);
+            Assert.assertFalse(streams[1].contains("warning"), streams[1]);
+            Assert.assertEquals(JsonParser.parseString(streams[0]).getAsJsonArray().size(), 2, streams[0]);
+
+            // A package that does not declare the platform is skipped with a warning
             Files.writeString(secondScanToml, "");
-            streams = scanWorkspace(workspacePath);
-            Assert.assertEquals(streams[1].split("Reporting issues to: examplePlatform", -1).length - 1, 1, streams[1]);
-            Assert.assertFalse(streams[1].contains("is not available"), streams[1]);
-            JsonArray consoleIssues = JsonParser.parseString(streams[0]).getAsJsonArray();
-            Assert.assertEquals(consoleIssues.size(), 1, streams[0]);
-            Assert.assertTrue(consoleIssues.get(0).getAsJsonObject().get("filePath").getAsString()
-                    .contains("second-package"), streams[0]);
+            streams = scanWorkspace(workspacePath, "--platforms=examplePlatform");
+            Assert.assertEquals(streams[1].split("Reporting issues to: ", -1).length - 1, 1, streams[1]);
+            Assert.assertTrue(streams[1].contains("bal scan: warning: second-package does not declare platform "
+                    + "'examplePlatform' in its Scan.toml and is not reported to it"), streams[1]);
+            Assert.assertEquals(JsonParser.parseString(streams[0]).getAsJsonArray().size(), 2, streams[0]);
+
+            // A platform that no package declares fails the scan before it starts
+            Files.writeString(firstScanToml, "");
+            streams = scanWorkspace(workspacePath, "--platforms=examplePlatform");
+            Assert.assertTrue(streams[1].contains("bal scan: error: platform 'examplePlatform' is not available"),
+                    streams[1]);
+            Assert.assertFalse(streams[1].contains("Running scans on"), streams[1]);
         } finally {
             Files.deleteIfExists(firstScanToml);
             Files.deleteIfExists(secondScanToml);
@@ -1054,14 +1133,102 @@ public class ScanCmdTest extends BaseTest {
         }
     }
 
+    @Test(description = "test a failed platform fails the scan after every platform has run, naming each failure")
+    void testPlatformFailureFailsTheScan() throws IOException {
+        Path workspacePath = testResources.resolve("test-resources").resolve("workspace-with-platforms");
+        String platformConfiguration = platformConfiguration("");
+        Path firstScanToml = workspacePath.resolve("first-package").resolve("Scan.toml");
+        Path secondScanToml = workspacePath.resolve("second-package").resolve("Scan.toml");
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        try {
+            Files.writeString(firstScanToml, platformConfiguration);
+            Files.writeString(secondScanToml, platformConfiguration);
+            System.setProperty("user.dir", workspacePath.toString());
+            ScanCmd scanCmd = new ScanCmd(printStream, new PrintStream(err, true, StandardCharsets.UTF_8));
+            new CommandLine(scanCmd).parseArgs("--platforms=examplePlatform", "--fail-on-count=1");
+            // The test platform writes to the working directory, so a missing one makes it fail
+            System.setProperty("user.dir", workspacePath.resolve("missing-directory").toString());
+            scanCmd.execute();
+            Assert.assertEquals(scanCmd.exitCode(), 1);
+        } finally {
+            System.setProperty("user.dir", userDir);
+            Files.deleteIfExists(firstScanToml);
+            Files.deleteIfExists(secondScanToml);
+        }
+        String stderr = err.toString(StandardCharsets.UTF_8).replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+        Assert.assertTrue(stderr.contains("View scan results at:"), "the results are saved first: " + stderr);
+        Assert.assertTrue(stderr.contains("bal scan: error: 2 platforms failed to report the issues\n"), stderr);
+        for (String packageName : List.of("first-package", "second-package")) {
+            Assert.assertTrue(stderr.contains(packageName + ": error: platform 'examplePlatform' failed: Error "
+                    + "occurred while writing platform arguments to file"), stderr);
+        }
+        Assert.assertFalse(stderr.contains("failed the gate"), "a failed platform wins over the gate: " + stderr);
+    }
+
+    @Test(description = "test platform paths are resolved relative to the Scan.toml file that sets them")
+    void testPlatformPathsRelativeToScanToml() throws IOException {
+        Path workspacePath = testResources.resolve("test-resources").resolve("workspace-with-platforms");
+        Path firstPackage = workspacePath.resolve("first-package").toAbsolutePath();
+        Path firstScanToml = firstPackage.resolve("Scan.toml");
+        String relativeJarPath = firstPackage.relativize(platformPluginPath()).toString().replace("\\", "/");
+        try {
+            Files.writeString(firstScanToml, """
+                    [[platform]]
+                    name = "examplePlatform"
+                    path = "__relative_path__"
+                    propertiesPath = "Ballerina.toml"
+                    """.replace("__relative_path__", relativeJarPath));
+            String[] streams = scanWorkspace(workspacePath, "--platforms=examplePlatform");
+            Assert.assertTrue(streams[1].contains("Reporting issues to: examplePlatform"), streams[1]);
+            String platformArguments = Files.readString(workspacePath.resolve("platform-arguments.json"),
+                    StandardCharsets.UTF_8);
+            Assert.assertEquals(JsonParser.parseString(platformArguments).getAsJsonObject().get("propertiesPath")
+                    .getAsString(), firstPackage.resolve("Ballerina.toml").normalize().toString());
+
+            Files.writeString(firstScanToml, platformConfiguration("""
+                    outputPath = "out/report.json"
+                    rulesPath = "https://example.com/rules.json"
+                    contextPath = "/api"
+                    """));
+            streams = scanWorkspace(workspacePath, "--platforms=examplePlatform");
+            Assert.assertTrue(streams[1].contains("Reporting issues to: examplePlatform"), streams[1]);
+            JsonObject arguments = JsonParser.parseString(Files.readString(
+                    workspacePath.resolve("platform-arguments.json"), StandardCharsets.UTF_8)).getAsJsonObject();
+            Assert.assertEquals(arguments.get("outputPath").getAsString(), "out/report.json");
+            Assert.assertEquals(arguments.get("rulesPath").getAsString(), "https://example.com/rules.json");
+            Assert.assertEquals(arguments.get("contextPath").getAsString(), "/api");
+        } finally {
+            Files.deleteIfExists(firstScanToml);
+            Files.deleteIfExists(workspacePath.resolve("analysis-issues.json"));
+            Files.deleteIfExists(workspacePath.resolve("platform-arguments.json"));
+        }
+    }
+
+    private Path platformPluginPath() {
+        Path rootProject = Path.of(System.getProperty("user.dir")).toAbsolutePath().getParent();
+        Assert.assertNotNull(rootProject);
+        return rootProject.resolve("test-static-code-analysis-platform-plugins")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin").resolve("build").resolve("libs")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
+    }
+
+    private String platformConfiguration(String extraArgument) throws IOException {
+        return Files.readString(testResources.resolve("test-resources").resolve("platform-plugin-configurations.txt"))
+                .replace("__platform_name__", "examplePlatform")
+                .replace("__platform_plugin_path__", platformPluginPath().toString().replace("\\", "\\\\"))
+                + System.lineSeparator() + extraArgument + System.lineSeparator();
+    }
+
     // Runs a scan of the workspace and returns its standard output and standard error
-    private String[] scanWorkspace(Path workspacePath) {
+    private String[] scanWorkspace(Path workspacePath, String... args) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         System.setProperty("user.dir", workspacePath.toString());
         try {
-            new ScanCmd(new PrintStream(out, true, StandardCharsets.UTF_8),
-                    new PrintStream(err, true, StandardCharsets.UTF_8)).execute();
+            ScanCmd scanCmd = new ScanCmd(new PrintStream(out, true, StandardCharsets.UTF_8),
+                    new PrintStream(err, true, StandardCharsets.UTF_8));
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
         } finally {
             System.setProperty("user.dir", userDir);
         }

@@ -66,6 +66,7 @@ import io.ballerina.projects.Module;
 import io.ballerina.projects.Package;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ResolvedPackageDependency;
+import io.ballerina.scan.utils.AnalyzedSources;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
 import io.ballerina.scan.utils.ScanUtils;
@@ -120,10 +121,11 @@ final class SuppressionCollector {
      * Returns the suppressions declared in the given project's current package. A package that does not depend on
      * {@code ballerina/scan} cannot declare any, so its documents are not visited.
      *
-     * @param project the project being scanned
+     * @param project      the project being scanned
+     * @param analyzedSources the sources the scan analyzes, whose suppressions are collected
      * @return the suppressions, and warnings about those that are ignored
      */
-    static Collected collect(Project project) {
+    static Collected collect(Project project, AnalyzedSources analyzedSources) {
         Package currentPackage = project.currentPackage();
         if (!dependsOnScanPackage(currentPackage)) {
             return new Collected(List.of(), List.of());
@@ -132,7 +134,7 @@ final class SuppressionCollector {
         currentPackage.moduleIds().forEach(moduleId -> {
             Module module = currentPackage.module(moduleId);
             SemanticModel semanticModel = module.getCompilation().getSemanticModel();
-            Stream.concat(module.documentIds().stream(), module.testDocumentIds().stream())
+            analyzedSources.documentIds(module)
                     .forEach(documentId -> collect(module, documentId, semanticModel, collected));
         });
         return new Collected(List.copyOf(collected.suppressions()), List.copyOf(collected.ignored()));

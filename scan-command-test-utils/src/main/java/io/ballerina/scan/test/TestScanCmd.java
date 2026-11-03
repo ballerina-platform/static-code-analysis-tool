@@ -25,11 +25,11 @@ import io.ballerina.projects.environment.Environment;
 import io.ballerina.projects.environment.EnvironmentBuilder;
 import io.ballerina.scan.internal.ProjectAnalyzer;
 import io.ballerina.scan.internal.ScanCmd;
+import io.ballerina.scan.utils.AnalyzedSources;
 import io.ballerina.scan.utils.ScanTomlFile;
 
 import java.nio.file.Path;
 import java.util.Collections;
-import java.util.Optional;
 
 import static io.ballerina.scan.ReportFormat.BALLERINA;
 
@@ -75,13 +75,14 @@ public class TestScanCmd extends ScanCmd {
     }
 
     @Override
-    protected Optional<Project> getProject() {
-        return Optional.of(this.project);
+    protected Project getProject() {
+        return this.project;
     }
 
     @Override
-    protected ProjectAnalyzer getProjectAnalyzer(Project project, ScanTomlFile scanTomlFile) {
-        this.projectAnalyzer = new TestProjectAnalyzer(project, scanTomlFile);
+    protected ProjectAnalyzer getProjectAnalyzer(Project project, ScanTomlFile scanTomlFile,
+                                                 AnalyzedSources analyzedSources) {
+        this.projectAnalyzer = new TestProjectAnalyzer(project, scanTomlFile, analyzedSources);
         return this.projectAnalyzer;
     }
 

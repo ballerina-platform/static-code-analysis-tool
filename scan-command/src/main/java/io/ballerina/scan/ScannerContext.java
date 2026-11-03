@@ -33,4 +33,16 @@ public interface ScannerContext {
     Reporter getReporter();
     
     Map<String, Object> userData();
+
+    /**
+     * Returns whether the test sources are left out of the scan, as set by {@code --exclude-tests} or
+     * {@code [analysis] excludeTests} in Scan.toml. The scan tool drops the issues reported in test sources either
+     * way, so an analyzer may use this only to skip analyzing them.
+     *
+     * @return true if the test sources are left out of the scan, false otherwise
+     * @since 0.13.0
+     */
+    default boolean isExcludeTests() {
+        return false;
+    }
 }

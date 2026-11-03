@@ -20,7 +20,6 @@ package io.ballerina.scan.utils;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import io.ballerina.cli.launcher.BLauncherException;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
 import io.ballerina.projects.util.ProjectUtils;
@@ -177,10 +176,7 @@ public class ScanUtilsTest extends BaseTest {
         ruleToInclude = ruleToIncludeList.get(3);
         Assert.assertEquals(ruleToInclude.id(), "ballerinax/example_module_static_code_analyzer:1");
         Set<ScanTomlFile.RuleToFilter> rulesToExclude = scanTomlFile.getRulesToExclude();
-        List<ScanTomlFile.RuleToFilter> ruleToExcludeList = new ArrayList<>(rulesToExclude);
-        Assert.assertEquals(ruleToExcludeList.size(), 1);
-        ScanTomlFile.RuleToFilter ruleToExclude = ruleToExcludeList.get(0);
-        Assert.assertEquals(ruleToExclude.id(), "ballerina:1");
+        Assert.assertTrue(rulesToExclude.isEmpty());
         Set<ScanTomlFile.Platform> platforms = scanTomlFile.getPlatforms();
         Assert.assertEquals(platforms.size(), 0);
     }
@@ -194,26 +190,30 @@ public class ScanUtilsTest extends BaseTest {
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
         System.setProperty("user.dir", userDir);
-        Assert.assertNull(scanTomlFile);
-        String expected = getExpectedOutput("scan-toml-invalid-platform-jar.txt")
-                .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString());
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        // The JAR is downloaded only when the platform is selected, so loading Scan.toml succeeds
+        Assert.assertNotNull(scanTomlFile);
+        ScanTomlFile.Platform platform = scanTomlFile.getPlatforms().iterator().next();
+        Assert.assertEquals(platform.path(), "https://example.com/example-platform-analyzer-1.0.jar");
+        ScanToolException exception = Assert.expectThrows(ScanToolException.class,
+                () -> ScanUtils.resolvePlatformJar(platform, project.targetDir(), printStream));
+        Assert.assertEquals(exception.getMessage(), "failed to download remote jar file: 'examplePlatform.jar'");
     }
 
-    @Test(description =
-            "test method for loading configurations from a Scan.toml file with invalid platform configuration")
-    void testloadInvalidPlatformScanTomlConfigurations() throws IOException {
+    @Test(description = "test a platform path that is neither a file nor a URL fails only when the platform is used")
+    void testloadInvalidPlatformScanTomlConfigurations() {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-invalid-platform-config-file");
         Project project = ProjectLoader.load(ballerinaProject).project();
-        System.setProperty("user.dir", ballerinaProject.toString());
         ScanTomlFile scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream).orElse(null);
-        System.setProperty("user.dir", userDir);
-        Assert.assertNull(scanTomlFile);
-        String expected = getExpectedOutput("scan-toml-invalid-platform-config.txt")
-                .replace("<ABS_SOURCE_ROOT>", ballerinaProject.toAbsolutePath().toString());
-        String actual = readOutput(true).trim();
-        Assert.assertEquals(actual, expected);
+        Assert.assertNotNull(scanTomlFile);
+        ScanTomlFile.Platform platform = scanTomlFile.getPlatforms().iterator().next();
+        String jarPath = ballerinaProject.toAbsolutePath().resolve("www.example.com/example-platform-analyzer-1.0.jar")
+                .normalize().toString();
+        Assert.assertEquals(platform.path(), jarPath);
+        ScanToolException exception = Assert.expectThrows(ScanToolException.class,
+                () -> ScanUtils.resolvePlatformJar(platform, project.targetDir(), printStream));
+        Assert.assertEquals(exception.getMessage(), DiagnosticLog.error(DiagnosticCode.PLATFORM_FILE_NOT_FOUND,
+                "examplePlatform", "path", jarPath));
     }
 
     @Test(description =
@@ -232,35 +232,32 @@ public class ScanUtilsTest extends BaseTest {
 
     @Test(description = "test method for loading a Scan.toml file with a suppression setting that is not a boolean")
     void testLoadScanTomlConfigurationsWithNonBooleanSuppressionSetting() {
-        Path ballerinaProject = testResources.resolve("test-resources")
-                .resolve("bal-project-with-invalid-suppression-settings");
-        Project project = ProjectLoader.load(ballerinaProject).project();
-        BLauncherException exception = Assert.expectThrows(BLauncherException.class,
-                () -> ScanUtils.loadScanTomlConfigurations(project, printStream));
-        Assert.assertEquals(exception.getMessages(),
-                List.of("error: " + DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, "requireReason")));
+        assertSuppressionError("bal-project-with-invalid-suppression-settings", "Scan.toml:2:17: error: "
+                + DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, "requireReason"));
     }
 
     @Test(description = "test method for loading a Scan.toml file whose suppression settings are not a table")
     void testLoadScanTomlConfigurationsWithSuppressionTableArray() {
-        Path ballerinaProject = testResources.resolve("test-resources")
-                .resolve("bal-project-with-suppression-table-array");
-        Project project = ProjectLoader.load(ballerinaProject).project();
-        BLauncherException exception = Assert.expectThrows(BLauncherException.class,
-                () -> ScanUtils.loadScanTomlConfigurations(project, printStream));
-        Assert.assertEquals(exception.getMessages(),
-                List.of("error: " + DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_TABLE)));
+        assertSuppressionError("bal-project-with-suppression-table-array", "Scan.toml:1:1: error: "
+                + DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_TABLE));
     }
 
     @Test(description = "test method for loading a Scan.toml file with an unknown suppression setting")
     void testLoadScanTomlConfigurationsWithUnknownSuppressionSetting() {
-        Path ballerinaProject = testResources.resolve("test-resources")
-                .resolve("bal-project-with-unknown-suppression-setting");
+        assertSuppressionError("bal-project-with-unknown-suppression-setting", "Scan.toml:2:1: error: "
+                + DiagnosticLog.error(DiagnosticCode.UNKNOWN_SUPPRESSION_SETTING, "requireReasons"));
+    }
+
+    // bal scan reports the error at its position with the other errors of the file, and the editor ignores it
+    private void assertSuppressionError(String projectName, String expectedError) {
+        Path ballerinaProject = testResources.resolve("test-resources").resolve(projectName);
         Project project = ProjectLoader.load(ballerinaProject).project();
-        BLauncherException exception = Assert.expectThrows(BLauncherException.class,
-                () -> ScanUtils.loadScanTomlConfigurations(project, printStream));
-        Assert.assertEquals(exception.getMessages(),
-                List.of("error: " + DiagnosticLog.error(DiagnosticCode.UNKNOWN_SUPPRESSION_SETTING, "requireReasons")));
+        ScanToolException exception = Assert.expectThrows(ScanToolException.class,
+                () -> ScanUtils.readScanTomlConfigurations(project, printStream));
+        Assert.assertEquals(exception.getMessage(),
+                DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, "Scan.toml", 1));
+        Assert.assertEquals(exception.diagnostics(), List.of(expectedError));
+        Assert.assertTrue(ScanUtils.loadScanTomlConfigurations(project, printStream).isPresent());
     }
 
     @Test(description = "test method for loading configurations from an external configuration file")

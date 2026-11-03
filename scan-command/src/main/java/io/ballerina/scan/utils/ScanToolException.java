@@ -18,18 +18,45 @@
 
 package io.ballerina.scan.utils;
 
+import java.util.List;
+
 /**
  * {@code ScanToolException} represents a scan tool related runtime exception.
  *
  * @since 0.1.0
  * */
 public class ScanToolException extends RuntimeException {
+    private final List<String> diagnostics;
+
     /**
      * Returns a new instance of the ScanToolException with the specified diagnostic message.
      *
      * @param exception diagnostic message
      */
     public ScanToolException(String exception) {
+        this(exception, List.of());
+    }
+
+    /**
+     * Returns a new instance of the ScanToolException with the specified diagnostic message and the diagnostics
+     * that explain it, such as the errors found in a configuration file.
+     *
+     * @param exception   diagnostic message
+     * @param diagnostics diagnostics reported under the message, each formatted as one line
+     * @since 0.13.0
+     */
+    public ScanToolException(String exception, List<String> diagnostics) {
         super(exception);
+        this.diagnostics = List.copyOf(diagnostics);
+    }
+
+    /**
+     * Returns the diagnostics reported under the message.
+     *
+     * @return the diagnostics, each formatted as one line
+     * @since 0.13.0
+     */
+    public List<String> diagnostics() {
+        return diagnostics;
     }
 }

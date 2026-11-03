@@ -551,4 +551,84 @@ public class ScanLanguageServerToolTest extends BaseTest {
                     "Issue context should have ruleId");
         }
     }
+
+    @Test(description = "test the quick fix copies the workspace Scan.toml to a package that has none, so that the "
+            + "package keeps the workspace settings")
+    void testGlobalExclusionKeepsWorkspaceSettings() throws IOException {
+        Path workspace = testResources.resolve("test-resources").resolve("workspace-with-gates");
+        Path workspaceScanToml = workspace.resolve("Scan.toml");
+        Path packageScanToml = workspace.resolve("pkg-b").resolve("Scan.toml");
+        String original = Files.readString(packageScanToml);
+        try {
+            Files.writeString(workspaceScanToml, """
+                    [rule]
+                    exclude = ["ballerina:1"]
+
+                    [gate]
+                    failOnSeverity = "HIGH"
+                    """);
+            Files.delete(packageScanToml);
+            JsonObject response = JsonParser.parseString(ScanLanguageServerTool.addGlobalExclusion(
+                    workspace.resolve("pkg-b").toString(), "ballerina:2")).getAsJsonObject();
+            Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+            String packageFile = Files.readString(packageScanToml);
+            Assert.assertTrue(packageFile.contains("failOnSeverity = \"HIGH\""), packageFile);
+            Assert.assertTrue(packageFile.contains("ballerina:1") && packageFile.contains("ballerina:2"), packageFile);
+
+            // Removing a rule the workspace file does not exclude leaves the package on the workspace file
+            Files.delete(packageScanToml);
+            response = JsonParser.parseString(ScanLanguageServerTool.removeGlobalExclusion(
+                    workspace.resolve("pkg-b").toString(), "ballerina:3")).getAsJsonObject();
+            Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+            Assert.assertFalse(Files.exists(packageScanToml));
+
+            response = JsonParser.parseString(ScanLanguageServerTool.removeGlobalExclusion(
+                    workspace.resolve("pkg-b").toString(), "ballerina:1")).getAsJsonObject();
+            Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+            packageFile = Files.readString(packageScanToml);
+            Assert.assertTrue(packageFile.contains("failOnSeverity = \"HIGH\""), packageFile);
+            Assert.assertFalse(packageFile.contains("ballerina:1"), packageFile);
+        } finally {
+            Files.deleteIfExists(workspaceScanToml);
+            Files.writeString(packageScanToml, original);
+        }
+    }
+
+    @Test(description = "test the quick fix writes to the Scan.toml that configPath points to")
+    void testGlobalExclusionUsesConfigPath() throws IOException {
+        Path project = Files.createTempDirectory("config-path-package");
+        try {
+            Files.writeString(project.resolve("Ballerina.toml"), """
+                    [package]
+                    org = "test"
+                    name = "config_path"
+                    version = "0.1.0"
+
+                    [scan]
+                    configPath = "config/scan-settings.toml"
+                    """);
+            JsonObject response = JsonParser.parseString(ScanLanguageServerTool.addGlobalExclusion(
+                    project.toString(), "ballerina:2")).getAsJsonObject();
+            Assert.assertTrue(response.get("success").getAsBoolean(), response.toString());
+            Assert.assertTrue(Files.readString(project.resolve("config").resolve("scan-settings.toml"))
+                    .contains("ballerina:2"));
+            Assert.assertFalse(Files.exists(project.resolve("Scan.toml")));
+
+            Files.writeString(project.resolve("Ballerina.toml"), """
+                    [package]
+                    org = "test"
+                    name = "config_path"
+                    version = "0.1.0"
+
+                    [scan]
+                    configPath = "https://example.com/Scan.toml"
+                    """);
+            response = JsonParser.parseString(ScanLanguageServerTool.addGlobalExclusion(
+                    project.toString(), "ballerina:2")).getAsJsonObject();
+            Assert.assertFalse(response.get("success").getAsBoolean(), response.toString());
+            Assert.assertFalse(Files.exists(project.resolve("Scan.toml")));
+        } finally {
+            ProjectUtils.deleteDirectory(project);
+        }
+    }
 }
