@@ -44,9 +44,6 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         Module defaultModule = getModule(documentName);
         Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
         ScannerContextImpl scannerContext = new ScannerContextImpl(rules);
-        SensitiveParameterTracker sensitiveParameterTracker = new SensitiveParameterTracker(document.syntaxTree(),
-                scannerContext, defaultModule.getCompilation().getSemanticModel());
-        sensitiveParameterTracker.scan();
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document,
                 scannerContext, document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
