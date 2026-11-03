@@ -1,0 +1,55 @@
+name: "📏 Request a New Rule"
+description: Suggest a new core rule for `bal scan`.
+labels: ["Type/New Feature", "Area/Rules"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Core rules cover the Ballerina language and lang libraries. Request rules about a library's API, such as `ballerina/http` or `ballerina/sql`, in [ballerina-library](https://github.com/ballerina-platform/ballerina-library/issues/new/choose).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What goes wrong in code like this, and when does it show up?
+    validations:
+      required: true
+  - type: textarea
+    id: noncompliant
+    attributes:
+      label: Code to Report
+      description: Code the rule should report.
+      render: ballerina
+    validations:
+      required: true
+  - type: textarea
+    id: compliant
+    attributes:
+      label: Suggested Fix
+      description: How the code should be written instead.
+      render: ballerina
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Rule Kind
+      options:
+        - Bug (fails or behaves unexpectedly at runtime)
+        - Vulnerability (security risk)
+        - Code smell (hurts maintainability)
+    validations:
+      required: true
+  - type: textarea
+    id: detection
+    attributes:
+      label: Detection
+      description: How the rule should decide what to report, and any cases it should skip.
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other ways to address the problem, such as a compiler warning or documentation.
+    validations:
+      required: false
