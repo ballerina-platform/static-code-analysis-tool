@@ -1742,7 +1742,9 @@ public final class ScanUtils {
     private static String loadRemoteJAR(Path targetDir, String fileName, URL remoteJarFile,
                                         PrintStream outputStream) {
         String platformJarFileName = fileName + JAR_PREDICATE;
-        Path cachedJarPath = targetDir.resolve(platformJarFileName);
+        // Keyed by URL too, so that platforms of the same name with different URLs do not share a cached JAR
+        Path cachedJarPath = targetDir.resolve(fileName + "-" + Integer.toHexString(remoteJarFile.toString().hashCode())
+                + JAR_PREDICATE);
         if (Files.exists(cachedJarPath)) {
             outputStream.println("Loading " + platformJarFileName + " from cache");
             return cachedJarPath.toAbsolutePath().toString();
