@@ -48,6 +48,7 @@ under the License.
             <class name="io.ballerina.scan.internal.SecretValueFilterEdgeCaseTest"/>
             <class name="io.ballerina.scan.internal.Rule013Test"/>
             <class name="io.ballerina.scan.internal.SecretValueChecksTest"/>
+            <class name="io.ballerina.scan.internal.SecretPositionalArgumentTest"/>
             <class name="io.ballerina.scan.internal.Rule014Test"/>
             <class name="io.ballerina.scan.internal.SecretNameCheckerTest"/>
             <class name="io.ballerina.scan.internal.SecretValueTracingTest"/>

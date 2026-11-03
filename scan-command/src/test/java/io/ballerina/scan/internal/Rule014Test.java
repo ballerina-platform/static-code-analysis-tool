@@ -79,12 +79,13 @@ public class Rule014Test extends StaticCodeAnalyzerTest {
     void testNonConfigSecretAsFunctionArgument() {
         String documentName = "rule014_non_config_secret_as_function_argument.bal";
         List<Issue> issues = analyze(documentName, List.of(NON_CONFIGURABLE_SECRET.rule()));
-        Assert.assertEquals(issues.size(), 7);
+        Assert.assertEquals(issues.size(), 8);
         List<Location> expectedIssueLocations = new ArrayList<>(List.of(
                 new Location(21, 38, 21, 50),
                 new Location(22, 49, 22, 61),
                 new Location(25, 36, 25, 48),
                 new Location(26, 47, 26, 59),
+                new Location(28, 38, 28, 50),
                 new Location(29, 41, 29, 53),
                 new Location(46, 37, 46, 49),
                 new Location(47, 59, 47, 71)
