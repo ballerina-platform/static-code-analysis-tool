@@ -120,6 +120,9 @@ public class ScanCmd implements BLauncherCmd {
     @CommandLine.Parameters
     private List<String> targets = new ArrayList<>();
 
+    @CommandLine.Spec
+    private CommandLine.Model.CommandSpec spec;
+
     private Path projectPath;
 
     @CommandLine.Option(names = { "--help", "-h", "?" }, hidden = true)
@@ -177,8 +180,10 @@ public class ScanCmd implements BLauncherCmd {
     private String failOnCount;
 
     // Written alone, the option means true; a value overrides [analysis] excludeTests either way. Validated when the
-    // command runs, so that an invalid value exits as a usage error
-    @CommandLine.Option(names = EXCLUDE_TESTS_OPTION, arity = "0..1", preprocessor = OptionalBooleanValue.class,
+    // command runs, so that an invalid value exits as a usage error. The bal launcher runs on picocli 4.0.1, which
+    // ignores the preprocessor, so the fallback value and resolveOptions cover the option written alone there
+    @CommandLine.Option(names = EXCLUDE_TESTS_OPTION, arity = "0..1", fallbackValue = "true",
+            preprocessor = OptionalBooleanValue.class,
             description = "Leave the test sources out of the scan (true/false). Default is false")
     private String excludeTestsOption;
     private Boolean excludeTests;
@@ -368,6 +373,11 @@ public class ScanCmd implements BLauncherCmd {
      * Validates the command-line arguments, so that invalid input exits as a usage error before anything is loaded.
      */
     private void resolveOptions() {
+        if (excludeTestsOption != null && !OptionalBooleanValue.isBoolean(excludeTestsOption)
+                && isExcludeTestsWrittenAlone()) {
+            targets.add(0, excludeTestsOption);
+            excludeTestsOption = "true";
+        }
         if (targets.size() > 1) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, targets.size(),
                     String.join(" ", targets)));
@@ -379,6 +389,10 @@ public class ScanCmd implements BLauncherCmd {
                 throw ScanFailure.invalidTarget(DiagnosticLog.error(DiagnosticCode.INVALID_PROJECT_PATH,
                         targets.get(0)), List.of());
             }
+        }
+        // The other options do not change the rules, so their values are not checked when listing them
+        if (listRules) {
+            return;
         }
         if (excludeTestsOption != null) {
             if (!excludeTestsOption.equalsIgnoreCase("true") && !excludeTestsOption.equalsIgnoreCase("false")) {
@@ -392,7 +406,7 @@ public class ScanCmd implements BLauncherCmd {
         } catch (IllegalArgumentException ex) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_FORMAT, format));
         }
-        if (!listRules && !includeRules.isEmpty() && !excludeRules.isEmpty()) {
+        if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
         }
         if (failOnSeverity != null) {
@@ -550,7 +564,7 @@ public class ScanCmd implements BLauncherCmd {
     private ScanTomlFile workspaceDefaults(WorkspaceProject workspaceProject) {
         if (!workspaceDefaultsRead) {
             workspaceDefaultsRead = true;
-            workspaceDefaults = ScanUtils.readWorkspaceScanToml(workspaceProject, quietStream).orElse(null);
+            workspaceDefaults = ScanUtils.readWorkspaceScanToml(workspaceProject, quietStream, listRules).orElse(null);
             if (workspaceDefaults != null) {
                 errorStream.println(LOADING_CONFIGURATIONS_LOG + "the workspace from "
                         + workspaceDefaults.getDisplayPath(workspaceProject.sourceRoot()).orElse(Constants.SCAN_FILE));
@@ -727,7 +741,7 @@ public class ScanCmd implements BLauncherCmd {
         Path root = scanningWorkspace ? project.workspaceProject().orElseThrow().sourceRoot() : project.sourceRoot();
         String scanTomlLabel = scanTomlFile.getDisplayPath(root).orElse(Constants.SCAN_FILE);
 
-        if (excludeTests != null) {
+        if (!listRules && excludeTests != null) {
             warnOverride(scanTomlFile, ScanTomlFile.ANALYSIS_EXCLUDE_TESTS_SETTING,
                     EXCLUDE_TESTS_OPTION + "=" + excludeTests, String.valueOf(excludeTests), scanTomlLabel);
         }
@@ -749,16 +763,16 @@ public class ScanCmd implements BLauncherCmd {
      */
     private ScanTomlFile chooseScanToml(Project project) {
         if (!scanningWorkspace) {
-            ScanTomlFile packageFile = ScanUtils.readScanTomlConfigurations(project, errorStream);
+            ScanTomlFile packageFile = ScanUtils.readScanTomlConfigurations(project, errorStream, listRules);
             // A workspace package scanned on its own uses the workspace file too, as it does in the editor
             if (packageFile.getPath().isEmpty()) {
-                return ScanUtils.readEnclosingWorkspaceScanToml(project, errorStream).orElse(packageFile);
+                return ScanUtils.readEnclosingWorkspaceScanToml(project, errorStream, listRules).orElse(packageFile);
             }
             return packageFile;
         }
         WorkspaceProject workspace = project.workspaceProject().orElseThrow();
         String label = packageLabel(workspace, project);
-        ScanTomlFile packageFile = ScanUtils.readScanTomlConfigurations(project, quietStream);
+        ScanTomlFile packageFile = ScanUtils.readScanTomlConfigurations(project, quietStream, listRules);
         ScanTomlFile workspaceFile = workspaceDefaults(workspace);
         if (packageFile.getPath().isPresent()) {
             errorStream.println(LOADING_CONFIGURATIONS_LOG + label + " from "
@@ -772,7 +786,7 @@ public class ScanCmd implements BLauncherCmd {
         if (packageFile.getPath().isEmpty()) {
             return workspaceFile;
         }
-        if (!packageFile.getPath().equals(workspaceFile.getPath())) {
+        if (!listRules && !packageFile.getPath().equals(workspaceFile.getPath())) {
             warnWorkspaceFileOverridden(workspace, project, packageFile, workspaceFile);
         }
         return packageFile;
@@ -1404,6 +1418,15 @@ public class ScanCmd implements BLauncherCmd {
      * {@code main.bal}. A value attached with {@code =} is kept as given, so that an invalid one is reported by the
      * command instead of by picocli.
      */
+    /**
+     * Returns whether {@code --exclude-tests} was written without an attached value, in which case picocli 4.0.1
+     * takes the next argument as its value even when it is the target.
+     */
+    private boolean isExcludeTestsWrittenAlone() {
+        CommandLine.ParseResult parseResult = spec == null ? null : spec.commandLine().getParseResult();
+        return parseResult != null && parseResult.originalArgs().contains(EXCLUDE_TESTS_OPTION);
+    }
+
     private static class OptionalBooleanValue implements CommandLine.IParameterPreprocessor {
         /**
          * Pushes the implicit true when the option is written alone or before an argument that is not a boolean.

@@ -214,6 +214,61 @@ public class GateTest extends BaseTest {
         Assert.assertTrue(run.output().contains("ballerina:1"), run.output());
     }
 
+    @Test(description = "test --list-rules ignores the Scan.toml settings and options that do not change the rules")
+    void testListRulesIgnoresSettingsOutsideRules() throws IOException {
+        Path scanToml = gateIssuesProject.resolve("Scan.toml");
+        Files.writeString(scanToml, """
+                [rule]
+                include = ["ballerina:1"]
+                exclude = ["ballerina:2"]
+
+                [gate]
+                failOnSeverity = "CRITICAL"
+
+                [suppression]
+                enabled = "yes"
+
+                [analysis]
+                excludeTests = 1
+                unknown = true
+                """);
+        try {
+            ScanRun run = scan(gateIssuesProject, "--list-rules", "--fail-on-severity=CRITICAL",
+                    "--fail-on-count=0", "--exclude-tests=maybe", "--format=xml");
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertTrue(run.output().contains("ballerina:1"), run.output());
+            Assert.assertFalse(run.output().contains("error:"), run.output());
+            Assert.assertFalse(run.output().contains("warning:"), run.output());
+
+            run = scan(gateIssuesProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+        } finally {
+            Files.deleteIfExists(scanToml);
+        }
+    }
+
+    @Test(description = "test --list-rules fails on the Scan.toml errors that change the rules")
+    void testListRulesFailsOnRuleChangingErrors() throws IOException {
+        Path scanToml = gateIssuesProject.resolve("Scan.toml");
+        try {
+            Files.writeString(scanToml, """
+                    analyzer = "org/name"
+                    """);
+            ScanRun run = scan(gateIssuesProject, "--list-rules");
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.output().contains("Scan.toml:1:1: error:"), run.output());
+
+            Files.writeString(scanToml, """
+                    [rule
+                    """);
+            run = scan(gateIssuesProject, "--list-rules");
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.output().contains("bal scan: error: Scan.toml has"), run.output());
+        } finally {
+            Files.deleteIfExists(scanToml);
+        }
+    }
+
     @Test(description = "test the language server loads Scan.toml leniently, ignoring invalid gate settings")
     void testLenientScanTomlLoading() {
         Project project = ProjectLoader.load(invalidGateConfigProject).project();

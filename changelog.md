@@ -9,12 +9,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - In-source suppression of scan findings with the `@scan:Suppress` annotation. Suppressed findings are left out of the console output and stay reviewable in the saved reports. ([#115](https://github.com/ballerina-platform/static-code-analysis-tool/pull/115))
+- Quality gate with the `--fail-on-severity` and `--fail-on-count` options and a `[gate]` table in `Scan.toml`. The scan exits with code `1` when the number of issues at or above the severity reaches the count. In a workspace, each package is gated on its own issues. ([#146](https://github.com/ballerina-platform/static-code-analysis-tool/pull/146))
+- `--exclude-tests[=<true|false>]` option and an `[analysis] excludeTests` setting in `Scan.toml` to leave test sources out of the scan. `ScannerContext.isExcludeTests()` lets analyzers skip test sources. ([#146](https://github.com/ballerina-platform/static-code-analysis-tool/pull/146))
+- Workspace `Scan.toml`, used by each workspace package that has no `Scan.toml` of its own. The two files are not merged, and `[[platform]]` is not allowed in the workspace file. ([#146](https://github.com/ballerina-platform/static-code-analysis-tool/pull/146))
 
 ### Changed
 
 - `ballerina:13` and `ballerina:14` skip values that cannot be secrets, such as booleans, nil defaults, records of configurables, objects and obvious placeholders. ([#147](https://github.com/ballerina-platform/static-code-analysis-tool/pull/147))
 - `ballerina:13` and `ballerina:14` match secret names by word instead of by substring, so names such as `author` and `tokenizer` are no longer reported, and names such as `dbCredential` and `privateKey` are. ([#148](https://github.com/ballerina-platform/static-code-analysis-tool/pull/148))
 - `ballerina:13` and `ballerina:14` trace the value given to a secret-named target back to its origin before choosing a rule, so values built from configurables or computed at run time are no longer reported as fixed secrets, and a value is reported once instead of at each step of a chain. ([#150](https://github.com/ballerina-platform/static-code-analysis-tool/pull/150))
+- `bal scan` exits with `1` when the scan fails or the gate is tripped, `2` on invalid command-line input and `3` when the path is not a Ballerina package, workspace or source file. Errors are printed as `bal scan: error: <message>`, followed by the location of each problem. ([#146](https://github.com/ballerina-platform/static-code-analysis-tool/pull/146))
+- `Scan.toml` validation reports every error with its location, and rejects unknown keys and wrongly typed values. An unknown rule ID in `--include-rules` or `--exclude-rules` is now an error, and include and exclude rules cannot be combined. ([#146](https://github.com/ballerina-platform/static-code-analysis-tool/pull/146))
+- A platform declared in `Scan.toml` is reported to only when it is named in `--platforms`, and a platform that fails now fails the scan. A relative platform `path` is resolved against the folder of `Scan.toml` instead of the working directory. ([#146](https://github.com/ballerina-platform/static-code-analysis-tool/pull/146))
+- `TestRunner` and the test-runner `ScanCmd` constructor in `scan-command-test-utils` throw `ScanToolException` instead of `BLauncherException`. ([#146](https://github.com/ballerina-platform/static-code-analysis-tool/pull/146))
 - The build provisions the Ballerina distribution itself and uses Gradle 9.5.1. ([#116](https://github.com/ballerina-platform/static-code-analysis-tool/pull/116))
 
 ### Fixed

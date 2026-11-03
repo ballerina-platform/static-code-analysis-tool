@@ -1030,9 +1030,10 @@ public final class ScanUtils {
      */
     public static Optional<ScanTomlFile> loadScanTomlConfigurations(Project project, PrintStream outputStream) {
         try {
-            ScanTomlFile scanTomlFile = readScanTomlConfigurations(project, outputStream, false);
+            ScanTomlFile scanTomlFile = readScanTomlConfigurations(project, outputStream, Validation.NONE);
             if (scanTomlFile.getPath().isEmpty()) {
-                return Optional.of(readEnclosingWorkspaceScanToml(project, outputStream, false).orElse(scanTomlFile));
+                return Optional.of(readEnclosingWorkspaceScanToml(project, outputStream, Validation.NONE)
+                        .orElse(scanTomlFile));
             }
             return Optional.of(scanTomlFile);
         } catch (ScanToolException ex) {
@@ -1054,15 +1055,32 @@ public final class ScanUtils {
      * @since 0.13.0
      */
     public static ScanTomlFile readScanTomlConfigurations(Project project, PrintStream outputStream) {
-        return readScanTomlConfigurations(project, outputStream, true);
+        return readScanTomlConfigurations(project, outputStream, false);
     }
 
     /**
-     * Reads the Scan.toml file of a package. When strict, syntax errors and invalid settings fail the load; otherwise
-     * they are ignored.
+     * Returns the in-memory representation of the local or remote Scan.toml file of a package, without the defaults
+     * of an enclosing workspace.
+     *
+     * @param project      Ballerina project
+     * @param outputStream print stream for progress messages
+     * @param rulesOnly    whether only the errors that change the rules of the package fail the load: TOML syntax
+     *                     errors and an invalid {@code [[analyzer]]} table
+     * @return the in-memory representation of the Scan.toml file, which is empty when the package has none
+     * @throws ScanToolException if the configurations cannot be loaded, with a diagnostic for each error found in
+     *                           the file
+     * @since 0.13.0
+     */
+    public static ScanTomlFile readScanTomlConfigurations(Project project, PrintStream outputStream,
+                                                          boolean rulesOnly) {
+        return readScanTomlConfigurations(project, outputStream, Validation.of(rulesOnly));
+    }
+
+    /**
+     * Reads the Scan.toml file of a package, failing the load on the errors the validation covers.
      */
     private static ScanTomlFile readScanTomlConfigurations(Project project, PrintStream outputStream,
-                                                           boolean strict) {
+                                                           Validation validation) {
         if (!project.kind().equals(ProjectKind.BUILD_PROJECT) || project.currentPackage().ballerinaToml().isEmpty()) {
             return new ScanTomlFile();
         }
@@ -1070,7 +1088,7 @@ public final class ScanUtils {
         BallerinaToml ballerinaToml = project.currentPackage().ballerinaToml().get();
         TomlDocument ballerinaTomlDocument = ballerinaToml.tomlDocument();
         return readScanFile(ballerinaTomlDocument.toml(), project.sourceRoot(), project.targetDir(), outputStream,
-                strict, false).orElseGet(ScanTomlFile::new);
+                validation, false).orElseGet(ScanTomlFile::new);
     }
 
     /**
@@ -1086,13 +1104,29 @@ public final class ScanUtils {
      */
     public static Optional<ScanTomlFile> readWorkspaceScanToml(WorkspaceProject workspaceProject,
                                                                PrintStream outputStream) {
-        return readWorkspaceScanToml(workspaceProject, outputStream, true);
+        return readWorkspaceScanToml(workspaceProject, outputStream, false);
+    }
+
+    /**
+     * Returns the in-memory representation of the Scan.toml file of a workspace.
+     *
+     * @param workspaceProject the workspace
+     * @param outputStream     print stream for progress messages
+     * @param rulesOnly        whether only the errors that change the rules of the packages fail the load: TOML
+     *                         syntax errors and an invalid {@code [[analyzer]]} table
+     * @return the in-memory representation of the file, or empty when the workspace has none
+     * @throws ScanToolException if the file cannot be loaded or has errors
+     * @since 0.13.0
+     */
+    public static Optional<ScanTomlFile> readWorkspaceScanToml(WorkspaceProject workspaceProject,
+                                                               PrintStream outputStream, boolean rulesOnly) {
+        return readWorkspaceScanToml(workspaceProject, outputStream, Validation.of(rulesOnly));
     }
 
     private static Optional<ScanTomlFile> readWorkspaceScanToml(WorkspaceProject workspaceProject,
-                                                                PrintStream outputStream, boolean strict) {
+                                                                PrintStream outputStream, Validation validation) {
         return readWorkspaceScanToml(workspaceProject.sourceRoot(), workspaceProject.targetDir(), outputStream,
-                strict);
+                validation);
     }
 
     /**
@@ -1106,7 +1140,23 @@ public final class ScanUtils {
      * @since 0.13.0
      */
     public static Optional<ScanTomlFile> readEnclosingWorkspaceScanToml(Project project, PrintStream outputStream) {
-        return readEnclosingWorkspaceScanToml(project, outputStream, true);
+        return readEnclosingWorkspaceScanToml(project, outputStream, false);
+    }
+
+    /**
+     * Returns the Scan.toml file of the workspace a package belongs to.
+     *
+     * @param project      a package, which may have been loaded without its workspace
+     * @param outputStream print stream for progress messages
+     * @param rulesOnly    whether only the errors that change the rules of the package fail the load: TOML syntax
+     *                     errors and an invalid {@code [[analyzer]]} table
+     * @return the workspace Scan.toml file, or empty when the package is not in a workspace or the workspace has none
+     * @throws ScanToolException if the file cannot be loaded or has errors
+     * @since 0.13.0
+     */
+    public static Optional<ScanTomlFile> readEnclosingWorkspaceScanToml(Project project, PrintStream outputStream,
+                                                                        boolean rulesOnly) {
+        return readEnclosingWorkspaceScanToml(project, outputStream, Validation.of(rulesOnly));
     }
 
     /**
@@ -1114,16 +1164,16 @@ public final class ScanUtils {
      * workspace.
      */
     private static Optional<ScanTomlFile> readEnclosingWorkspaceScanToml(Project project, PrintStream outputStream,
-                                                                         boolean strict) {
+                                                                         Validation validation) {
         if (project.kind() != ProjectKind.BUILD_PROJECT) {
             return Optional.empty();
         }
         Optional<WorkspaceProject> workspaceProject = project.workspaceProject();
         if (workspaceProject.isPresent()) {
-            return readWorkspaceScanToml(workspaceProject.get(), outputStream, strict);
+            return readWorkspaceScanToml(workspaceProject.get(), outputStream, validation);
         }
         return enclosingWorkspaceRoot(project.sourceRoot()).flatMap(root -> readWorkspaceScanToml(root,
-                root.resolve(ProjectConstants.TARGET_DIR_NAME), outputStream, strict));
+                root.resolve(ProjectConstants.TARGET_DIR_NAME), outputStream, validation));
     }
 
     /**
@@ -1153,7 +1203,7 @@ public final class ScanUtils {
         try (PrintStream quietStream = new PrintStream(OutputStream.nullOutputStream(), false,
                 StandardCharsets.UTF_8)) {
             return enclosingWorkspaceRoot(packageRoot).flatMap(root -> readWorkspaceScanToml(root,
-                    root.resolve(ProjectConstants.TARGET_DIR_NAME), quietStream, false));
+                    root.resolve(ProjectConstants.TARGET_DIR_NAME), quietStream, Validation.NONE));
         }
     }
 
@@ -1191,7 +1241,7 @@ public final class ScanUtils {
      * Reads the Scan.toml file of the workspace at a root, which cannot set platforms.
      */
     private static Optional<ScanTomlFile> readWorkspaceScanToml(Path sourceRoot, Path targetDir,
-                                                                PrintStream outputStream, boolean strict) {
+                                                                PrintStream outputStream, Validation validation) {
         Path ballerinaTomlPath = sourceRoot.resolve(ProjectConstants.BALLERINA_TOML);
         Toml ballerinaToml;
         try {
@@ -1199,20 +1249,21 @@ public final class ScanUtils {
         } catch (IOException ex) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.READING_CONFIG_FILE, ex.getMessage()));
         }
-        return readScanFile(ballerinaToml, sourceRoot, targetDir, outputStream, strict, true);
+        return readScanFile(ballerinaToml, sourceRoot, targetDir, outputStream, validation, true);
     }
 
     /**
      * Reads the Scan.toml file that the [scan] table of a Ballerina.toml file points to, or the one at the root.
      */
     private static Optional<ScanTomlFile> readScanFile(Toml ballerinaToml, Path sourceRoot, Path targetDir,
-                                                       PrintStream outputStream, boolean strict, boolean workspace) {
+                                                       PrintStream outputStream, Validation validation,
+                                                       boolean workspace) {
         if (ballerinaToml.getTable(SCAN_TABLE).isEmpty()) {
             Path scanTomlFilePath = sourceRoot.resolve(SCAN_FILE);
             if (Files.isRegularFile(scanTomlFilePath)) {
                 outputStream.println("Loading scan tool configurations from " + scanTomlFilePath);
                 return Optional.of(loadScanFile(targetDir, scanTomlFilePath, displayPath(sourceRoot, scanTomlFilePath),
-                        sourceRoot.toAbsolutePath(), outputStream, strict, workspace));
+                        sourceRoot.toAbsolutePath(), outputStream, validation, workspace));
             }
             return Optional.empty();
         }
@@ -1231,11 +1282,11 @@ public final class ScanUtils {
         if (absPath.isPresent() && absPath.get().toFile().isFile()) {
             outputStream.println("Loading scan tool configurations from " + absPath.get());
             return Optional.of(loadScanFile(targetDir, absPath.get(), displayPath(sourceRoot, absPath.get()),
-                    absPath.get().toAbsolutePath().getParent(), outputStream, strict, workspace));
+                    absPath.get().toAbsolutePath().getParent(), outputStream, validation, workspace));
         }
         // A remote file has no folder of its own, so its relative paths are resolved against the root
         return Optional.of(loadRemoteScanFile(targetDir, scanTomlPath, sourceRoot.toAbsolutePath(), outputStream,
-                strict, workspace));
+                validation, workspace));
     }
 
     /**
@@ -1273,19 +1324,20 @@ public final class ScanUtils {
      * @param scanTomlPath the remote Scan.toml file path
      * @param baseDir      the directory relative paths in the file are resolved against
      * @param outputStream the print stream
-     * @param strict       whether TOML syntax errors and invalid settings fail the load
+     * @param validation   the errors that fail the load
      * @param workspace    whether the file configures a workspace
      * @return the in-memory representation of the remote Scan.toml file
      */
     private static ScanTomlFile loadRemoteScanFile(Path targetDir, String scanTomlPath, Path baseDir,
-                                                   PrintStream outputStream, boolean strict, boolean workspace) {
+                                                   PrintStream outputStream, Validation validation,
+                                                   boolean workspace) {
         // Keyed by URL, so that a workspace and its packages sharing a target directory do not share a cache
         Path cachePath = targetDir.resolve(Integer.toHexString(scanTomlPath.hashCode()) + "-" + SCAN_FILE);
 
         if (Files.exists(cachePath)) {
             outputStream.println("Loading scan tool configurations from cache");
             ScanTomlFile scanTomlFile = loadScanFile(targetDir, cachePath, scanTomlPath, baseDir, outputStream,
-                    strict, workspace);
+                    validation, workspace);
             scanTomlFile.setRemoteLocation(scanTomlPath);
             return scanTomlFile;
         }
@@ -1299,8 +1351,8 @@ public final class ScanUtils {
                     ex.getMessage()));
         }
         outputStream.println("Loading scan tool configurations from " + remoteScanTomlFilePath);
-        ScanTomlFile scanTomlFile = loadScanFile(targetDir, cachePath, scanTomlPath, baseDir, outputStream, strict,
-                workspace);
+        ScanTomlFile scanTomlFile = loadScanFile(targetDir, cachePath, scanTomlPath, baseDir, outputStream,
+                validation, workspace);
         scanTomlFile.setRemoteLocation(scanTomlPath);
         return scanTomlFile;
     }
@@ -1314,17 +1366,18 @@ public final class ScanUtils {
      * @param displayPath      the path of the file as shown to the user
      * @param baseDir          the directory relative paths in the file are resolved against
      * @param outputStream     the print stream
-     * @param strict           whether TOML syntax errors and invalid settings fail the load
+     * @param validation       the errors that fail the load
      * @param workspace        whether the file configures a workspace, which cannot set platforms
      * @return the in-memory representation of the Scan.toml file
      */
     private static ScanTomlFile loadScanFile(Path targetDir, Path scanTomlFilePath, String displayPath, Path baseDir,
-                                             PrintStream outputStream, boolean strict, boolean workspace) {
-        Toml scanTomlDocumentContent = readTomlFile(scanTomlFilePath, displayPath, strict);
+                                             PrintStream outputStream, Validation validation, boolean workspace) {
+        Toml scanTomlDocumentContent = readTomlFile(scanTomlFilePath, displayPath, validation);
         ScanTomlFile scanTomlFile = new ScanTomlFile();
         scanTomlFile.setPath(scanTomlFilePath);
         Map<String, TopLevelNode> entries = scanTomlDocumentContent.rootNode().entries();
         List<String> errors = new ArrayList<>();
+        List<String> analyzerErrors = new ArrayList<>();
 
         TopLevelNode platformNode = entries.get(PLATFORM_TABLE);
         if (workspace) {
@@ -1343,8 +1396,10 @@ public final class ScanUtils {
             scanTomlDocumentContent.getTables(ANALYZER_TABLE).forEach(loadAnalyzer(scanTomlFile));
         } else if (analyzerNode != null && !(analyzerNode instanceof TomlKeyValueNode keyValue
                 && keyValue.value() instanceof TomlArrayValueNode array && array.elements().isEmpty())) {
-            errors.add(DiagnosticLog.fileError(displayPath, analyzerNode.location().lineRange(),
-                    DiagnosticLog.error(DiagnosticCode.INVALID_ANALYZER_LIST)));
+            String error = DiagnosticLog.fileError(displayPath, analyzerNode.location().lineRange(),
+                    DiagnosticLog.error(DiagnosticCode.INVALID_ANALYZER_LIST));
+            errors.add(error);
+            analyzerErrors.add(error);
         }
         TopLevelNode ruleNode = entries.get(RULES_TABLE);
         if (ruleNode != null && ruleNode.kind() != TomlType.TABLE) {
@@ -1385,23 +1440,25 @@ public final class ScanUtils {
             scanTomlDocumentContent.getTable(ANALYSIS_TABLE)
                     .ifPresent(analysisTable -> loadAnalysis(analysisTable, scanTomlFile, displayPath, errors));
         }
-        if (strict) {
-            failOnConfigErrors(displayPath, errors);
+        switch (validation) {
+            case ALL -> failOnConfigErrors(displayPath, errors);
+            case RULES -> failOnConfigErrors(displayPath, analyzerErrors);
+            case NONE -> { }
         }
         return scanTomlFile;
     }
 
     /**
-     * Parses a Scan.toml file. When strict, a syntax error fails the load with its position.
+     * Parses a Scan.toml file. Unless the validation is NONE, a syntax error fails the load with its position.
      */
-    private static Toml readTomlFile(Path scanTomlFilePath, String displayPath, boolean strict) {
+    private static Toml readTomlFile(Path scanTomlFilePath, String displayPath, Validation validation) {
         Toml scanTomlDocumentContent;
         try {
             scanTomlDocumentContent = Toml.read(scanTomlFilePath);
         } catch (IOException ex) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.READING_CONFIG_FILE, ex.getMessage()));
         }
-        if (!strict) {
+        if (validation == Validation.NONE) {
             return scanTomlDocumentContent;
         }
         List<String> syntaxErrors = scanTomlDocumentContent.diagnostics().stream()
@@ -1807,4 +1864,17 @@ public final class ScanUtils {
         return new AbstractMap.SimpleEntry<>(priorities.size(), false);
     }
 
+    /**
+     * The errors in a Scan.toml file that fail its load.
+     */
+    private enum Validation {
+        ALL,
+        // TOML syntax errors and the errors that change the rules of a package, for listing the rules
+        RULES,
+        NONE;
+
+        static Validation of(boolean rulesOnly) {
+            return rulesOnly ? RULES : ALL;
+        }
+    }
 }
