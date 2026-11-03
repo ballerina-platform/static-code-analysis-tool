@@ -88,17 +88,24 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private final SyntaxTree syntaxTree;
     private final ScannerContext scannerContext;
     private final SemanticModel semanticModel;
+    private final SecretValueResolver secretValueResolver;
 
     StaticCodeAnalyzer(Document document, ScannerContextImpl scannerContext, SemanticModel semanticModel) {
+        this(document, scannerContext, semanticModel, new SecretValueResolver(semanticModel, document.module()));
+    }
+
+    StaticCodeAnalyzer(Document document, ScannerContextImpl scannerContext, SemanticModel semanticModel,
+                       SecretValueResolver secretValueResolver) {
         this.document = document;
         this.syntaxTree = document.syntaxTree();
         this.scannerContext = scannerContext;
         this.semanticModel = semanticModel;
+        this.secretValueResolver = secretValueResolver;
     }
 
     void analyze() {
         this.visit((ModulePartNode) syntaxTree.rootNode());
-        SecretChecker secretChecker = new SecretChecker(document, scannerContext, semanticModel);
+        SecretChecker secretChecker = new SecretChecker(document, scannerContext, semanticModel, secretValueResolver);
         secretChecker.analyze();
     }
 

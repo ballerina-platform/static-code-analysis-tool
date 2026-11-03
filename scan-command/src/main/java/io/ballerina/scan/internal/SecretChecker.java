@@ -19,16 +19,32 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
-import io.ballerina.compiler.api.symbols.Qualifier;
+import io.ballerina.compiler.api.symbols.ArrayTypeSymbol;
+import io.ballerina.compiler.api.symbols.IntersectionTypeSymbol;
+import io.ballerina.compiler.api.symbols.MapTypeSymbol;
+import io.ballerina.compiler.api.symbols.SingletonTypeSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
-import io.ballerina.compiler.api.symbols.SymbolKind;
+import io.ballerina.compiler.api.symbols.TupleTypeSymbol;
+import io.ballerina.compiler.api.symbols.TypeDescKind;
+import io.ballerina.compiler.api.symbols.TypeReferenceTypeSymbol;
+import io.ballerina.compiler.api.symbols.TypeSymbol;
+import io.ballerina.compiler.api.symbols.UnionTypeSymbol;
 import io.ballerina.compiler.api.symbols.VariableSymbol;
+import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
-import io.ballerina.compiler.syntax.tree.ConstantDeclarationNode;
+import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
+import io.ballerina.compiler.syntax.tree.CaptureBindingPatternNode;
+import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
+import io.ballerina.compiler.syntax.tree.ConditionalExpressionNode;
 import io.ballerina.compiler.syntax.tree.DefaultableParameterNode;
 import io.ballerina.compiler.syntax.tree.ExpressionNode;
+import io.ballerina.compiler.syntax.tree.FieldAccessExpressionNode;
 import io.ballerina.compiler.syntax.tree.FunctionArgumentNode;
 import io.ballerina.compiler.syntax.tree.FunctionCallExpressionNode;
+import io.ballerina.compiler.syntax.tree.IndexedExpressionNode;
+import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
+import io.ballerina.compiler.syntax.tree.MappingConstructorExpressionNode;
+import io.ballerina.compiler.syntax.tree.MappingFieldNode;
 import io.ballerina.compiler.syntax.tree.MethodCallExpressionNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
 import io.ballerina.compiler.syntax.tree.ModuleVariableDeclarationNode;
@@ -36,81 +52,59 @@ import io.ballerina.compiler.syntax.tree.NamedArgumentNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
+import io.ballerina.compiler.syntax.tree.NonTerminalNode;
 import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
 import io.ballerina.compiler.syntax.tree.PositionalArgumentNode;
 import io.ballerina.compiler.syntax.tree.RecordFieldWithDefaultValueNode;
+import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.TemplateExpressionNode;
 import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.ScannerContext;
 
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.CoreRule.HARD_CODED_SECRET;
 import static io.ballerina.scan.internal.CoreRule.NON_CONFIGURABLE_SECRET;
 import static io.ballerina.scan.internal.SensitiveParameterTracker.FUNCTIONS_WITH_SENSITIVE_PARAMETERS;
 
 public class SecretChecker extends NodeVisitor {
-    private static final Pattern SECRET_WORDS = Pattern.compile(buildSecretKeywordPattern(),
-            Pattern.CASE_INSENSITIVE);
-    private static final Pattern URL_PREFIX = Pattern.compile("^\\w{1,8}://");
-    private static final Pattern NON_EMPTY_URL_CREDENTIAL = Pattern.compile("(?<user>[^\\s:]*+):(?<password>\\S++)");
-    private static final String PLACE_HOLDER_STRING = "xyz";
-
-    private static String buildSecretKeywordPattern() {
-        String[] baseKeywords = {
-                "password", "passwd", "pwd", "passphrase", 
-                "secret", "auth", "apiKey", "token"
-        };
-
-        StringBuilder patternBuilder = new StringBuilder();
-        for (int i = 0; i < baseKeywords.length; i++) {
-            if (i > 0) {
-                patternBuilder.append("|");
-            }
-            String keyword = baseKeywords[i];
-            patternBuilder.append(keyword);
-            patternBuilder.append("|").append(toSnakeCase(keyword));
-            patternBuilder.append("|").append(toKebabCase(keyword));
-        }
-        return patternBuilder.toString();
-    }
-
-    private static String toSnakeCase(String keyword) {
-        return keyword.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase(Locale.ENGLISH);
-    }
-
-    private static String toKebabCase(String keyword) {
-        return keyword.replaceAll("([a-z])([A-Z])", "$1-$2").toLowerCase(Locale.ENGLISH);
-    }
+    // Any scheme, including compound ones such as "mongodb+srv" and "jdbc:mysql", anywhere in the value.
+    private static final Pattern URL_WITH_CREDENTIALS = Pattern.compile("(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*"
+            + "(?::[A-Za-z][A-Za-z0-9+.-]*)?://(?<user>[^\\s:/@]*):(?<password>[^\\s/@]+)@");
+    // An interpolated part of a URL template is not hard-coded, so it is treated as a template placeholder.
+    private static final String INTERPOLATION_PLACEHOLDER = "${}";
 
     private final Document document;
     private final SyntaxTree syntaxTree;
     private final ScannerContext scannerContext;
     private final SemanticModel semanticModel;
     private final Map<Integer, FunctionWithSensitiveParams> functionsWithCredentialParams;
+    private final SecretValueResolver valueResolver;
     private final Set<String> reportedIssueKeys = new HashSet<>();
 
-    SecretChecker(Document document, ScannerContext scannerContext, SemanticModel semanticModel) {
+    SecretChecker(Document document, ScannerContext scannerContext, SemanticModel semanticModel,
+                  SecretValueResolver valueResolver) {
         this.document = document;
         this.syntaxTree = document.syntaxTree();
         this.scannerContext = scannerContext;
         this.semanticModel = semanticModel;
+        this.valueResolver = valueResolver;
         this.functionsWithCredentialParams = getFunctionsWithCredentialParams(scannerContext);
     }
 
@@ -126,8 +120,8 @@ public class SecretChecker extends NodeVisitor {
         this.visit((ModulePartNode) syntaxTree.rootNode());
     }
 
-    public static boolean isSecretName(String name) {
-        return SECRET_WORDS.matcher(name).find();
+    private static boolean isSecretName(String name) {
+        return SecretNameMatcher.isSecretName(name);
     }
 
     @Override
@@ -141,7 +135,7 @@ public class SecretChecker extends NodeVisitor {
 
     @Override
     public void visit(SpecificFieldNode specificFieldNode) {
-        if (isSecretName(specificFieldNode.fieldName().toSourceCode())) {
+        if (isSecretName(fieldNameText(specificFieldNode))) {
             if (specificFieldNode.valueExpr().isEmpty()) {
                 validateShorthandNotation(specificFieldNode);
             } else {
@@ -151,20 +145,27 @@ public class SecretChecker extends NodeVisitor {
         super.visit(specificFieldNode);
     }
 
+    // The field name without its minutiae, so that a comment above the field is not read as part of its name.
+    static String fieldNameText(SpecificFieldNode specificFieldNode) {
+        Node fieldName = specificFieldNode.fieldName();
+        return switch (fieldName) {
+            case Token token -> token.text();
+            case BasicLiteralNode literal -> literal.literalToken().text();
+            default -> fieldName.toSourceCode().trim();
+        };
+    }
+
     private void validateShorthandNotation(SpecificFieldNode specificFieldNode) {
-        Optional<Symbol> identifier = semanticModel.symbol(specificFieldNode);
-        if (identifier.isPresent() && identifier.get().kind() == SymbolKind.VARIABLE) {
-            VariableSymbol variableSymbol = (VariableSymbol) identifier.get();
-            if (!isConfigurable(variableSymbol)) {
-                reportNonConfigurableSecret(specificFieldNode);
-            }
-        }
+        semanticModel.symbol(specificFieldNode)
+                .filter(symbol -> !(symbol instanceof VariableSymbol variable)
+                        || canHoldSecret(variable.typeDescriptor()))
+                .ifPresent(symbol -> report(specificFieldNode, valueResolver.resolveSymbol(symbol)));
     }
 
     @Override
     public void visit(BasicLiteralNode basicLiteralNode) {
         if (basicLiteralNode.kind() == SyntaxKind.STRING_LITERAL) {
-            String cleanedLiteral = stripQuotes(basicLiteralNode.literalToken().text());
+            String cleanedLiteral = SecretValueFilter.literalValue(basicLiteralNode.literalToken().text());
             if (isUrlWithCredentials(cleanedLiteral)) {
                 reportHardCodedSecret(basicLiteralNode);
             }
@@ -172,17 +173,11 @@ public class SecretChecker extends NodeVisitor {
         super.visit(basicLiteralNode);
     }
 
-    private String stripQuotes(String text) {
-        return text.length() > 1 ? text.substring(1, text.length() - 1) : text;
-    }
-
-    private boolean isUrlWithCredentials(String stringLiteral) {
-        if (URL_PREFIX.matcher(stringLiteral).find()) {
-            try {
-                String userInfo = new URL(stringLiteral).getUserInfo();
-                return userInfo != null && NON_EMPTY_URL_CREDENTIAL.matcher(userInfo).matches();
-            } catch (MalformedURLException ignored) {
-                // Ignore since this not a valid url
+    private static boolean isUrlWithCredentials(String url) {
+        Matcher matcher = URL_WITH_CREDENTIALS.matcher(url);
+        while (matcher.find()) {
+            if (!SecretValueFilter.isPlaceholder(matcher.group("password"))) {
+                return true;
             }
         }
         return false;
@@ -190,13 +185,32 @@ public class SecretChecker extends NodeVisitor {
 
     @Override
     public void visit(TemplateExpressionNode templateExpressionNode) {
-        if (templateExpressionNode.kind() == SyntaxKind.STRING_TEMPLATE_EXPRESSION) {
-            String pattern = buildStringPattern(templateExpressionNode.content());
-            if (isUrlWithCredentials(pattern)) {
-                reportHardCodedSecret(templateExpressionNode);
-            }
+        if (isUrlTemplateWithCredentials(templateExpressionNode)) {
+            reportHardCodedSecret(templateExpressionNode);
         }
         super.visit(templateExpressionNode);
+    }
+
+    private boolean containsUrlWithCredentials(Node node) {
+        return switch (node) {
+            case BasicLiteralNode literal -> literal.kind() == SyntaxKind.STRING_LITERAL
+                    && isUrlWithCredentials(SecretValueFilter.literalValue(literal.literalToken().text()));
+            case TemplateExpressionNode template -> isUrlTemplateWithCredentials(template);
+            case NonTerminalNode parent -> {
+                for (Node child : parent.children()) {
+                    if (containsUrlWithCredentials(child)) {
+                        yield true;
+                    }
+                }
+                yield false;
+            }
+            default -> false;
+        };
+    }
+
+    private boolean isUrlTemplateWithCredentials(TemplateExpressionNode templateExpressionNode) {
+        return templateExpressionNode.kind() == SyntaxKind.STRING_TEMPLATE_EXPRESSION
+                && isUrlWithCredentials(buildStringPattern(templateExpressionNode.content()));
     }
 
     private String buildStringPattern(NodeList<Node> content) {
@@ -205,7 +219,7 @@ public class SecretChecker extends NodeVisitor {
             if (node.kind() == SyntaxKind.TEMPLATE_STRING) {
                 pattern.append(node.toSourceCode());
             } else {
-                pattern.append(PLACE_HOLDER_STRING);
+                pattern.append(INTERPOLATION_PLACEHOLDER);
             }
         }
         return pattern.toString();
@@ -213,20 +227,55 @@ public class SecretChecker extends NodeVisitor {
 
     @Override
     public void visit(ModuleVariableDeclarationNode moduleVariableDeclarationNode) {
-        if (isSecretName(moduleVariableDeclarationNode.typedBindingPattern().bindingPattern().toSourceCode())
+        if (isSecretName(variableName(moduleVariableDeclarationNode.typedBindingPattern()))
                 && moduleVariableDeclarationNode.initializer().isPresent()) {
             validateExpression(moduleVariableDeclarationNode.initializer().get());
         }
         super.visit(moduleVariableDeclarationNode);
     }
 
+    // The name of a variable declared on its own; a destructuring pattern declares no single secret-named variable.
+    private static String variableName(TypedBindingPatternNode typedBindingPattern) {
+        return typedBindingPattern.bindingPattern() instanceof CaptureBindingPatternNode captureBindingPattern
+                ? captureBindingPattern.variableName().text()
+                : "";
+    }
+
     @Override
     public void visit(VariableDeclarationNode variableDeclarationNode) {
-        if (isSecretName(variableDeclarationNode.typedBindingPattern().bindingPattern().toSourceCode())
+        if (isSecretName(variableName(variableDeclarationNode.typedBindingPattern()))
                 && variableDeclarationNode.initializer().isPresent()) {
             validateExpression(variableDeclarationNode.initializer().get());
         }
         super.visit(variableDeclarationNode);
+    }
+
+    @Override
+    public void visit(AssignmentStatementNode assignmentStatementNode) {
+        if (isSecretTarget(assignmentStatementNode.varRef())) {
+            validateExpression(assignmentStatementNode.expression());
+        }
+        super.visit(assignmentStatementNode);
+    }
+
+    @Override
+    public void visit(CompoundAssignmentStatementNode compoundAssignmentStatementNode) {
+        if (compoundAssignmentStatementNode.binaryOperator().kind() == SyntaxKind.PLUS_TOKEN
+                && isSecretTarget(compoundAssignmentStatementNode.lhsExpression())) {
+            validateExpression(compoundAssignmentStatementNode.rhsExpression());
+        }
+        super.visit(compoundAssignmentStatementNode);
+    }
+
+    private static boolean isSecretTarget(Node target) {
+        return switch (target) {
+            case SimpleNameReferenceNode variable -> isSecretName(variable.name().text());
+            case FieldAccessExpressionNode fieldAccess -> isSecretName(fieldAccess.fieldName().toSourceCode().trim());
+            case IndexedExpressionNode memberAccess -> SecretValueResolver.memberKey(memberAccess)
+                    .filter(SecretChecker::isSecretName)
+                    .isPresent();
+            default -> false;
+        };
     }
 
     @Override
@@ -258,17 +307,6 @@ public class SecretChecker extends NodeVisitor {
     public void visit(FunctionCallExpressionNode functionCallExpressionNode) {
         validateFunctionCall(functionCallExpressionNode, functionCallExpressionNode.arguments());
         super.visit(functionCallExpressionNode);
-    }
-
-    @Override
-    public void visit(ConstantDeclarationNode constantDeclarationNode) {
-        if (isSecretName(constantDeclarationNode.variableName().text())) {
-            Node initializer = constantDeclarationNode.initializer();
-            if (initializer instanceof ExpressionNode expressionNode) {
-                validateExpression(expressionNode);
-            }
-        }
-        super.visit(constantDeclarationNode);
     }
 
     @Override
@@ -309,12 +347,127 @@ public class SecretChecker extends NodeVisitor {
     }
 
     private void validateExpression(ExpressionNode expressionNode) {
-        switch (expressionNode.kind()) {
-            case STRING_LITERAL -> reportHardCodedSecret(expressionNode);
-            case SIMPLE_NAME_REFERENCE -> validateSimpleNameReference(expressionNode);
-            case REQUIRED_EXPRESSION -> { }
-            default -> reportNonConfigurableSecret(expressionNode);
+        // Each branch of a conditional or elvis expression is checked, and reported, where it is written.
+        if (expressionNode instanceof ConditionalExpressionNode conditional) {
+            validateExpression(conditional.middleExpression());
+            validateExpression(conditional.endExpression());
+            return;
         }
+        if (expressionNode instanceof BinaryExpressionNode binary
+                && binary.operator().kind() == SyntaxKind.ELVIS_TOKEN) {
+            Stream.of(binary.lhsExpr(), binary.rhsExpr())
+                    .filter(ExpressionNode.class::isInstance)
+                    .forEach(operand -> validateExpression((ExpressionNode) operand));
+            return;
+        }
+        if (expressionNode.kind() == SyntaxKind.STRING_LITERAL) {
+            report(expressionNode, valueResolver.resolve(expressionNode));
+            return;
+        }
+        Optional<TypeSymbol> type = semanticModel.typeOf(expressionNode);
+        if (expressionNode.kind() == SyntaxKind.LIST_CONSTRUCTOR
+                && !type.map(SecretChecker::isByteArray).orElse(false)) {
+            ((ListConstructorExpressionNode) expressionNode).expressions().forEach(member -> {
+                if (member instanceof ExpressionNode memberExpression) {
+                    validateExpression(memberExpression);
+                }
+            });
+            return;
+        }
+        if (expressionNode.kind() == SyntaxKind.MAPPING_CONSTRUCTOR) {
+            // A map of secrets is checked value by value, while a record's fields are checked by their own names.
+            if (type.map(SecretChecker::isMap).orElse(true)) {
+                ((MappingConstructorExpressionNode) expressionNode).fields().forEach(this::validateMapValue);
+            }
+            return;
+        }
+        if (!type.map(valueType -> canHoldSecret(slotType(expressionNode, valueType))).orElse(true)) {
+            return;
+        }
+        // A URL with credentials is reported once, as ballerina:13, when the literal or template is visited.
+        if (containsUrlWithCredentials(expressionNode)) {
+            return;
+        }
+        report(expressionNode, valueResolver.resolve(expressionNode));
+    }
+
+    // A list constant is typed by the shape of its value, so the type of the slot it is given to tells int[] from
+    // byte[].
+    private TypeSymbol slotType(ExpressionNode expressionNode, TypeSymbol valueType) {
+        if (!(unwrap(valueType) instanceof TupleTypeSymbol)) {
+            return valueType;
+        }
+        return semanticModel.expectedType(document, expressionNode.lineRange().startLine())
+                .filter(expectedType -> unwrap(expectedType) instanceof ArrayTypeSymbol)
+                .orElse(valueType);
+    }
+
+    private void validateMapValue(MappingFieldNode field) {
+        if (field instanceof SpecificFieldNode specificField) {
+            specificField.valueExpr().ifPresentOrElse(this::validateExpression,
+                    () -> validateShorthandNotation(specificField));
+        }
+    }
+
+    private void report(Node node, SecretValueResolver.Origin origin) {
+        switch (origin) {
+            case HARD_CODED -> reportHardCodedSecret(node);
+            case FIXED_VARIABLE -> reportNonConfigurableSecret(node);
+            default -> { }
+        }
+    }
+
+    // A value can hold a secret when its type allows a string or a byte array. Records, objects, booleans, numbers
+    // and nil with secret-like names cannot. A type that could not be resolved is assumed to.
+    private static boolean canHoldSecret(TypeSymbol typeSymbol) {
+        TypeSymbol type = unwrap(typeSymbol);
+        return switch (type) {
+            case ArrayTypeSymbol arrayType -> isByte(arrayType.memberTypeDescriptor())
+                    || canHoldSecret(arrayType.memberTypeDescriptor());
+            case MapTypeSymbol mapType -> canHoldSecret(mapType.typeParam());
+            // A byte array constant is typed by the shape of its value, a tuple of integer singletons.
+            case TupleTypeSymbol tupleType -> !tupleType.memberTypeDescriptors().isEmpty()
+                    && (tupleType.memberTypeDescriptors().stream().allMatch(SecretChecker::isByte)
+                    || tupleType.memberTypeDescriptors().stream().anyMatch(SecretChecker::canHoldSecret));
+            case UnionTypeSymbol unionType -> unionType.memberTypeDescriptors().stream()
+                    .anyMatch(SecretChecker::canHoldSecret);
+            default -> switch (type.typeKind()) {
+                case STRING, STRING_CHAR, JSON, ANYDATA, ANY, READONLY, COMPILATION_ERROR -> true;
+                default -> false;
+            };
+        };
+    }
+
+    private static boolean isByte(TypeSymbol typeSymbol) {
+        TypeSymbol type = unwrap(typeSymbol);
+        return type.typeKind() == TypeDescKind.BYTE || (typeSymbol instanceof SingletonTypeSymbol
+                && type.typeKind() == TypeDescKind.INT && isByteValue(typeSymbol.signature()));
+    }
+
+    private static boolean isByteValue(String value) {
+        try {
+            int number = Integer.parseInt(value.trim());
+            return number >= 0 && number <= 255;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private static boolean isByteArray(TypeSymbol typeSymbol) {
+        return unwrap(typeSymbol) instanceof ArrayTypeSymbol arrayType && isByte(arrayType.memberTypeDescriptor());
+    }
+
+    private static boolean isMap(TypeSymbol typeSymbol) {
+        return unwrap(typeSymbol).typeKind() == TypeDescKind.MAP;
+    }
+
+    private static TypeSymbol unwrap(TypeSymbol typeSymbol) {
+        return switch (typeSymbol) {
+            case TypeReferenceTypeSymbol typeReference -> unwrap(typeReference.typeDescriptor());
+            case IntersectionTypeSymbol intersectionType -> unwrap(intersectionType.effectiveTypeDescriptor());
+            case SingletonTypeSymbol singletonType -> unwrap(singletonType.originalType());
+            default -> typeSymbol;
+        };
     }
 
     private void reportHardCodedSecret(Node node) {
@@ -331,27 +484,5 @@ public class SecretChecker extends NodeVisitor {
         if (reportedIssueKeys.add(issueKey)) {
             scannerContext.getReporter().reportIssue(document, node.location(), rule);
         }
-    }
-
-    private void validateSimpleNameReference(ExpressionNode expressionNode) {
-        Optional<Symbol> identifier = semanticModel.symbol(expressionNode);
-        if (identifier.isEmpty()) {
-            return;
-        }
-        if (identifier.get().kind() == SymbolKind.VARIABLE) {
-            VariableSymbol variableSymbol = (VariableSymbol) identifier.get();
-            if (!isConfigurable(variableSymbol)) {
-                reportNonConfigurableSecret(expressionNode);
-            }
-            return;
-        }
-        if (identifier.get().kind() == SymbolKind.CONSTANT) {
-            reportHardCodedSecret(expressionNode);
-        }
-    }
-
-    private boolean isConfigurable(VariableSymbol variableSymbol) {
-        return variableSymbol.qualifiers().stream()
-                .anyMatch(qualifier -> Qualifier.CONFIGURABLE.name().equals(qualifier.name().trim()));
     }
 }

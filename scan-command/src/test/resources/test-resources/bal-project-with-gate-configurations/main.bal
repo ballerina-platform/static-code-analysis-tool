@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-string defaultValue = "";
+string defaultValue = "default-secret";
 
 function getResult() returns int|error => 1;
 

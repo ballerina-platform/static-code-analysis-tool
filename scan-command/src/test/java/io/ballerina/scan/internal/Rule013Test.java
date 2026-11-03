@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.ballerina.scan.internal.CoreRule.HARD_CODED_SECRET;
+import static io.ballerina.scan.internal.CoreRule.NON_CONFIGURABLE_SECRET;
 
 /**
  * Hard-coded secret analyzer tests.
@@ -108,6 +109,95 @@ public class Rule013Test extends StaticCodeAnalyzerTest {
     }
 
     @Test
+    void testPlaceholderSecretValues() {
+        String documentName = "rule013_placeholder_secret_values.bal";
+        List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule()));
+        Assert.assertEquals(issues.size(), 1);
+        assertIssue(issues.get(0), documentName, new Location(26, 23, 26, 37), HARD_CODED_SECRET.rule());
+    }
+
+    @Test
+    void testSecretValueTypes() {
+        String documentName = "rule013_secret_value_types.bal";
+        List<Issue> issues = analyze(documentName,
+                List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()));
+        Assert.assertEquals(issues.size(), 13);
+        assertIssue(issues.get(0), documentName, new Location(29, 26, 29, 37), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(1), documentName, new Location(29, 39, 29, 50), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(2), documentName, new Location(30, 34, 30, 41), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(3), documentName, new Location(30, 50, 30, 58), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(4), documentName, new Location(31, 21, 31, 37), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(5), documentName, new Location(32, 24, 32, 34), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(6), documentName, new Location(33, 31, 33, 41), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(7), documentName, new Location(34, 24, 34, 34), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(8), documentName, new Location(36, 52, 36, 60), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(9), documentName, new Location(39, 21, 39, 55), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(10), documentName, new Location(41, 33, 41, 38), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(11), documentName, new Location(42, 24, 42, 40), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(12), documentName, new Location(43, 25, 43, 36), NON_CONFIGURABLE_SECRET.rule());
+    }
+
+    @Test
+    void testHardcodedSecretNames() {
+        String documentName = "rule013_hardcoded_secret_names.bal";
+        List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule()));
+        Assert.assertEquals(issues.size(), 14);
+        List<Location> expectedIssueLocations = new ArrayList<>(List.of(
+                new Location(17, 26, 17, 43),
+                new Location(18, 19, 18, 32),
+                new Location(19, 22, 19, 30),
+                new Location(20, 24, 20, 39),
+                new Location(21, 23, 21, 37),
+                new Location(22, 23, 22, 37),
+                new Location(23, 20, 23, 36),
+                new Location(24, 24, 24, 39),
+                new Location(25, 23, 25, 37),
+                new Location(26, 44, 26, 59),
+                new Location(26, 74, 26, 85),
+                new Location(26, 97, 26, 108),
+                new Location(27, 23, 27, 48),
+                new Location(28, 29, 28, 50)));
+        issues.forEach(issue -> assertIssue(issue, documentName,
+                expectedIssueLocations.remove(0), HARD_CODED_SECRET.rule()));
+    }
+
+    @Test
+    void testNonSecretNames() {
+        List<Issue> issues = analyze("rule013_non_secret_names.bal",
+                List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()));
+        Assert.assertEquals(issues, List.of());
+    }
+
+    @Test
+    void testTracedHardcodedSecrets() {
+        String documentName = "rule013_traced_hardcoded_secrets.bal";
+        List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule()));
+        Assert.assertEquals(issues.size(), 7);
+        List<Location> expectedIssueLocations = new ArrayList<>(List.of(
+                new Location(22, 22, 22, 36),
+                new Location(24, 23, 24, 42),
+                new Location(25, 23, 25, 38),
+                new Location(26, 23, 26, 44),
+                new Location(27, 23, 27, 47),
+                new Location(28, 24, 28, 45),
+                new Location(29, 27, 29, 39)));
+        issues.forEach(issue -> assertIssue(issue, documentName,
+                expectedIssueLocations.remove(0), HARD_CODED_SECRET.rule()));
+    }
+
+    @Test
+    void testCsrfTokenSample() {
+        String documentName = "rule013_csrf_token_sample.bal";
+        List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule(), NON_CONFIGURABLE_SECRET.rule()))
+                .stream()
+                .filter(issue -> issue.rule().equals(HARD_CODED_SECRET.rule())
+                        || issue.rule().equals(NON_CONFIGURABLE_SECRET.rule()))
+                .toList();
+        Assert.assertEquals(issues.size(), 1);
+        assertIssue(issues.get(0), documentName, new Location(55, 93, 55, 100), HARD_CODED_SECRET.rule());
+    }
+
+    @Test
     void testHardcodedSecretObjectFields() {
         String documentName = "rule013_hardcoded_secret_object_field.bal";
         List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule()));
@@ -159,14 +249,9 @@ public class Rule013Test extends StaticCodeAnalyzerTest {
 
     @Test
     void testHardcodedSecretConstant() {
-        String documentName = "rule013_hardcoded_secret_constant.bal";
-        List<Issue> issues = analyze(documentName, List.of(HARD_CODED_SECRET.rule()));
-        Assert.assertEquals(issues.size(), 2);
-        List<Location> expectedIssueLocations = new ArrayList<>(List.of(
-                new Location(16, 17, 16, 27),
-                new Location(17, 16, 17, 51)));
-        issues.forEach(issue -> assertIssue(issue, documentName,
-                expectedIssueLocations.remove(0), HARD_CODED_SECRET.rule()));
+        // A constant is reported where it is used as a secret, not where it is declared.
+        List<Issue> issues = analyze("rule013_hardcoded_secret_constant.bal", List.of(HARD_CODED_SECRET.rule()));
+        Assert.assertEquals(issues, List.of());
     }
 
     @Test
