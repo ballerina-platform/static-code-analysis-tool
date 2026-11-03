@@ -66,7 +66,6 @@ import java.io.PrintStream;
 import java.io.Writer;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -701,6 +700,7 @@ public final class ScanUtils {
      * @return generated target directory
      */
     public static Target getTargetPath(Project project, String directoryName) {
+        Path targetDirectory = project.targetDir();
         try {
             if (directoryName == null) {
                 return new Target(project.targetDir());
@@ -709,10 +709,11 @@ public final class ScanUtils {
             if (parentDirectory == null) {
                 return new Target(project.targetDir());
             }
-            Path targetDirectory = Files.createDirectories(parentDirectory.resolve(directoryName));
-            return new Target(targetDirectory);
+            targetDirectory = parentDirectory.resolve(directoryName);
+            return new Target(Files.createDirectories(targetDirectory));
         } catch (IOException ex) {
-            throw new IllegalCharsetNameException(ex.toString());
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_CREATE_TARGET_DIR,
+                    targetDirectory, ex.getMessage()));
         }
     }
 
