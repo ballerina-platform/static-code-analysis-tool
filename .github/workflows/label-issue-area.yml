@@ -8,8 +8,7 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/workflows/label-issue-area.yml'
 
-permissions:
-  issues: write
+permissions: {}
 
 env:
   # Each area has an Area/<area> label and is an option of the Area dropdown in the issue forms
@@ -22,9 +21,13 @@ jobs:
       github.repository_owner == 'ballerina-platform' && github.event_name == 'issues' &&
       startsWith(github.event.issue.body, '### Area')
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    # Queue every run, since a run that replaced a pending Area change would skip it as unchanged
     concurrency:
       group: ${{ github.workflow }}-${{ github.event.issue.number }}
       cancel-in-progress: false
+      queue: max
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -36,14 +39,28 @@ jobs:
               return;
             }
 
-            // Runs for quick successive edits can be dropped or finish out of order, so act on the latest state
+            // A queued run can start after later edits, so act on the latest state
             const params = { ...context.repo, issue_number: issue.number };
             const { data: latest } = await github.rest.issues.get(params);
+            const removeLabel = (name) =>
+              github.rest.issues.removeLabel({ ...params, name }).catch((error) => {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              });
+            const areas = process.env.AREAS.split(',');
             const area = areaOf(latest.body);
+            if (area === 'Not sure' && action === 'edited') {
+              // Withdraw only the label of the previous answer, keeping labels set during triage
+              const previous = areaOf(changes.body.from);
+              if (areas.includes(previous)) {
+                await removeLabel(`Area/${previous}`);
+              }
+              return;
+            }
             if (area === undefined || area === 'Not sure') {
               return;
             }
-            const areas = process.env.AREAS.split(',');
             if (!areas.includes(area)) {
               core.warning(`"${area}" is not one of the areas: ${areas.join(', ')}`);
               return;
@@ -53,11 +70,7 @@ jobs:
             const labels = latest.labels.map((l) => (typeof l === 'string' ? l : l.name));
             const stale = labels.filter((l) => l !== label && areas.some((a) => l === `Area/${a}`));
             for (const name of stale) {
-              await github.rest.issues.removeLabel({ ...params, name }).catch((error) => {
-                if (error.status !== 404) {
-                  throw error;
-                }
-              });
+              await removeLabel(name);
             }
             if (!labels.includes(label)) {
               await github.rest.issues.addLabels({ ...params, labels: [label] });
