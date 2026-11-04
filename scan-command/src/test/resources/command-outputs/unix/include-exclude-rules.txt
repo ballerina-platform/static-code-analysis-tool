@@ -1,4 +1,3 @@
-Loading scan tool configurations from src/test/resources/test-resources/bal-project-with-analyzer-configurations/Scan.toml
-
-Running Scans
-cannot include and exclude rules at the same time
+bal scan: error: cannot include and exclude rules at the same time
+Usage: bal scan [OPTIONS] [<package>|<source-file>]
+Try 'bal scan --help' for more information.

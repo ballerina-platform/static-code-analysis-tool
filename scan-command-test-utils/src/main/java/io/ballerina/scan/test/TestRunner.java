@@ -65,8 +65,7 @@ public class TestRunner {
      * @return list of issues found during the scan
      */
     public List<Issue> getIssues() {
-        return scanCmd.getProjectAnalyzer().getReporters().stream()
-                .flatMap(reporter -> reporter.getIssues().stream()).toList();
+        return scanCmd.getProjectAnalyzer().getIssues();
     }
 
     /**

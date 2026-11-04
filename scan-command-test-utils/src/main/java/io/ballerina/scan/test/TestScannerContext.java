@@ -30,9 +30,11 @@ import java.util.List;
  */
 class TestScannerContext implements ScannerContext {
     private final TestReporter reporter;
+    private final boolean excludeTests;
 
-    TestScannerContext(List<Rule> rules) {
+    TestScannerContext(List<Rule> rules, boolean excludeTests) {
         this.reporter = new TestReporter(rules);
+        this.excludeTests = excludeTests;
     }
 
     /**
@@ -43,5 +45,10 @@ class TestScannerContext implements ScannerContext {
     @Override
     public TestReporter getReporter() {
         return reporter;
+    }
+
+    @Override
+    public boolean isExcludeTests() {
+        return excludeTests;
     }
 }

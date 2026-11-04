@@ -37,19 +37,19 @@ bal scan [OPTIONS] [<package>|<source-file>]
 --list-rules
 ```
 
--  Run analysis for a specific set of rules.
+-  Run analysis for a specific set of rules. Replaces only `include` in the `[rule]` table of `Scan.toml`; an `exclude` set there still applies, and the two cannot be combined.
 
 ```text
 --include-rules=<rule1, ...>
 ```
 
--  Exclude analysis for a specific set of rules.
+-  Exclude analysis for a specific set of rules. Replaces only `exclude` in the `[rule]` table of `Scan.toml`; an `include` set there still applies, and the two cannot be combined.
 
 ```text
 --exclude-rules=<rule1, ...>
 ```
 
-- Define platform(s) to report results. The user can define more than one platform.
+- Report the results to these platforms, which must be declared in the `[[platform]]` table of `Scan.toml`. No platform is reported to unless it is named here. The results are printed and saved first; then every named platform is run, and the scan fails if any of them fails.
 
 ```text
 --platforms=<platformName1, ...>
@@ -71,6 +71,24 @@ bal scan [OPTIONS] [<package>|<source-file>]
 
 ```text
 --require-suppression-rule-id
+```
+
+- Leave the test sources of the package, in its `tests` folder and in the `tests` folder of each module, out of the scan, so that their issues and `@scan:Suppress` annotations are not reported. Written alone, it means `true`. Overrides `excludeTests` in the `[analysis]` table of `Scan.toml` either way.
+
+```text
+--exclude-tests[=<true|false>]
+```
+
+- Fail the scan when the number of issues at or above this severity reaches `--fail-on-count`, or `1` if the count is not set. `NONE` turns the gate off. The value is case-insensitive. Same as `failOnSeverity` in the `[gate]` table of `Scan.toml`. See [Exit codes and the gate](#exit-codes-and-the-gate).
+
+```text
+--fail-on-severity=<BLOCKER|HIGH|MEDIUM|LOW|INFO|NONE>
+```
+
+- Fail the scan when there are `n` or more issues at or above `--fail-on-severity`, or of any severity if it is not set. A whole number of 1 or more. Same as `failOnCount` in the `[gate]` table of `Scan.toml`. Has no effect when the severity is `NONE`.
+
+```text
+--fail-on-count=<n>
 ```
 
 ## Examples
@@ -159,7 +177,59 @@ bal scan --ignore-suppressions
 bal scan --require-suppression-reason
 ```
 
+- Run analysis and fail on one or more BLOCKER or HIGH issues.
+
+```bash
+bal scan --fail-on-severity=HIGH
+```
+
+- Run analysis and fail on 5 or more BLOCKER, HIGH or MEDIUM issues.
+
+```bash
+bal scan --fail-on-severity=MEDIUM --fail-on-count=5
+```
+
+- Run analysis without the test sources of the package.
+
+```bash
+bal scan --exclude-tests
+```
+
 Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON, or SARIF with `--format=sarif`. Progress messages, warnings, report paths and the closing summary, such as `3 issue(s)`, are written to standard error.
+
+## Exit codes and the gate
+
+`bal scan` exits with the standard exit codes of Ballerina CLI tools, so scripts, Git hooks and CI/CD pipelines can act on the result:
+
+| Code | Meaning |
+|------|---------|
+| `0` | The scan completed, and no gate is set or the gate was not tripped. |
+| `1` | The gate was tripped, or the scan could not be completed, for example because of an invalid `Scan.toml`, a package that cannot be loaded, such as one whose `Ballerina.toml` has an error, a compilation error, an empty package, a platform or plugin failure, an invalid suppression or a report that cannot be written. |
+| `2` | Invalid command-line input, such as an invalid option value, too many arguments, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with `Scan.toml`, or an unknown rule ID. |
+| `3` | The path is not a Ballerina package or standalone file, or is a `.bal` file inside a package. |
+| `130` | The scan was interrupted. |
+
+Every failure other than an interrupt is reported on standard error as `bal scan: error: <message>`, followed by the problems that caused it, such as `Scan.toml:2:18: error: <message>`. Warnings printed by the scan tool are reported as `bal scan: warning: <message>` and never change the exit code.
+
+By default no gate is set, so findings never fail the scan. The gate is set with `--fail-on-severity` and `--fail-on-count`, or with the `[gate]` table of `Scan.toml`, and fails the scan when the number of issues at or above the severity reaches the count:
+
+| `--fail-on-severity` | `--fail-on-count` | Fails when |
+|----------------------|-------------------|------------|
+| Not set | Not set | Never. The gate is off. |
+| Not set | `n` | There are `n` or more issues of any severity. |
+| `X` | Not set | There is at least one issue at or above `X`. |
+| `X` | `n` | There are `n` or more issues at or above `X`. |
+| `NONE` | Any | Never. The gate is off. |
+
+```toml
+[gate]
+failOnSeverity = "MEDIUM"  # same as --fail-on-severity
+failOnCount = 5            # same as --fail-on-count
+```
+
+Each issue is counted by the kind of its rule: `BUG` as `HIGH`, `VULNERABILITY` as `MEDIUM` and `CODE_SMELL` as `LOW`. Each command-line option replaces only its own setting in the `[gate]` table, with a warning when the values differ, so a setting left off the command line is still read from `Scan.toml`. `--fail-on-severity=NONE` turns off a gate set in `Scan.toml`. `--fail-on-count` does not turn on a gate that `failOnSeverity = "NONE"` turns off; the scan warns that the count has no effect.
+
+The gate counts the issues left after rule selection and suppressions, and is checked after the results are printed, saved and reported to platforms, so a failing scan still leaves a full report. An error always wins over a tripped gate, so the gate is not checked when a platform fails. The gate is off when an analysis platform triggers the scan, since the platform applies its own quality gate.
 
 ## Suppressing issues
 

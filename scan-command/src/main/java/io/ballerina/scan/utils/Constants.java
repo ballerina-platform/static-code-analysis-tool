@@ -52,7 +52,7 @@ public class Constants {
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE_END_LINE_OFFSET = "endLineOffset";
     static final String SCAN_TABLE = "scan";
     static final String SCAN_FILE_FIELD = "configPath";
-    static final String SCAN_FILE = "Scan.toml";
+    public static final String SCAN_FILE = "Scan.toml";
     static final String PLATFORM_TABLE = "platform";
     static final String PLATFORM_NAME = "name";
     static final String PLATFORM_PATH = "path";
@@ -72,6 +72,14 @@ public class Constants {
     static final String SUPPRESSION_ENABLED = "enabled";
     static final String SUPPRESSION_REQUIRE_REASON = "requireReason";
     static final String SUPPRESSION_REQUIRE_RULE_ID = "requireRuleId";
+    static final String GATE_TABLE = "gate";
+    static final String GATE_FAIL_ON_SEVERITY = "failOnSeverity";
+    static final String GATE_FAIL_ON_COUNT = "failOnCount";
+    static final String ANALYSIS_TABLE = "analysis";
+    static final String ANALYSIS_EXCLUDE_TESTS = "excludeTests";
+    static final String PATH_ARGUMENT_SUFFIX = "Path";
+    static final String INCLUDE_KEY = "include";
+    static final String EXCLUDE_KEY = "exclude";
     static final String JAR_PREDICATE = ".jar";
     static final String CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN = "^\\d+\\.\\d+\\.\\d+$";
     static final String RULE_ID_COLUMN = "RuleID";
