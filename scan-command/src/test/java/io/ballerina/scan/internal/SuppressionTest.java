@@ -22,7 +22,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.ballerina.cli.launcher.BLauncherException;
+import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
@@ -115,7 +115,7 @@ public class SuppressionTest extends BaseTest {
         String consoleIssues = console.substring(console.indexOf("\n[") + 1, console.lastIndexOf(']') + 1);
         Assert.assertEquals(JsonParser.parseString(consoleIssues).getAsJsonArray().size(), 1);
         Assert.assertTrue(console.contains("1 issue(s), 2 suppressed"));
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_suppressions/main.bal:(23:29,23:42)] "
+        Assert.assertTrue(console.contains("bal_project_with_suppressions/main.bal:23:29: warning: "
                 + "suppression of 'ballerina:7' did not match any issue"), console);
     }
 
@@ -153,9 +153,9 @@ public class SuppressionTest extends BaseTest {
     @Test(description = "test a suppression that cannot be applied is reported instead of being dropped")
     void testIgnoredSuppressionsAreReported() throws IOException {
         String console = runScan(ignoredSuppressionsProject);
-        String warning = "] suppression could not be applied to this construct and is ignored";
+        String warning = ": warning: suppression could not be applied to this construct and is ignored";
         for (int line : List.of(19, 22, 25)) {
-            String location = "WARNING [bal_project_with_ignored_suppressions/main.bal:(" + line + ":";
+            String location = "bal_project_with_ignored_suppressions/main.bal:" + line + ":";
             Assert.assertTrue(console.contains(location), console);
         }
         Assert.assertEquals(console.split(Pattern.quote(warning), -1).length - 1, 3, console);
@@ -167,39 +167,32 @@ public class SuppressionTest extends BaseTest {
 
     @Test(description = "test an invalid suppression with several errors is counted once")
     void testInvalidSuppressionIsCountedOnce() throws IOException {
-        BLauncherException exception = scanFails(unknownRulesAndRequirementsProject);
-        String console = readOutput(true);
+        String console = scanFails(unknownRulesAndRequirementsProject);
         Assert.assertTrue(console.contains("unknown rule 'ballerina:998'"), console);
         Assert.assertTrue(console.contains("unknown rule 'ballerina:999'"), console);
         Assert.assertTrue(console.contains("suppression has no reason"), console);
-        Assert.assertTrue(exception.getDetailedMessages().get(0).contains("1 suppression(s) are invalid"),
-                exception.getDetailedMessages().toString());
+        Assert.assertTrue(console.contains("bal scan: error: 1 invalid suppression\n"), console);
     }
 
     @Test(description = "test an invalid or unknown setting in the [suppression] table fails the scan")
-    void testInvalidSuppressionSettingsFailTheScan() {
+    void testInvalidSuppressionSettingsFailTheScan() throws IOException {
         for (String projectName : List.of("bal-project-with-invalid-suppression-settings",
                 "bal-project-with-unknown-suppression-setting")) {
-            BLauncherException exception = scanFails(testResources.resolve("test-resources").resolve(projectName));
-            Assert.assertTrue(exception.getMessages().get(0).contains("in the [suppression] table"),
-                    exception.getMessages().toString());
+            String console = scanFails(testResources.resolve("test-resources").resolve(projectName));
+            Assert.assertTrue(console.contains("in the [suppression] table"), console);
         }
     }
 
-    @Test(description = "test malformed, unknown and empty rule lists fail the scan, and the others still apply")
+    // The ballerina/scan compiler plugin rejects malformed rule IDs and empty rule lists at compile time
+    @Test(description = "test malformed rule IDs and empty rule lists fail the scan as compilation errors")
     void testInvalidSuppressionsFailTheScan() throws IOException {
-        BLauncherException exception = scanFails(invalidSuppressionsProject);
-        String console = readOutput(true);
-        String file = "bal_project_with_invalid_suppressions/main.bal";
-        for (String error : List.of("(25:29,25:44)] unknown rule 'ballerina:999'",
-                "(27:29,27:41)] unknown rule 'ballerina:999'", "(29:29,29:37)] invalid rule ID 'http:1'",
-                "(39:28,39:37)] invalid rule ID 'http:1'", "(37:5,37:58)] empty rule list")) {
-            Assert.assertTrue(console.contains("ERROR [" + file + ":" + error), console);
-        }
-        Assert.assertTrue(console.contains("WARNING [" + file + ":(31:29,31:42)] cannot verify rule 'acme/lint:1'"),
+        String console = scanFails(invalidSuppressionsProject);
+        Assert.assertTrue(console.contains("bal scan: error: compilation contains errors, skipping the scan\n"),
                 console);
-        Assert.assertTrue(exception.getDetailedMessages().get(0).contains("5 suppression(s) are invalid"),
-                exception.getDetailedMessages().toString());
+        for (String error : List.of("main.bal:29:29: error: invalid rule ID 'http:1'",
+                "main.bal:37:28: error: empty rule list", "main.bal:39:28: error: invalid rule ID 'http:1'")) {
+            Assert.assertTrue(console.contains(error), console);
+        }
         assertNothingReported(invalidSuppressionsProject, console);
     }
 
@@ -275,15 +268,15 @@ public class SuppressionTest extends BaseTest {
         }
         Assert.assertEquals(justifications, List.of("Rule-specific", "Rule-specific", "First", "First"));
         Assert.assertTrue(console.contains("0 issue(s), 4 suppressed"), console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_same_construct_suppressions/"
-                + "main.bal:(20:5,20:39)] suppression of all rules did not match any issue"), console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_same_construct_suppressions/"
-                + "main.bal:(26:5,26:39)] suppression of all rules did not match any issue"), console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_same_construct_suppressions/"
-                + "main.bal:(31:29,31:42)] rule 'ballerina:1' is already suppressed on this construct"), console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_same_construct_suppressions/"
-                + "main.bal:(36:5,36:48)] every rule is already suppressed on this construct"), console);
-        Assert.assertFalse(console.contains("main.bal:(36:5,36:48)] suppression of all rules"), console);
+        Assert.assertTrue(console.contains("bal_project_with_same_construct_suppressions/"
+                + "main.bal:20:5: warning: suppression of all rules did not match any issue"), console);
+        Assert.assertTrue(console.contains("bal_project_with_same_construct_suppressions/"
+                + "main.bal:26:5: warning: suppression of all rules did not match any issue"), console);
+        Assert.assertTrue(console.contains("bal_project_with_same_construct_suppressions/"
+                + "main.bal:31:29: warning: rule 'ballerina:1' is already suppressed on this construct"), console);
+        Assert.assertTrue(console.contains("bal_project_with_same_construct_suppressions/"
+                + "main.bal:36:5: warning: every rule is already suppressed on this construct"), console);
+        Assert.assertFalse(console.contains("main.bal:36:5: warning: suppression of all rules"), console);
         Assert.assertFalse(console.contains("suppression of 'ballerina:1' did not match any issue"), console);
     }
 
@@ -292,11 +285,11 @@ public class SuppressionTest extends BaseTest {
     void testSuppressionsOnPartsOfConstructs() throws IOException {
         String console = runScan(partSuppressionsProject);
 
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_part_suppressions/main.bal:(23:36,23:49)] "
+        Assert.assertTrue(console.contains("bal_project_with_part_suppressions/main.bal:23:36: warning: "
                 + "suppression of 'ballerina:1' did not match any issue"), "the tuple member: " + console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_part_suppressions/main.bal:(25:42,25:55)] "
+        Assert.assertTrue(console.contains("bal_project_with_part_suppressions/main.bal:25:42: warning: "
                 + "suppression of 'ballerina:1' did not match any issue"), "the included parameter: " + console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_part_suppressions/main.bal:(29:61,29:74)] "
+        Assert.assertTrue(console.contains("bal_project_with_part_suppressions/main.bal:29:61: warning: "
                 + "suppression of 'ballerina:1' did not match any issue"), "the anonymous function: " + console);
         Assert.assertTrue(console.contains("1 issue(s), 2 suppressed"),
                 "the escaped rules field and a document named like the generated one apply: " + console);
@@ -311,7 +304,7 @@ public class SuppressionTest extends BaseTest {
         Assert.assertEquals(issues.size(), 6);
         Assert.assertTrue(console.contains("1 issue(s), 5 suppressed"),
                 "constant, template, escaped, commented and worker suppressions all apply: " + console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_unresolved_suppressions/main.bal:(30:21,30:26)] "
+        Assert.assertTrue(console.contains("bal_project_with_unresolved_suppressions/main.bal:30:21: warning: "
                 + "suppression of 'ballerina:7' did not match any "
                 + "issue"), "a shorthand rules field names the rules of its constant");
         Assert.assertFalse(console.contains("suppression names no rule"), console);
@@ -364,21 +357,17 @@ public class SuppressionTest extends BaseTest {
 
     @Test(description = "test a suppression of an unknown rule fails the scan even when the rule is not included")
     void testUnknownRuleFailsTheScanWhenNotIncluded() throws IOException {
-        scanFails(unknownCoreRuleProject, "--include-rules=ballerina:1");
-
-        String console = readOutput(true);
+        String console = scanFails(unknownCoreRuleProject, "--include-rules=ballerina:1");
         Assert.assertTrue(console.contains("unknown rule 'ballerina:999'"), console);
     }
 
     @Test(description = "test the command-line requirement fails the scan before anything is reported")
     void testRequireReasonFromCommandLine() throws IOException {
         deleteTarget(suppressionsProject);
-        BLauncherException exception = scanFails(suppressionsProject, "--require-suppression-reason");
+        String console = scanFails(suppressionsProject, "--require-suppression-reason");
 
-        Assert.assertTrue(exception.getDetailedMessages().get(0)
-                .contains("1 suppression(s) are invalid or do not meet the configured suppression requirements"));
-        String console = readOutput(true);
-        Assert.assertTrue(console.contains("ERROR [bal_project_with_suppressions/main.bal:(28:1,28:15)] "
+        Assert.assertTrue(console.contains("bal scan: error: 1 invalid suppression\n"), console);
+        Assert.assertTrue(console.contains("bal_project_with_suppressions/main.bal:28:1: error: "
                 + "suppression has no reason"), console);
         assertNothingReported(suppressionsProject, console);
     }
@@ -386,14 +375,12 @@ public class SuppressionTest extends BaseTest {
     @Test(description = "test the Scan.toml requirements fail the scan before anything is reported")
     void testRequirementsFromScanToml() throws IOException {
         deleteTarget(requirementsProject);
-        BLauncherException exception = scanFails(requirementsProject, "--scan-report");
+        String console = scanFails(requirementsProject, "--scan-report");
 
-        Assert.assertTrue(exception.getDetailedMessages().get(0)
-                .contains("2 suppression(s) are invalid or do not meet the configured suppression requirements"));
-        String console = readOutput(true);
-        Assert.assertTrue(console.contains("ERROR [bal_project_with_suppression_requirements/main.bal:(20:5,20:44)] "
+        Assert.assertTrue(console.contains("bal scan: error: 2 invalid suppressions\n"), console);
+        Assert.assertTrue(console.contains("bal_project_with_suppression_requirements/main.bal:20:5: error: "
                 + "suppression has no reason"), console);
-        Assert.assertTrue(console.contains("ERROR [bal_project_with_suppression_requirements/main.bal:(22:5,22:51)] "
+        Assert.assertTrue(console.contains("bal_project_with_suppression_requirements/main.bal:22:5: error: "
                 + "suppression names no rule"), console);
         assertNothingReported(requirementsProject, console);
     }
@@ -401,14 +388,12 @@ public class SuppressionTest extends BaseTest {
     @Test(description = "test the scan tool rejects a rule it does not know before anything is reported")
     void testUnknownRulesFailTheScan() throws IOException {
         deleteTarget(unknownCoreRuleProject);
-        BLauncherException exception = scanFails(unknownCoreRuleProject);
+        String console = scanFails(unknownCoreRuleProject);
 
-        Assert.assertTrue(exception.getDetailedMessages().get(0)
-                .contains("1 suppression(s) are invalid or do not meet the configured suppression requirements"));
-        String console = readOutput(true);
-        Assert.assertTrue(console.contains("ERROR [bal_project_with_unknown_core_rule/main.bal:(20:29,20:44)] "
+        Assert.assertTrue(console.contains("bal scan: error: 1 invalid suppression\n"), console);
+        Assert.assertTrue(console.contains("bal_project_with_unknown_core_rule/main.bal:20:29: error: "
                 + "unknown rule 'ballerina:999': 'ballerina' does not define this rule"), console);
-        Assert.assertTrue(console.contains("WARNING [bal_project_with_unknown_core_rule/main.bal:(24:29,24:42)] "
+        Assert.assertTrue(console.contains("bal_project_with_unknown_core_rule/main.bal:24:29: warning: "
                 + "cannot verify rule 'acme/lint:1': 'acme/lint' provides no scan rules to this project"), console);
         Assert.assertFalse(console.contains("did not match"), console);
         assertNothingReported(unknownCoreRuleProject, console);
@@ -427,15 +412,13 @@ public class SuppressionTest extends BaseTest {
 
     @Test(description = "test rules of an analyzer declared only in Scan.toml are checked when the scan runs")
     void testScanTomlAnalyzerRulesCheckedUnderScan() throws IOException {
-        BuildProject project = BuildProject.load(analyzerSuppressionsProject.toAbsolutePath());
+        Project project = BuildProject.load(analyzerSuppressionsProject.toAbsolutePath());
         long buildDiagnostics = project.currentPackage().getCompilation().diagnosticResult().diagnostics().stream()
                 .filter(diagnostic -> diagnostic.diagnosticInfo().code().startsWith("SCAN_SUPPRESS_"))
                 .count();
         Assert.assertEquals(buildDiagnostics, 0, "a build checks only the form of the rule IDs");
 
-        scanFails(analyzerSuppressionsProject);
-
-        String console = readOutput(true);
+        String console = scanFails(analyzerSuppressionsProject);
         Assert.assertTrue(console.contains("unknown rule 'exampleOrg/example_module_static_code_analyzer:99': "
                 + "'exampleOrg/example_module_static_code_analyzer' does not define this rule"), console);
         Assert.assertFalse(console.contains("unknown rule 'exampleOrg/example_module_static_code_analyzer:1'"),
@@ -455,15 +438,17 @@ public class SuppressionTest extends BaseTest {
         return readOutput(true);
     }
 
-    private BLauncherException scanFails(Path project, String... args) {
+    private String scanFails(Path project, String... args) throws IOException {
         System.setProperty("user.dir", project.toString());
         try {
             ScanCmd scanCmd = new ScanCmd(printStream);
             new CommandLine(scanCmd).parseArgs(args);
-            return Assert.expectThrows(BLauncherException.class, scanCmd::execute);
+            scanCmd.execute();
+            Assert.assertEquals(scanCmd.exitCode(), 1);
         } finally {
             System.setProperty("user.dir", userDir);
         }
+        return readOutput(true);
     }
 
     private static void assertNothingReported(Path project, String console) {

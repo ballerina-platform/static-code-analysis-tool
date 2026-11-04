@@ -30,13 +30,24 @@ import java.util.List;
  * */
 class ScannerContextImpl implements ScannerContext {
     private final ReporterImpl reporter;
+    private final boolean excludeTests;
 
     ScannerContextImpl(List<Rule> rules) {
+        this(rules, false);
+    }
+
+    ScannerContextImpl(List<Rule> rules, boolean excludeTests) {
         this.reporter = new ReporterImpl(rules);
+        this.excludeTests = excludeTests;
     }
 
     @Override
     public ReporterImpl getReporter() {
         return reporter;
+    }
+
+    @Override
+    public boolean isExcludeTests() {
+        return excludeTests;
     }
 }

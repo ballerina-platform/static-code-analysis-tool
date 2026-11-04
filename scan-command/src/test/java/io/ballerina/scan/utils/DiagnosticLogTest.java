@@ -32,8 +32,8 @@ import java.io.IOException;
 public class DiagnosticLogTest extends BaseTest {
     @Test(description = "Test error diagnostic message")
     public void testErrorDiagnostic() throws IOException {
-        String expected = "invalid number of arguments, expected one argument received 0";
-        String result = DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, 0);
+        String expected = "too many arguments: expected one package or source file, but received 2: main.bal extra";
+        String result = DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, 2, "main.bal extra");
         Assert.assertEquals(result, expected);
     }
 

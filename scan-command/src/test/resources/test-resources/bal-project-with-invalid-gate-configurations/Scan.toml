@@ -1,0 +1,4 @@
+[gate]
+failOnSeverity = "CRITICAL"
+failOnCount = 0
+failOnSevrity = "HIGH"
