@@ -98,7 +98,7 @@ exclude = ["ballerina:101", "ballerina/io:101"]
 
 Rules can be either included or excluded, not both: a `[rule]` table that sets both stops the scan with an error that gives its location, and so does using `--include-rules` together with `--exclude-rules`. A value that is not an array of rule IDs, or an unknown key in the `[rule]` table, also stops the scan with an error that gives its location.
 
-Each command-line option replaces only its own setting for that run: `--include-rules` replaces `include`, and `--exclude-rules` replaces `exclude`, with a warning when the rules differ. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes only `ballerina:2`. Since rules cannot be included and excluded at the same time, an option that conflicts with the other setting in `Scan.toml` stops the scan as a usage error (exit code `2`): with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` is an error. A rule named on the command line that the package does not have is also a usage error.
+Each command-line option adds its rules to its own setting for that run: `--include-rules` adds to `include`, and `--exclude-rules` adds to `exclude`. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes both `ballerina:1` and `ballerina:2`. Since rules cannot be included and excluded at the same time, an option that conflicts with the other setting in `Scan.toml` stops the scan as a usage error (exit code `2`): with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` is an error. A rule named on the command line that the package does not have is also a usage error.
 
 # Configuration for Suppressions
 

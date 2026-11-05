@@ -330,11 +330,10 @@ public class GateTest extends BaseTest {
                     + "combined with [rule] include = [\"ballerina:2\"] in Scan.toml"), run.output());
             Assert.assertFalse(run.output().contains("Running Scans"), run.output());
 
-            // Replacing the same field is not a conflict
+            // Adding to the same field is not a conflict
             run = scan(gateConfigProject, "--include-rules=ballerina:1", "--fail-on-severity=NONE");
             Assert.assertEquals(run.exitCode(), 0, run.output());
-            Assert.assertTrue(run.output().contains("bal scan: warning: --include-rules=ballerina:1 overrides "
-                    + "[rule] include = [\"ballerina:2\"] in Scan.toml\n"), run.output());
+            Assert.assertFalse(run.output().contains("overrides [rule]"), run.output());
         } finally {
             Files.writeString(scanToml, original);
         }

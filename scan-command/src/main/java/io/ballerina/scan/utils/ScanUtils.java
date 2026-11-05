@@ -211,7 +211,7 @@ public final class ScanUtils {
      * @param issues generated issues
      * @return json string array of generated issues
      */
-    private static String convertIssuesToJsonString(List<Issue> issues) {
+    public static String convertIssuesToJsonString(List<Issue> issues) {
         return convertIssuesToJsonString(issues, Map.of());
     }
 
@@ -254,7 +254,7 @@ public final class ScanUtils {
      * @param project Ballerina project
      * @return SARIF string representation of generated issues
      */
-    private static String convertIssuesToSarifString(List<Issue> issues, Project project) {
+    public static String convertIssuesToSarifString(List<Issue> issues, Project project) {
         return convertIssuesToSarifString(issues, project, Map.of());
     }
 

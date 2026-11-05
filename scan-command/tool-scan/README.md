@@ -37,19 +37,19 @@ bal scan [OPTIONS] [<package>|<source-file>]
 --list-rules
 ```
 
--  Run analysis for a specific set of rules. Replaces only `include` in the `[rule]` table of `Scan.toml`; an `exclude` set there still applies, and the two cannot be combined.
+-  Run analysis for a specific set of rules. Added to `include` in the `[rule]` table of `Scan.toml`; an `exclude` set there still applies, and the two cannot be combined.
 
 ```text
 --include-rules=<rule1, ...>
 ```
 
--  Exclude analysis for a specific set of rules. Replaces only `exclude` in the `[rule]` table of `Scan.toml`; an `include` set there still applies, and the two cannot be combined.
+-  Exclude analysis for a specific set of rules. Added to `exclude` in the `[rule]` table of `Scan.toml`; an `include` set there still applies, and the two cannot be combined.
 
 ```text
 --exclude-rules=<rule1, ...>
 ```
 
-- Report the results to these platforms, which must be declared in the `[[platform]]` table of `Scan.toml`. No platform is reported to unless it is named here. The results are printed and saved first; then every named platform is run, and the scan fails if any of them fails.
+- Report the results to these platforms, which must be declared in the `[[platform]]` table of `Scan.toml`. No platform is reported to unless it is named here. The results are printed and saved first; then every named platform is run, and the scan fails if any of them fails. Not supported for a single Ballerina file.
 
 ```text
 --platforms=<platformName1, ...>

@@ -15,6 +15,8 @@ Built against Ballerina 2201.12.0.
 ### Changed
 
 - The "Running scans" message is printed earlier in the run. ([#76](https://github.com/ballerina-platform/static-code-analysis-tool/pull/76))
+- Single file and package scans print their output in the same order, with one blank line between sections: configuration, warnings, progress, issues, issue summary, report locations, platform output and the gate result. `--platforms` is rejected for a single Ballerina file.
+- `--include-rules` and `--exclude-rules` add to `include` and `exclude` in `Scan.toml` instead of replacing them.
 - The build provisions the Ballerina distribution itself and uses Gradle 9.5.1. ([#120](https://github.com/ballerina-platform/static-code-analysis-tool/pull/120))
 
 ### Fixed
@@ -22,6 +24,7 @@ Built against Ballerina 2201.12.0.
 - `ballerina:2` and `ballerina:11` report the location of the parameter or field declaration instead of including its doc comment and annotations. ([#120](https://github.com/ballerina-platform/static-code-analysis-tool/pull/120), backport of [#117](https://github.com/ballerina-platform/static-code-analysis-tool/pull/117) and [#118](https://github.com/ballerina-platform/static-code-analysis-tool/pull/118))
 - `ballerina:2` no longer reports parameters of external functions. ([#120](https://github.com/ballerina-platform/static-code-analysis-tool/pull/120))
 - The published tool package contains up-to-date tool TOML files. ([#122](https://github.com/ballerina-platform/static-code-analysis-tool/pull/122))
+- `bal scan --exclude-tests` no longer fails with `NoClassDefFoundError` on the picocli version bundled with the `bal` launcher.
 
 ## [0.11.0] - 2025-08-06
 
