@@ -225,6 +225,10 @@ public class ScanCmd implements BLauncherCmd {
         this(outputStream, outputStream);
     }
 
+    /**
+     * Creates a scan command that writes to the given streams. When they are the same stream, they are tracked as one,
+     * so that the console layout counts their lines together.
+     */
     ScanCmd(PrintStream outputStream, PrintStream errorStream) {
         this.projectPath = Paths.get(System.getProperty(ProjectConstants.USER_DIR));
         this.outputStream = layout.track(outputStream);
@@ -1082,6 +1086,9 @@ public class ScanCmd implements BLauncherCmd {
         return QualityGate.of(severity, count);
     }
 
+    /**
+     * Prints the heading of the scans once, followed by a line for each package when a workspace is scanned.
+     */
     private void printRunningScans(Project project) {
         section(Section.RUNNING);
         if (!packageScansStarted) {
@@ -1209,6 +1216,9 @@ public class ScanCmd implements BLauncherCmd {
                 .forEach(pendingWarnings::add);
     }
 
+    /**
+     * Prints the number of active issues, and the number of suppressed issues when there are any.
+     */
     private void printSummary(int activeIssueCount, int suppressedIssueCount) {
         section(Section.SUMMARY);
         errorStream.println(suppressedIssueCount == 0 ? activeIssueCount + " issue(s)"
@@ -1432,6 +1442,9 @@ public class ScanCmd implements BLauncherCmd {
         return parseResult != null && parseResult.originalArgs().contains(EXCLUDE_TESTS_OPTION);
     }
 
+    /**
+     * Returns whether an argument is a boolean value, in any case.
+     */
     private static boolean isBoolean(String value) {
         return "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value);
     }

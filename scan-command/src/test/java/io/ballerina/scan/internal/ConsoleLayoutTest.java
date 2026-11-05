@@ -186,6 +186,9 @@ public class ConsoleLayoutTest extends BaseTest {
                 """);
     }
 
+    /**
+     * Runs a scan from the given directory, and returns everything it printed.
+     */
     private String scan(Path directory, String... args) throws IOException {
         System.setProperty("user.dir", directory.toString());
         try {
