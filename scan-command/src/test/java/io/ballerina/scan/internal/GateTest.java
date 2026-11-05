@@ -40,8 +40,10 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Tests for the exit codes, error reports and gate of the scan command.
@@ -651,13 +653,56 @@ public class GateTest extends BaseTest {
                     + "combined with [rule] include = [\"ballerina:13\"] in Scan.toml"), run.output());
             Assert.assertFalse(run.output().contains("Running Scans"), run.output());
 
-            // Adding to the same field is not a conflict
+            // Adding to the same field is not a conflict, and the rule of Scan.toml is still included
             run = scan(gateConfigProject, "--include-rules=ballerina:1", "--fail-on-severity=NONE");
             Assert.assertEquals(run.exitCode(), 0, run.output());
             Assert.assertFalse(run.output().contains("overrides [rule]"), run.output());
+            Assert.assertEquals(reportedRuleIds(gateConfigProject), Set.of("ballerina:1", "ballerina:13"),
+                    run.output());
+
+            Files.writeString(scanToml, original + """
+
+                    [rule]
+                    exclude = ["ballerina:13"]
+                    """);
+            run = scan(gateConfigProject, "--include-rules=ballerina:1");
+            Assert.assertEquals(run.exitCode(), 2, run.output());
+            Assert.assertTrue(run.errorReport().startsWith("bal scan: error: --include-rules=ballerina:1 cannot be "
+                    + "combined with [rule] exclude = [\"ballerina:13\"] in Scan.toml"), run.output());
+            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
         } finally {
             Files.writeString(scanToml, original);
         }
+    }
+
+    @Test(description = "test a workspace [rule] entry a package lacks is reported even with a rule option")
+    void testUnavailableWorkspaceRuleWithRuleOption() throws IOException {
+        Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
+        String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        try {
+            Files.delete(packageScanToml);
+            writeWorkspaceScanToml("""
+                    [rule]
+                    exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
+                    """);
+            // The option adds to the workspace exclude, so the entry pkg-a lacks still applies to it
+            ScanRun run = scan(gatedWorkspace, "--exclude-rules=ballerina:1");
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertTrue(run.output().contains("bal scan: warning: 'exampleOrg/example_module_static_code_"
+                    + "analyzer:1' in [rule] of Scan.toml is not a rule of pkg-a\n"), run.output());
+        } finally {
+            Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
+            Files.writeString(packageScanToml, original);
+        }
+    }
+
+    private static Set<String> reportedRuleIds(Path project) throws IOException {
+        String report = Files.readString(project.resolve("target").resolve("report").resolve("scan_results.json"),
+                StandardCharsets.UTF_8);
+        Set<String> ruleIds = new HashSet<>();
+        JsonParser.parseString(report).getAsJsonArray().forEach(issue ->
+                ruleIds.add(issue.getAsJsonObject().getAsJsonObject("rule").get("id").getAsString()));
+        return ruleIds;
     }
 
     @Test(description = "test a package Scan.toml is used instead of the workspace one, [rule] included")

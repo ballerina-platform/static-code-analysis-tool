@@ -171,7 +171,7 @@ public class TestOptions {
 
     public static class TestOptionsBuilder {
         private final Project project;
-        private PrintStream outputStream;
+        private PrintStream outputStream = System.out;
         private boolean helpFlag;
         private boolean platformTriggered;
         private String targetDir;
@@ -187,7 +187,7 @@ public class TestOptions {
         }
 
         /**
-         * Set the output stream.
+         * Set the output stream. Default is standard output.
          *
          * @param outputStream the output stream
          * @return this builder

@@ -26,6 +26,7 @@ import io.ballerina.scan.StaticCodeAnalysisPlatformPlugin;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -54,6 +55,13 @@ public class PlatformPlugin implements StaticCodeAnalysisPlatformPlugin {
     public void onScan(List<Issue> issues) {
         this.issues = Collections.unmodifiableList(issues);
         saveToFile();
+        // Lets the tests check where the output of a plugin is printed; the trailing blank line is deliberate
+        String consoleMessage = platformArgs.get("consoleMessage");
+        if (consoleMessage != null) {
+            PrintStream console = System.out;
+            console.println(consoleMessage);
+            console.println();
+        }
     }
 
     private void saveToFile() {
