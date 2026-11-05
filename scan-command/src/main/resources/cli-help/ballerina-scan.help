@@ -40,8 +40,6 @@ OPTIONS
                 Leave the test sources of each package out of the scan, so that their issues and
                 @scan:Suppress annotations are not reported. Written alone, it means true.
                 Overrides 'excludeTests' in the [analysis] table of Scan.toml either way.
-                A separate true or false after the option is read as its value, so a target
-                directory with that name must be written as ./true or ./false.
 
         --platforms=<platformName1, ...>
                 Report the results to these platforms, which must be declared in the [[platform]]
