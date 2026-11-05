@@ -759,6 +759,29 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(result, expected);
     }
 
+    @Test(description = "test --exclude-rules adds to the exclude rules of Scan.toml instead of replacing them")
+    void testExcludeRulesOptionCombinedWithScanToml() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-exclude-rule-configurations");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+        String[] args = {"--exclude-rules=exampleOrg/example_module_static_code_analyzer:1"};
+        new CommandLine(scanCmd).parseArgs(args);
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String output = readOutput(true);
+        Assert.assertEquals(scanCmd.exitCode(), 0, output);
+        Assert.assertFalse(output.contains("overrides [rule] exclude"), output);
+        String report = Files.readString(ballerinaProject.resolve("target").resolve("report")
+                .resolve("scan_results.json"), StandardCharsets.UTF_8);
+        List<String> ruleIds = new ArrayList<>();
+        JsonParser.parseString(report).getAsJsonArray().forEach(issue ->
+                ruleIds.add(issue.getAsJsonObject().getAsJsonObject("rule").get("id").getAsString()));
+        Assert.assertEquals(ruleIds.stream().sorted().toList(), List.of(
+                "ballerina/example_module_static_code_analyzer:1",
+                "ballerinax/example_module_static_code_analyzer:1"), "ballerina:1 stays excluded by Scan.toml");
+    }
+
     @Test(description = "test scan command with include and exclude rules Scan.toml configurations")
     void testScanCommandWithIncludeAndExcludeRulesScanTomlConfigurations() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
@@ -803,12 +826,12 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", userDir);
         Assert.assertEquals(scanCmd.exitCode(), 0);
 
-        // The results are saved and summarised before the platform runs
+        // The results are summarised and saved before the platform runs
         String stderr = err.toString(StandardCharsets.UTF_8).replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        int resultsAt = stderr.indexOf("View scan results at:");
         int summaryAt = stderr.indexOf(" issue(s)");
+        int resultsAt = stderr.indexOf("View scan results at:");
         int platformAt = stderr.indexOf("Reporting issues to: examplePlatform");
-        Assert.assertTrue(resultsAt >= 0 && resultsAt < summaryAt && summaryAt < platformAt, stderr);
+        Assert.assertTrue(summaryAt >= 0 && summaryAt < resultsAt && resultsAt < platformAt, stderr);
 
         Path result = ballerinaProject.resolve("analysis-issues.json");
         String platformIssuesOutput = Files.readString(result, StandardCharsets.UTF_8)
@@ -1074,8 +1097,11 @@ public class ScanCmdTest extends BaseTest {
                             .getAsJsonArray("results");
             String stderr = err.toString(StandardCharsets.UTF_8).replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR)
                     .trim();
-            Assert.assertTrue(stderr.endsWith("\n" + issues.size() + " issue(s)"),
-                    "one summary for the workspace is the last line: " + stderr);
+            String summary = "\n" + issues.size() + " issue(s)\n";
+            Assert.assertEquals(stderr.split(" issue\\(s\\)", -1).length, 2, "one summary for the workspace: "
+                    + stderr);
+            Assert.assertTrue(stderr.contains(summary), stderr);
+            Assert.assertTrue(stderr.indexOf(summary) < stderr.indexOf("View scan results at:"), stderr);
             Assert.assertTrue(issues.size() > 1, "the issues of both packages are printed: " + issues);
         }
     }

@@ -143,7 +143,8 @@ public class SuppressionTest extends BaseTest {
         Assert.assertTrue(stderr.contains("Running Scans"), stderr);
         Assert.assertTrue(stderr.contains("did not match any issue"), stderr);
         Assert.assertTrue(stderr.contains("View scan results at:"), stderr);
-        Assert.assertTrue(stderr.endsWith("\n1 issue(s), 2 suppressed"), "the summary is the last line: " + stderr);
+        Assert.assertTrue(stderr.contains("\n\n1 issue(s), 2 suppressed\n\nView scan results at:"),
+                "the summary comes before the results file: " + stderr);
     }
 
     @Test(description = "test suppressions in test documents apply to the issues reported there")

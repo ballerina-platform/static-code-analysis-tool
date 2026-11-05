@@ -28,7 +28,7 @@ All options are optional. Rule filters and platforms can also be configured in a
 | `--list-rules` | List the rules available to the project, along with their kind and severity. Only works inside a Ballerina project. Lists the core rules and the rules contributed by the project's dependencies (library tools and static code analyzer plugins) only. |
 | `--include-rules=<rule1, ...>` | Run analysis for a specific set of rules. By default, all available rules are included. A rule that is not available to the project is an error. |
 | `--exclude-rules=<rule1, ...>` | Exclude analysis for a specific set of rules. By default, no rules are excluded. A rule that is not available to the project is an error. |
-| `--platforms=<platformName1, ...>` | Define platform(s) to report results to. More than one platform can be defined. By default, results are not reported to any platform. |
+| `--platforms=<platformName1, ...>` | Define platform(s) to report results to. More than one platform can be defined. By default, results are not reported to any platform. Not supported for a single Ballerina file. |
 | `--ignore-suppressions` | Disregard `@scan:Suppress` annotations and report every issue, to audit the unsuppressed results. Rule inclusion and exclusion still apply. Same as `enabled = false` in `Scan.toml`. See [Suppressing issues](#suppressing-issues). |
 | `--require-suppression-reason` | Fail the scan when a `@scan:Suppress` annotation does not give a reason. Same as `requireReason = true` in `Scan.toml`. Has no effect with `--ignore-suppressions` or `enabled = false`. |
 | `--require-suppression-rule-id` | Fail the scan when a `@scan:Suppress` annotation does not name the rules it suppresses. Same as `requireRuleId = true` in `Scan.toml`. Has no effect with `--ignore-suppressions` or `enabled = false`. |
@@ -221,7 +221,7 @@ failOnCount = 5
 excludeTests = true
 ```
 
-`--include-rules` replaces only `include`, and `--exclude-rules` replaces only `exclude`, for that run, with a warning when the rules differ. Including and excluding rules at the same time is not allowed, so an option that conflicts with the other setting in `Scan.toml` is a usage error: with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` exits with code `2`.
+The rules given with `--include-rules` are added to `include`, and those given with `--exclude-rules` are added to `exclude`, for that run. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes both rules. Including and excluding rules at the same time is not allowed, so an option that conflicts with the other setting in `Scan.toml` is a usage error: with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` exits with code `2`.
 
 Each `[[platform]]` entry requires both a `name` and a `path`. The `path` must point to the platform plugin JAR, either as a local file path (resolved relative to the folder of the `Scan.toml` file) or as a URL to download it from. A declared platform is reported to only when it is named in `--platforms`, and `--platforms` can only name platforms declared there. The plugin JAR is checked, or downloaded, only when its platform is named; a path that is then neither an existing file nor a URL stops the scan with an error. The results are always printed and saved first, and the named platforms then run one after another. If any platform fails, the scan lists every failure and exits with code `1`.
 

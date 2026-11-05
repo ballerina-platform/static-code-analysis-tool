@@ -498,7 +498,7 @@ public class GateTest extends BaseTest {
                 Assert.assertTrue(run.output().contains(line), line + " in " + run.output());
             }
             Assert.assertFalse(run.output().contains("Loading scan tool configurations from"), run.output());
-            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+            Assert.assertTrue(run.output().contains("\nRunning Scans\nRunning scans on pkg-a\n"), run.output());
 
             run = scan(gatedWorkspace, "--fail-on-severity=BLOCKER");
             Assert.assertEquals(run.exitCode(), 0, run.output());
@@ -621,15 +621,14 @@ public class GateTest extends BaseTest {
             Assert.assertFalse(run.output().contains("is not a rule of pkg-b"), "pkg-b uses its own file: "
                     + run.output());
 
-            // --exclude-rules replaces the exclude field, so pkg-a reports its HIGH issue again
+            // --exclude-rules adds to the exclude field, so pkg-a still leaves out its HIGH issue
             writeWorkspaceScanToml("""
                     [rule]
                     exclude = ["ballerina:13"]
                     """);
             run = scan(gatedWorkspace, "--fail-on-severity=HIGH", "--exclude-rules=ballerina:1");
-            Assert.assertEquals(run.exitCode(), 1, run.output());
-            Assert.assertTrue(run.output().contains("bal scan: warning: --exclude-rules=ballerina:1 overrides "
-                    + "[rule] exclude = [\"ballerina:13\"] in Scan.toml\n"), run.output());
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertFalse(run.output().contains("overrides [rule]"), run.output());
         } finally {
             Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
             Files.writeString(packageScanToml, original);
@@ -652,11 +651,10 @@ public class GateTest extends BaseTest {
                     + "combined with [rule] include = [\"ballerina:13\"] in Scan.toml"), run.output());
             Assert.assertFalse(run.output().contains("Running Scans"), run.output());
 
-            // Replacing the same field is not a conflict
+            // Adding to the same field is not a conflict
             run = scan(gateConfigProject, "--include-rules=ballerina:1", "--fail-on-severity=NONE");
             Assert.assertEquals(run.exitCode(), 0, run.output());
-            Assert.assertTrue(run.output().contains("bal scan: warning: --include-rules=ballerina:1 overrides "
-                    + "[rule] include = [\"ballerina:13\"] in Scan.toml\n"), run.output());
+            Assert.assertFalse(run.output().contains("overrides [rule]"), run.output());
         } finally {
             Files.writeString(scanToml, original);
         }
