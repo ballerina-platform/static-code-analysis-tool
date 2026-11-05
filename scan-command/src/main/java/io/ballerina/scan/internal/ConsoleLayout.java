@@ -64,6 +64,9 @@ final class ConsoleLayout {
                 target.write(b);
             }
 
+            /**
+             * Writes the bytes, ignoring an empty write so that it does not start a section.
+             */
             @Override
             public void write(byte[] bytes, int offset, int length) {
                 if (length == 0) {
@@ -97,6 +100,9 @@ final class ConsoleLayout {
         return current;
     }
 
+    /**
+     * Prints the blank line that separates a new section from the output before it, before its first write.
+     */
     private void beforeWrite(PrintStream target) {
         if (separatorPending) {
             separatorPending = false;

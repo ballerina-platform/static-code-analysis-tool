@@ -53,6 +53,9 @@ public class LauncherPicocliTest extends BaseTest {
             .resolve("main.bal").toAbsolutePath();
     private URLClassLoader launcherLoader;
 
+    /**
+     * Loads the scan command with the picocli JAR of the Ballerina distribution the tests run on.
+     */
     @BeforeClass
     void loadWithLauncherPicocli() throws IOException, URISyntaxException {
         Path libDir = Paths.get(System.getProperty("ballerina.home"), "bre", "lib");
@@ -145,6 +148,9 @@ public class LauncherPicocliTest extends BaseTest {
             super(urls, parent);
         }
 
+        /**
+         * Loads picocli and the scan classes child first, and every other class from the parent.
+         */
         @Override
         protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
             if (!name.startsWith("picocli.") && !name.startsWith("io.ballerina.scan.")
