@@ -220,7 +220,10 @@ public final class ScanUtils {
      *
      * @param issues       generated issues
      * @param outputStream print stream
+     * @deprecated the leading blank line it prints does not fit the console layout of the scan; print
+     * {@link #convertIssuesToJsonString(List)} instead
      */
+    @Deprecated(since = "0.13.0")
     public static void printToConsole(List<Issue> issues, PrintStream outputStream) {
         printToConsole(issues, outputStream, false, null);
     }
@@ -232,7 +235,10 @@ public final class ScanUtils {
      * @param outputStream print stream
      * @param printSarif   whether to print SARIF format instead of default BALLERINA format
      * @param project      Ballerina project (required for SARIF format)
+     * @deprecated the leading blank line it prints does not fit the console layout of the scan; print
+     * {@link #convertIssuesToJsonString(List)} or {@link #convertIssuesToSarifString(List, Project)} instead
      */
+    @Deprecated(since = "0.13.0")
     public static void printToConsole(List<Issue> issues, PrintStream outputStream, boolean printSarif,
                                       Project project) {
         String output;

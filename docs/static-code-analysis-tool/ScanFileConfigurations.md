@@ -63,7 +63,7 @@ sonarProjectPropertiesPath = "sonar-project.properties"
 
 An argument whose name ends with `Path`, such as `sonarProjectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file is passed to the plugin as the absolute path of that file. Any other value, such as a URL or a file the plugin creates, is passed to the plugin unchanged.
 
-The results are always printed and saved before the platforms run, so a failed upload does not hide them. The named platforms then run one after another, and a platform that fails does not stop the others. If any platform fails, the scan lists every failure and exits with code `1`, and the gate is not checked, since an error wins over the gate. A name in `--platforms` that no `[[platform]]` entry declares also fails the scan. In a workspace, platforms can be set only in the `Scan.toml` of each package; a package that does not declare a named platform is skipped with a warning, and the scan fails only when no package declares it.
+The results are always printed and saved before the platforms run, so a failed upload does not hide them. The named platforms then run one after another, and a platform that fails does not stop the others. If any platform fails, the scan lists every failure and exits with code `1`, and the gate is not checked, since an error wins over the gate. A name in `--platforms` that no `[[platform]]` entry declares also fails the scan. In a workspace, platforms can be set only in the `Scan.toml` of each package; a package that does not declare a named platform is skipped with a warning, and the scan fails only when no package declares it. A single Ballerina file cannot report to platforms, so `--platforms` with a single file is a usage error (exit code `2`).
 
 # Configuration for Static Code Analyzer Plugins
 
@@ -105,7 +105,7 @@ exclude = ["ballerina:101", "ballerina/io:101"]
 
 Rules can be either included or excluded, not both: a `[rule]` table that sets both stops the scan with an error that gives its location, and so does using `--include-rules` together with `--exclude-rules`.
 
-Each command-line option replaces only its own setting for that run: `--include-rules` replaces `include`, and `--exclude-rules` replaces `exclude`, with a warning when the rules differ. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes only `ballerina:2`. Since rules cannot be included and excluded at the same time, an option that conflicts with the other setting in `Scan.toml` stops the scan as a usage error (exit code `2`): with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` is an error.
+Each command-line option adds its rules to its own setting for that run: `--include-rules` adds to `include`, and `--exclude-rules` adds to `exclude`. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes both `ballerina:1` and `ballerina:2`. Since rules cannot be included and excluded at the same time, an option that conflicts with the other setting in `Scan.toml` stops the scan as a usage error (exit code `2`): with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` is an error.
 
 # Configuration for Suppressions
 
@@ -185,7 +185,7 @@ The command-line options then apply to the file each package uses:
 
 | Table | Command-line options | How the options apply |
 |---|---|---|
-| `[rule]` | `--include-rules`, `--exclude-rules` | Each one replaces its own setting; a conflict with the other setting in the file is a usage error |
+| `[rule]` | `--include-rules`, `--exclude-rules` | Each one adds its rules to its own setting; a conflict with the other setting in the file is a usage error |
 | `[gate]` | `--fail-on-severity`, `--fail-on-count` | Each one replaces its own setting, and the other setting is still read from the file |
 | `[suppression]` | `--ignore-suppressions`, `--require-suppression-reason`, `--require-suppression-rule-id` | Each one tightens its own setting, and cannot undo `Scan.toml` |
 | `[analysis]` | `--exclude-tests[=<true\|false>]` | Overrides `excludeTests` either way |
