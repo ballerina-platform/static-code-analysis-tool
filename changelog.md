@@ -17,6 +17,7 @@ Built against Ballerina 2201.12.0.
 - The "Running scans" message is printed earlier in the run. ([#76](https://github.com/ballerina-platform/static-code-analysis-tool/pull/76))
 - Single file and package scans print their output in the same order, with one blank line between sections: configuration, warnings, progress, issues, issue summary, report locations, platform output and the gate result. `--platforms` is rejected for a single Ballerina file.
 - `--include-rules` and `--exclude-rules` add to `include` and `exclude` in `Scan.toml` instead of replacing them.
+- The HTML scan report uses the redesigned report of 0.12.0: syntax highlighting, a folder tree that lists every scanned file, issue filtering, and the severity of each issue, which is the one the gate counts its rule kind as. (backport of [#92](https://github.com/ballerina-platform/static-code-analysis-tool/pull/92), [#97](https://github.com/ballerina-platform/static-code-analysis-tool/pull/97) and [#102](https://github.com/ballerina-platform/static-code-analysis-tool/pull/102))
 - The build provisions the Ballerina distribution itself and uses Gradle 9.5.1. ([#120](https://github.com/ballerina-platform/static-code-analysis-tool/pull/120))
 
 ### Fixed

@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.internal;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.projects.Project;
@@ -46,10 +48,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
+import static io.ballerina.scan.ScanReportTestUtils.readScanReportData;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
@@ -230,11 +234,74 @@ public class ScanCmdTest extends BaseTest {
         issues.add(new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
                 validBalProject.resolve("main.bal").toString()));
         Project project = ProjectLoader.loadProject(validBalProject);
-        Path resultsFile = ScanUtils.generateScanReport(issues, project, null);
-        String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("issues-html-report.txt");
-        Assert.assertEquals(result, expected);
+        JsonObject scanData = readScanReportData(ScanUtils.generateScanReport(issues, project, null));
+        Assert.assertEquals(scanData.get("projectName").getAsString(), "valid_bal_project");
+        JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
+        Assert.assertEquals(scannedFiles.size(), 1);
+        JsonObject scannedFile = findScannedFile(scannedFiles, validBalProject.resolve("main.bal"));
+        Assert.assertEquals(scannedFile.get("fileName").getAsString(), "main.bal");
+        Assert.assertEquals(scannedFile.get("fileContent").getAsString(),
+                Files.readString(validBalProject.resolve("main.bal"), StandardCharsets.UTF_8));
+
+        JsonArray reportIssues = scannedFile.getAsJsonArray("issues");
+        Assert.assertEquals(reportIssues.size(), 2);
+        List<String> expectedRuleIds = List.of("ballerina:101", "exampleOrg/exampleName:101");
+        List<String> expectedIssueTypes = List.of("BUILT_IN", "EXTERNAL");
+        for (int i = 0; i < reportIssues.size(); i++) {
+            JsonObject issue = reportIssues.get(i).getAsJsonObject();
+            Assert.assertEquals(issue.keySet(),
+                    Set.of("ruleID", "ruleKind", "severity", "issueType", "message", "textRange"));
+            Assert.assertEquals(issue.get("ruleID").getAsString(), expectedRuleIds.get(i));
+            Assert.assertEquals(issue.get("issueType").getAsString(), expectedIssueTypes.get(i));
+            Assert.assertEquals(issue.get("message").getAsString(), "rule 101");
+            Assert.assertEquals(issue.get("ruleKind").getAsString(), "BUG");
+            // Rules have no severity of their own on this line, so a bug is shown as HIGH, as the gate counts it
+            Assert.assertEquals(issue.get("severity").getAsString(), "HIGH");
+            JsonObject textRange = issue.getAsJsonObject("textRange");
+            Assert.assertEquals(textRange.get("startLine").getAsInt(), 16);
+            Assert.assertEquals(textRange.get("startLineOffset").getAsInt(), 17);
+            Assert.assertEquals(textRange.get("endLine").getAsInt(), 23);
+            Assert.assertEquals(textRange.get("endLineOffset").getAsInt(), 1);
+        }
+    }
+
+    @Test(description = "test html analysis report groups issues under the file they were reported in")
+    void testScanReportGroupsIssuesByFile() throws IOException {
+        Rule rule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
+        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 16, 23, 17, 1, 748, 4);
+        Path otherFile = testResources.resolve("test-resources").resolve("bal-project-with-config-file")
+                .resolve("main.bal");
+        BLangDiagnosticLocation otherLocation = new BLangDiagnosticLocation("main.bal", 1, 1, 0, 5, 0, 5);
+        String mainBal = validBalProject.resolve("main.bal").toString();
+        List<Issue> issues = List.of(
+                new IssueImpl(location, rule, Source.BUILT_IN, "main.bal", mainBal),
+                new IssueImpl(otherLocation, rule, Source.BUILT_IN, "main.bal", otherFile.toString()),
+                new IssueImpl(location, rule, Source.BUILT_IN, "main.bal", mainBal));
+        Project project = ProjectLoader.loadProject(validBalProject);
+        JsonObject scanData = readScanReportData(ScanUtils.generateScanReport(issues, project, null));
+
+        JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
+        Assert.assertEquals(scannedFiles.size(), 2);
+        JsonObject mainFile = findScannedFile(scannedFiles, validBalProject.resolve("main.bal"));
+        // Project documents come first; files only known through issues follow
+        Assert.assertEquals(scannedFiles.get(0).getAsJsonObject(), mainFile);
+        JsonObject secondFile = findScannedFile(scannedFiles, otherFile);
+        Assert.assertEquals(mainFile.getAsJsonArray("issues").size(), 2);
+        Assert.assertEquals(secondFile.getAsJsonArray("issues").size(), 1);
+        Assert.assertEquals(secondFile.get("fileContent").getAsString(),
+                Files.readString(otherFile, StandardCharsets.UTF_8));
+        Assert.assertFalse(secondFile.has("relativePath"), "a file outside the package has no relative path");
+    }
+
+    // Compares as normalized paths so the check doesn't depend on the OS path separator
+    private static JsonObject findScannedFile(JsonArray scannedFiles, Path filePath) {
+        Path expected = filePath.toAbsolutePath().normalize();
+        return scannedFiles.asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .filter(file -> Path.of(file.get("filePath").getAsString()).toAbsolutePath().normalize()
+                        .equals(expected))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Report has no entry for " + expected));
     }
 
     @Test(description = "test method for printing static code analysis rules to the console")

@@ -38,7 +38,7 @@ import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
  * Tests the layout of the console output: every scan prints its sections in the same order, separated by exactly
  * one blank line, and skips the sections that do not apply.
  *
- * @since 0.13.0
+ * @since 0.11.1
  */
 public class ConsoleLayoutTest extends BaseTest {
     private final Path testResourcesRoot = testResources.resolve("test-resources");

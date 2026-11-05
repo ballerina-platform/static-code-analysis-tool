@@ -425,7 +425,7 @@ public class ScanCmd implements BLauncherCmd {
         resultsPath.ifPresent(this::printResultsLocation);
         if (resultsPath.isPresent() && scanReport) {
             printScanReportLocation(ScanUtils.generateScanReport(result.issues(), project, targetDir,
-                    result.suppressions()));
+                    result.suppressions(), packageScan.config().analyzedSources()));
         }
         // The results are saved before the platforms run, and a failed platform wins over the gate
         reportToPlatforms(result.platforms().stream()

@@ -46,7 +46,7 @@ import java.util.stream.Stream;
  * Tests the scan command with the picocli version of the bal launcher, which is older than the one the tool is built
  * and tested with. A picocli API that the launcher does not have fails only when the tool runs in a distribution.
  *
- * @since 0.13.0
+ * @since 0.11.1
  */
 public class LauncherPicocliTest extends BaseTest {
     private final Path singleFile = testResources.resolve("test-resources").resolve("valid-single-file-project")

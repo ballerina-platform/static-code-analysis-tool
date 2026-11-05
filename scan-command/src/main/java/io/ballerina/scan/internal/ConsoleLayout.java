@@ -25,7 +25,7 @@ import java.io.PrintStream;
  * Lays out the console output of a scan as sections separated by exactly one blank line. A section that prints
  * nothing leaves no blank line, and the output never starts with one.
  *
- * @since 0.13.0
+ * @since 0.11.1
  */
 final class ConsoleLayout {
     /**
