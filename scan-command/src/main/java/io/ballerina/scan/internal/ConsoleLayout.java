@@ -20,6 +20,9 @@ package io.ballerina.scan.internal;
 
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Lays out the console output of a scan as sections separated by exactly one blank line. A section that prints
@@ -29,7 +32,7 @@ import java.io.PrintStream;
  */
 final class ConsoleLayout {
     /**
-     * The sections of the console output, in the order a scan prints them.
+     * The sections of the console output.
      */
     enum Section {
         RESOLVING,
@@ -43,12 +46,17 @@ final class ConsoleLayout {
         RESULTS_FILE,
         SCAN_REPORT,
         PLATFORMS,
+        PLATFORM_OUTPUT,
         FAILURE
     }
 
+    private final List<PrintStream> targets = new ArrayList<>();
+    private PrintStream separatorTarget;
     private Section current;
     private boolean written;
     private boolean separatorPending;
+    // Line feeds at the end of the output, so that output already ending with a blank line gets no second one
+    private int trailingLineFeeds;
 
     /**
      * Returns a stream that writes to the target, starting each section that writes to it with a blank line.
@@ -57,11 +65,14 @@ final class ConsoleLayout {
      * @return the tracked stream
      */
     PrintStream track(PrintStream target) {
+        Objects.requireNonNull(target, "target");
+        targets.add(target);
         OutputStream tracked = new OutputStream() {
             @Override
             public void write(int b) {
                 beforeWrite(target);
                 target.write(b);
+                afterWrite(b);
             }
 
             /**
@@ -74,6 +85,9 @@ final class ConsoleLayout {
                 }
                 beforeWrite(target);
                 target.write(bytes, offset, length);
+                for (int i = offset; i < offset + length; i++) {
+                    afterWrite(bytes[i]);
+                }
             }
 
             @Override
@@ -82,6 +96,16 @@ final class ConsoleLayout {
             }
         };
         return new PrintStream(tracked, true, target.charset());
+    }
+
+    /**
+     * Writes every blank line that separates sections to the given stream, so that the other streams, such as
+     * standard output, hold only their own content.
+     *
+     * @param target the stream the separators are written to
+     */
+    void separateWith(PrintStream target) {
+        separatorTarget = target;
     }
 
     /**
@@ -100,14 +124,26 @@ final class ConsoleLayout {
         return current;
     }
 
-    /**
-     * Prints the blank line that separates a new section from the output before it, before its first write.
-     */
     private void beforeWrite(PrintStream target) {
         if (separatorPending) {
             separatorPending = false;
-            target.println();
+            if (trailingLineFeeds < 2) {
+                PrintStream separator = separatorTarget == null ? target : separatorTarget;
+                // The streams are flushed first, so that the separator lands between the sections on a console
+                targets.forEach(PrintStream::flush);
+                separator.println();
+                separator.flush();
+                trailingLineFeeds++;
+            }
         }
         written = true;
+    }
+
+    private void afterWrite(int b) {
+        if (b == '\n') {
+            trailingLineFeeds++;
+        } else if (b != '\r') {
+            trailingLineFeeds = 0;
+        }
     }
 }

@@ -18,8 +18,13 @@
 
 package io.ballerina.scan.internal;
 
+import com.google.gson.JsonParser;
+import io.ballerina.projects.Project;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.internal.ConsoleLayout.Section;
+import io.ballerina.scan.utils.AnalyzedSources;
+import io.ballerina.scan.utils.ScanTomlFile;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import picocli.CommandLine;
@@ -30,6 +35,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
@@ -77,6 +83,136 @@ public class ConsoleLayoutTest extends BaseTest {
         layout.enter(Section.FAILURE);
         err.println("bal scan: error: failed");
         Assert.assertEquals(normalize(bytes.toString(StandardCharsets.UTF_8)), "bal scan: error: failed\n");
+    }
+
+    @Test(description = "test output that already ends with a blank line gets no second one")
+    void testNoDoubleBlankLine() {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        ConsoleLayout layout = new ConsoleLayout();
+        PrintStream out = layout.track(new PrintStream(bytes, true, StandardCharsets.UTF_8));
+        layout.enter(Section.PLATFORMS);
+        out.println("Reporting issues to: examplePlatform");
+        layout.enter(Section.PLATFORM_OUTPUT);
+        out.println("uploaded");
+        out.println();
+        layout.enter(Section.FAILURE);
+        out.println("bal scan: error: failed");
+        Assert.assertEquals(normalize(bytes.toString(StandardCharsets.UTF_8)),
+                "Reporting issues to: examplePlatform\n\nuploaded\n\nbal scan: error: failed\n");
+    }
+
+    @Test(description = "test the blank lines between sections are written to the separator stream only")
+    void testSeparatorStream() {
+        ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+        ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
+        PrintStream outConsole = new PrintStream(outBytes, true, StandardCharsets.UTF_8);
+        PrintStream errConsole = new PrintStream(errBytes, true, StandardCharsets.UTF_8);
+        ConsoleLayout layout = new ConsoleLayout();
+        PrintStream out = layout.track(outConsole);
+        PrintStream err = layout.track(errConsole);
+        layout.separateWith(errConsole);
+
+        layout.enter(Section.LOADING);
+        err.println("loading");
+        layout.enter(Section.RESULTS);
+        out.println("[]");
+        layout.enter(Section.SUMMARY);
+        err.println("0 issue(s)");
+
+        Assert.assertEquals(normalize(outBytes.toString(StandardCharsets.UTF_8)), "[]\n");
+        Assert.assertEquals(normalize(errBytes.toString(StandardCharsets.UTF_8)), "loading\n\n\n0 issue(s)\n");
+    }
+
+    @Test(description = "test standard output holds only the results when it is separate from standard error")
+    void testSplitStreams() {
+        ScanStreams run = scanSplit(gateIssuesProject);
+        Assert.assertTrue(run.out().startsWith("["), "no blank line before the results: " + run.out());
+        Assert.assertFalse(JsonParser.parseString(run.out()).getAsJsonArray().isEmpty(), run.out());
+        // The two blank lines around the results, which went to standard output
+        Assert.assertTrue(run.err().startsWith("Running Scans\n\n\n3 issue(s)\n"), run.err());
+
+        run = scanSplit(gateIssuesProject, "--list-rules");
+        Assert.assertFalse(run.out().startsWith("\n") || run.out().startsWith("\r"),
+                "bal scan --list-rules > rules.txt starts with the table: " + run.out());
+        Assert.assertTrue(run.out().contains("ballerina:1"), run.out());
+        Assert.assertTrue(run.err().endsWith("\n\n"), "the separator before the table: " + run.err());
+    }
+
+    @Test(description = "test held warnings are printed, separated, before a failure")
+    void testFailureAfterHeldWarnings() throws IOException {
+        Path scanToml = gateIssuesProject.resolve("Scan.toml");
+        Files.writeString(scanToml, """
+                [gate]
+                failOnSeverity = "LOW"
+                """);
+        try {
+            String output = scan(gateIssuesProject, "--fail-on-severity=HIGH", "--include-rules=ballerina:99");
+            Assert.assertEquals(skeleton(output), """
+                    Loading scan tool configurations from <PATH>
+
+                    bal scan: warning: --fail-on-severity=HIGH overrides [gate] failOnSeverity = "LOW" in Scan.toml
+
+                    bal scan: error: unknown rule 'ballerina:99'
+                      Run 'bal scan --list-rules' to see the available rules.
+                    Usage: bal scan [OPTIONS] [<package>|<source-file>]
+                    Try 'bal scan --help' for more information.
+                    """, output);
+        } finally {
+            Files.deleteIfExists(scanToml);
+        }
+    }
+
+    @Test(description = "test the platform output is a section of its own, followed by the gate result")
+    void testPlatformsLayout() throws IOException {
+        Path project = testResourcesRoot.resolve("bal-project-with-platform-configurations");
+        withPlatformScanToml(project, "", () -> {
+            String output = scan(project, "--platforms=examplePlatform", "--fail-on-severity=INFO");
+            Assert.assertEquals(skeleton(output).replaceAll("(?m)^bal scan: error: .*$", "<GATE>"), """
+                    Loading scan tool configurations from <PATH>
+
+                    Running Scans
+
+                    <ISSUES>
+
+                    <SUMMARY>
+
+                    View scan results at:
+                    \t<URI>
+
+                    Reporting issues to: examplePlatform
+
+                    uploaded by examplePlatform
+
+                    <GATE>
+                    """, output);
+        });
+    }
+
+    @Test(description = "test a platform-triggered scan prints its held warnings before the summary")
+    void testPlatformTriggeredLayout() throws IOException {
+        Path project = testResourcesRoot.resolve("bal-project-with-tests");
+        withPlatformScanToml(project, """
+                [[analyzer]]
+                org = "exampleOrg"
+                name = "example_module_static_code_analyzer"
+
+                """, () -> {
+            String output = scan(project, "--platform-triggered");
+            Assert.assertEquals(withoutWarnings(skeleton(output)), """
+                    Loading scan tool configurations from <PATH>
+
+                    Running Scans
+
+                    <WARNING>
+
+                    <SUMMARY>
+
+                    Reporting issues to: examplePlatform
+
+                    uploaded by examplePlatform
+
+                    """, output);
+        });
     }
 
     @Test(description = "test the layout of a package scan with warnings, a report and a failing gate")
@@ -156,6 +292,74 @@ public class ConsoleLayoutTest extends BaseTest {
                 """);
     }
 
+    @Test(description = "test --platforms on a single file is a usage error before the file is loaded")
+    void testPlatformsOnSingleFileBeforeLoading() throws IOException {
+        Path directory = Files.createTempDirectory("scan-platforms");
+        try {
+            Path emptyFile = Files.writeString(directory.resolve("empty.bal"), "");
+            Path brokenFile = Files.writeString(directory.resolve("broken.bal"), "public function main( {");
+            for (Path file : new Path[]{emptyFile, brokenFile}) {
+                System.setProperty("user.dir", directory.toString());
+                ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+                try {
+                    new CommandLine(scanCmd).parseArgs(file.toString(), "--platforms=sonarqube");
+                    scanCmd.execute();
+                } finally {
+                    System.setProperty("user.dir", userDir);
+                }
+                String output = readOutput(true);
+                Assert.assertEquals(scanCmd.exitCode(), 2, output);
+                Assert.assertTrue(output.startsWith("bal scan: error: reporting to platforms is not supported with "
+                        + "single bal files"), output);
+            }
+        } finally {
+            ProjectUtils.deleteDirectory(directory);
+        }
+    }
+
+    @Test(description = "test --list-rules with --platforms on a single file lists the rules")
+    void testListRulesWithPlatformsOnSingleFile() throws IOException {
+        Path singleFile = testResourcesRoot.resolve("valid-single-file-project").resolve("main.bal");
+        System.setProperty("user.dir", testResourcesRoot.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+        try {
+            new CommandLine(scanCmd).parseArgs("--list-rules", "--platforms=x", singleFile.toAbsolutePath().toString());
+            scanCmd.execute();
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
+        String output = readOutput(true);
+        Assert.assertEquals(scanCmd.exitCode(), 0, output);
+        Assert.assertTrue(output.contains("ballerina:1"), output);
+    }
+
+    @Test(description = "test held warnings are printed when the scan ends with an Error")
+    void testWarningsPrintedOnError() throws IOException {
+        Path scanToml = gateIssuesProject.resolve("Scan.toml");
+        Files.writeString(scanToml, """
+                [gate]
+                failOnSeverity = "LOW"
+                """);
+        System.setProperty("user.dir", gateIssuesProject.toString());
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream, printStream) {
+                @Override
+                protected ProjectAnalyzer getProjectAnalyzer(Project project, ScanTomlFile scanTomlFile,
+                                                             AnalyzedSources analyzedSources) {
+                    throw new NoClassDefFoundError("io/example/MissingClass");
+                }
+            };
+            new CommandLine(scanCmd).parseArgs("--fail-on-severity=HIGH");
+            Assert.assertThrows(NoClassDefFoundError.class, scanCmd::execute);
+        } finally {
+            System.setProperty("user.dir", userDir);
+            Files.deleteIfExists(scanToml);
+        }
+        String output = readOutput(true);
+        Assert.assertTrue(output.contains("bal scan: warning: --fail-on-severity=HIGH overrides [gate] failOnSeverity"),
+                output);
+    }
+
     /**
      * Runs a scan from the given directory, and returns everything it printed.
      */
@@ -172,6 +376,59 @@ public class ConsoleLayoutTest extends BaseTest {
     }
 
     /**
+     * Runs a scan from the given directory with separate standard output and standard error streams.
+     */
+    private ScanStreams scanSplit(Path directory, String... args) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        System.setProperty("user.dir", directory.toString());
+        try (PrintStream outStream = new PrintStream(out, true, StandardCharsets.UTF_8);
+             PrintStream errStream = new PrintStream(err, true, StandardCharsets.UTF_8)) {
+            ScanCmd scanCmd = new ScanCmd(outStream, errStream);
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
+        return new ScanStreams(normalize(out.toString(StandardCharsets.UTF_8)),
+                normalize(err.toString(StandardCharsets.UTF_8)));
+    }
+
+    /**
+     * Runs a test with a Scan.toml that declares the example platform, which prints a message and a blank line.
+     */
+    private void withPlatformScanToml(Path project, String otherTables, ThrowingRunnable test) throws IOException {
+        Path pluginJar = Objects.requireNonNull(Path.of(userDir).toAbsolutePath().getParent())
+                .resolve("test-static-code-analysis-platform-plugins")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin").resolve("build").resolve("libs")
+                .resolve("exampleOrg-static-code-analysis-platform-plugin.jar");
+        Path scanToml = project.resolve("Scan.toml");
+        String original = Files.exists(scanToml) ? Files.readString(scanToml, StandardCharsets.UTF_8) : null;
+        Files.writeString(scanToml, otherTables + """
+                [[platform]]
+                name = "examplePlatform"
+                path = "<PLUGIN_JAR>"
+                consoleMessage = "uploaded by examplePlatform"
+                """.replace("<PLUGIN_JAR>", pluginJar.toString().replace("\\", "\\\\")));
+        try {
+            test.run();
+        } finally {
+            if (original == null) {
+                Files.deleteIfExists(scanToml);
+            } else {
+                Files.writeString(scanToml, original);
+            }
+            // The example platform saves what it receives in the working directory
+            Files.deleteIfExists(project.resolve("analysis-issues.json"));
+            Files.deleteIfExists(project.resolve("platform-arguments.json"));
+        }
+    }
+
+    private static String withoutWarnings(String output) {
+        return output.replaceAll("(?m)^.*warning: .*$", "<WARNING>");
+    }
+
+    /**
      * Replaces the parts of the output that vary between runs and machines with placeholders.
      */
     private static String skeleton(String output) {
@@ -184,5 +441,12 @@ public class ConsoleLayoutTest extends BaseTest {
 
     private static String normalize(String output) {
         return output.replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
+    }
+
+    private record ScanStreams(String out, String err) {
+    }
+
+    private interface ThrowingRunnable {
+        void run() throws IOException;
     }
 }

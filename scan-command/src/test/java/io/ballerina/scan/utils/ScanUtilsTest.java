@@ -63,6 +63,7 @@ public class ScanUtilsTest extends BaseTest {
     }
 
     @Test(description = "test method for printing results to console")
+    @SuppressWarnings("deprecation")
     void testPrintToConsole() throws IOException {
         List<Issue> issues = new ArrayList<>();
         ScanUtils.printToConsole(issues, printStream);

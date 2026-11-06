@@ -19,6 +19,7 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.projects.Document;
+import io.ballerina.projects.ProjectKind;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Reporter;
 import io.ballerina.scan.Rule;
@@ -94,8 +95,11 @@ public class ReporterImpl implements Reporter {
                 .orElse(Path.of(document.name())).toString();
     }
 
-    // The name of a document as shown in scan results
+    // The name of a document as shown in scan results; a single file has no package to qualify it with
     static String reportFileName(Document document) {
+        if (document.module().project().kind() == ProjectKind.SINGLE_FILE_PROJECT) {
+            return document.name();
+        }
         return document.module().moduleName() + FORWARD_SLASH + document.name();
     }
 

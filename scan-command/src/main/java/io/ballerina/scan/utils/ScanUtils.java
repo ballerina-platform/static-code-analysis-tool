@@ -31,6 +31,7 @@ import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.TomlDocument;
 import io.ballerina.projects.internal.model.Target;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
@@ -57,6 +58,8 @@ import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.Writer;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -74,7 +77,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -196,7 +198,10 @@ public final class ScanUtils {
      *
      * @param issues       generated issues
      * @param outputStream print stream
+     * @deprecated the leading blank line it prints does not fit the console layout of the scan; print
+     * {@link #convertIssuesToJsonString(List)} instead
      */
+    @Deprecated(since = "0.11.1")
     public static void printToConsole(List<Issue> issues, PrintStream outputStream) {
         printToConsole(issues, outputStream, false, null);
     }
@@ -208,7 +213,10 @@ public final class ScanUtils {
      * @param outputStream print stream
      * @param printSarif   whether to print SARIF format instead of default BALLERINA format
      * @param project      Ballerina project (required for SARIF format)
+     * @deprecated the leading blank line it prints does not fit the console layout of the scan; print
+     * {@link #convertIssuesToJsonString(List)} or {@link #convertIssuesToSarifString(List, Project)} instead
      */
+    @Deprecated(since = "0.11.1")
     public static void printToConsole(List<Issue> issues, PrintStream outputStream, boolean printSarif,
                                       Project project) {
         String output;
@@ -232,6 +240,26 @@ public final class ScanUtils {
     }
 
     /**
+     * Fails when the dependencies of a package are not locked in its Dependencies.toml, as {@code bal build} locks
+     * them. A single file has no dependencies to lock.
+     *
+     * @param project the project to scan
+     * @throws ScanToolException if the project is a package without a Dependencies.toml
+     * @since 0.11.1
+     */
+    public static void requireLockedDependencies(Project project) {
+        if (project.kind() != ProjectKind.BUILD_PROJECT) {
+            return;
+        }
+        Package currentPackage = project.currentPackage();
+        // An empty package has no dependencies to lock, and is reported as empty instead
+        if (!ProjectUtils.isProjectEmpty(project) && currentPackage.dependenciesToml().isEmpty()) {
+            String packageName = currentPackage.packageOrg().value() + "/" + currentPackage.packageName().value();
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.MISSING_DEPENDENCIES_TOML, packageName));
+        }
+    }
+
+    /**
      * Returns the json {@link String} array of generated issues, where each suppressed issue carries a
      * {@code suppressions} entry mirroring the SARIF suppression object.
      *
@@ -240,12 +268,22 @@ public final class ScanUtils {
      * @return json string array of generated issues
      */
     private static String convertIssuesToJsonString(List<Issue> issues, Map<Issue, SuppressedIssue> suppressions) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
         JsonArray issuesAsJson = gson.toJsonTree(issues).getAsJsonArray();
+        Map<String, String> fileContentCache = new HashMap<>();
         for (int i = 0; i < issues.size(); i++) {
-            SuppressedIssue suppressedIssue = suppressions.get(issues.get(i));
+            Issue issue = issues.get(i);
+            JsonObject issueAsJson = issuesAsJson.get(i).getAsJsonObject();
+            if (issue instanceof IssueImpl issueImpl) {
+                String snippetText = SnippetExtractor.extract(issueImpl.filePath(),
+                        issueImpl.location().textRange(), fileContentCache);
+                if (snippetText != null) {
+                    issueAsJson.getAsJsonObject("location").addProperty("snippet", snippetText);
+                }
+            }
+            SuppressedIssue suppressedIssue = suppressions.get(issue);
             if (suppressedIssue != null) {
-                issuesAsJson.get(i).getAsJsonObject().add(SUPPRESSIONS, toSuppressionsJson(suppressedIssue));
+                issueAsJson.add(SUPPRESSIONS, toSuppressionsJson(suppressedIssue));
             }
         }
         return gson.toJson(issuesAsJson);
@@ -344,6 +382,7 @@ public final class ScanUtils {
 
         // Create results array
         JsonArray results = new JsonArray();
+        Map<String, String> fileContentCache = new HashMap<>();
 
         for (Issue issue : issues) {
             IssueImpl issueImpl = (IssueImpl) issue;
@@ -375,6 +414,12 @@ public final class ScanUtils {
             region.addProperty("endColumn", lineRange.endLine().offset() + 1);
             region.addProperty("charOffset", textRange.startOffset());
             region.addProperty("charLength", textRange.length());
+            String snippetText = SnippetExtractor.extract(issueImpl.filePath(), textRange, fileContentCache);
+            if (snippetText != null) {
+                JsonObject snippet = new JsonObject();
+                snippet.addProperty("text", snippetText);
+                region.add("snippet", snippet);
+            }
             physicalLocation.add("region", region);
 
             location.add("physicalLocation", physicalLocation);
@@ -672,13 +717,11 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the {@link JsonObject} representation of the static code analysis
-     * issue.
+     * Returns the {@link JsonObject} representation of a scanned source file, including its content.
      *
-     * @param issueImpl       the {@link IssueImpl} representing the issue, to be
-     *                        converted to a JSON object
-     * @param suppressedIssue the suppression that accepted the issue, or {@code null} when it is active
-     * @return json object representation of the static code analysis issue
+     * @param fileName name of the source file
+     * @param filePath path of the source file
+     * @return json object representation of the scanned source file
      */
     private static JsonObject createScanReportFile(String fileName, String filePath) {
         JsonObject scanReportFile = new JsonObject();
@@ -964,7 +1007,7 @@ public final class ScanUtils {
 
         URL remoteScanTomlFilePath;
         try {
-            remoteScanTomlFilePath = new URL(scanTomlPath);
+            remoteScanTomlFilePath = toUrl(scanTomlPath);
             FileUtils.copyURLToFile(remoteScanTomlFilePath, cachePath.toFile());
         } catch (IOException ex) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.LOADING_REMOTE_CONFIG_FILE,
@@ -1254,10 +1297,25 @@ public final class ScanUtils {
      */
     private static boolean isUrl(String path) {
         try {
-            new URL(path);
+            toUrl(path);
             return true;
         } catch (MalformedURLException ex) {
             return false;
+        }
+    }
+
+    // Reports relative or unparsable paths as malformed, matching the deprecated URL(String) constructor
+    private static URL toUrl(String path) throws MalformedURLException {
+        try {
+            URI uri = new URI(path);
+            if (!uri.isAbsolute()) {
+                throw new MalformedURLException("no protocol: " + path);
+            }
+            return uri.toURL();
+        } catch (URISyntaxException | IllegalArgumentException ex) {
+            MalformedURLException malformed = new MalformedURLException(ex.getMessage());
+            malformed.initCause(ex);
+            throw malformed;
         }
     }
 
@@ -1330,7 +1388,7 @@ public final class ScanUtils {
             return localJar.get().toAbsolutePath();
         }
         try {
-            return Path.of(loadRemoteJAR(targetDir, platform.name(), new URL(platform.path()), outputStream));
+            return Path.of(loadRemoteJAR(targetDir, platform.name(), toUrl(platform.path()), outputStream));
         } catch (MalformedURLException ex) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.PLATFORM_FILE_NOT_FOUND, platform.name(),
                     PLATFORM_PATH, platform.path()));

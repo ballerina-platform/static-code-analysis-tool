@@ -11,14 +11,18 @@ Built against Ballerina 2201.12.0.
 ### Added
 
 - In-source suppression of scan findings with the `@scan:Suppress` annotation. Suppressed findings are left out of the console output and stay reviewable in the saved reports. ([#119](https://github.com/ballerina-platform/static-code-analysis-tool/pull/119), backport of [#115](https://github.com/ballerina-platform/static-code-analysis-tool/pull/115))
+- Each issue in the JSON and SARIF output carries the source text it covers, as `location.snippet` and `region.snippet.text`.
 
 ### Changed
 
 - The "Running scans" message is printed earlier in the run. ([#76](https://github.com/ballerina-platform/static-code-analysis-tool/pull/76))
-- Single file and package scans print their output in the same order, with one blank line between sections: configuration, warnings, progress, issues, issue summary, report locations, platform output and the gate result. `--platforms` is rejected for a single Ballerina file.
+- Single file and package scans print their output in the same order, with one blank line between sections: configuration, warnings, progress, issues, issue summary, report locations, platform output and the gate result. Warnings are printed before the section that follows them, and the blank lines are written to standard error, so standard output holds only the results. `--platforms` is rejected for a single Ballerina file.
 - `--include-rules` and `--exclude-rules` add to `include` and `exclude` in `Scan.toml` instead of replacing them.
 - The HTML scan report uses the redesigned report of 0.12.0: syntax highlighting, a folder tree that lists every scanned file, issue filtering, and the severity of each issue, which is the one the gate counts its rule kind as. (backport of [#92](https://github.com/ballerina-platform/static-code-analysis-tool/pull/92), [#97](https://github.com/ballerina-platform/static-code-analysis-tool/pull/97) and [#102](https://github.com/ballerina-platform/static-code-analysis-tool/pull/102))
 - The build provisions the Ballerina distribution itself and uses Gradle 9.5.1. ([#120](https://github.com/ballerina-platform/static-code-analysis-tool/pull/120))
+- A package is scanned, or has its rules listed, only when its dependencies are locked in `Dependencies.toml`; otherwise the scan asks to run `bal build` first.
+- `bal scan --list-rules` prints "Resolving scan rules from package dependencies" instead of "Running Scans", and fails when the package does not compile.
+- The `fileName` of an issue in a single Ballerina file is the file name, without a `./` prefix.
 
 ### Fixed
 
@@ -26,6 +30,7 @@ Built against Ballerina 2201.12.0.
 - `ballerina:2` no longer reports parameters of external functions. ([#120](https://github.com/ballerina-platform/static-code-analysis-tool/pull/120))
 - The published tool package contains up-to-date tool TOML files. ([#122](https://github.com/ballerina-platform/static-code-analysis-tool/pull/122))
 - `bal scan --exclude-tests` no longer fails with `NoClassDefFoundError` on the picocli version bundled with the `bal` launcher.
+- `bal scan .` scans the package in the current directory instead of failing with "'.' is already within a Ballerina package".
 
 ## [0.11.0] - 2025-08-06
 

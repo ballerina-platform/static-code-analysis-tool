@@ -48,9 +48,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Set;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.ScanReportTestUtils.readScanReportData;
@@ -59,6 +59,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 import static io.ballerina.scan.utils.DiagnosticCode.COMPILATION_CONTAINS_ERRORS;
 import static io.ballerina.scan.utils.DiagnosticCode.EMPTY_PACKAGE;
+import static io.ballerina.scan.utils.DiagnosticCode.MISSING_DEPENDENCIES_TOML;
 import static io.ballerina.scan.utils.DiagnosticLog.error;
 
 /**
@@ -76,6 +77,11 @@ public class ScanCmdTest extends BaseTest {
     void cleanup() {
         Path resultsDirectoryPath = validBalProject.resolve(RESULTS_DIRECTORY);
         removeFile(resultsDirectoryPath);
+    }
+
+    // The issues record absolute file paths, which the expected outputs write as <ABS_SOURCE_ROOT>
+    private static String withSourceRoot(String expected, Path project) {
+        return expected.replace("<ABS_SOURCE_ROOT>", project.toAbsolutePath().toString().replace("\\", "\\\\"));
     }
 
     private void removeFile(Path filePath) {
@@ -426,7 +432,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("include-rules-issues-report.txt");
+        String expected = withSourceRoot(getExpectedOutput("include-rules-issues-report.txt"),
+                ballerinaProject);
         Assert.assertEquals(result, expected);
     }
 
@@ -443,7 +450,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("exclude-rules-issues-report.txt");
+        String expected = withSourceRoot(getExpectedOutput("exclude-rules-issues-report.txt"),
+                ballerinaProject);
         Assert.assertEquals(result, expected);
     }
 
@@ -473,7 +481,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("toml-include-rules-issues-report.txt");
+        String expected = withSourceRoot(getExpectedOutput("toml-include-rules-issues-report.txt"),
+                ballerinaProject);
         Assert.assertEquals(result, expected);
     }
 
@@ -490,7 +499,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("toml-exclude-rules-issues-report.txt");
+        String expected = withSourceRoot(getExpectedOutput("toml-exclude-rules-issues-report.txt"),
+                ballerinaProject);
         Assert.assertEquals(result, expected);
     }
 
@@ -498,23 +508,27 @@ public class ScanCmdTest extends BaseTest {
     void testExcludeRulesOptionCombinedWithScanToml() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-exclude-rule-configurations");
+        Path resultsFile = ballerinaProject.resolve("target").resolve("report").resolve("scan_results.json");
         System.setProperty("user.dir", ballerinaProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
-        String[] args = {"--exclude-rules=exampleOrg/example_module_static_code_analyzer:1"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-        System.setProperty("user.dir", userDir);
-        String output = readOutput(true);
-        Assert.assertEquals(scanCmd.exitCode(), 0, output);
-        Assert.assertFalse(output.contains("overrides [rule] exclude"), output);
-        String report = Files.readString(ballerinaProject.resolve("target").resolve("report")
-                .resolve("scan_results.json"), StandardCharsets.UTF_8);
-        List<String> ruleIds = new ArrayList<>();
-        JsonParser.parseString(report).getAsJsonArray().forEach(issue ->
-                ruleIds.add(issue.getAsJsonObject().getAsJsonObject("rule").get("id").getAsString()));
-        Assert.assertEquals(ruleIds.stream().sorted().toList(), List.of(
-                "ballerina/example_module_static_code_analyzer:1",
-                "ballerinax/example_module_static_code_analyzer:1"), "ballerina:1 stays excluded by Scan.toml");
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+            String[] args = {"--exclude-rules=exampleOrg/example_module_static_code_analyzer:1"};
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+            String output = readOutput(true);
+            Assert.assertEquals(scanCmd.exitCode(), 0, output);
+            Assert.assertFalse(output.contains("overrides [rule] exclude"), output);
+            String report = Files.readString(resultsFile, StandardCharsets.UTF_8);
+            List<String> ruleIds = new ArrayList<>();
+            JsonParser.parseString(report).getAsJsonArray().forEach(issue ->
+                    ruleIds.add(issue.getAsJsonObject().getAsJsonObject("rule").get("id").getAsString()));
+            Assert.assertEquals(ruleIds.stream().sorted().toList(), List.of(
+                    "ballerina/example_module_static_code_analyzer:1",
+                    "ballerinax/example_module_static_code_analyzer:1"), "ballerina:1 stays excluded by Scan.toml");
+        } finally {
+            System.setProperty("user.dir", userDir);
+            Files.deleteIfExists(resultsFile);
+        }
     }
 
     @Test(description = "test scan command with include and exclude rules Scan.toml configurations")
@@ -575,7 +589,8 @@ public class ScanCmdTest extends BaseTest {
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         removeFile(result);
 
-        String expected = getExpectedOutput("platform-plugin-issue-output.txt");
+        String expected = withSourceRoot(getExpectedOutput("platform-plugin-issue-output.txt"),
+                ballerinaProject);
         Assert.assertEquals(platformIssuesOutput, expected);
 
         expected = getExpectedOutput("platform-plugin-arguments-output.txt");
@@ -873,6 +888,52 @@ public class ScanCmdTest extends BaseTest {
         Path jsonReport = ballerinaProject.resolve("target").resolve("report").resolve("scan_results.json");
         Assert.assertFalse(Files.exists(jsonReport),
                 "No scan report should be generated when compilation contains errors");
+    }
+
+    @Test(description = "test listing the rules of a project containing compilation errors")
+    void testListRulesWithCompilationErrors() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-compilation-errors");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        new CommandLine(scanCmd).parseArgs("--list-rules");
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String output = readOutput(true);
+        Assert.assertEquals(output.trim(), ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG + "\n\n"
+                + "bal scan: error: " + error(COMPILATION_CONTAINS_ERRORS) + "\n"
+                + "main.bal:18:17: error: incompatible types: expected 'int', found 'string'");
+        Assert.assertEquals(scanCmd.exitCode(), 1);
+    }
+
+    @Test(description = "test a package whose dependencies are not locked is neither scanned nor has its rules listed")
+    void testScanCommandRequiresDependenciesToml() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources").resolve(UNLOCKED_PROJECT);
+        Files.deleteIfExists(ballerinaProject.resolve("Dependencies.toml"));
+        String expected = "bal scan: error: "
+                + error(MISSING_DEPENDENCIES_TOML, "ballerina/bal_project_without_dependencies_toml");
+        for (String[] args : List.of(new String[0], new String[]{"--list-rules"})) {
+            System.setProperty("user.dir", ballerinaProject.toString());
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+            System.setProperty("user.dir", userDir);
+            Assert.assertEquals(scanCmd.exitCode(), 1);
+            Assert.assertEquals(readOutput(true).trim(), expected);
+        }
+        Assert.assertFalse(Files.exists(ballerinaProject.resolve("Dependencies.toml")),
+                "The scan should not resolve the dependencies itself");
+        Assert.assertFalse(Files.exists(ballerinaProject.resolve("target").resolve("report")));
+    }
+
+    @Test(description = "test scanning a package by a relative path ending in '.'")
+    void testScanCommandWithDotPath() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        new CommandLine(scanCmd).parseArgs(validBalProject.resolve(".").toString());
+        scanCmd.execute();
+        String output = readOutput(true);
+        Assert.assertEquals(scanCmd.exitCode(), 0, output);
+        Assert.assertTrue(output.contains(" issue(s)"), output);
     }
 
     @Test(description = "test scan command default format behavior")

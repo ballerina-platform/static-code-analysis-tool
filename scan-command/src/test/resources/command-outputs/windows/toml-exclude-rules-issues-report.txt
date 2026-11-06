@@ -7,7 +7,8 @@
       "startColumn": 0,
       "endColumn": 1,
       "startOffset": 664,
-      "length": 139
+      "length": 139,
+      "snippet": "function getResult() returns int|error => 1;\r\n\r\npublic function main() {\r\n    // Non-compliant\r\n    int result = checkpanic getResult();\r\n}"
     },
     "rule": {
       "id": "ballerina/example_module_static_code_analyzer:1",
@@ -17,7 +18,7 @@
     },
     "source": "BUILT_IN",
     "fileName": "bal_project_with_exclude_rule_configurations/main.bal",
-    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-exclude-rule-configurations\\main.bal"
+    "filePath": "<ABS_SOURCE_ROOT>\\main.bal"
   },
   {
     "location": {
@@ -27,7 +28,8 @@
       "startColumn": 0,
       "endColumn": 1,
       "startOffset": 664,
-      "length": 139
+      "length": 139,
+      "snippet": "function getResult() returns int|error => 1;\r\n\r\npublic function main() {\r\n    // Non-compliant\r\n    int result = checkpanic getResult();\r\n}"
     },
     "rule": {
       "id": "exampleOrg/example_module_static_code_analyzer:1",
@@ -37,7 +39,7 @@
     },
     "source": "EXTERNAL",
     "fileName": "bal_project_with_exclude_rule_configurations/main.bal",
-    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-exclude-rule-configurations\\main.bal"
+    "filePath": "<ABS_SOURCE_ROOT>\\main.bal"
   },
   {
     "location": {
@@ -47,7 +49,8 @@
       "startColumn": 0,
       "endColumn": 1,
       "startOffset": 664,
-      "length": 139
+      "length": 139,
+      "snippet": "function getResult() returns int|error => 1;\r\n\r\npublic function main() {\r\n    // Non-compliant\r\n    int result = checkpanic getResult();\r\n}"
     },
     "rule": {
       "id": "ballerinax/example_module_static_code_analyzer:1",
@@ -57,6 +60,6 @@
     },
     "source": "BUILT_IN",
     "fileName": "bal_project_with_exclude_rule_configurations/main.bal",
-    "filePath": "src\\test\\resources\\test-resources\\bal-project-with-exclude-rule-configurations\\main.bal"
+    "filePath": "<ABS_SOURCE_ROOT>\\main.bal"
   }
 ]
