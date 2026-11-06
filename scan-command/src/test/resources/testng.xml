@@ -45,6 +45,8 @@ under the License.
             <class name="io.ballerina.scan.internal.GateTest"/>
             <class name="io.ballerina.scan.internal.ExcludeTestsTest"/>
             <class name="io.ballerina.scan.internal.PlatformRunnerTest"/>
+            <class name="io.ballerina.scan.internal.LauncherPicocliTest"/>
+            <class name="io.ballerina.scan.internal.ConsoleLayoutTest"/>
             <class name="io.ballerina.scan.utils.ScanUtilsTest"/>
             <class name="io.ballerina.scan.utils.ScanTomlFileTest"/>
             <class name="io.ballerina.scan.utils.DiagnosticLogTest"/>

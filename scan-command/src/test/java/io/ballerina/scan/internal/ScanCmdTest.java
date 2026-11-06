@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.internal;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.projects.Project;
@@ -48,13 +50,16 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
+import static io.ballerina.scan.ScanReportTestUtils.readScanReportData;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINAX_ORG;
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 import static io.ballerina.scan.utils.DiagnosticCode.COMPILATION_CONTAINS_ERRORS;
 import static io.ballerina.scan.utils.DiagnosticCode.EMPTY_PACKAGE;
+import static io.ballerina.scan.utils.DiagnosticCode.MISSING_DEPENDENCIES_TOML;
 import static io.ballerina.scan.utils.DiagnosticLog.error;
 
 /**
@@ -72,6 +77,11 @@ public class ScanCmdTest extends BaseTest {
     void cleanup() {
         Path resultsDirectoryPath = validBalProject.resolve(RESULTS_DIRECTORY);
         removeFile(resultsDirectoryPath);
+    }
+
+    // The issues record absolute file paths, which the expected outputs write as <ABS_SOURCE_ROOT>
+    private static String withSourceRoot(String expected, Path project) {
+        return expected.replace("<ABS_SOURCE_ROOT>", project.toAbsolutePath().toString().replace("\\", "\\\\"));
     }
 
     private void removeFile(Path filePath) {
@@ -230,11 +240,74 @@ public class ScanCmdTest extends BaseTest {
         issues.add(new IssueImpl(location, externalRule, Source.EXTERNAL, "main.bal",
                 validBalProject.resolve("main.bal").toString()));
         Project project = ProjectLoader.loadProject(validBalProject);
-        Path resultsFile = ScanUtils.generateScanReport(issues, project, null);
-        String result = Files.readString(resultsFile, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("issues-html-report.txt");
-        Assert.assertEquals(result, expected);
+        JsonObject scanData = readScanReportData(ScanUtils.generateScanReport(issues, project, null));
+        Assert.assertEquals(scanData.get("projectName").getAsString(), "valid_bal_project");
+        JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
+        Assert.assertEquals(scannedFiles.size(), 1);
+        JsonObject scannedFile = findScannedFile(scannedFiles, validBalProject.resolve("main.bal"));
+        Assert.assertEquals(scannedFile.get("fileName").getAsString(), "main.bal");
+        Assert.assertEquals(scannedFile.get("fileContent").getAsString(),
+                Files.readString(validBalProject.resolve("main.bal"), StandardCharsets.UTF_8));
+
+        JsonArray reportIssues = scannedFile.getAsJsonArray("issues");
+        Assert.assertEquals(reportIssues.size(), 2);
+        List<String> expectedRuleIds = List.of("ballerina:101", "exampleOrg/exampleName:101");
+        List<String> expectedIssueTypes = List.of("BUILT_IN", "EXTERNAL");
+        for (int i = 0; i < reportIssues.size(); i++) {
+            JsonObject issue = reportIssues.get(i).getAsJsonObject();
+            Assert.assertEquals(issue.keySet(),
+                    Set.of("ruleID", "ruleKind", "severity", "issueType", "message", "textRange"));
+            Assert.assertEquals(issue.get("ruleID").getAsString(), expectedRuleIds.get(i));
+            Assert.assertEquals(issue.get("issueType").getAsString(), expectedIssueTypes.get(i));
+            Assert.assertEquals(issue.get("message").getAsString(), "rule 101");
+            Assert.assertEquals(issue.get("ruleKind").getAsString(), "BUG");
+            // Rules have no severity of their own on this line, so a bug is shown as HIGH, as the gate counts it
+            Assert.assertEquals(issue.get("severity").getAsString(), "HIGH");
+            JsonObject textRange = issue.getAsJsonObject("textRange");
+            Assert.assertEquals(textRange.get("startLine").getAsInt(), 16);
+            Assert.assertEquals(textRange.get("startLineOffset").getAsInt(), 17);
+            Assert.assertEquals(textRange.get("endLine").getAsInt(), 23);
+            Assert.assertEquals(textRange.get("endLineOffset").getAsInt(), 1);
+        }
+    }
+
+    @Test(description = "test html analysis report groups issues under the file they were reported in")
+    void testScanReportGroupsIssuesByFile() throws IOException {
+        Rule rule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
+        BLangDiagnosticLocation location = new BLangDiagnosticLocation("main.bal", 16, 23, 17, 1, 748, 4);
+        Path otherFile = testResources.resolve("test-resources").resolve("bal-project-with-config-file")
+                .resolve("main.bal");
+        BLangDiagnosticLocation otherLocation = new BLangDiagnosticLocation("main.bal", 1, 1, 0, 5, 0, 5);
+        String mainBal = validBalProject.resolve("main.bal").toString();
+        List<Issue> issues = List.of(
+                new IssueImpl(location, rule, Source.BUILT_IN, "main.bal", mainBal),
+                new IssueImpl(otherLocation, rule, Source.BUILT_IN, "main.bal", otherFile.toString()),
+                new IssueImpl(location, rule, Source.BUILT_IN, "main.bal", mainBal));
+        Project project = ProjectLoader.loadProject(validBalProject);
+        JsonObject scanData = readScanReportData(ScanUtils.generateScanReport(issues, project, null));
+
+        JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
+        Assert.assertEquals(scannedFiles.size(), 2);
+        JsonObject mainFile = findScannedFile(scannedFiles, validBalProject.resolve("main.bal"));
+        // Project documents come first; files only known through issues follow
+        Assert.assertEquals(scannedFiles.get(0).getAsJsonObject(), mainFile);
+        JsonObject secondFile = findScannedFile(scannedFiles, otherFile);
+        Assert.assertEquals(mainFile.getAsJsonArray("issues").size(), 2);
+        Assert.assertEquals(secondFile.getAsJsonArray("issues").size(), 1);
+        Assert.assertEquals(secondFile.get("fileContent").getAsString(),
+                Files.readString(otherFile, StandardCharsets.UTF_8));
+        Assert.assertFalse(secondFile.has("relativePath"), "a file outside the package has no relative path");
+    }
+
+    // Compares as normalized paths so the check doesn't depend on the OS path separator
+    private static JsonObject findScannedFile(JsonArray scannedFiles, Path filePath) {
+        Path expected = filePath.toAbsolutePath().normalize();
+        return scannedFiles.asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .filter(file -> Path.of(file.get("filePath").getAsString()).toAbsolutePath().normalize()
+                        .equals(expected))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Report has no entry for " + expected));
     }
 
     @Test(description = "test method for printing static code analysis rules to the console")
@@ -359,7 +432,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("include-rules-issues-report.txt");
+        String expected = withSourceRoot(getExpectedOutput("include-rules-issues-report.txt"),
+                ballerinaProject);
         Assert.assertEquals(result, expected);
     }
 
@@ -376,7 +450,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("exclude-rules-issues-report.txt");
+        String expected = withSourceRoot(getExpectedOutput("exclude-rules-issues-report.txt"),
+                ballerinaProject);
         Assert.assertEquals(result, expected);
     }
 
@@ -406,7 +481,8 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("toml-include-rules-issues-report.txt");
+        String expected = withSourceRoot(getExpectedOutput("toml-include-rules-issues-report.txt"),
+                ballerinaProject);
         Assert.assertEquals(result, expected);
     }
 
@@ -423,8 +499,36 @@ public class ScanCmdTest extends BaseTest {
         String result = Files.readString(ballerinaProject.resolve("target").resolve("report")
                         .resolve("scan_results.json"), StandardCharsets.UTF_8)
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("toml-exclude-rules-issues-report.txt");
+        String expected = withSourceRoot(getExpectedOutput("toml-exclude-rules-issues-report.txt"),
+                ballerinaProject);
         Assert.assertEquals(result, expected);
+    }
+
+    @Test(description = "test --exclude-rules adds to the exclude rules of Scan.toml instead of replacing them")
+    void testExcludeRulesOptionCombinedWithScanToml() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-exclude-rule-configurations");
+        Path resultsFile = ballerinaProject.resolve("target").resolve("report").resolve("scan_results.json");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+            String[] args = {"--exclude-rules=exampleOrg/example_module_static_code_analyzer:1"};
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+            String output = readOutput(true);
+            Assert.assertEquals(scanCmd.exitCode(), 0, output);
+            Assert.assertFalse(output.contains("overrides [rule] exclude"), output);
+            String report = Files.readString(resultsFile, StandardCharsets.UTF_8);
+            List<String> ruleIds = new ArrayList<>();
+            JsonParser.parseString(report).getAsJsonArray().forEach(issue ->
+                    ruleIds.add(issue.getAsJsonObject().getAsJsonObject("rule").get("id").getAsString()));
+            Assert.assertEquals(ruleIds.stream().sorted().toList(), List.of(
+                    "ballerina/example_module_static_code_analyzer:1",
+                    "ballerinax/example_module_static_code_analyzer:1"), "ballerina:1 stays excluded by Scan.toml");
+        } finally {
+            System.setProperty("user.dir", userDir);
+            Files.deleteIfExists(resultsFile);
+        }
     }
 
     @Test(description = "test scan command with include and exclude rules Scan.toml configurations")
@@ -469,12 +573,12 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", userDir);
         Assert.assertEquals(scanCmd.exitCode(), 0);
 
-        // The results are saved and summarised before the platform runs
+        // The results are summarised and saved before the platform runs
         String stderr = err.toString(StandardCharsets.UTF_8).replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        int resultsAt = stderr.indexOf("View scan results at:");
         int summaryAt = stderr.indexOf(" issue(s)");
+        int resultsAt = stderr.indexOf("View scan results at:");
         int platformAt = stderr.indexOf("Reporting issues to: examplePlatform");
-        Assert.assertTrue(resultsAt >= 0 && resultsAt < summaryAt && summaryAt < platformAt, stderr);
+        Assert.assertTrue(summaryAt >= 0 && summaryAt < resultsAt && resultsAt < platformAt, stderr);
 
         Path result = ballerinaProject.resolve("analysis-issues.json");
         String platformIssuesOutput = Files.readString(result, StandardCharsets.UTF_8)
@@ -485,7 +589,8 @@ public class ScanCmdTest extends BaseTest {
                 .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
         removeFile(result);
 
-        String expected = getExpectedOutput("platform-plugin-issue-output.txt");
+        String expected = withSourceRoot(getExpectedOutput("platform-plugin-issue-output.txt"),
+                ballerinaProject);
         Assert.assertEquals(platformIssuesOutput, expected);
 
         expected = getExpectedOutput("platform-plugin-arguments-output.txt");
@@ -783,6 +888,52 @@ public class ScanCmdTest extends BaseTest {
         Path jsonReport = ballerinaProject.resolve("target").resolve("report").resolve("scan_results.json");
         Assert.assertFalse(Files.exists(jsonReport),
                 "No scan report should be generated when compilation contains errors");
+    }
+
+    @Test(description = "test listing the rules of a project containing compilation errors")
+    void testListRulesWithCompilationErrors() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-compilation-errors");
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        new CommandLine(scanCmd).parseArgs("--list-rules");
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        String output = readOutput(true);
+        Assert.assertEquals(output.trim(), ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG + "\n\n"
+                + "bal scan: error: " + error(COMPILATION_CONTAINS_ERRORS) + "\n"
+                + "main.bal:18:17: error: incompatible types: expected 'int', found 'string'");
+        Assert.assertEquals(scanCmd.exitCode(), 1);
+    }
+
+    @Test(description = "test a package whose dependencies are not locked is neither scanned nor has its rules listed")
+    void testScanCommandRequiresDependenciesToml() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources").resolve(UNLOCKED_PROJECT);
+        Files.deleteIfExists(ballerinaProject.resolve("Dependencies.toml"));
+        String expected = "bal scan: error: "
+                + error(MISSING_DEPENDENCIES_TOML, "ballerina/bal_project_without_dependencies_toml");
+        for (String[] args : List.of(new String[0], new String[]{"--list-rules"})) {
+            System.setProperty("user.dir", ballerinaProject.toString());
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+            System.setProperty("user.dir", userDir);
+            Assert.assertEquals(scanCmd.exitCode(), 1);
+            Assert.assertEquals(readOutput(true).trim(), expected);
+        }
+        Assert.assertFalse(Files.exists(ballerinaProject.resolve("Dependencies.toml")),
+                "The scan should not resolve the dependencies itself");
+        Assert.assertFalse(Files.exists(ballerinaProject.resolve("target").resolve("report")));
+    }
+
+    @Test(description = "test scanning a package by a relative path ending in '.'")
+    void testScanCommandWithDotPath() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        new CommandLine(scanCmd).parseArgs(validBalProject.resolve(".").toString());
+        scanCmd.execute();
+        String output = readOutput(true);
+        Assert.assertEquals(scanCmd.exitCode(), 0, output);
+        Assert.assertTrue(output.contains(" issue(s)"), output);
     }
 
     @Test(description = "test scan command default format behavior")

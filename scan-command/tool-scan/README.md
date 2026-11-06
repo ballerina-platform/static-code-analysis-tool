@@ -37,19 +37,19 @@ bal scan [OPTIONS] [<package>|<source-file>]
 --list-rules
 ```
 
--  Run analysis for a specific set of rules. Replaces only `include` in the `[rule]` table of `Scan.toml`; an `exclude` set there still applies, and the two cannot be combined.
+-  Run analysis for a specific set of rules. Added to `include` in the `[rule]` table of `Scan.toml`; an `exclude` set there still applies, and the two cannot be combined.
 
 ```text
 --include-rules=<rule1, ...>
 ```
 
--  Exclude analysis for a specific set of rules. Replaces only `exclude` in the `[rule]` table of `Scan.toml`; an `include` set there still applies, and the two cannot be combined.
+-  Exclude analysis for a specific set of rules. Added to `exclude` in the `[rule]` table of `Scan.toml`; an `include` set there still applies, and the two cannot be combined.
 
 ```text
 --exclude-rules=<rule1, ...>
 ```
 
-- Report the results to these platforms, which must be declared in the `[[platform]]` table of `Scan.toml`. No platform is reported to unless it is named here. The results are printed and saved first; then every named platform is run, and the scan fails if any of them fails.
+- Report the results to these platforms, which must be declared in the `[[platform]]` table of `Scan.toml`. No platform is reported to unless it is named here. The results are printed and saved first; then every named platform is run, and the scan fails if any of them fails. Not supported for a single Ballerina file.
 
 ```text
 --platforms=<platformName1, ...>
@@ -195,7 +195,29 @@ bal scan --fail-on-severity=MEDIUM --fail-on-count=5
 bal scan --exclude-tests
 ```
 
-Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON, or SARIF with `--format=sarif`. Progress messages, warnings, report paths and the closing summary, such as `3 issue(s)`, are written to standard error.
+Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON, or SARIF with `--format=sarif`. Progress messages, warnings, the issue summary, such as `3 issue(s)`, report paths, and the blank lines between sections are written to standard error.
+
+The console output is printed as sections, in this order, with one blank line between them: configuration, warnings, progress, issues, issue summary, report locations, platform output and the gate result. A section that prints nothing is left out, and warnings raised during the scan, such as unmatched suppressions, are printed before the section that follows them.
+
+## Scan report
+
+To generate a detailed HTML report of the analysis results, use the `--scan-report` option:
+
+```bash
+bal scan --scan-report
+```
+
+This produces an HTML report and the scan results in JSON format inside the `target/report` directory (or the directory given via `--target-dir`). The report is only generated for Ballerina projects, not for standalone Ballerina files. It is generated even when the results are also reported to a platform.
+
+The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. Every scanned file is listed, including files without issues, in a folder tree of the package. You can filter, search, and export the list of files.
+
+![scan-report-summary-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-summary-view.png)
+
+To investigate further, click on a file name to open the file view. This view shows the source of the file and highlights the exact lines where problems were detected. Hover over a highlight to see a summary of the issue, or click it to see the full details.
+
+![scan-report-file-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-file-view.png)
+
+The issues found in the file are listed in a table with the line, rule ID, kind and severity of each issue. The severity is the one the gate counts the rule's kind as: `BUG` as `HIGH`, `VULNERABILITY` as `MEDIUM` and `CODE_SMELL` as `LOW`. Expand an issue to see its description and details such as its location and source, and jump to it in the source using **Show in code**.
 
 ## Exit codes and the gate
 
@@ -205,7 +227,7 @@ Only the issues are written to standard output, so `bal scan > issues.json` save
 |------|---------|
 | `0` | The scan completed, and no gate is set or the gate was not tripped. |
 | `1` | The gate was tripped, or the scan could not be completed, for example because of an invalid `Scan.toml`, a package that cannot be loaded, such as one whose `Ballerina.toml` has an error, a compilation error, an empty package, a platform or plugin failure, an invalid suppression or a report that cannot be written. |
-| `2` | Invalid command-line input, such as an invalid option value, too many arguments, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with `Scan.toml`, or an unknown rule ID. |
+| `2` | Invalid command-line input, such as an invalid option value, too many arguments, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, an unknown option, `--platforms` with a single Ballerina file, or an unknown rule ID. |
 | `3` | The path is not a Ballerina package or standalone file, or is a `.bal` file inside a package. |
 | `130` | The scan was interrupted. |
 
@@ -213,7 +235,7 @@ Every failure other than an interrupt is reported on standard error as `bal scan
 
 By default no gate is set, so findings never fail the scan. The gate is set with `--fail-on-severity` and `--fail-on-count`, or with the `[gate]` table of `Scan.toml`, and fails the scan when the number of issues at or above the severity reaches the count:
 
-| `--fail-on-severity` | `--fail-on-count` | Fails when |
+| --fail-on-severity | --fail-on-count | Fails when |
 |----------------------|-------------------|------------|
 | Not set | Not set | Never. The gate is off. |
 | Not set | `n` | There are `n` or more issues of any severity. |
@@ -247,9 +269,9 @@ function hashPassword(string password) returns string|error {
 ```
 
 - **Placement.** The annotation applies to issues reported within the construct it is attached to: a variable or constant declaration, a function, method or resource, a parameter, a return type, a field, a type, a class, a service, a listener, a worker or an `external` function body. A suppression on a service, class, object type or object constructor does not reach issues inside its members. An issue in a statement that is not a declaration can be suppressed by turning the statement into one, for example `var _ = check f();` instead of `check f();`. A suppression the scan cannot apply, such as one on a destructuring declaration or on the return type of a function type, is reported as a warning and ignored.
-- **Fields.** Both fields are optional. Without `rules`, every issue in the construct is suppressed; without `reason`, the issue is suppressed without a justification. The annotation can be attached more than once to give each rule its own reason. See the [`ballerina/scan` package documentation](https://github.com/ballerina-platform/module-ballerina-scan/blob/main/ballerina/README.md) for examples of each option, the checks done during `bal build` and the editor's code actions.
+- **Fields.** Both fields are optional. Without `rules`, every issue in the construct is suppressed; without `reason`, the issue is suppressed without a justification. The annotation can be attached more than once to give each rule its own reason. See the [`ballerina/scan` package documentation](https://central.ballerina.io/ballerina/scan/latest) for examples of each option, the checks done during `bal build` and the editor's code actions.
 - **Rule ID validation.** The compiler plugin of `ballerina/scan` reports a malformed rule ID or an empty rule list as a compile error, and `bal scan` reports them as errors too, so that such a suppression never passes as one of no rule. `bal scan` checks that each rule exists, among the core rules and the rules of every analyzer it engages, and fails before reporting anything when one does not. A rule of an analyzer the scan does not engage cannot be verified and is reported as a warning.
-- **Results.** Suppressed issues are not printed to the console or sent to platforms, and the closing summary counts them, such as `3 issue(s), 2 suppressed`. They remain in the saved JSON and SARIF reports with a `suppressions` entry of kind `inSource` carrying the reason, so every accepted issue stays reviewable. The HTML report counts them separately from the active issues, and lists them with a `Suppressed` status and their justification.
+- **Results.** Suppressed issues are not printed to the console or sent to platforms, and the issue summary counts them, such as `3 issue(s), 2 suppressed`. They remain in the saved JSON and SARIF reports with a `suppressions` entry of kind `inSource` carrying the reason, so every accepted issue stays reviewable. The HTML report counts them separately from the active issues and lists them, with their reason and the rules the annotation names, under the `Suppressed` or `All` status filter.
 - **Unmatched suppressions.** A suppression that matches no issue is reported as a warning, for example when the issue was fixed. A suppression is not reported for a rule left out by `--include-rules`, `--exclude-rules` or `Scan.toml`, and one without `rules` is only reported when every rule is scanned, since whether it is still needed cannot be told from a narrowed scan. An unknown rule still fails the scan, before anything is reported. A rule that an earlier annotation on the same construct already names is reported as already suppressed instead, since that annotation is the one that applies. Likewise, a second annotation without `rules` on a construct is reported as suppressing rules that are already suppressed.
 - **Requirements.** A project can require every suppression to give a reason or name its rules, with `requireReason` and `requireRuleId` in the `[suppression]` table of `Scan.toml`, or with the matching command-line options. The requirements have no effect when suppressions are disabled, since every issue is then reported. A suppression that does not meet a requirement fails the scan before anything is reported: the errors are printed, and no issues are printed, saved to the target directory or sent to platforms.
 - **Audit.** `--ignore-suppressions` reports every issue as though no suppression existed. To disregard suppressions for every run of a project, for example from a shared `Scan.toml`, set `enabled = false` in the `[suppression]` table.

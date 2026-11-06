@@ -39,15 +39,15 @@ repositories {
     maven {
         url = 'https://maven.pkg.github.com/ballerina-platform/*'
         credentials {
-            username System.getenv("packageUser")
-            password System.getenv("packagePAT")
+            username = System.getenv("packageUser")
+            password = System.getenv("packagePAT")
         }
     }
 }
 
 dependencies {
     implementation "com.google.code.gson:gson:${gsonVersion}"
-    implementation group: 'org.ballerinalang', name: 'ballerina-tools-api', version: "${ballerinaLangVersion}"
+    implementation "org.ballerinalang:ballerina-tools-api:${ballerinaLangVersion}"
     implementation project(':scan-command')
 }
 
@@ -80,8 +80,8 @@ tasks.withType(Checkstyle).configureEach {
 }
 
 checkstyle {
-    toolVersion "${project.puppycrawlCheckstyleVersion}"
-    configFile rootProject.file("${project.buildDir}/checkstyle.xml")
+    toolVersion = "${project.puppycrawlCheckstyleVersion}"
+    configFile = rootProject.file("${project.buildDir}/checkstyle.xml")
     configProperties = ["suppressionFile": file("${project.buildDir}/suppressions.xml")]
 }
 

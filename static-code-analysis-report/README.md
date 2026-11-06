@@ -32,4 +32,4 @@ This module consists of the React code required to build the static code analysi
    ./gradlew createScanReportZip
    ```
    
-> **Note**: The scan tool tests related to the analysis report will fail after the build process as the generated JS and CSS files in the zip have changed. Consider updating the test resource outputs after a build.
+> **Note**: The scan tool's report tests don't compare against a stored copy of the page, so rebuilding the UI doesn't require updating test resources. They check that the generated `index.html` references JS/CSS bundles that exist and assert on the embedded scan data fields (see `ScanReportTestUtils` in `scan-command`). Update those assertions only when the report's JSON fields change.

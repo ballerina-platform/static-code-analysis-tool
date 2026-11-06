@@ -30,7 +30,7 @@ public class ScanToolConstants {
     static final String BALLERINAI_ORG = "ballerinai";
     static final String BALLERINAX_ORG = "ballerinax";
     static final String USE_IMPORT_AS_UNDERSCORE = " as _;";
-    static final String IMPORT_GENERATOR_FILE = "scan_file";
+    static final String IMPORT_GENERATOR_FILE = io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
     static final String RULES_FILE = "rules.json";
     static final String RULE_KIND = "kind";
     static final String BUG = "BUG";
@@ -39,6 +39,7 @@ public class ScanToolConstants {
     static final String RULE_ID = "id";
     static final String RULE_DESCRIPTION = "description";
     static final String RUNNING_SCANS_LOG = "Running Scans";
+    static final String RESOLVING_PACKAGE_SCAN_RULES_LOG = "Resolving scan rules from package dependencies";
 
     public static final String SCANNER_CONTEXT = "ScannerContext";
     public static final String FORWARD_SLASH = "/";
