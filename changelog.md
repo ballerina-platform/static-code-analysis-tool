@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.13.0] - 2026-11-05
 
+Built against Ballerina 2201.13.2.
+
 ### Added
 
 - In-source suppression of scan findings with the `@scan:Suppress` annotation. Suppressed findings are left out of the console output and stay reviewable in the saved reports. ([#115](https://github.com/ballerina-platform/static-code-analysis-tool/pull/115))
@@ -102,7 +104,8 @@ Built against Ballerina 2201.10.2.
 - Rule selection with `--include-rules`, `--exclude-rules` and `--list-rules`, and configuration through `Scan.toml`, including remote configurations.
 - Loading analyzers from compiler plugins and reporting to static code analysis platforms with `--platforms`.
 
-[Unreleased]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.9.0...v0.10.0
