@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.utils;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.ProjectLoader;
@@ -35,9 +37,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static io.ballerina.projects.util.ProjectConstants.LOCAL_REPOSITORY_NAME;
+import static io.ballerina.scan.ScanReportTestUtils.readScanReportData;
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 
@@ -60,6 +64,7 @@ public class ScanUtilsTest extends BaseTest {
     }
 
     @Test(description = "test method for printing results to console")
+    @SuppressWarnings("deprecation")
     void testPrintToConsole() throws IOException {
         List<Issue> issues = new ArrayList<>();
         ScanUtils.printToConsole(issues, printStream);
@@ -94,10 +99,7 @@ public class ScanUtilsTest extends BaseTest {
         List<Issue> issues = new ArrayList<>();
         Project project = ProjectLoader.loadProject(validBalProject);
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, null);
-        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("empty-issues-html-report.txt");
-        Assert.assertEquals(result, expected);
+        assertEmptyScanReport(scanReportPath);
     }
 
     @Test(description =
@@ -106,10 +108,34 @@ public class ScanUtilsTest extends BaseTest {
         List<Issue> issues = new ArrayList<>();
         Project project = ProjectLoader.loadProject(validBalProject);
         Path scanReportPath = ScanUtils.generateScanReport(issues, project, RESULTS_DIRECTORY);
-        String result = Files.readString(scanReportPath, StandardCharsets.UTF_8)
-                .replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR);
-        String expected = getExpectedOutput("empty-issues-html-report.txt");
-        Assert.assertEquals(result, expected);
+        Assert.assertTrue(scanReportPath.toAbsolutePath().normalize()
+                        .startsWith(validBalProject.resolve(RESULTS_DIRECTORY).toAbsolutePath().normalize()),
+                "Report was not written to the provided directory: " + scanReportPath);
+        assertEmptyScanReport(scanReportPath);
+    }
+
+    // Files are listed even when they have no issues, so a clean project still shows every analyzed file
+    private void assertEmptyScanReport(Path scanReportPath) throws IOException {
+        JsonObject scanData = readScanReportData(scanReportPath);
+        Assert.assertEquals(scanData.get("projectName").getAsString(), "valid_bal_project");
+        Assert.assertEquals(scanData.get("projectVersion").getAsString(), "0.1.0");
+        Assert.assertEquals(scanData.get("projectKind").getAsString(), "BUILD_PROJECT");
+        JsonArray packages = scanData.getAsJsonArray("packages");
+        Assert.assertEquals(packages.size(), 1);
+        JsonObject scannedPackage = packages.get(0).getAsJsonObject();
+        Assert.assertEquals(scannedPackage.get("org").getAsString(), "ballerina");
+        Assert.assertEquals(scannedPackage.get("name").getAsString(), "valid_bal_project");
+        Assert.assertEquals(scannedPackage.get("version").getAsString(), "0.1.0");
+        Assert.assertEquals(scannedPackage.get("path").getAsString(), "");
+        JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
+        Assert.assertEquals(scannedFiles.size(), 1);
+        JsonObject scannedFile = scannedFiles.get(0).getAsJsonObject();
+        Assert.assertEquals(scannedFile.get("fileName").getAsString(), "valid_bal_project/main.bal");
+        Assert.assertEquals(scannedFile.get("relativePath").getAsString(), "main.bal");
+        Assert.assertEquals(scannedFile.get("packageName").getAsString(), "valid_bal_project");
+        Assert.assertEquals(scannedFile.get("fileContent").getAsString(),
+                Files.readString(validBalProject.resolve("main.bal"), StandardCharsets.UTF_8));
+        Assert.assertTrue(scannedFile.getAsJsonArray("issues").isEmpty());
     }
 
     @Test(description =
@@ -178,6 +204,30 @@ public class ScanUtilsTest extends BaseTest {
         ScanToolException exception = Assert.expectThrows(ScanToolException.class,
                 () -> ScanUtils.resolvePlatformJar(platform, project.targetDir(), printStream));
         Assert.assertEquals(exception.getMessage(), "failed to download remote jar file: 'examplePlatform.jar'");
+    }
+
+    @Test(description = "test a platform URL with characters a URI does not allow is still downloaded as a URL")
+    void testPlatformUrlWithUnencodedCharacters() throws IOException {
+        Path targetDir = Files.createTempDirectory("scan-platform-url");
+        for (String url : List.of("https://example.invalid/my jars/platform.jar",
+                "https://example.invalid/my jars/platform.jar#latest")) {
+            ScanTomlFile.Platform platform = new ScanTomlFile.Platform("examplePlatform", url, Map.of());
+            ScanToolException exception = Assert.expectThrows(ScanToolException.class,
+                    () -> ScanUtils.resolvePlatformJar(platform, targetDir, printStream));
+            Assert.assertEquals(exception.getMessage(), "failed to download remote jar file: 'examplePlatform.jar'");
+        }
+    }
+
+    @Test(description = "test a platform path that is not a URL and not a file is reported as not found")
+    void testPlatformPathThatIsNotAUrl() throws IOException {
+        Path targetDir = Files.createTempDirectory("scan-platform-path");
+        for (String path : List.of("missing jars/platform.jar", "C:\\missing jars\\platform.jar")) {
+            ScanTomlFile.Platform platform = new ScanTomlFile.Platform("examplePlatform", path, Map.of());
+            ScanToolException exception = Assert.expectThrows(ScanToolException.class,
+                    () -> ScanUtils.resolvePlatformJar(platform, targetDir, printStream));
+            Assert.assertEquals(exception.getMessage(), DiagnosticLog.error(DiagnosticCode.PLATFORM_FILE_NOT_FOUND,
+                    "examplePlatform", "path", path));
+        }
     }
 
     @Test(description = "test a platform path that is neither a file nor a URL fails only when the platform is used")

@@ -21,6 +21,7 @@ package io.ballerina.scan.utils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
+import java.util.regex.Pattern;
 
 /**
  * {@code Constants} contains the constants used by the scan tool utilities.
@@ -33,14 +34,24 @@ public class Constants {
     static final String RESULTS_HTML_FILE = "index.html";
     static final String REPORT_DATA_PLACEHOLDER = "__data__";
     static final String SCAN_REPORT_PROJECT_NAME = "projectName";
+    static final String SCAN_REPORT_PROJECT_VERSION = "projectVersion";
+    static final String SCAN_REPORT_PROJECT_KIND = "projectKind";
+    static final String SCAN_REPORT_PACKAGES = "packages";
+    static final String SCAN_REPORT_PACKAGE_ORG = "org";
+    static final String SCAN_REPORT_PACKAGE_NAME = "name";
+    static final String SCAN_REPORT_PACKAGE_VERSION = "version";
+    static final String SCAN_REPORT_PACKAGE_PATH = "path";
     static final String SCAN_REPORT_FILE_NAME = "fileName";
     static final String SCAN_REPORT_FILE_PATH = "filePath";
     static final String SCAN_REPORT_FILE_CONTENT = "fileContent";
+    static final String SCAN_REPORT_FILE_RELATIVE_PATH = "relativePath";
+    static final String SCAN_REPORT_FILE_PACKAGE = "packageName";
     static final String SCAN_REPORT_SCANNED_FILES = "scannedFiles";
     static final String SCAN_REPORT_ZIP_FILE = "report.zip";
     static final String SCAN_REPORT_ISSUES = "issues";
     static final String SCAN_REPORT_ISSUE_RULE_ID = "ruleID";
-    static final String SCAN_REPORT_ISSUE_SEVERITY = "issueSeverity";
+    static final String SCAN_REPORT_ISSUE_KIND = "ruleKind";
+    static final String SCAN_REPORT_ISSUE_SEVERITY = "severity";
     static final String SCAN_REPORT_ISSUE_TYPE = "issueType";
     static final String SCAN_REPORT_ISSUE_MESSAGE = "message";
     static final String SCAN_REPORT_ISSUE_TEXT_RANGE = "textRange";
@@ -53,6 +64,14 @@ public class Constants {
     static final String SCAN_TABLE = "scan";
     static final String SCAN_FILE_FIELD = "configPath";
     public static final String SCAN_FILE = "Scan.toml";
+    public static final String IMPORT_GENERATOR_FILE = "scan_file";
+    /**
+     * The name of the in-memory document the analyzer adds to import the external analyzer plugins.
+     *
+     * @since 0.11.1
+     */
+    public static final Pattern IMPORT_GENERATOR_DOCUMENT = Pattern.compile(Pattern.quote(IMPORT_GENERATOR_FILE)
+            + "-\\p{XDigit}{8}-\\p{XDigit}{4}-\\p{XDigit}{4}-\\p{XDigit}{4}-\\p{XDigit}{12}\\.bal");
     static final String PLATFORM_TABLE = "platform";
     static final String PLATFORM_NAME = "name";
     static final String PLATFORM_PATH = "path";

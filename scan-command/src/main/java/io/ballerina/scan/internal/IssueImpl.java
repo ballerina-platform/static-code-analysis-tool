@@ -23,8 +23,11 @@ import io.ballerina.scan.Rule;
 import io.ballerina.scan.Source;
 import io.ballerina.tools.diagnostics.Location;
 import io.ballerina.tools.text.LineRange;
+import io.ballerina.tools.text.TextDocument;
 import io.ballerina.tools.text.TextRange;
 import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
+
+import java.util.Optional;
 
 /**
  * Represents the implementation of the {@link Issue} interface.
@@ -37,12 +40,23 @@ public class IssueImpl implements Issue {
     private final Source source;
     private final String fileName;
     private final String filePath;
+    // Transient, so the JSON results do not serialize the whole source of the file
+    private final transient TextDocument textDocument;
 
     IssueImpl(Location location,
               Rule rule,
               Source source,
               String fileName,
               String filePath) {
+        this(location, rule, source, fileName, filePath, null);
+    }
+
+    IssueImpl(Location location,
+              Rule rule,
+              Source source,
+              String fileName,
+              String filePath,
+              TextDocument textDocument) {
         LineRange lineRange = location.lineRange();
         TextRange textRange = location.textRange();
         this.location = new BLangDiagnosticLocation(lineRange.fileName(), lineRange.startLine().line(),
@@ -52,6 +66,7 @@ public class IssueImpl implements Issue {
         this.source = source;
         this.fileName = fileName;
         this.filePath = filePath;
+        this.textDocument = textDocument;
     }
 
     @Override
@@ -75,5 +90,15 @@ public class IssueImpl implements Issue {
 
     public String fileName() {
         return fileName;
+    }
+
+    /**
+     * Returns the source the issue was reported in, as the compiler analyzed it.
+     *
+     * @return the source of the reported document, or empty when the issue was not reported against a document
+     * @since 0.11.1
+     */
+    public Optional<TextDocument> textDocument() {
+        return Optional.ofNullable(textDocument);
     }
 }

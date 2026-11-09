@@ -34,6 +34,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static io.ballerina.scan.ScanReportTestUtils.readScanReportData;
+
 /**
  * Tests for leaving the test sources out of a scan.
  *
@@ -160,8 +162,8 @@ public class ExcludeTestsTest extends BaseTest {
     }
 
     private String readHtmlReport() throws IOException {
-        return Files.readString(testsProject.resolve("target").resolve("report").resolve("index.html"),
-                StandardCharsets.UTF_8);
+        Path report = testsProject.resolve("target").resolve("report").resolve("index.html");
+        return readScanReportData(report).getAsJsonArray("scannedFiles").toString();
     }
 
     private void withScanToml(String content, ThrowingRunnable test) throws IOException {

@@ -7,7 +7,8 @@
       "startColumn": 17,
       "endColumn": 39,
       "startOffset": 757,
-      "length": 22
+      "length": 22,
+      "snippet": "checkpanic getResult()"
     },
     "rule": {
       "id": "ballerina:1",
@@ -17,6 +18,6 @@
     },
     "source": "BUILT_IN",
     "fileName": "bal_project_with_analyzer_configurations/main.bal",
-    "filePath": "src/test/resources/test-resources/bal-project-with-analyzer-configurations/main.bal"
+    "filePath": "<ABS_SOURCE_ROOT>/main.bal"
   }
 ]

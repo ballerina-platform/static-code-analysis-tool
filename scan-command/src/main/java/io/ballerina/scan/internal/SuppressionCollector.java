@@ -84,7 +84,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
-import static io.ballerina.scan.internal.ScanToolConstants.IMPORT_GENERATOR_FILE;
+import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_DOCUMENT;
 
 /**
  * Collects the {@code @scan:Suppress} annotations of a package. Each annotation is read from the value the compiler
@@ -94,9 +94,6 @@ import static io.ballerina.scan.internal.ScanToolConstants.IMPORT_GENERATOR_FILE
  */
 final class SuppressionCollector {
 
-    // The imports document ProjectAnalyzer adds, named <IMPORT_GENERATOR_FILE>-<UUID>.bal
-    private static final Pattern IMPORT_GENERATOR_DOCUMENT = Pattern.compile(Pattern.quote(IMPORT_GENERATOR_FILE)
-            + "-\\p{XDigit}{8}-\\p{XDigit}{4}-\\p{XDigit}{4}-\\p{XDigit}{4}-\\p{XDigit}{12}\\.bal");
     private static final String SCAN_PACKAGE = "scan";
     private static final String ANNOTATION_NAME = "Suppress";
     private static final String RULES_FIELD = "rules";

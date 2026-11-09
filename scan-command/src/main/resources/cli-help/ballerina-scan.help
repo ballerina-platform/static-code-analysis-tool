@@ -27,23 +27,25 @@ OPTIONS
                 List all available rules.
 
         --include-rules=<rule1, ...>
-                Run analysis for a specific set of rules. Replaces 'include' in the [rule] table of
-                Scan.toml; an 'exclude' set there still applies, and the two cannot be combined.
+                Run analysis for a specific set of rules. Added to 'include' in the [rule] table of
+                Scan.toml; it cannot be used when Scan.toml sets 'exclude'.
 
         --exclude-rules=<rule1, ...>
-                Exclude analysis for a specific set of rules. Replaces 'exclude' in the [rule] table
-                of Scan.toml; an 'include' set there still applies, and the two cannot be combined.
+                Exclude analysis for a specific set of rules. Added to 'exclude' in the [rule] table
+                of Scan.toml; it cannot be used when Scan.toml sets 'include'.
 
         --exclude-tests[=<true|false>]
                 Leave the test sources of the package out of the scan, so that their issues and
                 @scan:Suppress annotations are not reported. Written alone, it means true.
                 Overrides 'excludeTests' in the [analysis] table of Scan.toml either way.
+                A separate true or false after the option is read as its value, so a target
+                directory with that name must be written as ./true or ./false.
 
         --platforms=<platformName1, ...>
                 Report the results to these platforms, which must be declared in the [[platform]]
                 table of Scan.toml. No platform is reported to unless it is named here. The results
                 are printed and saved first; then every platform is run, and the scan fails if any
-                of them fails.
+                of them fails. Not supported for a single Ballerina file.
 
         --ignore-suppressions
                 Disregard @scan:Suppress annotations and report every issue.

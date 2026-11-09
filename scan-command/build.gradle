@@ -44,41 +44,47 @@ repositories {
     maven {
         url = 'https://maven.pkg.github.com/ballerina-platform/*'
         credentials {
-            username System.getenv("packageUser")
-            password System.getenv("packagePAT")
+            username = System.getenv("packageUser")
+            password = System.getenv("packagePAT")
         }
     }
 }
 
 dependencies {
-    implementation group: 'info.picocli', name: 'picocli', version: "${picoCLIVersion}"
+    compileOnly "info.picocli:picocli:${picoCLIVersion}"
     implementation "com.google.code.gson:gson:${gsonVersion}"
-    implementation group: 'org.ballerinalang', name: 'ballerina-lang', version: "${ballerinaLangVersion}"
-    implementation group: 'org.ballerinalang', name: 'ballerina-parser', version: "${ballerinaLangVersion}"
-    implementation group: 'org.ballerinalang', name: 'ballerina-runtime', version: "${ballerinaLangVersion}"
-    implementation group: 'org.ballerinalang', name: 'ballerina-tools-api', version: "${ballerinaLangVersion}"
-    implementation group: 'org.ballerinalang', name: 'jballerina-tools', version: "${ballerinaLangVersion}"
-    implementation group: 'org.ballerinalang', name: 'ballerina-cli', version: "${ballerinaLangVersion}"
-    implementation group: 'org.ballerinalang', name: 'toml-parser', version: "${ballerinaLangVersion}"
+    implementation "org.ballerinalang:ballerina-lang:${ballerinaLangVersion}"
+    implementation "org.ballerinalang:ballerina-parser:${ballerinaLangVersion}"
+    implementation "org.ballerinalang:ballerina-runtime:${ballerinaLangVersion}"
+    implementation "org.ballerinalang:ballerina-tools-api:${ballerinaLangVersion}"
+    implementation "org.ballerinalang:jballerina-tools:${ballerinaLangVersion}"
+    implementation "org.ballerinalang:ballerina-cli:${ballerinaLangVersion}"
+    implementation "org.ballerinalang:toml-parser:${ballerinaLangVersion}"
 
     // Required for determining the platform a java process is running on
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: "${apacheCommonsLang3Version}"
+    implementation "org.apache.commons:commons-lang3:${apacheCommonsLang3Version}"
 
     // For extracting remote JAR files and other file operations
-    implementation group: 'commons-io', name: 'commons-io', version: "${commonsIoVersion}"
+    implementation "commons-io:commons-io:${commonsIoVersion}"
 
     // Required dependencies for jacoco
-    implementation group: 'org.jacoco', name: 'org.jacoco.core', version: "${jacocoVersion}"
-    implementation group: 'org.jacoco', name: 'org.jacoco.report', version: "${jacocoVersion}"
+    implementation "org.jacoco:org.jacoco.core:${jacocoVersion}"
+    implementation "org.jacoco:org.jacoco.report:${jacocoVersion}"
 
-    checkstyle group: 'com.puppycrawl.tools', name: 'checkstyle', version: "${puppycrawlCheckstyleVersion}"
+    checkstyle "com.puppycrawl.tools:checkstyle:${puppycrawlCheckstyleVersion}"
 
     // Required dependencies for running scan tool tests
-    testImplementation group: 'org.testng', name: 'testng', version: "${testngVersion}"
-    testImplementation group: 'org.ballerinalang', name: 'ballerina-lang', version: "${ballerinaLangVersion}"
+    testImplementation "org.testng:testng:${testngVersion}"
+    testImplementation "info.picocli:picocli:${picoCLIVersion}"
+    testImplementation "org.ballerinalang:ballerina-lang:${ballerinaLangVersion}"
 
     // For including the scan report zip
     implementation files("${projectDir}/src/main/resources/report.zip")
+}
+
+// io.ballerina.scan.test requires this module, so it is never on the module path for the qualified exports
+compileJava {
+    options.compilerArgs << '-Xlint:-module'
 }
 
 tasks.withType(JavaExec).configureEach {
@@ -122,8 +128,8 @@ tasks.withType(Checkstyle).configureEach {
 }
 
 checkstyle {
-    toolVersion "${project.puppycrawlCheckstyleVersion}"
-    configFile rootProject.file("${project.buildDir}/checkstyle.xml")
+    toolVersion = "${project.puppycrawlCheckstyleVersion}"
+    configFile = rootProject.file("${project.buildDir}/checkstyle.xml")
     configProperties = ["suppressionFile": file("${project.buildDir}/suppressions.xml")]
 }
 
@@ -324,9 +330,9 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-            groupId group
-            artifactId project.name
-            version version
+            groupId = project.group
+            artifactId = project.name
+            version = project.version
         }
     }
 
