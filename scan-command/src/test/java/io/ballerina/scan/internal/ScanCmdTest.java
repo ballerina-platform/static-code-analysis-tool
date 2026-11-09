@@ -188,6 +188,15 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(scanCmd.exitCode(), 3);
     }
 
+    @Test(description = "test a target taken by --exclude-tests keeps its place when an option value matches a target")
+    void testExcludeTestsTargetOrderAfterOptionValue() throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        new CommandLine(scanCmd).parseArgs("--target-dir", "a.bal", "--exclude-tests", "b.bal", "a.bal");
+        scanCmd.execute();
+        Assert.assertEquals(scanCmd.exitCode(), 2);
+        Assert.assertTrue(readOutput(true).contains("but received 2: b.bal a.bal"));
+    }
+
     @Test(description = "test scan command with single file project with too many arguments")
     void testScanCommandSingleFileProjectWithTooManyArguments() throws IOException {
         Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
@@ -245,7 +254,7 @@ public class ScanCmdTest extends BaseTest {
         JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
         Assert.assertEquals(scannedFiles.size(), 1);
         JsonObject scannedFile = findScannedFile(scannedFiles, validBalProject.resolve("main.bal"));
-        Assert.assertEquals(scannedFile.get("fileName").getAsString(), "main.bal");
+        Assert.assertEquals(scannedFile.get("fileName").getAsString(), "valid_bal_project/main.bal");
         Assert.assertEquals(scannedFile.get("fileContent").getAsString(),
                 Files.readString(validBalProject.resolve("main.bal"), StandardCharsets.UTF_8));
 
@@ -896,9 +905,12 @@ public class ScanCmdTest extends BaseTest {
                 .resolve("bal-project-with-compilation-errors");
         System.setProperty("user.dir", ballerinaProject.toString());
         ScanCmd scanCmd = new ScanCmd(printStream);
-        new CommandLine(scanCmd).parseArgs("--list-rules");
-        scanCmd.execute();
-        System.setProperty("user.dir", userDir);
+        try {
+            new CommandLine(scanCmd).parseArgs("--list-rules");
+            scanCmd.execute();
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
         String output = readOutput(true);
         Assert.assertEquals(output.trim(), ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG + "\n\n"
                 + "bal scan: error: " + error(COMPILATION_CONTAINS_ERRORS) + "\n"
@@ -915,9 +927,12 @@ public class ScanCmdTest extends BaseTest {
         for (String[] args : List.of(new String[0], new String[]{"--list-rules"})) {
             System.setProperty("user.dir", ballerinaProject.toString());
             ScanCmd scanCmd = new ScanCmd(printStream);
-            new CommandLine(scanCmd).parseArgs(args);
-            scanCmd.execute();
-            System.setProperty("user.dir", userDir);
+            try {
+                new CommandLine(scanCmd).parseArgs(args);
+                scanCmd.execute();
+            } finally {
+                System.setProperty("user.dir", userDir);
+            }
             Assert.assertEquals(scanCmd.exitCode(), 1);
             Assert.assertEquals(readOutput(true).trim(), expected);
         }

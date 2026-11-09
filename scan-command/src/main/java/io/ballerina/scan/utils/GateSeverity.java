@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.utils;
 
+import io.ballerina.scan.RuleKind;
+
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
@@ -49,5 +51,19 @@ public enum GateSeverity {
     public static Optional<GateSeverity> parse(String value) {
         String name = value.trim().toUpperCase(Locale.ROOT);
         return Arrays.stream(values()).filter(known -> known.name().equals(name)).findFirst();
+    }
+
+    /**
+     * Returns the severity issues of a rule kind are counted as. Rules have no severity of their own on this line.
+     *
+     * @param kind the rule kind
+     * @return the severity of the rule kind
+     */
+    public static GateSeverity of(RuleKind kind) {
+        return switch (kind) {
+            case BUG -> HIGH;
+            case VULNERABILITY -> MEDIUM;
+            case CODE_SMELL -> LOW;
+        };
     }
 }

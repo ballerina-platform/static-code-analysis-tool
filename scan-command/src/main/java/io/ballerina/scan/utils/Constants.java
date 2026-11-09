@@ -21,6 +21,7 @@ package io.ballerina.scan.utils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
+import java.util.regex.Pattern;
 
 /**
  * {@code Constants} contains the constants used by the scan tool utilities.
@@ -64,6 +65,13 @@ public class Constants {
     static final String SCAN_FILE_FIELD = "configPath";
     public static final String SCAN_FILE = "Scan.toml";
     public static final String IMPORT_GENERATOR_FILE = "scan_file";
+    /**
+     * The name of the in-memory document the analyzer adds to import the external analyzer plugins.
+     *
+     * @since 0.11.1
+     */
+    public static final Pattern IMPORT_GENERATOR_DOCUMENT = Pattern.compile(Pattern.quote(IMPORT_GENERATOR_FILE)
+            + "-\\p{XDigit}{8}-\\p{XDigit}{4}-\\p{XDigit}{4}-\\p{XDigit}{4}-\\p{XDigit}{12}\\.bal");
     static final String PLATFORM_TABLE = "platform";
     static final String PLATFORM_NAME = "name";
     static final String PLATFORM_PATH = "path";

@@ -37,6 +37,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static io.ballerina.projects.util.ProjectConstants.LOCAL_REPOSITORY_NAME;
@@ -129,7 +130,7 @@ public class ScanUtilsTest extends BaseTest {
         JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
         Assert.assertEquals(scannedFiles.size(), 1);
         JsonObject scannedFile = scannedFiles.get(0).getAsJsonObject();
-        Assert.assertEquals(scannedFile.get("fileName").getAsString(), "main.bal");
+        Assert.assertEquals(scannedFile.get("fileName").getAsString(), "valid_bal_project/main.bal");
         Assert.assertEquals(scannedFile.get("relativePath").getAsString(), "main.bal");
         Assert.assertEquals(scannedFile.get("packageName").getAsString(), "valid_bal_project");
         Assert.assertEquals(scannedFile.get("fileContent").getAsString(),
@@ -203,6 +204,30 @@ public class ScanUtilsTest extends BaseTest {
         ScanToolException exception = Assert.expectThrows(ScanToolException.class,
                 () -> ScanUtils.resolvePlatformJar(platform, project.targetDir(), printStream));
         Assert.assertEquals(exception.getMessage(), "failed to download remote jar file: 'examplePlatform.jar'");
+    }
+
+    @Test(description = "test a platform URL with characters a URI does not allow is still downloaded as a URL")
+    void testPlatformUrlWithUnencodedCharacters() throws IOException {
+        Path targetDir = Files.createTempDirectory("scan-platform-url");
+        for (String url : List.of("https://example.invalid/my jars/platform.jar",
+                "https://example.invalid/my jars/platform.jar#latest")) {
+            ScanTomlFile.Platform platform = new ScanTomlFile.Platform("examplePlatform", url, Map.of());
+            ScanToolException exception = Assert.expectThrows(ScanToolException.class,
+                    () -> ScanUtils.resolvePlatformJar(platform, targetDir, printStream));
+            Assert.assertEquals(exception.getMessage(), "failed to download remote jar file: 'examplePlatform.jar'");
+        }
+    }
+
+    @Test(description = "test a platform path that is not a URL and not a file is reported as not found")
+    void testPlatformPathThatIsNotAUrl() throws IOException {
+        Path targetDir = Files.createTempDirectory("scan-platform-path");
+        for (String path : List.of("missing jars/platform.jar", "C:\\missing jars\\platform.jar")) {
+            ScanTomlFile.Platform platform = new ScanTomlFile.Platform("examplePlatform", path, Map.of());
+            ScanToolException exception = Assert.expectThrows(ScanToolException.class,
+                    () -> ScanUtils.resolvePlatformJar(platform, targetDir, printStream));
+            Assert.assertEquals(exception.getMessage(), DiagnosticLog.error(DiagnosticCode.PLATFORM_FILE_NOT_FOUND,
+                    "examplePlatform", "path", path));
+        }
     }
 
     @Test(description = "test a platform path that is neither a file nor a URL fails only when the platform is used")

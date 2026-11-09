@@ -39,7 +39,6 @@ final class ConsoleLayout {
         LOADING,
         WARNINGS,
         RUNNING,
-        COMBINING,
         RULES,
         RESULTS,
         SUMMARY,
@@ -70,9 +69,7 @@ final class ConsoleLayout {
         OutputStream tracked = new OutputStream() {
             @Override
             public void write(int b) {
-                beforeWrite(target);
-                target.write(b);
-                afterWrite(b);
+                ConsoleLayout.this.write(target, new byte[]{(byte) b}, 0, 1);
             }
 
             /**
@@ -83,11 +80,7 @@ final class ConsoleLayout {
                 if (length == 0) {
                     return;
                 }
-                beforeWrite(target);
-                target.write(bytes, offset, length);
-                for (int i = offset; i < offset + length; i++) {
-                    afterWrite(bytes[i]);
-                }
+                ConsoleLayout.this.write(target, bytes, offset, length);
             }
 
             @Override
@@ -113,15 +106,20 @@ final class ConsoleLayout {
      *
      * @param section the section the next lines belong to
      */
-    void enter(Section section) {
+    synchronized void enter(Section section) {
         if (section != current) {
             current = section;
             separatorPending = written;
         }
     }
 
-    Section current() {
-        return current;
+    // Plugins may write to both streams from separate threads, which share the layout state
+    private synchronized void write(PrintStream target, byte[] bytes, int offset, int length) {
+        beforeWrite(target);
+        target.write(bytes, offset, length);
+        for (int i = offset; i < offset + length; i++) {
+            afterWrite(bytes[i]);
+        }
     }
 
     private void beforeWrite(PrintStream target) {

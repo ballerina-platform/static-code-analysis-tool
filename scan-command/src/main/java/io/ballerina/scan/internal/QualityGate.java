@@ -99,11 +99,7 @@ final class QualityGate {
         BLOCKER, HIGH, MEDIUM, LOW, INFO;
 
         static Severity of(Rule rule) {
-            return switch (rule.kind()) {
-                case BUG -> HIGH;
-                case VULNERABILITY -> MEDIUM;
-                case CODE_SMELL -> LOW;
-            };
+            return valueOf(GateSeverity.of(rule.kind()).name());
         }
     }
 }

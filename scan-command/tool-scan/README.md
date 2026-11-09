@@ -37,13 +37,13 @@ bal scan [OPTIONS] [<package>|<source-file>]
 --list-rules
 ```
 
--  Run analysis for a specific set of rules. Added to `include` in the `[rule]` table of `Scan.toml`; an `exclude` set there still applies, and the two cannot be combined.
+-  Run analysis for a specific set of rules. Added to `include` in the `[rule]` table of `Scan.toml`; it cannot be used when `Scan.toml` sets `exclude`, and the scan exits with a usage error.
 
 ```text
 --include-rules=<rule1, ...>
 ```
 
--  Exclude analysis for a specific set of rules. Added to `exclude` in the `[rule]` table of `Scan.toml`; an `include` set there still applies, and the two cannot be combined.
+-  Exclude analysis for a specific set of rules. Added to `exclude` in the `[rule]` table of `Scan.toml`; it cannot be used when `Scan.toml` sets `include`, and the scan exits with a usage error.
 
 ```text
 --exclude-rules=<rule1, ...>

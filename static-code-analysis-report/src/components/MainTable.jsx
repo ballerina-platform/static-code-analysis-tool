@@ -186,7 +186,8 @@ function MainTable({ onOpenFile, fileRecords, allIssues, statusIssues, kindCount
     const allRows = useMemo(
         () => listMode ? flattenList(fileRecords, sort) : flattenTree(tree, collapsed, sort),
         [listMode, fileRecords, tree, collapsed, sort])
-    const rows = listMode ? allRows.slice(page * rowsPerPage, (page + 1) * rowsPerPage) : allRows
+    const currentPage = Math.min(page, Math.max(0, Math.ceil(allRows.length / rowsPerPage) - 1))
+    const rows = listMode ? allRows.slice(currentPage * rowsPerPage, (currentPage + 1) * rowsPerPage) : allRows
 
     const panelFilterCount = countPanelFilters(filters)
     const countColumns = [
@@ -209,6 +210,12 @@ function MainTable({ onOpenFile, fileRecords, allIssues, statusIssues, kindCount
         setSort((prev) => prev.field === field
             ? { field, direction: prev.direction === "asc" ? "desc" : "asc" }
             : { field, direction: field === "name" ? "asc" : "desc" })
+        setPage(0)
+    }
+
+    // A filter change starts the list over, since the page the user was on may no longer exist
+    const changeFilters = (next) => {
+        onFiltersChange(next)
         setPage(0)
     }
 
@@ -239,17 +246,17 @@ function MainTable({ onOpenFile, fileRecords, allIssues, statusIssues, kindCount
                     <StatusFilter
                         issues={allIssues}
                         selected={filters.status}
-                        onChange={(status) => onFiltersChange(changeStatus(filters, status, allIssues))}
+                        onChange={(status) => changeFilters(changeStatus(filters, status, allIssues))}
                     />
                     <KindFilterChips
                         counts={kindCounts}
                         selected={filters.kinds}
-                        onChange={(kinds) => onFiltersChange({ ...filters, kinds })}
+                        onChange={(kinds) => changeFilters({ ...filters, kinds })}
                     />
                     <SearchField
                         placeholder="Search issues…"
                         value={filters.search}
-                        onChange={(search) => onFiltersChange({ ...filters, search })}
+                        onChange={(search) => changeFilters({ ...filters, search })}
                     />
                 </Box>
             </Box>
@@ -307,7 +314,7 @@ function MainTable({ onOpenFile, fileRecords, allIssues, statusIssues, kindCount
                     </Button>
                 </Tooltip>
                 <Box sx={{ flex: 1 }} />
-                <ClearFiltersButton filters={filters} onChange={onFiltersChange} />
+                <ClearFiltersButton filters={filters} onChange={changeFilters} />
 
                 <Menu anchorEl={columnsMenu} open={Boolean(columnsMenu)} onClose={() => setColumnsMenu(null)}>
                     {[...COUNT_COLUMNS.map(({ field, kind }) => ({ field, label: RULE_KINDS[kind].plural })),
@@ -334,7 +341,7 @@ function MainTable({ onOpenFile, fileRecords, allIssues, statusIssues, kindCount
                     <IssueFilterFields
                         issues={statusIssues}
                         filters={filters}
-                        onChange={onFiltersChange}
+                        onChange={changeFilters}
                         fields={PANEL_FILTER_KEYS}
                     />
                 </Box>
@@ -420,7 +427,7 @@ function MainTable({ onOpenFile, fileRecords, allIssues, statusIssues, kindCount
                 <TablePagination
                     component="div"
                     count={allRows.length}
-                    page={Math.min(page, Math.max(0, Math.ceil(allRows.length / rowsPerPage) - 1))}
+                    page={currentPage}
                     onPageChange={(_, next) => setPage(next)}
                     rowsPerPage={rowsPerPage}
                     onRowsPerPageChange={(event) => { setRowsPerPage(Number(event.target.value)); setPage(0); }}

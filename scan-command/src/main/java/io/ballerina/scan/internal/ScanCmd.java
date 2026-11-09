@@ -167,9 +167,8 @@ public class ScanCmd implements BLauncherCmd {
             description = "Fail the scan when the number of issues at or above --fail-on-severity reaches the count")
     private String failOnCount;
 
-    // Written alone, the option means true; a value overrides [analysis] excludeTests either way. Validated when the
-    // command runs, so that an invalid value exits as a usage error. The bal launcher runs on picocli 4.0.1, so only
-    // its API may be used here; resolveOptions gives back a target that the option took as its value
+    // A String, as the bal launcher's picocli 4.0.1 would let a Boolean swallow a target; resolveOptions validates
+    // the value and gives back a target the option took as its value
     @CommandLine.Option(names = EXCLUDE_TESTS_OPTION, arity = "0..1", fallbackValue = "true",
             description = "Leave the test sources out of the scan (true/false). Default is false")
     private String excludeTestsOption;
@@ -357,6 +356,7 @@ public class ScanCmd implements BLauncherCmd {
         if (ProjectUtils.isProjectEmpty(project)) {
             throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.EMPTY_PACKAGE));
         }
+        ScanUtils.requireLockedDependencies(project);
         executeProject(project);
     }
 
@@ -881,13 +881,10 @@ public class ScanCmd implements BLauncherCmd {
      * Loads the project to scan.
      *
      * @return the project
-     * @throws RuntimeException if the path is not a valid Ballerina project, which exits as an invalid target, or
-     *                          if the dependencies of a package are not locked
+     * @throws RuntimeException if the path is not a valid Ballerina project, which exits as an invalid target
      */
     protected Project getProject() {
-        Project project = loadTarget();
-        ScanUtils.requireLockedDependencies(project);
-        return project;
+        return loadTarget();
     }
 
     private Project loadTarget() {
@@ -1051,11 +1048,22 @@ public class ScanCmd implements BLauncherCmd {
         int optionIndex = args.indexOf(EXCLUDE_TESTS_OPTION);
         int position = 0;
         for (int i = 0; i < optionIndex && position < targets.size(); i++) {
-            if (args.get(i).equals(targets.get(position))) {
+            String arg = args.get(i);
+            if (arg.startsWith("-")) {
+                // An option value written as a separate argument is not a target
+                if (!arg.contains("=") && takesValue(arg)) {
+                    i++;
+                }
+            } else if (arg.equals(targets.get(position))) {
                 position++;
             }
         }
         return position;
+    }
+
+    private boolean takesValue(String option) {
+        CommandLine.Model.OptionSpec optionSpec = spec.findOption(option);
+        return optionSpec != null && optionSpec.arity().max > 0;
     }
 
     private List<String> originalArgs() {

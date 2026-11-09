@@ -149,8 +149,12 @@ const COLUMNS = [
     },
 ];
 
+// Spreadsheets run a cell starting with one of these as a formula, so such a cell is kept as text
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 const csvEscape = (value) => {
-    const text = String(value ?? "");
+    const raw = String(value ?? "");
+    const text = FORMULA_START.test(raw) ? `'${raw}` : raw;
     return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
@@ -220,9 +224,8 @@ function SingleFileTable({ issues, fileName, selectedIssue, onSelectIssue, onSho
         }
     }, [focusRequest]);
 
-    // Brings a requested row into view: clear filters that hide it, jump to its page, then scroll to it.
-    // This only acts on a pending request, so typing in the search box while an issue is expanded
-    // just filters the list instead of snapping the filters back to reveal the selected row.
+    // Reveals a requested row by clearing filters that hide it, jumping to its page and scrolling to it. Only a
+    // pending request acts, so typing in the search box filters the list instead of snapping back to the row.
     useEffect(() => {
         const target = pendingReveal.current;
         if (target === null) {

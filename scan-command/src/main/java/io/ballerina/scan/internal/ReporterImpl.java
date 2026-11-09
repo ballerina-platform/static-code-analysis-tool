@@ -86,7 +86,7 @@ public class ReporterImpl implements Reporter {
             }
         }
         return new IssueImpl(location, rule, source, reportFileName(reportedDocument),
-                reportFilePath(reportedDocument));
+                reportFilePath(reportedDocument), reportedDocument.textDocument());
     }
 
     // The path of a document as recorded in the issues reported for it
@@ -95,8 +95,14 @@ public class ReporterImpl implements Reporter {
                 .orElse(Path.of(document.name())).toString();
     }
 
-    // The name of a document as shown in scan results; a single file has no package to qualify it with
-    static String reportFileName(Document document) {
+    /**
+     * Returns the name of a document as shown in scan results. A single file has no package to qualify it with.
+     *
+     * @param document the document
+     * @return the module-qualified name of the document
+     * @since 0.11.1
+     */
+    public static String reportFileName(Document document) {
         if (document.module().project().kind() == ProjectKind.SINGLE_FILE_PROJECT) {
             return document.name();
         }

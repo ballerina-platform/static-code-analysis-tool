@@ -39,9 +39,8 @@ const findClosingFence = (lines, from, fenceLength) => {
     return -1;
 };
 
-// Splits rule text into prose and ``` fenced code blocks, scanning line by line so it stays linear. A fence
-// opens and closes at the start of a line; the closer repeats the opener's backticks (or more) and may only
-// be followed by whitespace. Each block keeps the line it starts on, which serves as a stable React key.
+// Splits rule text into prose and ``` fenced code blocks; a closer repeats the opener's backticks (or more) followed
+// only by whitespace. Each block keeps its starting line as a stable React key.
 const splitBlocks = (text) => {
     const lines = text.split(/\r?\n/);
     const blocks = [];
@@ -53,13 +52,17 @@ const splitBlocks = (text) => {
             prose = [];
         }
     };
+    // No closer has at least this many backticks in the rest of the text, so longer openers need no search
+    let unclosedLength = Infinity;
     let index = 0;
     while (index < lines.length) {
         const fenceLength = countLeadingBackticks(lines[index]);
         const lang = lines[index].slice(fenceLength).trim();
-        const closeAt = fenceLength >= MIN_FENCE_LENGTH && LANGUAGE.test(lang)
-            ? findClosingFence(lines, index + 1, fenceLength)
-            : -1;
+        const searchClose = fenceLength >= MIN_FENCE_LENGTH && fenceLength < unclosedLength && LANGUAGE.test(lang);
+        const closeAt = searchClose ? findClosingFence(lines, index + 1, fenceLength) : -1;
+        if (searchClose && closeAt === -1) {
+            unclosedLength = fenceLength;
+        }
         if (closeAt === -1) {
             if (prose.length === 0) {
                 proseStart = index;

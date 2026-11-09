@@ -18,6 +18,7 @@
 
 package io.ballerina.scan.utils;
 
+import io.ballerina.scan.internal.IssueImpl;
 import io.ballerina.tools.text.TextRange;
 
 import java.io.IOException;
@@ -25,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * {@code SnippetExtractor} extracts the exact source text an issue's location covers, for use as a
@@ -35,30 +37,35 @@ import java.util.Map;
 final class SnippetExtractor {
 
     /**
-     * Extracts the source text covered by {@code textRange} from the given file.
+     * Extracts the source text covered by the issue's location. The text is taken from the source the compiler
+     * analyzed, which the issue's offsets refer to, and from the file only when the issue carries no source.
      *
-     * @param filePath         absolute path of the file the issue was found in
-     * @param textRange        the character range of the issue's location
-     * @param fileContentCache cache of file path to its full content, shared across a single report
+     * @param issue            the issue
+     * @param fileContentCache cache of file path to its full content, or empty when it cannot be read
      * @return the source text covered by the range, or {@code null} when unavailable
      */
-    static String extract(String filePath, TextRange textRange, Map<String, String> fileContentCache) {
-        String content = fileContentCache.computeIfAbsent(filePath, path -> {
-            try {
-                return Files.readString(Path.of(path), StandardCharsets.UTF_8);
-            } catch (IOException ex) {
-                return null;
-            }
-        });
-        if (content == null) {
+    static String extract(IssueImpl issue, Map<String, Optional<String>> fileContentCache) {
+        Optional<String> content = fileContentCache.computeIfAbsent(issue.filePath(), path -> issue.textDocument()
+                .map(textDocument -> new String(textDocument.toCharArray()))
+                .or(() -> readFile(path)));
+        if (content.isEmpty()) {
             return null;
         }
+        TextRange textRange = issue.location().textRange();
         int start = textRange.startOffset();
         int end = start + textRange.length();
-        if (start < 0 || end > content.length() || start > end) {
+        if (start < 0 || end > content.get().length() || start > end) {
             return null;
         }
-        return content.substring(start, end);
+        return content.get().substring(start, end);
+    }
+
+    private static Optional<String> readFile(String path) {
+        try {
+            return Optional.of(Files.readString(Path.of(path), StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            return Optional.empty();
+        }
     }
 
     private SnippetExtractor() {

@@ -31,12 +31,12 @@ import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
 import io.ballerina.projects.TomlDocument;
 import io.ballerina.projects.internal.model.Target;
-import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.SuppressedIssue;
 import io.ballerina.scan.internal.IssueImpl;
+import io.ballerina.scan.internal.ReporterImpl;
 import io.ballerina.toml.api.Toml;
 import io.ballerina.toml.semantic.TomlType;
 import io.ballerina.toml.semantic.ast.TomlArrayValueNode;
@@ -241,7 +241,8 @@ public final class ScanUtils {
 
     /**
      * Fails when the dependencies of a package are not locked in its Dependencies.toml, as {@code bal build} locks
-     * them. A single file has no dependencies to lock.
+     * them. A single file has no dependencies to lock. Report an empty package as empty before this check, since it
+     * has no dependencies to lock either.
      *
      * @param project the project to scan
      * @throws ScanToolException if the project is a package without a Dependencies.toml
@@ -252,8 +253,7 @@ public final class ScanUtils {
             return;
         }
         Package currentPackage = project.currentPackage();
-        // An empty package has no dependencies to lock, and is reported as empty instead
-        if (!ProjectUtils.isProjectEmpty(project) && currentPackage.dependenciesToml().isEmpty()) {
+        if (currentPackage.dependenciesToml().isEmpty()) {
             String packageName = currentPackage.packageOrg().value() + "/" + currentPackage.packageName().value();
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.MISSING_DEPENDENCIES_TOML, packageName));
         }
@@ -270,13 +270,12 @@ public final class ScanUtils {
     private static String convertIssuesToJsonString(List<Issue> issues, Map<Issue, SuppressedIssue> suppressions) {
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
         JsonArray issuesAsJson = gson.toJsonTree(issues).getAsJsonArray();
-        Map<String, String> fileContentCache = new HashMap<>();
+        Map<String, Optional<String>> fileContentCache = new HashMap<>();
         for (int i = 0; i < issues.size(); i++) {
             Issue issue = issues.get(i);
             JsonObject issueAsJson = issuesAsJson.get(i).getAsJsonObject();
             if (issue instanceof IssueImpl issueImpl) {
-                String snippetText = SnippetExtractor.extract(issueImpl.filePath(),
-                        issueImpl.location().textRange(), fileContentCache);
+                String snippetText = SnippetExtractor.extract(issueImpl, fileContentCache);
                 if (snippetText != null) {
                     issueAsJson.getAsJsonObject("location").addProperty("snippet", snippetText);
                 }
@@ -323,7 +322,7 @@ public final class ScanUtils {
      */
     private static String convertIssuesToSarifString(List<Issue> issues, Project project,
                                                      Map<Issue, SuppressedIssue> suppressions) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
         // Create SARIF root object
         JsonObject sarif = new JsonObject();
@@ -382,7 +381,7 @@ public final class ScanUtils {
 
         // Create results array
         JsonArray results = new JsonArray();
-        Map<String, String> fileContentCache = new HashMap<>();
+        Map<String, Optional<String>> fileContentCache = new HashMap<>();
 
         for (Issue issue : issues) {
             IssueImpl issueImpl = (IssueImpl) issue;
@@ -401,8 +400,7 @@ public final class ScanUtils {
             JsonObject physicalLocation = new JsonObject();
 
             JsonObject artifactLocation = new JsonObject();
-            String relativePath = getRelativePath(issueImpl.filePath(), project.sourceRoot().toString());
-            artifactLocation.addProperty("uri", relativePath.replace("\\", "/"));
+            artifactLocation.addProperty("uri", toArtifactUri(project.sourceRoot(), issueImpl.filePath()));
             physicalLocation.add("artifactLocation", artifactLocation);
 
             JsonObject region = new JsonObject();
@@ -414,7 +412,7 @@ public final class ScanUtils {
             region.addProperty("endColumn", lineRange.endLine().offset() + 1);
             region.addProperty("charOffset", textRange.startOffset());
             region.addProperty("charLength", textRange.length());
-            String snippetText = SnippetExtractor.extract(issueImpl.filePath(), textRange, fileContentCache);
+            String snippetText = SnippetExtractor.extract(issueImpl, fileContentCache);
             if (snippetText != null) {
                 JsonObject snippet = new JsonObject();
                 snippet.addProperty("text", snippetText);
@@ -479,21 +477,17 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the relative path from the source root.
-     *
-     * @param filePath   the absolute file path
-     * @param sourceRoot the source root path
-     * @return relative path
+     * Returns the SARIF artifact URI of a file: its path relative to the source root, or its file name when it is
+     * outside the source root.
      */
-    private static String getRelativePath(String filePath, String sourceRoot) {
+    private static String toArtifactUri(Path sourceRoot, String filePath) {
         Path path = Paths.get(filePath);
-        try {
-            Path source = Paths.get(sourceRoot);
-            return source.relativize(path).toString();
-        } catch (IllegalArgumentException e) {
-            Path fileName = path.getFileName();
-            return fileName != null ? fileName.toString() : filePath;
+        String relativePath = toRelativePath(sourceRoot, path);
+        if (relativePath != null) {
+            return relativePath;
         }
+        Path fileName = path.getFileName();
+        return fileName != null ? fileName.toString() : filePath;
     }
 
     /**
@@ -669,23 +663,19 @@ public final class ScanUtils {
 
         Map<String, JsonObject> scanReportPathAndFile = new LinkedHashMap<>();
         for (Document document : getAnalyzedDocuments(currentPackage, analyzedSources)) {
-            // Documents that exist only in memory have no file to show; issues in them still get an entry below
-            Optional<Path> documentPath = project.documentPath(document.documentId());
+            // A build project gives a path even for documents that exist only in memory, which have no file to show
+            Optional<Path> documentPath = project.documentPath(document.documentId()).filter(Files::isRegularFile);
             if (documentPath.isEmpty()) {
                 continue;
             }
-            JsonObject scanReportFile = createScanReportFile(document.name(), documentPath.get().toString());
-            String relativePath = toRelativePath(reportRoot, documentPath.get());
-            if (relativePath != null) {
-                scanReportFile.addProperty(SCAN_REPORT_FILE_RELATIVE_PATH, relativePath);
-            }
-            scanReportFile.addProperty(SCAN_REPORT_FILE_PACKAGE, packageName);
-            scanReportPathAndFile.put(toReportFileKey(documentPath.get().toString()), scanReportFile);
+            scanReportPathAndFile.put(toReportFileKey(documentPath.get().toString()), createScanReportFile(
+                    ReporterImpl.reportFileName(document), documentPath.get(), reportRoot, packageName));
         }
         for (Issue issue : issues) {
             IssueImpl issueImpl = (IssueImpl) issue;
             JsonObject scanReportFile = scanReportPathAndFile.computeIfAbsent(toReportFileKey(issueImpl.filePath()),
-                    key -> createScanReportFile(issueImpl.fileName(), issueImpl.filePath()));
+                    key -> createScanReportFile(issueImpl.fileName(), Path.of(issueImpl.filePath()), reportRoot,
+                            packageName));
             scanReportFile.getAsJsonArray(SCAN_REPORT_ISSUES).add(getJsonIssue(issueImpl, suppressions.get(issue)));
         }
 
@@ -719,17 +709,25 @@ public final class ScanUtils {
     /**
      * Returns the {@link JsonObject} representation of a scanned source file, including its content.
      *
-     * @param fileName name of the source file
-     * @param filePath path of the source file
+     * @param fileName    module-qualified name of the source file
+     * @param filePath    path of the source file
+     * @param reportRoot  the root the report's folder tree starts from
+     * @param packageName name of the package the file belongs to
      * @return json object representation of the scanned source file
      */
-    private static JsonObject createScanReportFile(String fileName, String filePath) {
+    private static JsonObject createScanReportFile(String fileName, Path filePath, Path reportRoot,
+                                                   String packageName) {
         JsonObject scanReportFile = new JsonObject();
         scanReportFile.addProperty(SCAN_REPORT_FILE_NAME, fileName);
-        scanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath);
+        scanReportFile.addProperty(SCAN_REPORT_FILE_PATH, filePath.toString());
+        String relativePath = toRelativePath(reportRoot, filePath);
+        if (relativePath != null) {
+            scanReportFile.addProperty(SCAN_REPORT_FILE_RELATIVE_PATH, relativePath);
+        }
+        scanReportFile.addProperty(SCAN_REPORT_FILE_PACKAGE, packageName);
         String fileContent;
         try {
-            fileContent = Files.readString(Path.of(filePath));
+            fileContent = Files.readString(filePath);
         } catch (IOException ex) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.FAILED_TO_READ_BALLERINA_FILE,
                     ex.getMessage()));
@@ -745,8 +743,7 @@ public final class ScanUtils {
             Module module = analyzedPackage.module(moduleId);
             analyzedSources.documentIds(module)
                     .map(module::document)
-                    // Skip the in-memory document the analyzer adds to import external analyzer plugins
-                    .filter(document -> !document.name().startsWith(Constants.IMPORT_GENERATOR_FILE))
+                    .filter(document -> !Constants.IMPORT_GENERATOR_DOCUMENT.matcher(document.name()).matches())
                     .forEach(documents::add);
         }
         return documents;
@@ -771,23 +768,11 @@ public final class ScanUtils {
         return Path.of(filePath).toAbsolutePath().normalize().toString();
     }
 
-    /**
-     * Returns the severity the report shows for a rule. Rules have no severity of their own on this line, so it is
-     * the severity the quality gate counts the rule's kind as.
-     */
-    private static String reportSeverity(RuleKind kind) {
-        return switch (kind) {
-            case BUG -> "HIGH";
-            case VULNERABILITY -> "MEDIUM";
-            case CODE_SMELL -> "LOW";
-        };
-    }
-
     private static JsonObject getJsonIssue(IssueImpl issueImpl, SuppressedIssue suppressedIssue) {
         JsonObject scanReportIssue = new JsonObject();
         scanReportIssue.addProperty(SCAN_REPORT_ISSUE_RULE_ID, issueImpl.rule().id());
         scanReportIssue.addProperty(SCAN_REPORT_ISSUE_KIND, issueImpl.rule().kind().toString());
-        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_SEVERITY, reportSeverity(issueImpl.rule().kind()));
+        scanReportIssue.addProperty(SCAN_REPORT_ISSUE_SEVERITY, GateSeverity.of(issueImpl.rule().kind()).name());
         scanReportIssue.addProperty(SCAN_REPORT_ISSUE_TYPE, issueImpl.source().toString());
         scanReportIssue.addProperty(SCAN_REPORT_ISSUE_MESSAGE, issueImpl.rule().description());
 
@@ -1307,7 +1292,7 @@ public final class ScanUtils {
     // Reports relative or unparsable paths as malformed, matching the deprecated URL(String) constructor
     private static URL toUrl(String path) throws MalformedURLException {
         try {
-            URI uri = new URI(path);
+            URI uri = toUri(path);
             if (!uri.isAbsolute()) {
                 throw new MalformedURLException("no protocol: " + path);
             }
@@ -1316,6 +1301,23 @@ public final class ScanUtils {
             MalformedURLException malformed = new MalformedURLException(ex.getMessage());
             malformed.initCause(ex);
             throw malformed;
+        }
+    }
+
+    // URL(String) also took characters a URI does not, such as spaces, so those are encoded instead of rejected
+    private static URI toUri(String path) throws URISyntaxException {
+        try {
+            return new URI(path);
+        } catch (URISyntaxException ex) {
+            int schemeEnd = path.indexOf(':');
+            if (schemeEnd <= 0) {
+                throw ex;
+            }
+            int fragmentStart = path.indexOf('#', schemeEnd);
+            String schemeSpecificPart = fragmentStart < 0 ? path.substring(schemeEnd + 1)
+                    : path.substring(schemeEnd + 1, fragmentStart);
+            String fragment = fragmentStart < 0 ? null : path.substring(fragmentStart + 1);
+            return new URI(path.substring(0, schemeEnd), schemeSpecificPart, fragment);
         }
     }
 
