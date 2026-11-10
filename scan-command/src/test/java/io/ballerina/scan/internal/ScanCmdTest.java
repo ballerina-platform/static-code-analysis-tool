@@ -63,6 +63,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 import static io.ballerina.scan.utils.DiagnosticCode.COMPILATION_CONTAINS_ERRORS;
 import static io.ballerina.scan.utils.DiagnosticCode.EMPTY_PACKAGE;
 import static io.ballerina.scan.utils.DiagnosticCode.MISSING_DEPENDENCIES_TOML;
+import static io.ballerina.scan.utils.DiagnosticCode.PACKAGE_COMPILATION_CONTAINS_ERRORS;
 import static io.ballerina.scan.utils.DiagnosticLog.error;
 
 /**
@@ -1080,6 +1081,30 @@ public class ScanCmdTest extends BaseTest {
                 ballerinaProject.toAbsolutePath().toString(), Map.of())).getAsJsonObject();
         Assert.assertFalse(result.get("success").getAsBoolean());
         Assert.assertEquals(result.get("error").getAsString(), "error: " + message);
+    }
+
+    @Test(description = "test a package that has no Dependencies.toml because it does not compile is reported with its "
+            + "compilation errors instead of a request to run bal build")
+    void testScanCommandReportsCompilationErrorsOfUnlockedPackage() throws IOException {
+        Path ballerinaProject = testResources.resolve("test-resources")
+                .resolve("bal-project-with-compilation-errors-without-dependencies-toml");
+        Files.deleteIfExists(ballerinaProject.resolve("Dependencies.toml"));
+        String message = error(PACKAGE_COMPILATION_CONTAINS_ERRORS,
+                "ballerina/bal_project_with_compilation_errors_without_dependencies_toml");
+        String compilationError = "main.bal:18:17: error: incompatible types: expected 'int', found 'string'";
+        System.setProperty("user.dir", ballerinaProject.toString());
+        ScanCmd scanCmd = new ScanCmd(printStream);
+        scanCmd.execute();
+        System.setProperty("user.dir", userDir);
+        Assert.assertEquals(scanCmd.exitCode(), 1);
+        Assert.assertEquals(readOutput(true).trim(), "bal scan: error: " + message + "\n" + compilationError);
+        Assert.assertFalse(Files.exists(ballerinaProject.resolve("Dependencies.toml")),
+                "The scan should not resolve the dependencies itself");
+
+        JsonObject result = JsonParser.parseString(ScanLanguageServerTool.runScan(
+                ballerinaProject.toAbsolutePath().toString(), Map.of())).getAsJsonObject();
+        Assert.assertFalse(result.get("success").getAsBoolean());
+        Assert.assertEquals(result.get("error").getAsString(), message);
     }
 
     @Test(description = "test a workspace prints the issues of all its packages as one document on standard output")

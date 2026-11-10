@@ -77,6 +77,7 @@ public enum DiagnosticCode {
     FAILED_TO_CREATE_TARGET_DIR("STATIC_ANALYSIS_ERROR_051", "failed.to.create.target.dir"),
     PLATFORMS_NOT_SUPPORTED("STATIC_ANALYSIS_ERROR_052", "platforms.not.supported"),
     UNKNOWN_OPTION("STATIC_ANALYSIS_ERROR_053", "unknown.option"),
+    PACKAGE_COMPILATION_CONTAINS_ERRORS("STATIC_ANALYSIS_ERROR_054", "package.compilation.contains.errors"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),

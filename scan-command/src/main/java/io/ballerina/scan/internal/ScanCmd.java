@@ -47,8 +47,6 @@ import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.diagnostics.Diagnostic;
-import io.ballerina.tools.diagnostics.Location;
-import io.ballerina.tools.text.LineRange;
 import picocli.CommandLine;
 
 import java.io.BufferedReader;
@@ -1197,7 +1195,7 @@ public class ScanCmd implements BLauncherCmd {
             return;
         }
         throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.COMPILATION_CONTAINS_ERRORS),
-                compilationErrors.stream().map(ScanCmd::formatDiagnostic).toList());
+                compilationErrors.stream().map(DiagnosticLog::compilerError).toList());
     }
 
     /**
@@ -1216,18 +1214,6 @@ public class ScanCmd implements BLauncherCmd {
                 .toList();
         return ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.SUPPRESSION_REQUIREMENTS_NOT_MET,
                 invalidSuppressionCount), diagnostics);
-    }
-
-    /**
-     * Formats a compiler diagnostic with its file and position, when it has them.
-     */
-    private static String formatDiagnostic(Diagnostic diagnostic) {
-        Location location = diagnostic.location();
-        LineRange lineRange = location == null ? null : location.lineRange();
-        if (lineRange == null || lineRange.fileName() == null || lineRange.fileName().isEmpty()) {
-            return "error: " + diagnostic.message();
-        }
-        return DiagnosticLog.fileError(lineRange.fileName(), lineRange, diagnostic.message());
     }
 
     /**
@@ -1330,7 +1316,7 @@ public class ScanCmd implements BLauncherCmd {
         }
         if (loadResult.diagnostics().hasErrors()) {
             throw ScanFailure.runtime(loadFailure,
-                    loadResult.diagnostics().errors().stream().map(ScanCmd::formatDiagnostic).toList());
+                    loadResult.diagnostics().errors().stream().map(DiagnosticLog::compilerError).toList());
         }
         return loadResult.project();
     }

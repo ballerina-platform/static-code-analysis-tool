@@ -195,6 +195,8 @@ public final class ScanUtils {
     /**
      * Fails unless each package of the project has its dependencies locked in {@code Dependencies.toml}. The scan
      * uses the locked versions and does not resolve the dependencies of a package itself; {@code bal build} does.
+     * A package without {@code Dependencies.toml} that does not compile fails with its compilation errors instead,
+     * as {@code bal build} does not lock its dependencies until it compiles.
      *
      * @param project the project to scan
      */
@@ -209,6 +211,15 @@ public final class ScanUtils {
             // An empty package has no dependencies to lock, and is reported as empty instead
             if (!ProjectUtils.isProjectEmpty(buildProject) && currentPackage.dependenciesToml().isEmpty()) {
                 String packageName = currentPackage.packageOrg().value() + "/" + currentPackage.packageName().value();
+                // bal build writes Dependencies.toml only for a package that compiles, so running it again would
+                // not help a package with compilation errors
+                List<String> compilationErrors = currentPackage.getCompilation().diagnosticResult().errors().stream()
+                        .map(DiagnosticLog::compilerError)
+                        .toList();
+                if (!compilationErrors.isEmpty()) {
+                    throw new ScanToolException(DiagnosticLog.error(
+                            DiagnosticCode.PACKAGE_COMPILATION_CONTAINS_ERRORS, packageName), compilationErrors);
+                }
                 throw LauncherUtils.createLauncherException(
                         DiagnosticLog.error(DiagnosticCode.MISSING_DEPENDENCIES_TOML, packageName));
             }

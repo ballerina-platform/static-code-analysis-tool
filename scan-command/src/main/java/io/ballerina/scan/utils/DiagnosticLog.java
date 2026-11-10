@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.utils;
 
+import io.ballerina.tools.diagnostics.Diagnostic;
+import io.ballerina.tools.diagnostics.Location;
 import io.ballerina.tools.text.LineRange;
 
 import java.text.MessageFormat;
@@ -45,6 +47,23 @@ public class DiagnosticLog {
     public static String warning(DiagnosticCode code, Object... args) {
         String msgKey = MESSAGES.getString(WARNING_PREFIX + "." + code.messageKey());
         return MessageFormat.format(msgKey, args);
+    }
+
+    /**
+     * Formats a compiler error with its file and position, as {@link #fileError(String, LineRange, String)} does, or
+     * as {@code error: <message>} when it has no file.
+     *
+     * @param diagnostic the compiler error
+     * @return the formatted error
+     * @since 0.13.1
+     */
+    public static String compilerError(Diagnostic diagnostic) {
+        Location location = diagnostic.location();
+        LineRange lineRange = location == null ? null : location.lineRange();
+        if (lineRange == null || lineRange.fileName() == null || lineRange.fileName().isEmpty()) {
+            return ERROR_PREFIX + ": " + diagnostic.message();
+        }
+        return fileError(lineRange.fileName(), lineRange, diagnostic.message());
     }
 
     /**
