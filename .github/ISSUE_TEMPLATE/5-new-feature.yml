@@ -1,7 +1,20 @@
 name: "💡 New Feature Request"
-description: Suggest new functionality and features for the product.
-labels: ["Type/NewFeature"]
+description: Suggest new functionality for `bal scan`. For a new rule, use "Request a New Rule".
+labels: ["Type/New Feature"]
 body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - Configuration
+        - Reports
+        - Core
+        - Build
+        - Not sure
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
@@ -20,13 +33,13 @@ body:
     id: alternatives
     attributes:
       label: Alternatives
-      description: Describe any alternatives have you considered
+      description: Describe any alternatives you have considered.
     validations:
       required: false
   - type: input
     id: version
     attributes:
       label: Version
-      description: Enter product/component version.
+      description: The `scan` version shown by `bal tool list`.
     validations:
       required: false

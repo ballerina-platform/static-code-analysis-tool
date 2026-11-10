@@ -1,0 +1,114 @@
+name: Label Issue Area
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request:
+    paths:
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/workflows/label-issue-area.yml'
+
+permissions: {}
+
+env:
+  # Each area has an Area/<area> label and is an option of the Area dropdown in the issue forms
+  AREAS: CLI,Rules,Configuration,Reports,Core,Build
+
+jobs:
+  label:
+    # The forms with an Area dropdown put it first, which the validate_forms job checks
+    if: >-
+      github.repository_owner == 'ballerina-platform' && github.event_name == 'issues' &&
+      startsWith(github.event.issue.body, '### Area')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    # Queue every run, since a run that replaced a pending Area change would skip it as unchanged
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.issue.number }}
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const areaOf = (body) => /^### Area\r?\n\r?\n(.+)/.exec(body ?? '')?.[1].trim();
+            const { action, changes, issue } = context.payload;
+            // Labels set during triage are only replaced when the reporter changes the Area answer
+            if (action === 'edited' && (changes.body === undefined || areaOf(changes.body.from) === areaOf(issue.body))) {
+              return;
+            }
+
+            // A queued run can start after later edits, so act on the latest state
+            const params = { ...context.repo, issue_number: issue.number };
+            const { data: latest } = await github.rest.issues.get(params);
+            const removeLabel = (name) =>
+              github.rest.issues.removeLabel({ ...params, name }).catch((error) => {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              });
+            const areas = process.env.AREAS.split(',');
+            const area = areaOf(latest.body);
+            if (area === 'Not sure' && action === 'edited') {
+              // Withdraw only the label of the previous answer, keeping labels set during triage
+              const previous = areaOf(changes.body.from);
+              if (areas.includes(previous)) {
+                await removeLabel(`Area/${previous}`);
+              }
+              return;
+            }
+            if (area === undefined || area === 'Not sure') {
+              return;
+            }
+            if (!areas.includes(area)) {
+              core.warning(`"${area}" is not one of the areas: ${areas.join(', ')}`);
+              return;
+            }
+
+            const label = `Area/${area}`;
+            const labels = latest.labels.map((l) => (typeof l === 'string' ? l : l.name));
+            const stale = labels.filter((l) => l !== label && areas.some((a) => l === `Area/${a}`));
+            for (const name of stale) {
+              await removeLabel(name);
+            }
+            if (!labels.includes(label)) {
+              await github.rest.issues.addLabels({ ...params, labels: [label] });
+            }
+
+  validate_forms:
+    if: github.repository_owner == 'ballerina-platform' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the Area dropdowns against the areas and labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=0
+          labels=$(gh label list --repo "$GITHUB_REPOSITORY" --limit 500 --json name --jq '.[].name')
+          for area in ${AREAS//,/ }; do
+            if ! grep -qxF "Area/$area" <<< "$labels"; then
+              echo "::error::The label Area/$area does not exist"
+              status=1
+            fi
+          done
+          for form in .github/ISSUE_TEMPLATE/*.yml; do
+            if [ "$(yq '[(.body // [])[] | select(.id == "area")] | length' "$form")" = 0 ]; then
+              continue
+            fi
+            if [ "$(yq '.body[0].id' "$form")" != area ]; then
+              echo "::error file=$form::The Area dropdown must be the first field"
+              status=1
+            fi
+            while read -r option; do
+              if [ "$option" != "Not sure" ] && [[ ",$AREAS," != *",$option,"* ]]; then
+                echo "::error file=$form::The Area option \"$option\" is not in AREAS"
+                status=1
+              fi
+            done < <(yq '.body[] | select(.id == "area") | .attributes.options[]' "$form")
+          done
+          exit $status
