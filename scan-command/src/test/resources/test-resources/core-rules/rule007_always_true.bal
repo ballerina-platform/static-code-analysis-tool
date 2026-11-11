@@ -31,7 +31,7 @@ function testSimpleVariableReference() {
     test2(a["a"] === a["a"]);  // warning
     result = x >= int:MIN_VALUE; // warning
     result = x <= int:MAX_VALUE; // warning
-    result = y <= float:Infinity; // warning
+    result = y <= float:Infinity; // no warning: false when y is NaN
     result = b || true; // warning
     result2 = x | -1;// warning
 
@@ -68,6 +68,14 @@ function testOperators() {
     int x = 1;
     float y = 2.3f;
     boolean result;
+    result = int:MAX_VALUE >= x; // warning
+    result = int:MIN_VALUE <= x; // warning
+    result = x <= i:MAX_VALUE; // warning
+    result = float:Infinity >= y; // no warning: false when y is NaN
+    result = y >= -float:Infinity; // no warning: false when y is NaN
+    int? maybe = ();
+    result = maybe <= int:MAX_VALUE; // no warning: false when maybe is nil
+    result = int:MIN_VALUE <= maybe; // no warning: false when maybe is nil
 }
 
 function testRelationaOperatorsWithoutWarnings() {

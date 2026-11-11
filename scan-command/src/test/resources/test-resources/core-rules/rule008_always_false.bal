@@ -124,3 +124,21 @@ function testRelationaOperatorsWithoutWarnings2() {
     int result2 = x | 1;
     result2 = x & --1;
 }
+
+function testBoundOnTheLeft() {
+    int x = 1;
+    float y = 2.3f;
+    boolean result;
+    result = int:MIN_VALUE > x; // warning
+    result = int:MAX_VALUE < x; // warning
+    result = float:Infinity < y; // warning
+    result = y < -float:Infinity; // warning
+    result = -float:Infinity > y; // warning
+    result = x < i:MIN_VALUE; // warning
+    result = int:MIN_VALUE < x;
+    result = int:MAX_VALUE > x;
+    result = float:Infinity > y;
+    result = -float:Infinity < y;
+    int? maybe = ();
+    result = maybe > int:MAX_VALUE; // warning
+}

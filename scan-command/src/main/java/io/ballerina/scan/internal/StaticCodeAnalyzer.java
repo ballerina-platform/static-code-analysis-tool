@@ -47,6 +47,7 @@ import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeLocation;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
+import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.RequiredParameterNode;
 import io.ballerina.compiler.syntax.tree.RestParameterNode;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
@@ -74,7 +75,6 @@ import static io.ballerina.compiler.syntax.tree.SyntaxKind.PRIVATE_KEYWORD;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.PUBLIC_KEYWORD;
 import static io.ballerina.scan.utils.Constants.INIT_FUNCTION;
 import static io.ballerina.scan.utils.Constants.MAIN_FUNCTION;
-import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference;
 import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isEqualToProvidedLiteralIdentifier;
 import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isSameSimpleExpression;
 
@@ -210,51 +210,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     private void reportIssuesWithTrivialOperations(BinaryExpressionNode binaryExpressionNode) {
+        reportComparisonWithTypeBound(binaryExpressionNode);
         SyntaxKind binaryOperatorKind = binaryExpressionNode.operator().kind();
-        if (binaryOperatorKind == SyntaxKind.GT_TOKEN) {
-            if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
-                    Constants.Token.FLOAT, Constants.Token.INFINITY)) {
-                // a > Infinity is always false.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
-            }
-
-            if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
-                    Constants.Token.INT, Constants.Token.MAX_VALUE)) {
-                // a > MAX_VALUE is always false.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
-            }
-        }
-
-        if (binaryOperatorKind == SyntaxKind.LT_EQUAL_TOKEN) {
-            if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
-                    Constants.Token.FLOAT, Constants.Token.INFINITY)) {
-                // a <= Infinity is always true.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
-            }
-
-            if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
-                    Constants.Token.INT, Constants.Token.MAX_VALUE)) {
-                // a <= MAX_VALUE is always true.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
-            }
-        }
-
-        if (binaryOperatorKind == SyntaxKind.LT_TOKEN) {
-            if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
-                    Constants.Token.INT, Constants.Token.MIN_VALUE)) {
-                // a < MIN_VALUE is always false.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
-            }
-        }
-
-        if (binaryOperatorKind == SyntaxKind.GT_EQUAL_TOKEN) {
-            if (isDefinedQualifiedNameReference(binaryExpressionNode.rhsExpr(),
-                    Constants.Token.INT, Constants.Token.MIN_VALUE)) {
-                // a >= MIN_VALUE is always true.
-                reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
-            }
-        }
-
         if (binaryOperatorKind == SyntaxKind.LOGICAL_AND_TOKEN) {
             if (isEqualToProvidedLiteralIdentifier(binaryExpressionNode.rhsExpr(), Constants.Token.FALSE)
                     || isEqualToProvidedLiteralIdentifier(binaryExpressionNode.lhsExpr(), Constants.Token.FALSE)) {
@@ -309,6 +266,102 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 // a | -1 is always true.
                 reportIssue(binaryExpressionNode, CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
             }
+        }
+    }
+
+    /**
+     * Reports a comparison against the largest or smallest value of its type, such as {@code x > int:MAX_VALUE}
+     * or {@code int:MIN_VALUE > x}. A bound on the left is compared as if the operands were swapped.
+     */
+    private void reportComparisonWithTypeBound(BinaryExpressionNode binaryExpressionNode) {
+        SyntaxKind operator = binaryExpressionNode.operator().kind();
+        if (operator != SyntaxKind.LT_TOKEN && operator != SyntaxKind.LT_EQUAL_TOKEN
+                && operator != SyntaxKind.GT_TOKEN && operator != SyntaxKind.GT_EQUAL_TOKEN) {
+            return;
+        }
+        Node lhs = binaryExpressionNode.lhsExpr();
+        Node rhs = binaryExpressionNode.rhsExpr();
+        typeBound(rhs).flatMap(bound -> outcome(bound, operator, lhs))
+                .or(() -> typeBound(lhs).flatMap(bound -> outcome(bound, swapOperands(operator), rhs)))
+                .ifPresent(rule -> reportIssue(binaryExpressionNode, rule));
+    }
+
+    // A comparison with nil, or with NaN for a float bound, is false, so it is always true only when neither can be.
+    private Optional<CoreRule> outcome(TypeBound bound, SyntaxKind operator, Node otherOperand) {
+        return bound.outcome(operator)
+                .filter(rule -> rule != CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE || !canBeNil(otherOperand));
+    }
+
+    private boolean canBeNil(Node expression) {
+        return semanticModel.typeOf(expression)
+                .map(type -> semanticModel.types().NIL.subtypeOf(type))
+                .orElse(true);
+    }
+
+    private static SyntaxKind swapOperands(SyntaxKind operator) {
+        return switch (operator) {
+            case GT_TOKEN -> SyntaxKind.LT_TOKEN;
+            case LT_TOKEN -> SyntaxKind.GT_TOKEN;
+            case GT_EQUAL_TOKEN -> SyntaxKind.LT_EQUAL_TOKEN;
+            case LT_EQUAL_TOKEN -> SyntaxKind.GT_EQUAL_TOKEN;
+            default -> operator;
+        };
+    }
+
+    private Optional<TypeBound> typeBound(Node node) {
+        if (node instanceof UnaryExpressionNode unary && unary.unaryOperator().kind() == SyntaxKind.MINUS_TOKEN) {
+            return langLibConstant(unary.expression())
+                    .filter(constant -> constant.equals(Constants.Token.FLOAT + ":" + Constants.Token.INFINITY))
+                    .map(constant -> TypeBound.FLOAT_LOWER);
+        }
+        return langLibConstant(node).flatMap(constant -> switch (constant) {
+            case Constants.Token.INT + ":" + Constants.Token.MAX_VALUE -> Optional.of(TypeBound.INT_UPPER);
+            case Constants.Token.INT + ":" + Constants.Token.MIN_VALUE -> Optional.of(TypeBound.INT_LOWER);
+            case Constants.Token.FLOAT + ":" + Constants.Token.INFINITY -> Optional.of(TypeBound.FLOAT_UPPER);
+            default -> Optional.empty();
+        });
+    }
+
+    /**
+     * Returns the name of the lang library constant the node refers to, such as {@code int:MAX_VALUE}, whatever
+     * prefix the module is imported with.
+     */
+    private Optional<String> langLibConstant(Node node) {
+        if (!(node instanceof QualifiedNameReferenceNode)) {
+            return Optional.empty();
+        }
+        return semanticModel.symbol(node)
+                .filter(symbol -> symbol.kind() == SymbolKind.CONSTANT && SemanticUtils.isLangLib(symbol))
+                .flatMap(symbol -> symbol.getModule().flatMap(module -> symbol.getName()
+                        .map(name -> module.id().moduleName().substring("lang.".length()) + ":" + name)));
+    }
+
+    /**
+     * The largest or smallest value of a type. Nothing is greater than an upper bound, but a value can be not
+     * less than or equal to {@code float:Infinity} when it is {@code NaN}.
+     */
+    private enum TypeBound {
+        INT_UPPER(true, false),
+        INT_LOWER(false, false),
+        FLOAT_UPPER(true, true),
+        FLOAT_LOWER(false, true);
+
+        private final boolean upper;
+        private final boolean hasNaN;
+
+        TypeBound(boolean upper, boolean hasNaN) {
+            this.upper = upper;
+            this.hasNaN = hasNaN;
+        }
+
+        Optional<CoreRule> outcome(SyntaxKind operator) {
+            if (operator == (upper ? SyntaxKind.GT_TOKEN : SyntaxKind.LT_TOKEN)) {
+                return Optional.of(CoreRule.OPERATION_ALWAYS_EVALUATES_TO_FALSE);
+            }
+            if (!hasNaN && operator == (upper ? SyntaxKind.LT_EQUAL_TOKEN : SyntaxKind.GT_EQUAL_TOKEN)) {
+                return Optional.of(CoreRule.OPERATION_ALWAYS_EVALUATES_TO_TRUE);
+            }
+            return Optional.empty();
         }
     }
 

@@ -46,7 +46,7 @@ public class Rule007Test extends StaticCodeAnalyzerTest {
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext, semanticModel);
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 21);
+        Assert.assertEquals(issues.size(), 23);
 
         assertIssue(issues.get(0), documentName, 15, 10, 15, 16, "ballerina:7", 7,
                 OPERATION_ALWAYS_EVALUATES_TO_TRUE, RuleKind.CODE_SMELL);
@@ -84,11 +84,15 @@ public class Rule007Test extends StaticCodeAnalyzerTest {
                 OPERATION_ALWAYS_EVALUATES_TO_TRUE, RuleKind.CODE_SMELL);
         assertIssue(issues.get(17), documentName, 32, 13, 32, 31, "ballerina:7", 7,
                 OPERATION_ALWAYS_EVALUATES_TO_TRUE, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(18), documentName, 33, 13, 33, 32, "ballerina:7", 7,
+        assertIssue(issues.get(18), documentName, 34, 13, 34, 22, "ballerina:7", 7,
                 OPERATION_ALWAYS_EVALUATES_TO_TRUE, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(19), documentName, 34, 13, 34, 22, "ballerina:7", 7,
+        assertIssue(issues.get(19), documentName, 35, 14, 35, 20, "ballerina:7", 7,
                 OPERATION_ALWAYS_EVALUATES_TO_TRUE, RuleKind.CODE_SMELL);
-        assertIssue(issues.get(20), documentName, 35, 14, 35, 20, "ballerina:7", 7,
+        assertIssue(issues.get(20), documentName, 70, 13, 70, 31, "ballerina:7", 7,
+                OPERATION_ALWAYS_EVALUATES_TO_TRUE, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(21), documentName, 71, 13, 71, 31, "ballerina:7", 7,
+                OPERATION_ALWAYS_EVALUATES_TO_TRUE, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(22), documentName, 72, 13, 72, 29, "ballerina:7", 7,
                 OPERATION_ALWAYS_EVALUATES_TO_TRUE, RuleKind.CODE_SMELL);
     }
 }

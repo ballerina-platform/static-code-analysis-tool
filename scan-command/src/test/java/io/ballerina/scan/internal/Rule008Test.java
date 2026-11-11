@@ -46,7 +46,7 @@ public class Rule008Test extends StaticCodeAnalyzerTest {
         StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext, semanticModel);
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 21);
+        Assert.assertEquals(issues.size(), 28);
 
         assertIssue(issues.get(0), documentName, 17, 10, 17, 16, "ballerina:8", 8,
                 OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
@@ -89,6 +89,20 @@ public class Rule008Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(19), documentName, 36, 13, 36, 23, "ballerina:8", 8,
                 OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
         assertIssue(issues.get(20), documentName, 37, 14, 37, 19, "ballerina:8", 8,
+                OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(21), documentName, 131, 13, 131, 30, "ballerina:8", 8,
+                OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(22), documentName, 132, 13, 132, 30, "ballerina:8", 8,
+                OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(23), documentName, 133, 13, 133, 31, "ballerina:8", 8,
+                OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(24), documentName, 134, 13, 134, 32, "ballerina:8", 8,
+                OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(25), documentName, 135, 13, 135, 32, "ballerina:8", 8,
+                OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(26), documentName, 136, 13, 136, 28, "ballerina:8", 8,
+                OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(27), documentName, 142, 13, 142, 34, "ballerina:8", 8,
                 OPERATION_ALWAYS_EVALUATES_TO_FALSE, RuleKind.CODE_SMELL);
     }
 }

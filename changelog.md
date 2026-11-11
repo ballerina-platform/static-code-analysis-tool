@@ -4,6 +4,16 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. Releases for older distributions are maintained on the `support/*` branches, which keep their own changelog.
 
+## [Unreleased]
+
+### Fixed
+
+- `ballerina:7` and `ballerina:8` report a comparison with `int:MAX_VALUE`, `int:MIN_VALUE`, `float:Infinity` or `-float:Infinity` on either side of the operator and with any prefix for the `lang.int` and `lang.float` modules. `x <= float:Infinity` is no longer reported as always true, as it is false when `x` is `NaN`, nor is `x <= int:MAX_VALUE` when `x` can be nil. ([#87](https://github.com/ballerina-platform/static-code-analysis-tool/issues/87))
+
+### Deprecated
+
+- `ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference`, which matches the prefix a module is imported with instead of the module, and is no longer used by the core rules.
+
 ## [0.13.0] - 2026-11-05
 
 Built against Ballerina 2201.13.2.
