@@ -76,4 +76,22 @@ public class SecretNameMatcherTest {
     void testNonSecretName(String name) {
         Assert.assertFalse(SecretNameMatcher.isSecretName(name), name);
     }
+
+    @DataProvider
+    Object[][] secretKinds() {
+        return new Object[][]{
+                {"password", SecretNameMatcher.Kind.PASSWORD}, {"dbPassword", SecretNameMatcher.Kind.PASSWORD},
+                {"dbpwd", SecretNameMatcher.Kind.PASSWORD}, {"passCodes", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordForFileServer", SecretNameMatcher.Kind.PASSWORD},
+                {"apiKey", SecretNameMatcher.Kind.SECRET}, {"accessToken", SecretNameMatcher.Kind.SECRET},
+                {"clientSecret", SecretNameMatcher.Kind.SECRET}, {"\"Authorization\"", SecretNameMatcher.Kind.SECRET},
+                {"credentials", SecretNameMatcher.Kind.SECRET}, {"passwordToken", SecretNameMatcher.Kind.SECRET},
+                {"tokenPassword", SecretNameMatcher.Kind.PASSWORD}, {"username", SecretNameMatcher.Kind.NONE}
+        };
+    }
+
+    @Test(dataProvider = "secretKinds")
+    void testSecretKind(String name, SecretNameMatcher.Kind kind) {
+        Assert.assertEquals(SecretNameMatcher.kind(name), kind, name);
+    }
 }
