@@ -19,43 +19,80 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.TypeBuilder;
+import io.ballerina.compiler.api.symbols.ArrayTypeSymbol;
 import io.ballerina.compiler.api.symbols.ClassFieldSymbol;
+import io.ballerina.compiler.api.symbols.ClassSymbol;
+import io.ballerina.compiler.api.symbols.FunctionSymbol;
+import io.ballerina.compiler.api.symbols.FunctionTypeSymbol;
+import io.ballerina.compiler.api.symbols.MapTypeSymbol;
+import io.ballerina.compiler.api.symbols.MethodSymbol;
+import io.ballerina.compiler.api.symbols.ObjectFieldSymbol;
 import io.ballerina.compiler.api.symbols.ObjectTypeSymbol;
+import io.ballerina.compiler.api.symbols.ParameterSymbol;
 import io.ballerina.compiler.api.symbols.Qualifier;
+import io.ballerina.compiler.api.symbols.RecordFieldSymbol;
+import io.ballerina.compiler.api.symbols.RecordTypeSymbol;
+import io.ballerina.compiler.api.symbols.ServiceDeclarationSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.SymbolKind;
+import io.ballerina.compiler.api.symbols.TupleTypeSymbol;
 import io.ballerina.compiler.api.symbols.TypeDefinitionSymbol;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
+import io.ballerina.compiler.api.symbols.UnionTypeSymbol;
+import io.ballerina.compiler.api.symbols.VariableSymbol;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
+import io.ballerina.compiler.syntax.tree.BindingPatternNode;
+import io.ballerina.compiler.syntax.tree.BracedExpressionNode;
 import io.ballerina.compiler.syntax.tree.CheckExpressionNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.DefaultableParameterNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
+import io.ballerina.compiler.syntax.tree.ExplicitNewExpressionNode;
+import io.ballerina.compiler.syntax.tree.ExpressionNode;
 import io.ballerina.compiler.syntax.tree.ExternalFunctionBodyNode;
+import io.ballerina.compiler.syntax.tree.FieldBindingPatternFullNode;
+import io.ballerina.compiler.syntax.tree.FieldBindingPatternVarnameNode;
+import io.ballerina.compiler.syntax.tree.ForEachStatementNode;
+import io.ballerina.compiler.syntax.tree.FunctionArgumentNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
 import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionExpressionNode;
-import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionParameters;
+import io.ballerina.compiler.syntax.tree.ImplicitNewExpressionNode;
 import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
+import io.ballerina.compiler.syntax.tree.ListBindingPatternNode;
+import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
+import io.ballerina.compiler.syntax.tree.MappingBindingPatternNode;
+import io.ballerina.compiler.syntax.tree.MappingConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
+import io.ballerina.compiler.syntax.tree.ModuleVariableDeclarationNode;
+import io.ballerina.compiler.syntax.tree.NamedArgumentNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NodeList;
 import io.ballerina.compiler.syntax.tree.NodeLocation;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
+import io.ballerina.compiler.syntax.tree.ObjectConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
+import io.ballerina.compiler.syntax.tree.ParenthesizedArgList;
+import io.ballerina.compiler.syntax.tree.PositionalArgumentNode;
 import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.RequiredParameterNode;
+import io.ballerina.compiler.syntax.tree.RestBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.RestParameterNode;
-import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
+import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
+import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
+import io.ballerina.compiler.syntax.tree.SpreadMemberNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.Token;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
+import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
+import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.utils.Constants;
@@ -65,8 +102,15 @@ import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextDocument;
 import io.ballerina.tools.text.TextRange;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.DOUBLE_DOT_LT_TOKEN;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.ELLIPSIS_TOKEN;
@@ -93,6 +137,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private final SecretValueResolver secretValueResolver;
     // Test sources are compiled only into the test module, so their public constructs are not a public API
     private final boolean isTestSource;
+    private final Map<Node, Set<MethodSymbol>> implementedMethodsByParent = new HashMap<>();
 
     StaticCodeAnalyzer(Document document, ScannerContextImpl scannerContext, SemanticModel semanticModel) {
         this(document, scannerContext, semanticModel, new SecretValueResolver(semanticModel, document.module()));
@@ -379,7 +424,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     public void visit(FunctionDefinitionNode functionDefinitionNode) {
-        if (!(functionDefinitionNode.functionBody() instanceof ExternalFunctionBodyNode)) {
+        if (!(functionDefinitionNode.functionBody() instanceof ExternalFunctionBodyNode)
+                && !isDeclaredByIncludedType(functionDefinitionNode)) {
             checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
         }
         String functionName = functionDefinitionNode.functionName().text();
@@ -391,24 +437,431 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     @Override
     public void visit(ExplicitAnonymousFunctionExpressionNode explicitAnonymousFunctionExpressionNode) {
-        checkUnusedFunctionParameters(explicitAnonymousFunctionExpressionNode.functionSignature());
+        if (!isParameterListExpected(explicitAnonymousFunctionExpressionNode)) {
+            checkUnusedFunctionParameters(explicitAnonymousFunctionExpressionNode.functionSignature());
+        }
         this.visitSyntaxNode(explicitAnonymousFunctionExpressionNode);
     }
 
+    /**
+     * The parameters of an implicit anonymous function, such as {@code (acc, x) => acc + 1}, are never reported:
+     * the function type expected where it is used fixes how many there are.
+     */
     @Override
     public void visit(ImplicitAnonymousFunctionExpressionNode implicitAnonymousFunctionExpressionNode) {
-        Node params = implicitAnonymousFunctionExpressionNode.params();
-        if (params instanceof ImplicitAnonymousFunctionParameters parameters) {
-            parameters.parameters().forEach(parameter -> {
-                reportIssueIfNodeIsUnused(parameter, CoreRule.UNUSED_FUNCTION_PARAMETER);
-            });
-            return;
-        }
-        if (params instanceof SimpleNameReferenceNode) {
-            reportIssueIfNodeIsUnused(params, CoreRule.UNUSED_FUNCTION_PARAMETER);
-        }
+        implicitAnonymousFunctionExpressionNode.expression().accept(this);
+    }
 
-        this.visitSyntaxNode(implicitAnonymousFunctionExpressionNode.expression());
+    /**
+     * Checks whether the anonymous function is used where a function type with a parameter list is expected, such
+     * as an argument to {@code reduce}. The parameters cannot be removed there, even when they are unused.
+     */
+    private boolean isParameterListExpected(ExplicitAnonymousFunctionExpressionNode anonymousFunction) {
+        return contextualTypes(anonymousFunction).stream()
+                .flatMap(StaticCodeAnalyzer::unionMembers)
+                .anyMatch(type -> type instanceof FunctionTypeSymbol functionType
+                        && functionType.params().isPresent());
+    }
+
+    /**
+     * Returns the types the context expects the expression to have, such as the type of the parameter it is passed
+     * to; the value of a {@code var} variable has none.
+     */
+    private List<TypeSymbol> contextualTypes(ExpressionNode expression) {
+        Node parent = expression.parent();
+        return switch (parent) {
+            case PositionalArgumentNode argument -> parameterType(argument).stream().toList();
+            case NamedArgumentNode argument -> parameterType(argument).stream().toList();
+            case BracedExpressionNode braced -> contextualTypes(braced);
+            case ListConstructorExpressionNode list when isDestructured(list) ->
+                    boundType(expression).stream().toList();
+            case ListConstructorExpressionNode list -> contextualTypes(list).stream()
+                    .flatMap(StaticCodeAnalyzer::unionMembers)
+                    .flatMap(listType -> memberType(listType, list, expression).stream())
+                    .toList();
+            case SpecificFieldNode field when field.parent() instanceof MappingConstructorExpressionNode mapping
+                    && isDestructured(mapping) -> boundType(expression).stream().toList();
+            case SpecificFieldNode field when field.parent() instanceof MappingConstructorExpressionNode mapping ->
+                    contextualTypes(mapping).stream()
+                            .flatMap(StaticCodeAnalyzer::unionMembers)
+                            .flatMap(mappingType -> fieldType(mappingType, field).stream())
+                            .toList();
+            case VariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
+            case ModuleVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
+            case ForEachStatementNode forEach -> forEachType(forEach)
+                    .map(memberType -> List.of(iterableType(memberType, expression)))
+                    .orElseGet(() -> expectedTypes(expression));
+            default -> expectedTypes(expression);
+        };
+    }
+
+    private List<TypeSymbol> expectedTypes(ExpressionNode expression) {
+        return semanticModel.expectedType(document, expression.lineRange().startLine()).stream().toList();
+    }
+
+    private List<TypeSymbol> declaredType(TypedBindingPatternNode typedBindingPattern) {
+        if (typedBindingPattern.typeDescriptor().kind() == SyntaxKind.VAR_TYPE_DESC) {
+            return List.of();
+        }
+        return semanticModel.symbol(typedBindingPattern.bindingPattern())
+                .filter(VariableSymbol.class::isInstance)
+                .map(symbol -> ((VariableSymbol) symbol).typeDescriptor())
+                .stream().toList();
+    }
+
+    /**
+     * Returns the type of the variable a destructured member is bound to, as f in {@code [F, int] [f, n] = [fn, 1]},
+     * since the semantic model gives no type for a binding pattern. A member bound to {@code _} has none.
+     */
+    private Optional<TypeSymbol> boundType(ExpressionNode member) {
+        Optional<Node> pattern = bindingPattern(member);
+        if (pattern.isPresent()) {
+            return pattern.flatMap(this::variableType);
+        }
+        // A member with no pattern of its own is bound to the rest variable, as in [n, ...rest] or {f, ...rest}
+        if (member.parent() instanceof SpecificFieldNode field
+                && field.parent() instanceof MappingConstructorExpressionNode mapping) {
+            return restVariableType(bindingPattern(mapping)).flatMap(restType -> fieldType(restType, field));
+        }
+        if (!(member.parent() instanceof ListConstructorExpressionNode list)
+                || !(bindingPattern(list).orElse(null) instanceof ListBindingPatternNode listPattern)) {
+            return Optional.empty();
+        }
+        List<Node> members = list.expressions().stream().toList();
+        int memberIndex = members.indexOf(member);
+        OptionalInt position = memberIndex < 0 ? OptionalInt.empty() : length(members.subList(0, memberIndex));
+        Optional<TypeSymbol> restType = restVariableType(Optional.of(listPattern));
+        if (restType.isEmpty() || position.isEmpty()) {
+            return Optional.empty();
+        }
+        int index = position.getAsInt() - (listPattern.bindingPatterns().size() - 1);
+        if (index < 0) {
+            return Optional.empty();
+        }
+        if (restType.get() instanceof ArrayTypeSymbol arrayType) {
+            return Optional.of(arrayType.memberTypeDescriptor());
+        }
+        if (restType.get() instanceof TupleTypeSymbol tupleType) {
+            return index < tupleType.memberTypeDescriptors().size()
+                    ? Optional.of(tupleType.memberTypeDescriptors().get(index))
+                    : tupleType.restTypeDescriptor();
+        }
+        return Optional.empty();
+    }
+
+    private Optional<TypeSymbol> restVariableType(Optional<Node> pattern) {
+        List<? extends Node> patterns = switch (pattern.orElse(null)) {
+            case ListBindingPatternNode listPattern -> listPattern.bindingPatterns().stream().toList();
+            case MappingBindingPatternNode mappingPattern -> mappingPattern.fieldBindingPatterns().stream().toList();
+            case null, default -> List.of();
+        };
+        return patterns.isEmpty() || !(patterns.get(patterns.size() - 1) instanceof RestBindingPatternNode rest)
+                ? Optional.empty()
+                : variableType(rest.variableName()).map(SemanticUtils::unwrap);
+    }
+
+    private boolean isDestructured(ExpressionNode constructor) {
+        return bindingPattern(constructor)
+                .filter(pattern -> pattern instanceof ListBindingPatternNode
+                        || pattern instanceof MappingBindingPatternNode)
+                .isPresent();
+    }
+
+    // The variables a foreach binds are narrowed to the members' own types, so the declared type is resolved instead
+    private Optional<TypeSymbol> forEachType(ForEachStatementNode forEach) {
+        Node typeDescriptor = forEach.typedBindingPattern().typeDescriptor();
+        return typeDescriptor.kind() == SyntaxKind.VAR_TYPE_DESC
+                ? Optional.empty()
+                : semanticModel.symbol(typeDescriptor).filter(TypeSymbol.class::isInstance).map(TypeSymbol.class::cast);
+    }
+
+    private TypeSymbol iterableType(TypeSymbol memberType, ExpressionNode iterable) {
+        ExpressionNode source = iterable;
+        while (source instanceof BracedExpressionNode braced) {
+            source = braced.expression();
+        }
+        TypeBuilder builder = semanticModel.types().builder();
+        return source instanceof MappingConstructorExpressionNode
+                ? builder.MAP_TYPE.withTypeParam(memberType).build()
+                : builder.ARRAY_TYPE.withType(memberType).build();
+    }
+
+    /**
+     * Returns the binding pattern that destructures the expression, or the part of it that binds the expression when
+     * it is a member of a destructured list or mapping. A member after a spread of unknown length has none.
+     */
+    private Optional<Node> bindingPattern(ExpressionNode expression) {
+        return switch (expression.parent()) {
+            case BracedExpressionNode braced -> bindingPattern(braced);
+            case VariableDeclarationNode variable -> destructuringPattern(variable.typedBindingPattern());
+            case ModuleVariableDeclarationNode variable -> destructuringPattern(variable.typedBindingPattern());
+            case AssignmentStatementNode assignment when assignment.varRef() instanceof BindingPatternNode pattern ->
+                    Optional.of(pattern);
+            case ListConstructorExpressionNode list -> {
+                List<Node> members = list.expressions().stream().toList();
+                int index = members.indexOf(expression);
+                OptionalInt position = index < 0 ? OptionalInt.empty() : length(members.subList(0, index));
+                if (position.isEmpty()) {
+                    yield Optional.empty();
+                }
+                yield bindingPattern(list)
+                        .filter(ListBindingPatternNode.class::isInstance)
+                        .map(pattern -> ((ListBindingPatternNode) pattern).bindingPatterns())
+                        .filter(patterns -> position.getAsInt() < patterns.size()
+                                && !(patterns.get(position.getAsInt()) instanceof RestBindingPatternNode))
+                        .map(patterns -> patterns.get(position.getAsInt()));
+            }
+            case SpecificFieldNode field when field.parent() instanceof MappingConstructorExpressionNode mapping -> {
+                String name = fieldName(field);
+                yield bindingPattern(mapping)
+                        .filter(MappingBindingPatternNode.class::isInstance)
+                        .flatMap(pattern -> ((MappingBindingPatternNode) pattern).fieldBindingPatterns().stream()
+                                .flatMap(fieldPattern -> switch (fieldPattern) {
+                                    case FieldBindingPatternFullNode full
+                                            when unquote(full.variableName().name().text()).equals(name) ->
+                                            Stream.of((Node) full.bindingPattern());
+                                    case FieldBindingPatternVarnameNode varName
+                                            when unquote(varName.variableName().name().text()).equals(name) ->
+                                            Stream.of((Node) varName.variableName());
+                                    default -> Stream.empty();
+                                })
+                                .findFirst());
+            }
+            case null, default -> Optional.empty();
+        };
+    }
+
+    private static Optional<Node> destructuringPattern(TypedBindingPatternNode typedBindingPattern) {
+        Node pattern = typedBindingPattern.bindingPattern();
+        return typedBindingPattern.typeDescriptor().kind() != SyntaxKind.VAR_TYPE_DESC
+                && (pattern instanceof ListBindingPatternNode || pattern instanceof MappingBindingPatternNode)
+                ? Optional.of(pattern)
+                : Optional.empty();
+    }
+
+    private Optional<TypeSymbol> variableType(Node pattern) {
+        return semanticModel.symbol(pattern)
+                .filter(VariableSymbol.class::isInstance)
+                .map(symbol -> ((VariableSymbol) symbol).typeDescriptor());
+    }
+
+    private Optional<TypeSymbol> parameterType(FunctionArgumentNode argument) {
+        Node call = argument.parent() instanceof ParenthesizedArgList argList ? argList.parent() : argument.parent();
+        Optional<FunctionTypeSymbol> functionType = calleeType(call);
+        if (functionType.isEmpty()) {
+            return Optional.empty();
+        }
+        List<ParameterSymbol> parameters = functionType.get().params().orElse(List.of());
+        if (argument instanceof NamedArgumentNode namedArgument) {
+            String name = namedArgument.argumentName().name().text();
+            return parameters.stream()
+                    .filter(parameter -> parameter.getName().filter(name::equals).isPresent())
+                    .findFirst()
+                    .map(ParameterSymbol::typeDescriptor);
+        }
+        // A lang library function called as a method, as in value.f(a), receives the value as its first parameter
+        int position = isLangLibMethodCall(call) ? 1 : 0;
+        for (Node sibling : argument.parent().children()) {
+            if (sibling == argument) {
+                break;
+            }
+            if (sibling instanceof PositionalArgumentNode) {
+                position++;
+            }
+        }
+        if (position < parameters.size()) {
+            return Optional.of(parameters.get(position).typeDescriptor());
+        }
+        return functionType.get().restParam()
+                .map(ParameterSymbol::typeDescriptor)
+                .map(SemanticUtils::unwrap)
+                .filter(ArrayTypeSymbol.class::isInstance)
+                .map(type -> ((ArrayTypeSymbol) type).memberTypeDescriptor());
+    }
+
+    private Optional<FunctionTypeSymbol> calleeType(Node call) {
+        if (call instanceof ImplicitNewExpressionNode || call instanceof ExplicitNewExpressionNode) {
+            return semanticModel.typeOf(call)
+                    .map(SemanticUtils::unwrap)
+                    .filter(ClassSymbol.class::isInstance)
+                    .flatMap(type -> ((ClassSymbol) type).initMethod())
+                    .map(MethodSymbol::typeDescriptor);
+        }
+        Optional<TypeSymbol> type = semanticModel.symbol(call).flatMap(symbol -> switch (symbol) {
+            case FunctionSymbol function -> Optional.of(function.typeDescriptor());
+            case VariableSymbol variable -> Optional.of(variable.typeDescriptor());
+            case ParameterSymbol parameter -> Optional.of(parameter.typeDescriptor());
+            case ObjectFieldSymbol field -> Optional.of(field.typeDescriptor());
+            default -> Optional.empty();
+        });
+        return type.map(SemanticUtils::unwrap)
+                .filter(FunctionTypeSymbol.class::isInstance)
+                .map(FunctionTypeSymbol.class::cast);
+    }
+
+    private boolean isLangLibMethodCall(Node call) {
+        return call.kind() == SyntaxKind.METHOD_CALL
+                && semanticModel.symbol(call).filter(SemanticUtils::isLangLib).isPresent();
+    }
+
+    private Optional<TypeSymbol> memberType(TypeSymbol listType, ListConstructorExpressionNode list,
+                                            ExpressionNode member) {
+        return switch (listType) {
+            case ArrayTypeSymbol arrayType -> Optional.of(arrayType.memberTypeDescriptor());
+            case TupleTypeSymbol tupleType -> tupleMemberType(tupleType, list.expressions().stream().toList(), member);
+            default -> Optional.empty();
+        };
+    }
+
+    /**
+     * Returns the tuple member type for a member of a list constructor. After a spread of unknown length, the member
+     * is counted from the end of a tuple of fixed length, or else takes the rest type of the tuple.
+     */
+    private Optional<TypeSymbol> tupleMemberType(TupleTypeSymbol tupleType, List<Node> members, Node member) {
+        int index = members.indexOf(member);
+        if (index < 0) {
+            return Optional.empty();
+        }
+        List<TypeSymbol> memberTypes = tupleType.memberTypeDescriptors();
+        OptionalInt position = length(members.subList(0, index));
+        if (position.isEmpty() && tupleType.restTypeDescriptor().isEmpty()) {
+            OptionalInt fromEnd = length(members.subList(index + 1, members.size()));
+            if (fromEnd.isPresent()) {
+                position = OptionalInt.of(memberTypes.size() - 1 - fromEnd.getAsInt());
+            }
+        }
+        if (position.isEmpty()) {
+            return tupleType.restTypeDescriptor();
+        }
+        int typeIndex = position.getAsInt();
+        if (typeIndex >= 0 && typeIndex < memberTypes.size()) {
+            return Optional.of(memberTypes.get(typeIndex));
+        }
+        return tupleType.restTypeDescriptor();
+    }
+
+    // The number of members of a tuple without a rest type or of an array of fixed size, such as int[2].
+    private static OptionalInt fixedLength(TypeSymbol listType) {
+        return switch (listType) {
+            case TupleTypeSymbol tuple when tuple.restTypeDescriptor().isEmpty() ->
+                    OptionalInt.of(tuple.memberTypeDescriptors().size());
+            case ArrayTypeSymbol array when array.size().isPresent() -> OptionalInt.of(array.size().get());
+            default -> OptionalInt.empty();
+        };
+    }
+
+    // The number of values the members give, unless a spread member's length is not known from its type.
+    private OptionalInt length(List<Node> members) {
+        int length = 0;
+        for (Node member : members) {
+            if (!(member instanceof SpreadMemberNode spread)) {
+                length++;
+                continue;
+            }
+            OptionalInt spreadLength = semanticModel.typeOf(spread.expression())
+                    .map(SemanticUtils::unwrap)
+                    .map(StaticCodeAnalyzer::fixedLength)
+                    .orElse(OptionalInt.empty());
+            if (spreadLength.isEmpty()) {
+                return OptionalInt.empty();
+            }
+            length += spreadLength.getAsInt();
+        }
+        return OptionalInt.of(length);
+    }
+
+    private static Optional<TypeSymbol> fieldType(TypeSymbol mappingType, SpecificFieldNode field) {
+        String name = fieldName(field);
+        return switch (mappingType) {
+            case MapTypeSymbol mapType -> Optional.of(mapType.typeParam());
+            case RecordTypeSymbol recordType -> Optional.ofNullable(recordType.fieldDescriptors().get(name))
+                    .map(RecordFieldSymbol::typeDescriptor)
+                    .or(recordType::restTypeDescriptor);
+            default -> Optional.empty();
+        };
+    }
+
+    private static String fieldName(SpecificFieldNode field) {
+        return switch (field.fieldName()) {
+            case BasicLiteralNode literal -> literal.literalToken().text().replaceAll("^\"|\"$", "");
+            case Token token -> unquote(token.text());
+            default -> "";
+        };
+    }
+
+    private static String unquote(String identifier) {
+        return identifier.startsWith("'") ? identifier.substring(1) : identifier;
+    }
+
+    private static Stream<TypeSymbol> unionMembers(TypeSymbol typeSymbol) {
+        TypeSymbol type = SemanticUtils.unwrap(typeSymbol);
+        return type instanceof UnionTypeSymbol union
+                ? union.memberTypeDescriptors().stream().flatMap(StaticCodeAnalyzer::unionMembers)
+                : Stream.of(type);
+    }
+
+    /**
+     * Checks whether the method implements a method of an object type included with {@code *T}, or of the type
+     * of its service declaration or object constructor. That type fixes the parameters of such a method.
+     */
+    private boolean isDeclaredByIncludedType(FunctionDefinitionNode method) {
+        if (method.functionSignature().parameters().isEmpty()) {
+            return false;
+        }
+        Node parent = method.parent();
+        if (!(parent instanceof ClassDefinitionNode || parent instanceof ServiceDeclarationNode
+                || parent instanceof ObjectConstructorExpressionNode)) {
+            return false;
+        }
+        Set<MethodSymbol> implementedMethods = implementedMethodsByParent.computeIfAbsent(parent,
+                this::implementedMethods);
+        return semanticModel.symbol(method)
+                .filter(MethodSymbol.class::isInstance)
+                .filter(implementedMethods::contains)
+                .isPresent();
+    }
+
+    private Set<MethodSymbol> implementedMethods(Node objectDefinition) {
+        Optional<ObjectTypeSymbol> objectType;
+        List<TypeSymbol> declaringTypes = new ArrayList<>();
+        switch (objectDefinition) {
+            case ClassDefinitionNode classDefinition -> objectType = semanticModel.symbol(classDefinition)
+                    .filter(ClassSymbol.class::isInstance)
+                    .map(ClassSymbol.class::cast);
+            case ServiceDeclarationNode serviceDeclaration -> {
+                Optional<ServiceDeclarationSymbol> service = semanticModel.symbol(serviceDeclaration)
+                        .filter(ServiceDeclarationSymbol.class::isInstance)
+                        .map(ServiceDeclarationSymbol.class::cast);
+                service.flatMap(ServiceDeclarationSymbol::typeDescriptor).ifPresent(declaringTypes::add);
+                return service.map(symbol -> implementedMethods(symbol.methods(), declaringTypes)).orElse(Set.of());
+            }
+            case ObjectConstructorExpressionNode objectConstructor -> {
+                objectType = semanticModel.typeOf(objectConstructor)
+                        .map(SemanticUtils::unwrap)
+                        .filter(ObjectTypeSymbol.class::isInstance)
+                        .map(ObjectTypeSymbol.class::cast);
+                declaringTypes.addAll(contextualTypes(objectConstructor));
+            }
+            default -> objectType = Optional.empty();
+        }
+        if (objectType.isEmpty()) {
+            return Set.of();
+        }
+        declaringTypes.addAll(objectType.get().typeInclusions());
+        return implementedMethods(objectType.get().methods(), declaringTypes);
+    }
+
+    private static Set<MethodSymbol> implementedMethods(Map<String, ? extends MethodSymbol> methods,
+                                                        List<TypeSymbol> declaringTypes) {
+        Set<String> declaredMethodNames = declaringTypes.stream()
+                .flatMap(StaticCodeAnalyzer::unionMembers)
+                .filter(ObjectTypeSymbol.class::isInstance)
+                .flatMap(type -> ((ObjectTypeSymbol) type).methods().keySet().stream())
+                .collect(Collectors.toSet());
+        return methods.entrySet().stream()
+                .filter(entry -> declaredMethodNames.contains(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -532,7 +985,6 @@ class StaticCodeAnalyzer extends NodeVisitor {
             } else if (isUnusedNode(parameter)) {
                 reportIssue(withoutAnnotations(parameter), CoreRule.UNUSED_FUNCTION_PARAMETER);
             }
-            this.visitSyntaxNode(parameter);
         });
     }
 
@@ -590,7 +1042,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     private boolean isUnusedNode(Node node) {
         Optional<Symbol> symbol = semanticModel.symbol(node);
-        return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
+        // The compiler can give the same reference twice, as for a parameter of an object constructor method
+        return symbol.filter(value -> semanticModel.references(value).stream()
+                .map(location -> location.lineRange().fileName() + ":" + location.textRange().startOffset())
+                .distinct().count() == 1).isPresent();
     }
 
     private Optional<Long> getIntValueFromRangeExprNode(Node rangeExprNode) {
