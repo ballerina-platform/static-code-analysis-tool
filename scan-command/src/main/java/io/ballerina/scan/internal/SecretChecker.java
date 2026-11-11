@@ -23,7 +23,6 @@ import io.ballerina.compiler.api.symbols.ArrayTypeSymbol;
 import io.ballerina.compiler.api.symbols.ClassSymbol;
 import io.ballerina.compiler.api.symbols.FunctionSymbol;
 import io.ballerina.compiler.api.symbols.FunctionTypeSymbol;
-import io.ballerina.compiler.api.symbols.IntersectionTypeSymbol;
 import io.ballerina.compiler.api.symbols.MapTypeSymbol;
 import io.ballerina.compiler.api.symbols.ObjectFieldSymbol;
 import io.ballerina.compiler.api.symbols.ParameterSymbol;
@@ -31,7 +30,6 @@ import io.ballerina.compiler.api.symbols.SingletonTypeSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.TupleTypeSymbol;
 import io.ballerina.compiler.api.symbols.TypeDescKind;
-import io.ballerina.compiler.api.symbols.TypeReferenceTypeSymbol;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
 import io.ballerina.compiler.api.symbols.UnionTypeSymbol;
 import io.ballerina.compiler.api.symbols.VariableSymbol;
@@ -90,6 +88,7 @@ import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.CoreRule.HARD_CODED_SECRET;
 import static io.ballerina.scan.internal.CoreRule.NON_CONFIGURABLE_SECRET;
+import static io.ballerina.scan.internal.SemanticUtils.unwrap;
 
 public class SecretChecker extends NodeVisitor {
     // Any scheme, including compound ones such as "mongodb+srv" and "jdbc:mysql", anywhere in the value.
@@ -365,14 +364,14 @@ public class SecretChecker extends NodeVisitor {
             case ObjectFieldSymbol objectField -> Optional.of(objectField.typeDescriptor());
             default -> Optional.empty();
         };
-        return type.map(SecretChecker::unwrap)
+        return type.map(SemanticUtils::unwrap)
                 .filter(FunctionTypeSymbol.class::isInstance)
                 .map(FunctionTypeSymbol.class::cast);
     }
 
     // A lang library function called as a method, as in value.f(a), receives the value as its first parameter.
     private static boolean isLangLibMethodCall(Node functionNode, FunctionSymbol function) {
-        return functionNode.kind() == SyntaxKind.METHOD_CALL && SecretValueResolver.isLangLib(function);
+        return functionNode.kind() == SyntaxKind.METHOD_CALL && SemanticUtils.isLangLib(function);
     }
 
     private void validateNewExpression(Node newExpressionNode, ParenthesizedArgList argList) {
@@ -538,15 +537,6 @@ public class SecretChecker extends NodeVisitor {
 
     private static boolean isMap(TypeSymbol typeSymbol) {
         return unwrap(typeSymbol).typeKind() == TypeDescKind.MAP;
-    }
-
-    private static TypeSymbol unwrap(TypeSymbol typeSymbol) {
-        return switch (typeSymbol) {
-            case TypeReferenceTypeSymbol typeReference -> unwrap(typeReference.typeDescriptor());
-            case IntersectionTypeSymbol intersectionType -> unwrap(intersectionType.effectiveTypeDescriptor());
-            case SingletonTypeSymbol singletonType -> unwrap(singletonType.originalType());
-            default -> typeSymbol;
-        };
     }
 
     private void reportHardCodedSecret(Node node) {

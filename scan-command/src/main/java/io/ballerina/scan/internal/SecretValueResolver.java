@@ -397,19 +397,12 @@ class SecretValueResolver {
                 ? qualifiedName.identifier().text()
                 : functionName.toSourceCode().trim();
         boolean isLangLibConversion = value.isPresent() && TRANSPARENT_CONVERSIONS.contains(name)
-                && semanticModel.symbol(call).filter(SecretValueResolver::isLangLib).isPresent();
+                && semanticModel.symbol(call).filter(SemanticUtils::isLangLib).isPresent();
         if (!isLangLibConversion) {
             return Origin.UNKNOWN;
         }
         Origin origin = resolve(value.get(), depth, visited);
         return origin == Origin.UNKNOWN || origin == Origin.CONFIGURABLE ? Origin.UNKNOWN : origin;
-    }
-
-    static boolean isLangLib(Symbol symbol) {
-        return symbol.getModule()
-                .map(moduleSymbol -> moduleSymbol.id().orgName().equals("ballerina")
-                        && moduleSymbol.id().moduleName().startsWith("lang."))
-                .orElse(false);
     }
 
     private static Optional<ExpressionNode> singlePositionalArgument(FunctionCallExpressionNode functionCall) {
