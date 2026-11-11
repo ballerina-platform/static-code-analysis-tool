@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - `ballerina:7` and `ballerina:8` report a comparison with `int:MAX_VALUE`, `int:MIN_VALUE`, `float:Infinity` or `-float:Infinity` on either side of the operator and with any prefix for the `lang.int` and `lang.float` modules. `x <= float:Infinity` is no longer reported as always true, as it is false when `x` is `NaN`, nor is `x <= int:MAX_VALUE` when `x` can be nil. ([#87](https://github.com/ballerina-platform/static-code-analysis-tool/issues/87))
+- `ballerina:12` reports invalid ranges written with hexadecimal literals or with values outside the 32-bit range. ([#88](https://github.com/ballerina-platform/static-code-analysis-tool/issues/88))
 
 ### Deprecated
 

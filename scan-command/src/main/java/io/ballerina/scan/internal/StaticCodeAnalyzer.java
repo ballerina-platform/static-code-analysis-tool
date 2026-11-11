@@ -140,30 +140,23 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     private void validateRangeExpressionOperator(ScannerContext scannerContext, Document document,
                                                  Node lhsNode, Node rhsNode, Token operator, NodeLocation location) {
-        Optional<String> lhsExpr = getExprStringValueFromRangeExprNode(lhsNode);
-        Optional<String> rhsExpr = getExprStringValueFromRangeExprNode(rhsNode);
+        Optional<Long> lhsValue = getIntValueFromRangeExprNode(lhsNode);
+        Optional<Long> rhsValue = getIntValueFromRangeExprNode(rhsNode);
 
-        if (lhsExpr.isEmpty() || rhsExpr.isEmpty()) {
+        if (lhsValue.isEmpty() || rhsValue.isEmpty()) {
             return;
         }
 
-        // According to the spec, these literal tokens are integers. So no need to cast or check.
-        try {
-            int lhsValue = Integer.parseInt(lhsExpr.get());
-            int rhsValue = Integer.parseInt(rhsExpr.get());
-            if (operator.kind() == DOUBLE_DOT_LT_TOKEN) {
-                if (lhsValue >= rhsValue) {
-                    scannerContext.getReporter().reportIssue(document, location,
-                            CoreRule.INVALID_RANGE_EXPRESSION.rule());
-                }
-            } else if (operator.kind() == ELLIPSIS_TOKEN) {
-                if (lhsValue > rhsValue) {
-                    scannerContext.getReporter().reportIssue(document, location,
-                            CoreRule.INVALID_RANGE_EXPRESSION.rule());
-                }
+        if (operator.kind() == DOUBLE_DOT_LT_TOKEN) {
+            if (lhsValue.get() >= rhsValue.get()) {
+                scannerContext.getReporter().reportIssue(document, location,
+                        CoreRule.INVALID_RANGE_EXPRESSION.rule());
             }
-        } catch (NumberFormatException e) {
-            // ignore
+        } else if (operator.kind() == ELLIPSIS_TOKEN) {
+            if (lhsValue.get() > rhsValue.get()) {
+                scannerContext.getReporter().reportIssue(document, location,
+                        CoreRule.INVALID_RANGE_EXPRESSION.rule());
+            }
         }
     }
     
@@ -587,24 +580,34 @@ class StaticCodeAnalyzer extends NodeVisitor {
         return symbol.filter(value -> semanticModel.references(value).size() == 1).isPresent();
     }
 
-    private Optional<String> getExprStringValueFromRangeExprNode(Node rangeExprNode) {
+    private Optional<Long> getIntValueFromRangeExprNode(Node rangeExprNode) {
         boolean isMinusOperatorPresent = false;
 
         if (rangeExprNode instanceof UnaryExpressionNode unaryNode) {
-            if (unaryNode.unaryOperator().kind() == SyntaxKind.MINUS_TOKEN) {
-                isMinusOperatorPresent = true;
+            SyntaxKind unaryOperator = unaryNode.unaryOperator().kind();
+            if (unaryOperator != SyntaxKind.MINUS_TOKEN && unaryOperator != SyntaxKind.PLUS_TOKEN) {
+                return Optional.empty();
             }
+            isMinusOperatorPresent = unaryOperator == SyntaxKind.MINUS_TOKEN;
             rangeExprNode = unaryNode.expression();
         }
 
-        if (rangeExprNode instanceof BasicLiteralNode literalNode) {
-            String expr = literalNode.literalToken().text();
-            if (isMinusOperatorPresent) {
-                expr = "-" + expr;
-            }
-            return Optional.of(expr);
+        if (!(rangeExprNode instanceof BasicLiteralNode literalNode)) {
+            return Optional.empty();
         }
-
+        Token literal = literalNode.literalToken();
+        try {
+            // The digits are parsed with the sign, so that -9223372036854775808 does not overflow
+            String sign = isMinusOperatorPresent ? "-" : "";
+            if (literal.kind() == SyntaxKind.DECIMAL_INTEGER_LITERAL_TOKEN) {
+                return Optional.of(Long.parseLong(sign + literal.text()));
+            }
+            if (literal.kind() == SyntaxKind.HEX_INTEGER_LITERAL_TOKEN) {
+                return Optional.of(Long.parseLong(sign + literal.text().substring(2), 16));
+            }
+        } catch (NumberFormatException e) {
+            // A literal out of the int range is a compile error, which is reported by the compiler
+        }
         return Optional.empty();
     }
     

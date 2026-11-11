@@ -43,7 +43,7 @@ public class Rule012Test extends StaticCodeAnalyzerTest {
                 scannerContext, document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 12);
+        Assert.assertEquals(issues.size(), 16);
         assertIssue(issues.get(0), documentName, 25, 21, 25, 27, "ballerina:12", 12,
                 INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
         assertIssue(issues.get(1), documentName, 29, 21, 29, 27, "ballerina:12", 12,
@@ -67,6 +67,14 @@ public class Rule012Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(10), documentName, 83, 22, 83, 29, "ballerina:12", 12,
                 INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
         assertIssue(issues.get(11), documentName, 87, 14, 87, 22, "ballerina:12", 12,
+                INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(12), documentName, 89, 21, 89, 34, "ballerina:12", 12,
+                INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(13), documentName, 92, 21, 92, 34, "ballerina:12", 12,
+                INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(14), documentName, 98, 21, 98, 34, "ballerina:12", 12,
+                INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(15), documentName, 101, 21, 101, 37, "ballerina:12", 12,
                 INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
     }
 }
