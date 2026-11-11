@@ -23,6 +23,9 @@ import io.ballerina.compiler.api.symbols.ConstantSymbol;
 import io.ballerina.compiler.api.symbols.Qualifier;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.SymbolKind;
+import io.ballerina.compiler.api.symbols.TypeDescKind;
+import io.ballerina.compiler.api.symbols.TypeSymbol;
+import io.ballerina.compiler.api.symbols.UnionTypeSymbol;
 import io.ballerina.compiler.api.symbols.VariableSymbol;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
@@ -48,6 +51,7 @@ import io.ballerina.compiler.syntax.tree.OptionalFieldAccessExpressionNode;
 import io.ballerina.compiler.syntax.tree.PositionalArgumentNode;
 import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.RestArgumentNode;
+import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
 import io.ballerina.compiler.syntax.tree.StatementNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
@@ -58,6 +62,7 @@ import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Module;
+import io.ballerina.scan.internal.SecretNameMatcher.Kind;
 import io.ballerina.tools.diagnostics.Location;
 import io.ballerina.tools.text.TextRange;
 
@@ -67,6 +72,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -95,7 +101,8 @@ class SecretValueResolver {
         FIXED_VARIABLE,
         // A configurable variable without a fixed default.
         CONFIGURABLE,
-        // An empty, template or dummy value, which is not a secret on its own but can be part of one.
+        // A fixed value that cannot be the secret on its own but can be part of one: an empty, template or dummy
+        // value, or for a secret other than a password, a value that does not look generated.
         PLACEHOLDER,
         // A value computed at run time, a parameter, or a value already reported where it is written.
         UNKNOWN
@@ -113,94 +120,136 @@ class SecretValueResolver {
         this.module = module;
     }
 
-    Origin resolve(ExpressionNode expression) {
-        return resolve(expression, 0, new HashSet<>());
+    /**
+     * Resolves the value given to a target whose name suggests the given kind of secret. Any fixed text can be a
+     * password, but only a text that looks generated can be another secret, such as a token or a key.
+     */
+    Origin resolve(ExpressionNode expression, Kind kind) {
+        return resolve(expression, kind, 0, new HashSet<>());
     }
 
-    Origin resolveSymbol(Symbol symbol) {
-        return resolveSymbol(symbol, 0, new HashSet<>());
+    Origin resolveSymbol(Symbol symbol, Kind kind) {
+        return resolveSymbol(symbol, kind, 0, new HashSet<>());
     }
 
-    private Origin resolve(ExpressionNode expression, int depth, Set<Symbol> visited) {
+    // Whether a fixed text cannot be the secret on its own, which depends on the kind of the secret.
+    private static boolean isNotSecret(String text, Kind kind) {
+        return SecretValueFilter.isPlaceholder(text) || kind == Kind.SECRET && !SecretValueFilter.looksGenerated(text);
+    }
+
+    private Origin resolve(ExpressionNode expression, Kind kind, int depth, Set<Symbol> visited) {
         if (depth > MAX_DEPTH) {
             return Origin.UNKNOWN;
         }
         return switch (expression.kind()) {
-            case STRING_LITERAL -> SecretValueFilter.isPlaceholder(
-                    SecretValueFilter.literalValue(((BasicLiteralNode) expression).literalToken().text()))
+            case STRING_LITERAL -> isNotSecret(
+                    SecretValueFilter.literalValue(((BasicLiteralNode) expression).literalToken().text()), kind)
                     ? Origin.PLACEHOLDER
                     : Origin.HARD_CODED;
-            case TYPE_CAST_EXPRESSION -> resolve(((TypeCastExpressionNode) expression).expression(), depth, visited);
+            case TYPE_CAST_EXPRESSION -> resolve(((TypeCastExpressionNode) expression).expression(), kind, depth,
+                    visited);
             case BYTE_ARRAY_LITERAL -> Origin.HARD_CODED;
             case LIST_CONSTRUCTOR -> isNumericList((ListConstructorExpressionNode) expression)
                     ? Origin.HARD_CODED
                     : combine(((ListConstructorExpressionNode) expression).expressions().stream()
                     .map(member -> member instanceof ExpressionNode memberExpression
-                            ? resolve(memberExpression, depth, visited)
+                            ? resolve(memberExpression, kind, depth, visited)
                             : Origin.UNKNOWN));
             case REQUIRED_EXPRESSION -> Origin.CONFIGURABLE;
-            case BRACED_EXPRESSION -> resolve(((BracedExpressionNode) expression).expression(), depth, visited);
+            case BRACED_EXPRESSION -> resolve(((BracedExpressionNode) expression).expression(), kind, depth, visited);
             case SIMPLE_NAME_REFERENCE, QUALIFIED_NAME_REFERENCE -> semanticModel.symbol(expression)
-                    .map(symbol -> resolveSymbol(symbol, depth, visited))
+                    .map(symbol -> resolveSymbol(symbol, kind, depth, visited))
                     .orElse(Origin.UNKNOWN);
             case FIELD_ACCESS -> resolveField(((FieldAccessExpressionNode) expression).expression(),
-                    ((FieldAccessExpressionNode) expression).fieldName().toSourceCode().trim(), depth, visited);
+                    ((FieldAccessExpressionNode) expression).fieldName().toSourceCode().trim(), kind, depth, visited);
             case OPTIONAL_FIELD_ACCESS -> resolveField(((OptionalFieldAccessExpressionNode) expression).expression(),
-                    ((OptionalFieldAccessExpressionNode) expression).fieldName().toSourceCode().trim(), depth,
+                    ((OptionalFieldAccessExpressionNode) expression).fieldName().toSourceCode().trim(), kind, depth,
                     visited);
             case INDEXED_EXPRESSION -> memberKey((IndexedExpressionNode) expression)
-                    .map(key -> resolveField(((IndexedExpressionNode) expression).containerExpression(), key, depth,
-                            visited))
+                    .map(key -> resolveField(((IndexedExpressionNode) expression).containerExpression(), key, kind,
+                            depth, visited))
                     .orElse(Origin.UNKNOWN);
-            case BINARY_EXPRESSION -> resolveConcatenation((BinaryExpressionNode) expression, depth, visited);
-            case STRING_TEMPLATE_EXPRESSION -> resolveTemplate((TemplateExpressionNode) expression, depth, visited);
+            case BINARY_EXPRESSION, STRING_TEMPLATE_EXPRESSION -> fixedText(expression)
+                    .map(text -> isNotSecret(text, kind) ? Origin.PLACEHOLDER : Origin.HARD_CODED)
+                    .orElseGet(() -> expression instanceof TemplateExpressionNode template
+                            ? resolveTemplate(template, kind, depth, visited)
+                            : resolveConcatenation((BinaryExpressionNode) expression, kind, depth, visited));
             case METHOD_CALL -> resolveConversion(expression, ((MethodCallExpressionNode) expression).methodName(),
                     ((MethodCallExpressionNode) expression).arguments().isEmpty()
                             ? Optional.of(((MethodCallExpressionNode) expression).expression())
-                            : Optional.empty(), depth, visited);
+                            : Optional.empty(), kind, depth, visited);
             case FUNCTION_CALL -> resolveConversion(expression,
                     ((FunctionCallExpressionNode) expression).functionName(),
-                    singlePositionalArgument((FunctionCallExpressionNode) expression), depth, visited);
+                    singlePositionalArgument((FunctionCallExpressionNode) expression), kind, depth, visited);
             default -> Origin.UNKNOWN;
         };
     }
 
-    private Origin resolveSymbol(Symbol symbol, int depth, Set<Symbol> visited) {
-        // A constant is a hard-coded value wherever it is used; its declaration is not a secret on its own.
+    private Origin resolveSymbol(Symbol symbol, Kind kind, int depth, Set<Symbol> visited) {
         if (symbol instanceof ConstantSymbol constant) {
-            if (isNamedChoice(constant)) {
-                return Origin.UNKNOWN;
-            }
-            return isPlaceholder(constant) ? Origin.PLACEHOLDER : Origin.HARD_CODED;
+            return resolveConstant(constant, kind, depth, visited);
         }
         if (symbol.kind() != SymbolKind.VARIABLE || !visited.add(symbol)) {
             return Origin.UNKNOWN;
         }
         try {
             VariableSymbol variable = (VariableSymbol) symbol;
-            Origin initializerOrigin = findTracedInitializer(variable)
-                    .map(value -> resolve(value, depth + 1, visited))
+            Optional<ExpressionNode> initializer = findTracedInitializer(variable);
+            Origin initializerOrigin = initializer
+                    .map(value -> resolve(value, kind, depth + 1, visited))
                     .orElse(Origin.UNKNOWN);
-            if (isConfigurable(variable)) {
-                // A configurable's fixed default is a fallback for the secret, which keeps the origin of the default.
-                return isFixed(initializerOrigin) ? reachedThrough(variable, initializerOrigin) : Origin.CONFIGURABLE;
+            if (!isFixed(initializerOrigin)) {
+                return isConfigurable(variable) ? Origin.CONFIGURABLE : initializerOrigin;
             }
-            return isFixed(initializerOrigin) ? reachedThrough(variable, Origin.FIXED_VARIABLE) : initializerOrigin;
+            if (isReportedWhereWritten(variable.getName().orElse(""), kind,
+                    writtenKind -> resolve(initializer.get(), writtenKind, depth + 1, visited))) {
+                return Origin.UNKNOWN;
+            }
+            // A configurable's fixed default is a fallback for the secret, which keeps the origin of the default.
+            return isConfigurable(variable) ? initializerOrigin : Origin.FIXED_VARIABLE;
         } finally {
             visited.remove(symbol);
         }
+    }
+
+    // A constant is a hard-coded value wherever it is used; its declaration is not a secret on its own.
+    private Origin resolveConstant(ConstantSymbol constant, Kind kind, int depth, Set<Symbol> visited) {
+        if (isNamedChoice(constant)) {
+            return Origin.UNKNOWN;
+        }
+        // The initializer of a constant of this module is resolved as written, as for a list of texts
+        Origin initializerOrigin = isDeclaredInModule(constant)
+                ? constant.getLocation().flatMap(this::findNode)
+                        .flatMap(SecretValueResolver::findConstantInitializer)
+                        .map(initializer -> resolve(initializer, kind, depth + 1, visited))
+                        .orElse(Origin.UNKNOWN)
+                : Origin.UNKNOWN;
+        if (initializerOrigin == Origin.PLACEHOLDER || isFixed(initializerOrigin)) {
+            return initializerOrigin == Origin.PLACEHOLDER ? Origin.PLACEHOLDER : Origin.HARD_CODED;
+        }
+        return isNotSecret(constant, kind) ? Origin.PLACEHOLDER : Origin.HARD_CODED;
     }
 
     private static boolean isFixed(Origin origin) {
         return origin == Origin.HARD_CODED || origin == Origin.FIXED_VARIABLE;
     }
 
-    // A secret-named variable is reported where it is declared, so the values that reach a target through it are not.
-    private static Origin reachedThrough(Symbol variable, Origin origin) {
-        return SecretNameMatcher.isSecretName(variable.getName().orElse("")) ? Origin.UNKNOWN : origin;
+    /**
+     * Checks whether a fixed value that reaches a target of the given kind through a secret-named variable or field
+     * was already reported where it is written, so that it is not reported again at the target. It was when the
+     * name reports any value, as a password does, or applies the same check as the target. Otherwise, the value is
+     * resolved again with the kind of the name, as a weak value written to a token can still reach a password.
+     */
+    private static boolean isReportedWhereWritten(String name, Kind kind, Function<Kind, Origin> resolveAsWritten) {
+        Kind writtenKind = SecretNameMatcher.kind(name);
+        if (!writtenKind.isSecret()) {
+            return false;
+        }
+        return writtenKind == kind || writtenKind == Kind.PASSWORD || isFixed(resolveAsWritten.apply(writtenKind));
     }
 
-    private Origin resolveField(ExpressionNode container, String fieldName, int depth, Set<Symbol> visited) {
+    private Origin resolveField(ExpressionNode container, String fieldName, Kind kind, int depth,
+                                Set<Symbol> visited) {
         Optional<Symbol> root = semanticModel.symbol(rootExpression(container));
         boolean isConfigurableRoot = root.filter(symbol -> symbol.kind() == SymbolKind.VARIABLE)
                 .map(symbol -> isConfigurable((VariableSymbol) symbol))
@@ -210,21 +259,44 @@ class SecretValueResolver {
         if (field.isEmpty()) {
             return isConfigurableRoot ? Origin.CONFIGURABLE : Origin.UNKNOWN;
         }
-        Origin origin = field.get().valueExpr()
-                .map(value -> resolve(value, depth + 1, visited))
+        Function<Kind, Origin> resolveValue = valueKind -> field.get().valueExpr()
+                .map(value -> resolve(value, valueKind, depth + 1, visited))
                 .orElseGet(() -> semanticModel.symbol(field.get())
-                        .map(symbol -> resolveSymbol(symbol, depth + 1, visited))
+                        .map(symbol -> resolveSymbol(symbol, valueKind, depth + 1, visited))
                         .orElse(Origin.UNKNOWN));
+        Origin origin = resolveValue.apply(kind);
         if (!isFixed(origin)) {
             return isConfigurableRoot ? Origin.CONFIGURABLE : origin;
         }
-        // A secret-named field is reported where it is written. Any other fixed field of a constant or of a
-        // configurable's default keeps its origin, and is otherwise reached through the variable that holds it.
-        if (SecretNameMatcher.isSecretName(fieldName)) {
+        // A secret-named field, or any field of a map of secrets, is reported where it is written. Any other fixed
+        // field of a constant or of a configurable's default keeps its origin, and is otherwise reached through the
+        // variable that holds it.
+        String writtenName = SecretNameMatcher.kind(fieldName).isSecret()
+                ? fieldName
+                : mapName((MappingConstructorExpressionNode) field.get().parent()).orElse(fieldName);
+        if (isReportedWhereWritten(writtenName, kind, resolveValue)) {
             return Origin.UNKNOWN;
         }
         boolean isConstantRoot = root.filter(symbol -> symbol.kind() == SymbolKind.CONSTANT).isPresent();
         return isConstantRoot || isConfigurableRoot ? origin : Origin.FIXED_VARIABLE;
+    }
+
+    // The name a map is written to, whose kind its values are checked with, as for passwords in passwords = {...}.
+    private Optional<String> mapName(MappingConstructorExpressionNode mapping) {
+        boolean isMap = semanticModel.typeOf(mapping)
+                .map(type -> SemanticUtils.unwrap(type).typeKind() == TypeDescKind.MAP)
+                .orElse(false);
+        if (!isMap) {
+            return Optional.empty();
+        }
+        return switch (mapping.parent()) {
+            case VariableDeclarationNode variable -> Optional.of(SecretChecker.variableName(
+                    variable.typedBindingPattern()));
+            case ModuleVariableDeclarationNode variable -> Optional.of(SecretChecker.variableName(
+                    variable.typedBindingPattern()));
+            case SpecificFieldNode field -> Optional.of(SecretChecker.fieldNameText(field));
+            case null, default -> Optional.empty();
+        };
     }
 
     // The variable or constant that a field access or member access chain starts at, as in DEFAULTS["db"].
@@ -351,27 +423,70 @@ class SecretValueResolver {
         return Optional.empty();
     }
 
-    private Origin resolveConcatenation(BinaryExpressionNode binaryExpression, int depth, Set<Symbol> visited) {
+    private Origin resolveConcatenation(BinaryExpressionNode binaryExpression, Kind kind, int depth,
+                                        Set<Symbol> visited) {
         if (binaryExpression.operator().kind() != SyntaxKind.PLUS_TOKEN) {
             return Origin.UNKNOWN;
         }
         return combine(Stream.of(binaryExpression.lhsExpr(), binaryExpression.rhsExpr())
                 .map(operand -> operand instanceof ExpressionNode expression
-                        ? resolve(expression, depth, visited)
+                        ? resolve(expression, kind, depth, visited)
                         : Origin.UNKNOWN));
     }
 
-    private Origin resolveTemplate(TemplateExpressionNode template, int depth, Set<Symbol> visited) {
+    private Origin resolveTemplate(TemplateExpressionNode template, Kind kind, int depth, Set<Symbol> visited) {
         String text = template.content().stream()
                 .filter(node -> node.kind() == SyntaxKind.TEMPLATE_STRING)
                 .map(Node::toSourceCode)
                 .reduce("", String::concat);
         List<Origin> interpolations = template.content().stream()
                 .filter(InterpolationNode.class::isInstance)
-                .map(interpolation -> resolve(((InterpolationNode) interpolation).expression(), depth, visited))
+                .map(interpolation -> resolve(((InterpolationNode) interpolation).expression(), kind, depth, visited))
                 .toList();
-        Origin textOrigin = SecretValueFilter.isPlaceholder(text) ? Origin.PLACEHOLDER : Origin.HARD_CODED;
+        Origin textOrigin = isNotSecret(text, kind) ? Origin.PLACEHOLDER : Origin.HARD_CODED;
         return combine(Stream.concat(Stream.of(textOrigin), interpolations.stream()));
+    }
+
+    /**
+     * Returns the text of a value built only from string literals and string constants, by concatenation or in a
+     * template, as in {@code "sk_live_" + KEY}. Such a value is checked as a whole, as its parts can each look like
+     * text that is not a secret.
+     */
+    private Optional<String> fixedText(ExpressionNode expression) {
+        return switch (expression) {
+            case BasicLiteralNode literal when literal.kind() == SyntaxKind.STRING_LITERAL ->
+                    Optional.of(SecretValueFilter.literalValue(literal.literalToken().text()));
+            case BracedExpressionNode braced -> fixedText(braced.expression());
+            case BinaryExpressionNode binary when binary.operator().kind() == SyntaxKind.PLUS_TOKEN
+                    && binary.lhsExpr() instanceof ExpressionNode lhs
+                    && binary.rhsExpr() instanceof ExpressionNode rhs ->
+                    fixedText(lhs).flatMap(lhsText -> fixedText(rhs).map(lhsText::concat));
+            case TemplateExpressionNode template when template.kind() == SyntaxKind.STRING_TEMPLATE_EXPRESSION -> {
+                StringBuilder text = new StringBuilder();
+                for (Node part : template.content()) {
+                    Optional<String> partText = part instanceof InterpolationNode interpolation
+                            ? fixedText(interpolation.expression())
+                            : Optional.of(part.toSourceCode());
+                    if (partText.isEmpty()) {
+                        yield Optional.empty();
+                    }
+                    text.append(partText.get());
+                }
+                yield Optional.of(text.toString());
+            }
+            case SimpleNameReferenceNode ignored -> constantText(expression);
+            case QualifiedNameReferenceNode ignored -> constantText(expression);
+            default -> Optional.empty();
+        };
+    }
+
+    private Optional<String> constantText(ExpressionNode reference) {
+        return semanticModel.symbol(reference)
+                .filter(ConstantSymbol.class::isInstance)
+                .map(ConstantSymbol.class::cast)
+                .filter(constant -> !isNamedChoice(constant) && isString(constant.broaderTypeDescriptor()))
+                .flatMap(ConstantSymbol::resolvedValue)
+                .map(SecretValueFilter::literalValue);
     }
 
     // A value built from fixed parts is fixed, and hard-coded only when no part is reached through a variable. It
@@ -392,7 +507,7 @@ class SecretValueResolver {
     // A value converted by a lang library function, such as "secret".toBytes() or string:trim(secret), keeps the
     // origin of the value.
     private Origin resolveConversion(ExpressionNode call, Node functionName, Optional<ExpressionNode> value,
-                                     int depth, Set<Symbol> visited) {
+                                     Kind kind, int depth, Set<Symbol> visited) {
         String name = functionName instanceof QualifiedNameReferenceNode qualifiedName
                 ? qualifiedName.identifier().text()
                 : functionName.toSourceCode().trim();
@@ -401,7 +516,7 @@ class SecretValueResolver {
         if (!isLangLibConversion) {
             return Origin.UNKNOWN;
         }
-        Origin origin = resolve(value.get(), depth, visited);
+        Origin origin = resolve(value.get(), kind, depth, visited);
         return origin == Origin.UNKNOWN || origin == Origin.CONFIGURABLE ? Origin.UNKNOWN : origin;
     }
 
@@ -513,11 +628,22 @@ class SecretValueResolver {
                 .map(syntaxTree -> ((ModulePartNode) syntaxTree.rootNode()).findNode(location.textRange(), true));
     }
 
-    private static boolean isPlaceholder(ConstantSymbol constant) {
+    private static boolean isNotSecret(ConstantSymbol constant, Kind kind) {
+        // Only a string constant is text; a byte array or a list constant resolves to its source form
+        boolean isText = isString(constant.broaderTypeDescriptor());
         return constant.resolvedValue()
                 .map(SecretValueFilter::literalValue)
-                .map(SecretValueFilter::isPlaceholder)
+                .map(value -> isText ? isNotSecret(value, kind) : SecretValueFilter.isPlaceholder(value))
                 .orElse(false);
+    }
+
+    // A string type, or a union of string types, as in "live"|"test".
+    private static boolean isString(TypeSymbol typeSymbol) {
+        TypeSymbol type = SemanticUtils.unwrap(typeSymbol);
+        if (type instanceof UnionTypeSymbol union) {
+            return union.memberTypeDescriptors().stream().allMatch(SecretValueResolver::isString);
+        }
+        return type.typeKind() == TypeDescKind.STRING || type.typeKind() == TypeDescKind.STRING_CHAR;
     }
 
     // An enum member whose value is its own name, such as BASIC in enum AuthScheme { BASIC }, names a choice.

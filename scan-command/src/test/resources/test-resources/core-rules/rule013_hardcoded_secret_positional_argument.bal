@@ -28,7 +28,7 @@ public function main() returns error? {
     crypto:PrivateKey _ = check crypto:decodeRsaPrivateKeyFromKeyFile("key.pem", "keyPassword1");
     LoginClient loginClient = new;
     loginClient->login("admin", "remotePassword1");
-    storeTokens("tokenOne", "tokenTwo");
+    storeTokens("ReUHuy3Q", "z7X2dnBT");
     ExplicitClient _ = new ExplicitClient("admin", "explicitPassword1");
     ResourceClient resourceClient = new;
     resourceClient->/login.post("admin", "resourcePassword1");

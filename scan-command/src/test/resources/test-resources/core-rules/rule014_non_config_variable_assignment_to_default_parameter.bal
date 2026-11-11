@@ -16,7 +16,7 @@
 
 import ballerina/io;
 
-string defaultValue = "password";
+string defaultValue = "YH5be9vf";
 
 function printUserInfo(string username, string password = defaultValue) {
     io:println(string `Username: ${username}, Password strength: ${passwordStrength(password)}%`);

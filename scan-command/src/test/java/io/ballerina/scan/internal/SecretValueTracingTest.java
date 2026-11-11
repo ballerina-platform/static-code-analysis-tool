@@ -160,7 +160,7 @@ public class SecretValueTracingTest extends StaticCodeAnalyzerTest {
         assertSecretIssues("rule013_tracing_constants_and_parts.bal", List.of(lines(0, END_OF_FILE)),
                 hardCoded(34, 53, 73), hardCoded(44, 23, 45), hardCoded(45, 23, 45), hardCoded(46, 23, 40),
                 hardCoded(49, 23, 43), hardCoded(50, 23, 40), hardCoded(51, 23, 44), hardCoded(52, 23, 54),
-                hardCoded(53, 23, 38), hardCoded(54, 23, 42), hardCoded(55, 23, 49), hardCoded(58, 22, 36),
+                hardCoded(53, 23, 38), hardCoded(54, 23, 42), hardCoded(58, 22, 36),
                 hardCoded(59, 16, 34), fixed(61, 23, 44));
     }
 

@@ -25,7 +25,7 @@ public function main() {
     connect(password = "s3cr3t" + "-value");
     connect(password = PREFIX + SUFFIX);
     connect(password = string `s3cr3t-value`);
-    byte[] secretKey = "key-material".toBytes();
+    byte[] secretKey = "9n8q2UUUMdNS".toBytes();
     byte[] privateKey = base16 `aabbccddeeff`;
     byte[] signingSecret = [1, 2, 3, 4];
     printValue(secretKey, privateKey, signingSecret);

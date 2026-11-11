@@ -25,12 +25,12 @@ class Client {
     string apiKey;
 
     function init() {
-        self.apiKey = "sk_live_object";
+        self.apiKey = "WfLBKNiWpeGut6";
     }
 }
 
 function init() {
-    apiKey = "sk_live_module";
+    apiKey = "Vm2TtqKpPZUid6";
     settings.dbValue = fetch();
 }
 
@@ -48,7 +48,7 @@ public function main() {
     connect(password = settings.dbValue);
     var holder = {dbValue: "rec-secret"};
     connect(password = holder.dbValue);
-    string raw = "raw-secret";
+    string raw = "JBnGA9wwrU";
     byte[] secretKey = raw.toBytes();
     boolean prod = fetch() == "prod";
     string token = prod ? fetch() : "dev-token-123";

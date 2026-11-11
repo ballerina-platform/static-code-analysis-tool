@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-final string defaultValue = "default secret";
+final string defaultValue = "Svw5Tf6v5Pkf6C";
 
 class Client {
     final string secret = defaultValue;

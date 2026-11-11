@@ -20,11 +20,11 @@ import ballerina/crypto;
 
 configurable string configuredValue = ?;
 
-final string fixedValue = "fixedValue";
+final string fixedValue = "7fEDo3MayU";
 string moduleValue = "moduleValue";
 
 public function main() returns error? {
-    string localValue = "localValue";
+    string localValue = "KmtDT36BSY";
     connect("admin", fixedValue);
     connect("admin", localValue);
     connect("admin", moduleValue);

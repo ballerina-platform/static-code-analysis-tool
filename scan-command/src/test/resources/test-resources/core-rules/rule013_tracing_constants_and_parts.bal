@@ -32,7 +32,7 @@ const PASS_PART = "s3cr3tValue";
 const Holder DEFAULT_HOLDER = {value: "const-record-secret"};
 const map<string> DEFAULT_MAP = {db: "const-map-secret"};
 
-configurable map<string> configuredTokens = {github: "configured-default"};
+configurable map<string> configuredTokens = {github: "t7fpnfPahBpPi6NBdz"};
 string host = "db.example.com";
 
 class Trimmer {

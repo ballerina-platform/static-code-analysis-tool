@@ -30,7 +30,7 @@ type Settings record {|
 class Holder {
 }
 
-const FIXED_VALUE = "hunter22";
+const FIXED_VALUE = "Axryjfi6";
 const LIVE_KEY = "live-key-9f2";
 const int RETRIES = 3;
 const boolean ENABLED = true;

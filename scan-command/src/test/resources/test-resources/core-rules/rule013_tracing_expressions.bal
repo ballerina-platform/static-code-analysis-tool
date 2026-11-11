@@ -48,14 +48,14 @@ public function main() {
     connect(password = DERIVED_MASTER);
     string viaConstant = DERIVED_VALUE;
     connect(password = viaConstant);
-    connectBytes(secret = "literal-secret".toBytes());
+    connectBytes(secret = "bbt7dgHAMJJNkk".toBytes());
     connect(password = "literal-secret".toBytes().toBase64());
     connect(password = "literal-secret".toBytes().toBase16());
     connect(password = BASE_VALUE.trim());
     connect(password = " padded-secret ".trim().toUpperAscii());
     connectBytes(secret = base64 `c2VjcmV0LXZhbHVl`);
     connectBytes(secret = [1, 2, 3, 4]);
-    byte[] literalBytes = "literal-secret".toBytes();
+    byte[] literalBytes = "bbt7dgHAMJJNkk".toBytes();
     connectBytes(secret = literalBytes);
     byte[] numbers = [1, 2, 3, 4];
     connectBytes(secret = numbers);

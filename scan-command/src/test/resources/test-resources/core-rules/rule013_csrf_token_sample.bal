@@ -56,5 +56,6 @@ public function main() {
     Response tokenResponse = serviceClient->get(path = "/orders", headers = {"x-csrf-token": "Fetch"});
     string csrfToken = tokenResponse.getHeader("x-csrf-token");
     Response created = serviceClient->get(path = "/orders", headers = {"x-csrf-token": csrfToken});
-    _ = created;
+    Response replayed = serviceClient->get(path = "/orders", headers = {"x-csrf-token": "Q2xpZW50VG9rZW4x"});
+    _ = [created, replayed];
 }

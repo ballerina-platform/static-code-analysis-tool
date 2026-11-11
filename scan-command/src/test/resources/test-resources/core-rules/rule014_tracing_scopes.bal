@@ -17,7 +17,7 @@
 import ballerina/http;
 
 
-final string defaultValue = "default-secret";
+final string defaultValue = "pyqS9KZqbYva7U";
 
 class Client {
     private final string endpointValue = defaultValue;
@@ -34,7 +34,7 @@ class Client {
 
 service /api on new http:Listener(9090) {
     private final string serviceValue = defaultValue;
-    private final string apiKey = "service-field-secret";
+    private final string apiKey = "F7aycnFzkojCpkGA8NYe";
 
     resource function get .() {
         connect(password = self.serviceValue);

@@ -18,5 +18,5 @@ string password = "password";
 string passwd = "passwd";
 string pwd = "pwd";
 string passphrase = "passphrase";
-string secret = "secret";
-string clientSecret = "clientSecret";
+string secret = "JE4kfQMy2Dkt";
+string clientSecret = "dMPYkDzwE5AH";

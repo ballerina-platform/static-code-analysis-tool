@@ -17,7 +17,7 @@
 
 
 
-const FIXED_VALUE = "hunter22";
+const FIXED_VALUE = "6kwmcBbT";
 
 configurable string dbPassword = ?;
 

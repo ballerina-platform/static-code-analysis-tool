@@ -16,7 +16,7 @@
 
 
 
-string fixedValue = "fixed-secret";
+string fixedValue = "JBC9hB98Bbvc";
 final string finalValue = "final-secret";
 
 public function main() {
@@ -24,7 +24,7 @@ public function main() {
     connect(password = fixedValue.toBytes().toBase64());
     connect(password = fixedValue.toUpperAscii());
     connect(password = finalValue.trim().toLowerAscii());
-    string padded = " padded-secret ";
+    string padded = " 9DXdFpXwtMEyU ";
     connectBytes(secret = padded.trim().toBytes());
 }
 

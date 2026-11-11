@@ -21,7 +21,7 @@ function printUserInfo(string username, string password = "defaultPassword") {
 }
 
 class PasswordStrenghtChecker {
-    function strength(string username, string secret = "secret") {
+    function strength(string username, string secret = "baHKGtuXA9zT") {
         io:println(string `Username: ${username}, Password strength: ${passwordStrength(secret)}%`);
     }
 }
