@@ -4,6 +4,16 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. Releases for older distributions are maintained on the `support/*` branches, which keep their own changelog.
 
+## [Unreleased]
+
+### Changed
+
+- The `location` of each issue in `scan_results.json` and in the JSON printed to standard output gives one-based lines and columns, as the SARIF report and the compiler's diagnostics do, and the path of the file relative to the package root, or to the workspace root in the output and combined report of a workspace scan, instead of only its file name. The `scan_results.json` of each workspace package gives paths relative to the root of that package. Consumers that added one to the lines or columns, or matched files by name, need to be updated. `ScanUtils.convertIssuesToJsonString(List, Project, Map)` is added, and the overloads without the project are deprecated, as they can give only the file name. ([#172](https://github.com/ballerina-platform/static-code-analysis-tool/issues/172), [#152](https://github.com/ballerina-platform/static-code-analysis-tool/issues/152))
+
+### Fixed
+
+- The SARIF report gives the file name as the `uri` of a single Ballerina file instead of an empty path, and of a file outside the project root instead of a `../` path. ([#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174))
+
 ## [0.13.0] - 2026-11-05
 
 Built against Ballerina 2201.13.2.

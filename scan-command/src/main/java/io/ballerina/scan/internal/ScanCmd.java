@@ -646,7 +646,7 @@ public class ScanCmd implements BLauncherCmd {
     private void printIssues(List<Issue> issues, Project project) {
         section(Section.RESULTS);
         outputStream.println(ReportFormat.SARIF.equals(reportFormat)
-                ? convertIssuesToSarifString(issues, project) : convertIssuesToJsonString(issues));
+                ? convertIssuesToSarifString(issues, project) : convertIssuesToJsonString(issues, project, Map.of()));
         outputStream.flush();
     }
 
@@ -701,7 +701,7 @@ public class ScanCmd implements BLauncherCmd {
                     .resolve(reportFileName);
             String finalReportContent = isSarifFormat
                     ? convertIssuesToSarifString(allIssues, workspaceProject, allSuppressions)
-                    : convertIssuesToJsonString(allIssues, allSuppressions);
+                    : convertIssuesToJsonString(allIssues, workspaceProject, allSuppressions);
             Files.writeString(finalReportPath, finalReportContent);
         } catch (IOException e) {
             throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.FAILED_TO_WRITE_REPORT, reportFileName,

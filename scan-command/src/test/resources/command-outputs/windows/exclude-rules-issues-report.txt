@@ -2,10 +2,10 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 21,
-      "startColumn": 0,
-      "endColumn": 1,
+      "startLine": 17,
+      "endLine": 22,
+      "startColumn": 1,
+      "endColumn": 2,
       "startOffset": 664,
       "length": 139,
       "snippet": "function getResult() returns int|error => 1;\r\n\r\npublic function main() {\r\n    // Non-compliant\r\n    int result = checkpanic getResult();\r\n}"
@@ -24,10 +24,10 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 21,
-      "startColumn": 0,
-      "endColumn": 1,
+      "startLine": 17,
+      "endLine": 22,
+      "startColumn": 1,
+      "endColumn": 2,
       "startOffset": 664,
       "length": 139,
       "snippet": "function getResult() returns int|error => 1;\r\n\r\npublic function main() {\r\n    // Non-compliant\r\n    int result = checkpanic getResult();\r\n}"
@@ -46,10 +46,10 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 21,
-      "startColumn": 0,
-      "endColumn": 1,
+      "startLine": 17,
+      "endLine": 22,
+      "startColumn": 1,
+      "endColumn": 2,
       "startOffset": 664,
       "length": 139,
       "snippet": "function getResult() returns int|error => 1;\r\n\r\npublic function main() {\r\n    // Non-compliant\r\n    int result = checkpanic getResult();\r\n}"

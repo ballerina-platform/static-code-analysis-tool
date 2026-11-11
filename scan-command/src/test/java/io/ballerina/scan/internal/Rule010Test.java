@@ -32,6 +32,7 @@ import org.testng.annotations.Test;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Self assignment tests.
@@ -145,7 +146,7 @@ public class Rule010Test extends StaticCodeAnalyzerTest {
 
         String expectedSnippet = "'default = 'default;";
 
-        String json = ScanUtils.convertIssuesToJsonString(issues);
+        String json = ScanUtils.convertIssuesToJsonString(issues, project, Map.of());
         Assert.assertTrue(json.contains("\"snippet\": \"" + expectedSnippet + "\""),
                 "expected an unescaped reserved-keyword snippet in JSON output, got: " + json);
 

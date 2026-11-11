@@ -35,6 +35,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Tests verifying that optional rule metadata fields are included in, or omitted from, the
@@ -63,7 +64,8 @@ public final class CoreRuleOutputTest extends BaseTest {
     void testOptionalFieldsOmittedFromJsonOutput() {
         Issue issue = new IssueImpl(location, CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT.rule(), Source.BUILT_IN,
                 "main.bal", balProject.resolve("main.bal").toString());
-        String json = ScanUtils.convertIssuesToJsonString(List.of(issue));
+        String json = ScanUtils.convertIssuesToJsonString(List.of(issue), ProjectLoader.load(balProject).project(),
+                Map.of());
 
         Assert.assertFalse(json.contains("\"standards\""),
                 "standards should be omitted since rule 3's metadata does not specify any CWE/OWASP coverage");
@@ -79,7 +81,8 @@ public final class CoreRuleOutputTest extends BaseTest {
     void testStandardsIncludedInJsonOutputWhenSpecified() {
         Issue issue = new IssueImpl(location, CoreRule.HARD_CODED_SECRET.rule(), Source.BUILT_IN, "main.bal",
                 balProject.resolve("main.bal").toString());
-        String json = ScanUtils.convertIssuesToJsonString(List.of(issue));
+        String json = ScanUtils.convertIssuesToJsonString(List.of(issue), ProjectLoader.load(balProject).project(),
+                Map.of());
 
         Assert.assertTrue(json.contains("\"severity\": \"HIGH\""),
                 "severity should be present since rule 13's metadata specifies one");
@@ -139,7 +142,8 @@ public final class CoreRuleOutputTest extends BaseTest {
                 "a rule with no distinct full description should not duplicate shortDescription's text into "
                         + "a redundant SARIF fullDescription");
 
-        String json = ScanUtils.convertIssuesToJsonString(List.of(issue));
+        String json = ScanUtils.convertIssuesToJsonString(List.of(issue), ProjectLoader.load(balProject).project(),
+                Map.of());
         Assert.assertFalse(json.contains("\"name\""),
                 "a rule with no authored name should not duplicate description into a redundant \"name\" "
                         + "field in the Ballerina JSON output");

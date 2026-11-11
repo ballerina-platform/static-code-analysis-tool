@@ -1,11 +1,11 @@
 [
   {
     "location": {
-      "filePath": "main.bal",
-      "startLine": 20,
-      "endLine": 20,
-      "startColumn": 17,
-      "endColumn": 39,
+      "filePath": "bal-project-with-analyzer-configurations/main.bal",
+      "startLine": 21,
+      "endLine": 21,
+      "startColumn": 18,
+      "endColumn": 40,
       "startOffset": 777,
       "length": 22,
       "snippet": "checkpanic getResult()"
@@ -43,11 +43,11 @@
   },
   {
     "location": {
-      "filePath": "main.bal",
-      "startLine": 20,
-      "endLine": 20,
-      "startColumn": 17,
-      "endColumn": 39,
+      "filePath": "bal-project-with-include-rule-configurations/main.bal",
+      "startLine": 21,
+      "endLine": 21,
+      "startColumn": 18,
+      "endColumn": 40,
       "startOffset": 777,
       "length": 22,
       "snippet": "checkpanic getResult()"
