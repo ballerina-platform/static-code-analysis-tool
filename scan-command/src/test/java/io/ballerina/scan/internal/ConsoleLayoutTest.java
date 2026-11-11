@@ -36,6 +36,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.function.BiFunction;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
@@ -230,6 +231,63 @@ public class ConsoleLayoutTest extends BaseTest {
                     <GATE>
                     """, output);
         });
+    }
+
+    @Test(description = "test the output of a platform is printed to standard error, so the results stay valid JSON")
+    void testPlatformOutputIsPrintedToStandardError() throws IOException {
+        Path project = testResourcesRoot.resolve("bal-project-with-platform-configurations");
+        withPlatformScanToml(project, "", () -> {
+            ScanStreams streams = scanSplit(project, "--platforms=examplePlatform");
+            Assert.assertFalse(streams.out().contains("uploaded by examplePlatform"), streams.out());
+            Assert.assertTrue(JsonParser.parseString(streams.out()).isJsonArray(), streams.out());
+            Assert.assertTrue(streams.err().contains("uploaded by examplePlatform\n"), streams.err());
+        });
+    }
+
+    @Test(description = "test anything printed to System.out while the scan runs, such as by a compiler plugin, is "
+            + "printed to standard error, and System.out is restored after the scan")
+    void testSystemOutIsPrintedToStandardError() {
+        PrintStream systemOut = System.out;
+        BiFunction<PrintStream, PrintStream, ScanCmd> printingCommand = (out, err) -> new ScanCmd(out, err) {
+            @Override
+            protected ProjectAnalyzer getProjectAnalyzer(Project project, ScanTomlFile scanTomlFile,
+                                                         AnalyzedSources analyzedSources) {
+                PrintStream pluginOut = System.out;
+                pluginOut.println("printed to System.out by a plugin");
+                return super.getProjectAnalyzer(project, scanTomlFile, analyzedSources);
+            }
+        };
+        ScanStreams streams = scanSplit(testResourcesRoot.resolve("bal-project-with-tests"), printingCommand);
+        Assert.assertTrue(JsonParser.parseString(streams.out()).isJsonArray(), streams.out());
+        Assert.assertTrue(streams.err().contains("printed to System.out by a plugin\n"), streams.err());
+        Assert.assertSame(System.out, systemOut);
+
+        ScanStreams failed = scanSplit(testResourcesRoot.resolve("bal-project-with-tests"), printingCommand,
+                "--include-rules=ballerina:9999");
+        Assert.assertTrue(failed.err().contains("bal scan: error:"), failed.err());
+        Assert.assertSame(System.out, systemOut);
+    }
+
+    @Test(description = "test a scan that writes to one stream, as the test runner does, leaves System.out alone")
+    void testSingleStreamScanLeavesSystemOut() {
+        PrintStream systemOut = System.out;
+        PrintStream[] outDuringScan = new PrintStream[1];
+        System.setProperty("user.dir", testResourcesRoot.resolve("bal-project-with-tests").toString());
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream) {
+                @Override
+                protected ProjectAnalyzer getProjectAnalyzer(Project project, ScanTomlFile scanTomlFile,
+                                                             AnalyzedSources analyzedSources) {
+                    outDuringScan[0] = System.out;
+                    return super.getProjectAnalyzer(project, scanTomlFile, analyzedSources);
+                }
+            };
+            scanCmd.execute();
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
+        Assert.assertSame(outDuringScan[0], systemOut);
+        Assert.assertSame(System.out, systemOut);
     }
 
     @Test(description = "test a platform-triggered scan prints its held warnings before the summary")
@@ -453,12 +511,17 @@ public class ConsoleLayoutTest extends BaseTest {
      * Runs a scan from the given directory with separate standard output and standard error streams.
      */
     private ScanStreams scanSplit(Path directory, String... args) {
+        return scanSplit(directory, ScanCmd::new, args);
+    }
+
+    private ScanStreams scanSplit(Path directory, BiFunction<PrintStream, PrintStream, ScanCmd> command,
+                                  String... args) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         System.setProperty("user.dir", directory.toString());
         try (PrintStream outStream = new PrintStream(out, true, StandardCharsets.UTF_8);
              PrintStream errStream = new PrintStream(err, true, StandardCharsets.UTF_8)) {
-            ScanCmd scanCmd = new ScanCmd(outStream, errStream);
+            ScanCmd scanCmd = command.apply(outStream, errStream);
             new CommandLine(scanCmd).parseArgs(args);
             scanCmd.execute();
         } finally {
