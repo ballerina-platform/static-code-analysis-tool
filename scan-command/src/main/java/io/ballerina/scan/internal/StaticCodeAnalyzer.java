@@ -73,6 +73,8 @@ import static io.ballerina.compiler.syntax.tree.SyntaxKind.ELLIPSIS_TOKEN;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.ISOLATED_KEYWORD;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.PRIVATE_KEYWORD;
 import static io.ballerina.compiler.syntax.tree.SyntaxKind.PUBLIC_KEYWORD;
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.READONLY_KEYWORD;
+import static io.ballerina.compiler.syntax.tree.SyntaxKind.SERVICE_KEYWORD;
 import static io.ballerina.scan.utils.Constants.INIT_FUNCTION;
 import static io.ballerina.scan.utils.Constants.MAIN_FUNCTION;
 import static io.ballerina.scan.utils.ScanCodeAnalyzerUtils.isEqualToProvidedLiteralIdentifier;
@@ -89,6 +91,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private final ScannerContext scannerContext;
     private final SemanticModel semanticModel;
     private final SecretValueResolver secretValueResolver;
+    // Test sources are compiled only into the test module, so their public constructs are not a public API
+    private final boolean isTestSource;
 
     StaticCodeAnalyzer(Document document, ScannerContextImpl scannerContext, SemanticModel semanticModel) {
         this(document, scannerContext, semanticModel, new SecretValueResolver(semanticModel, document.module()));
@@ -101,6 +105,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
         this.scannerContext = scannerContext;
         this.semanticModel = semanticModel;
         this.secretValueResolver = secretValueResolver;
+        this.isTestSource = document.module().testDocumentIds().contains(document.documentId());
     }
 
     void analyze() {
@@ -378,7 +383,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
             checkUnusedFunctionParameters(functionDefinitionNode.functionSignature());
         }
         String functionName = functionDefinitionNode.functionName().text();
-        if (!functionName.equals(MAIN_FUNCTION) && !functionName.equals(INIT_FUNCTION)) {
+        if (!isTestSource && !functionName.equals(MAIN_FUNCTION) && !functionName.equals(INIT_FUNCTION)) {
             checkNonIsolatedPublicFunction(functionDefinitionNode);
         }
         this.visitSyntaxNode(functionDefinitionNode);
@@ -408,14 +413,18 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     @Override
     public void visit(ClassDefinitionNode classDefinitionNode) {
-        checkNonIsolatedPublicClassDefinition(classDefinitionNode);
-        checkNonIsolatedPublicClassMethod(classDefinitionNode);
+        if (!isTestSource) {
+            checkNonIsolatedPublicClassDefinition(classDefinitionNode);
+            checkNonIsolatedPublicClassMethod(classDefinitionNode);
+        }
         this.visitSyntaxNode(classDefinitionNode);
     }
 
     @Override
     public void visit(TypeDefinitionNode typeDefinitionNode) {
-        checkNonIsolatedConstructsInTypeDefinition(typeDefinitionNode);
+        if (!isTestSource) {
+            checkNonIsolatedConstructsInTypeDefinition(typeDefinitionNode);
+        }
         this.visitSyntaxNode(typeDefinitionNode);
     }
 
@@ -426,8 +435,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 if (typeSymbol instanceof ObjectTypeSymbol objectTypeSymbol) {
                     List<Qualifier> qualifiers = objectTypeSymbol.qualifiers();
                     Optional<Token> visibilityQualifier = typeDefinitionNode.visibilityQualifier();
+                    // A service object type is the contract of a listener, and user code never shares its values
                     if (visibilityQualifier.isPresent() && visibilityQualifier.get().kind().equals(PUBLIC_KEYWORD)
-                            && !hasQualifier(qualifiers, ISOLATED_KEYWORD)) {
+                            && !hasQualifier(qualifiers, ISOLATED_KEYWORD)
+                            && !hasQualifier(qualifiers, SERVICE_KEYWORD)) {
                         reportIssue(visibilityQualifier.get(), CoreRule.PUBLIC_NON_ISOLATED_OBJECT_CONSTRUCT);
                     }
                 }
@@ -439,7 +450,9 @@ class StaticCodeAnalyzer extends NodeVisitor {
         semanticModel.symbol(classDefinitionNode).ifPresent(symbol -> {
             if (symbol instanceof ObjectTypeSymbol objectTypeSymbol) {
                 List<Qualifier> qualifiers = objectTypeSymbol.qualifiers();
-                if (isPublicIsolatedConstruct(qualifiers)) {
+                // Instances of a readonly class are immutable, so they can be shared without a lock
+                if (isPublicNonIsolatedConstruct(qualifiers)
+                        && !hasQualifier(classDefinitionNode.classTypeQualifiers(), READONLY_KEYWORD)) {
                     Token visibilityQualifier = classDefinitionNode.visibilityQualifier().orElseThrow(
                             () -> new IllegalStateException("Expected visibility qualifier to be present"));
                     reportIssue(visibilityQualifier, CoreRule.PUBLIC_NON_ISOLATED_CLASS_CONSTRUCT);
@@ -465,7 +478,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     private void checkNonIsolatedPublicMethod(FunctionDefinitionNode member) {
         NodeList<Token> qualifiers = member.qualifierList();
-        if (isPublicIsolatedConstruct(qualifiers)) {
+        if (isPublicNonIsolatedConstruct(qualifiers)) {
             Token publicToken = getQualifier(qualifiers, PUBLIC_KEYWORD).orElseThrow(
                     () -> new IllegalStateException("Expected public token to be present"));
             reportIssue(publicToken, CoreRule.PUBLIC_NON_ISOLATED_METHOD_CONSTRUCT);
@@ -476,7 +489,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
         semanticModel.symbol(functionDefinitionNode).ifPresent(symbol -> {
             if (symbol.kind() != SymbolKind.METHOD) {
                 NodeList<Token> qualifiers = functionDefinitionNode.qualifierList();
-                if (isPublicIsolatedConstruct(qualifiers)) {
+                if (isPublicNonIsolatedConstruct(qualifiers)) {
                     Token publicToken = getQualifier(qualifiers, PUBLIC_KEYWORD).orElseThrow(
                             () -> new IllegalStateException("Expected public token to be present"));
                     reportIssue(publicToken, CoreRule.PUBLIC_NON_ISOLATED_FUNCTION_CONSTRUCT);
@@ -610,12 +623,12 @@ class StaticCodeAnalyzer extends NodeVisitor {
         }
         return Optional.empty();
     }
-    
-    private boolean isPublicIsolatedConstruct(NodeList<Token> qualifiers) {
+
+    private boolean isPublicNonIsolatedConstruct(NodeList<Token> qualifiers) {
         return hasQualifier(qualifiers, PUBLIC_KEYWORD) && !hasQualifier(qualifiers, ISOLATED_KEYWORD);
     }
 
-    private boolean isPublicIsolatedConstruct(List<Qualifier> qualifiers) {
+    private boolean isPublicNonIsolatedConstruct(List<Qualifier> qualifiers) {
         return hasQualifier(qualifiers, PUBLIC_KEYWORD) && !hasQualifier(qualifiers, ISOLATED_KEYWORD);
     }
 }
