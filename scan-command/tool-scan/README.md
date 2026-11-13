@@ -213,11 +213,11 @@ This produces an HTML report and the scan results in JSON format inside the `tar
 
 The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. Every scanned file is listed, including files without issues, in a folder tree of the package. You can filter, search, and export the list of files.
 
-![scan-report-summary-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-summary-view.png)
+![scan-report-summary-view](images/scan-tool-html-report-summary-view.png)
 
 To investigate further, click on a file name to open the file view. This view shows the source of the file and highlights the exact lines where problems were detected. Hover over a highlight to see a summary of the issue, or click it to see the full details.
 
-![scan-report-file-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-file-view.png)
+![scan-report-file-view](images/scan-tool-html-report-file-view.png)
 
 The issues found in the file are listed in a table with the line, rule ID, kind and severity of each issue. The severity is the one the gate counts the rule's kind as: `BUG` as `HIGH`, `VULNERABILITY` as `MEDIUM` and `CODE_SMELL` as `LOW`. Expand an issue to see its description and details such as its location and source, and jump to it in the source using **Show in code**.
 
