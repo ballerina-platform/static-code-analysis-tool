@@ -124,6 +124,16 @@ public class GateTest extends BaseTest {
                         "invalid value '-1' for --fail-on-count; expected a whole number of 1 or more"},
                 {new String[]{"--fail-on-count=ten"},
                         "invalid value 'ten' for --fail-on-count; expected a whole number of 1 or more"},
+                {new String[]{"--fail-on-count=99999999999"}, "invalid value '99999999999' for --fail-on-count; the "
+                        + "number is too large, expected at most 2147483647"},
+                {new String[]{"--fail-on-count=+2147483648"}, "invalid value '+2147483648' for --fail-on-count; the "
+                        + "number is too large, expected at most 2147483647"},
+                {new String[]{"--fail-on-count=-99999999999"},
+                        "invalid value '-99999999999' for --fail-on-count; expected a whole number of 1 or more"},
+                {new String[]{"--fail-on-count=00"},
+                        "invalid value '00' for --fail-on-count; expected a whole number of 1 or more"},
+                {new String[]{"--fail-on-count=1.5"},
+                        "invalid value '1.5' for --fail-on-count; expected a whole number of 1 or more"},
                 {new String[]{"--format=xml"}, "invalid value 'xml' for --format; expected json or sarif"},
                 {new String[]{"--exclude-tests=yes"},
                         "invalid value 'yes' for --exclude-tests; expected true or false"},
@@ -342,8 +352,8 @@ public class GateTest extends BaseTest {
             Assert.assertTrue(report.startsWith("bal scan: error: Scan.toml has 2 errors\n"), report);
             Assert.assertTrue(report.contains("Scan.toml:2:1: error: unknown key 'includes' in [rule]; expected "
                     + "include or exclude"), report);
-            Assert.assertTrue(report.contains("Scan.toml:3:11: error: invalid value 'ballerina:1' for 'exclude'; "
-                    + "expected an array of rule IDs, such as [\"ballerina:1\"]"), report);
+            Assert.assertTrue(report.contains("Scan.toml:3:11: error: 'exclude' must be an array of rule IDs, such as "
+                    + "[\"ballerina:1\"], not the string \"ballerina:1\""), report);
         } finally {
             Files.deleteIfExists(scanToml);
         }
@@ -403,6 +413,48 @@ public class GateTest extends BaseTest {
         Assert.assertTrue(report.contains("Scan.toml:4:1: error: unknown key 'failOnSevrity' in [gate]; expected "
                 + "failOnSeverity or failOnCount"), report);
         Assert.assertFalse(run.output().contains("Running Scans"), "a configuration error stops the scan");
+    }
+
+    @Test(description = "test a quoted or too large failOnCount in Scan.toml names the problem")
+    void testFailOnCountTypeAndRangeInScanToml() throws IOException {
+        Path scanToml = gateIssuesProject.resolve("Scan.toml");
+        try {
+            Files.writeString(scanToml, """
+                    [gate]
+                    failOnCount = "5"
+                    """);
+            ScanRun run = scan(gateIssuesProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.errorReport().contains("Scan.toml:2:15: error: 'failOnCount' must be a whole number "
+                    + "of 1 or more, not the string \"5\""), run.output());
+
+            Files.writeString(scanToml, """
+                    [gate]
+                    failOnCount = 99999999999
+                    """);
+            run = scan(gateIssuesProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.errorReport().contains("Scan.toml:2:15: error: invalid value '99999999999' for "
+                    + "'failOnCount'; the number is too large, expected at most 2147483647"), run.output());
+
+            Files.writeString(scanToml, """
+                    [gate]
+                    failOnCount = 2147483647
+                    """);
+            run = scan(gateIssuesProject);
+            Assert.assertEquals(run.exitCode(), 0, "the largest count is valid: " + run.output());
+
+            Files.writeString(scanToml, """
+                    [gate]
+                    failOnCount = 2.0
+                    """);
+            run = scan(gateIssuesProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.errorReport().contains("Scan.toml:2:15: error: invalid value '2.0' for "
+                    + "'failOnCount'; expected a whole number of 1 or more"), run.output());
+        } finally {
+            Files.deleteIfExists(scanToml);
+        }
     }
 
     @Test(description = "test suppressed issues count toward the gate only when suppressions are disregarded")

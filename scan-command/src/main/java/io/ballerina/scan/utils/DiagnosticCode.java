@@ -79,6 +79,8 @@ public enum DiagnosticCode {
     UNKNOWN_OPTION("STATIC_ANALYSIS_ERROR_053", "unknown.option"),
     REPORT_DIR_CONFLICT("STATIC_ANALYSIS_ERROR_054", "report.dir.conflict"),
     MISSING_OPTION_VALUE("STATIC_ANALYSIS_ERROR_055", "missing.option.value"),
+    NUMBER_TOO_LARGE("STATIC_ANALYSIS_ERROR_056", "number.too.large"),
+    INVALID_CONFIG_STRING_VALUE("STATIC_ANALYSIS_ERROR_057", "invalid.config.string.value"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
