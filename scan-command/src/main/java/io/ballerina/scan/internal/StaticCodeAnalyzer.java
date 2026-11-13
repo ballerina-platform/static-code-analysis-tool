@@ -91,6 +91,7 @@ import io.ballerina.compiler.syntax.tree.SpreadMemberNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.TypeCastExpressionNode;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
@@ -498,6 +499,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
             case ObjectFieldNode field -> declarationType(field);
             case RecordFieldWithDefaultValueNode field -> declarationType(field);
             case DefaultableParameterNode parameter -> declarationType(parameter);
+            // A cast with only annotations, as in <@a> value, leaves the expected type to its context
+            case TypeCastExpressionNode cast -> cast.typeCastParam().type().isPresent()
+                    ? semanticModel.typeOf(cast).stream().toList()
+                    : contextualTypes(cast);
             case ForEachStatementNode forEach -> forEachType(forEach)
                     .map(memberType -> List.of(iterableType(memberType, expression)))
                     .orElseGet(() -> expectedTypes(expression));

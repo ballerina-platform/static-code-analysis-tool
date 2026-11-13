@@ -224,4 +224,20 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(1), documentName, 24, 24, 24, 29, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
+
+    @Test(description = "test anonymous functions typed by a type cast, a field, a default value or a let variable")
+    void testTypeCastsAndInitializers() {
+        String documentName = "rule002_type_casts_and_initializers.bal";
+        List<Issue> issues = analyze(documentName, List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        Assert.assertEquals(issues.size(), 4);
+
+        assertIssue(issues.get(0), documentName, 42, 37, 42, 42, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(1), documentName, 43, 49, 43, 54, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(2), documentName, 49, 38, 49, 43, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(3), documentName, 59, 38, 59, 43, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+    }
 }
