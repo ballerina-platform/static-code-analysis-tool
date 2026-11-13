@@ -15,6 +15,7 @@ These documentations are intended for the developers who wish to understand the 
 - [Extending Static Code Analysis Tool's Behavior](#extending-static-code-analysis-tools-behavior)
   - [Compiler Plugins](#compiler-plugins)
   - [Platform Plugins](#platform-plugins)
+  - [Adding the scan tool dependency](#adding-the-scan-tool-dependency)
 - [References](#references)
 
 # Overview
@@ -124,7 +125,7 @@ bal scan --exclude-rules="ballerina:1, ballerina/io:2"
 bal scan --platforms=sonarqube
 ```
 
-> Note: The platform and the path to its plugin JAR must be declared in a `[[platform]]` entry of the `Scan.toml` file. A declared platform is reported to only when it is named in `--platforms`, so a plain `bal scan` never reports to a platform.
+> Note: The platform and the path to its plugin JAR must be declared in a `[[platform]]` entry of the `Scan.toml` file. A declared platform is reported to only when it is named in `--platforms`, so a plain `bal scan` never reports to a platform. A scan that a platform runs with `--platform-triggered`, such as the SonarQube Ballerina plugin does, reports to every declared platform unless `--platforms` names some.
 
 12. Run analysis and report to multiple static analysis platforms.
 
@@ -204,6 +205,35 @@ public interface StaticCodeAnalysisPlatformPlugin {
 For each platform named in `--platforms`, the scan tool uses the `platform` method to find the plugin in the JAR declared for that platform in `Scan.toml`. After completing the scans and saving the results, the tool initializes the plugin by calling its `init` method with a platform plugin context, which holds the platform-specific arguments that the user sets in the `[[platform]]` entry of `Scan.toml`. It then invokes the plugin's `onScan` method to notify identified issues. The plugin can then report issues to the relevant platform in the expected format.
 
 For more information on reporting analysis results to static analysis platforms, refer to creating a [Static Code Analysis Platform Plugin.](StaticCodeAnalysisPlatformPlugin.md)
+
+## Adding the scan tool dependency
+
+Compiler plugins and platform plugins are built against the `io.ballerina.scan:scan-command` artifact, which each release of the scan tool publishes to the GitHub Packages Maven registry of this repository, and against the Ballerina compiler artifacts (`org.ballerinalang`), which the Ballerina language publishes to the GitHub Packages registry of `ballerina-lang`. Neither is on Maven Central, so add the GitHub Packages registry of the `ballerina-platform` organization, which serves both. GitHub Packages requires authentication even for public packages, so use a GitHub user and a personal access token with the `read:packages` scope:
+
+```groovy
+repositories {
+    mavenCentral()
+    maven {
+        url = 'https://maven.pkg.github.com/ballerina-platform/*'
+        credentials {
+            username = System.getenv("packageUser")
+            password = System.getenv("packagePAT")
+        }
+    }
+}
+```
+
+Each guide lists the dependencies its plugin needs. In them, replace `<scan-tool-version>` with the scan tool release the plugin is built for, from the [releases](https://github.com/ballerina-platform/static-code-analysis-tool/releases), and `<ballerina-version>` with the Ballerina version that release is built against, which the [changelog](../../changelog.md) states for each release. The scan tool runs on Java 21, so compile the plugin for Java 21 or earlier.
+
+The dependencies are `compileOnly`, because the scan tool and the Ballerina distribution provide these classes when `bal scan` runs the plugin. A library the plugin needs that they do not provide must be bundled with the plugin.
+
+To build against unreleased changes of the scan tool, publish it to the local Maven repository, add `mavenLocal()` to the repositories of the plugin, and use the `version` in the `gradle.properties` file of the repository as `<scan-tool-version>`:
+
+```bash
+git clone https://github.com/ballerina-platform/static-code-analysis-tool.git
+cd static-code-analysis-tool
+./gradlew :scan-command:publishToMavenLocal
+```
 
 # References
 
