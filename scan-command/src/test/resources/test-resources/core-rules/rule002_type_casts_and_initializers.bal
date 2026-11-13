@@ -58,3 +58,14 @@ function withDefault(F f = function(int a, int b) returns int => a) returns int 
 
 function withLet() returns int => let F f = function(int a, int b) returns int => a,
         var untyped = function(int a, int b) returns int => a in f(1, 2) + untyped(1, 2); // warning
+
+function annotatedForEachSource() returns int {
+    int total = 0;
+    foreach F f in <@Tag>{first: function(int a, int b) returns int => a} {
+        total += f(1, 2);
+    }
+    foreach F f in (<@Tag>[function(int a, int b) returns int => a]) {
+        total += f(1, 2);
+    }
+    return total;
+}
