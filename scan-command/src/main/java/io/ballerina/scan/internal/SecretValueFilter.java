@@ -50,8 +50,10 @@ final class SecretValueFilter {
     // Six distinct characters in eight reach it, as do random hexadecimal digits.
     private static final int MIN_GENERATED_LENGTH = 8;
     private static final double MIN_GENERATED_ENTROPY = 2.5;
-    private static final Pattern LETTER_SEGMENTS = Pattern.compile("[A-Za-z]+(?:[ _.-]+[A-Za-z]+)*");
-    private static final Pattern SEGMENT_SEPARATOR = Pattern.compile("[ _.-]+");
+    // Words are separated as in text, a header or a path, as in "Authorization: Bearer" or "auth/token", but a
+    // colon alone joins a user and a password, as in "admin:admin"
+    private static final Pattern LETTER_SEGMENTS = Pattern.compile("[A-Za-z]+(?:(?:: |[ _./,-])+[A-Za-z]+)*");
+    private static final Pattern SEGMENT_SEPARATOR = Pattern.compile("(?:: |[ _./,-])+");
     private static final Pattern EDGE_SEPARATORS = Pattern.compile("^[^A-Za-z0-9]+|[^A-Za-z0-9]+$");
     private static final Pattern SINGLE_CASE_WORD = Pattern.compile("[a-z]+|[A-Z]+|[A-Z][a-z]+");
     // The words of a camel case segment, such as "XML", "Http" and "Request" in "XMLHttpRequest".

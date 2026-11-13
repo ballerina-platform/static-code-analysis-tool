@@ -189,6 +189,41 @@ function longChain() returns string {
     return apiKey;
 }
 
+// Placeholders joined together are still a placeholder, while other parts are joined and checked
+function joinedPlaceholders() returns string[] {
+    connect(password = "<user>" + "<password>");
+    string dbPassword = "changeme" + "changeme";
+    string adminPassword = "admin" + "123"; // warning
+    return [dbPassword, adminPassword];
+}
+
+// A weak secret-named part is not reported where it is written, so it is joined with the other parts
+function weakNamedPart() returns string {
+    string secretPart = "x8F2";
+    string apiKey = "Kq9z" + secretPart; // warning: ballerina:14
+    return apiKey;
+}
+
+function useToken(string? token) {
+}
+
+// A map inside a map of secrets is reported where it is written, and not again where it is used
+function nestedMapOfSecrets() {
+    map<map<string>> tokens = {github: {dev: "ghp_a1B2c3D4e5F6g7H8"}}; // warning
+    useToken(tokens["github"]["dev"]);
+}
+
+// Words joined as in a header or a path do not look generated, unlike a base64 value with a slash
+function separatedWords() returns string[] {
+    string authHeader = "Authorization: Bearer";
+    string scheme = "Bearer";
+    string authorization = "Authorization: " + scheme;
+    string authPath = "oauth/token";
+    string apiKey = "Kq9z/x8F2mPq/Lw7R"; // warning
+    string clientCredentials = "admin:admin"; // warning
+    return [authHeader, authorization, authPath, apiKey, clientCredentials];
+}
+
 public function main() {
     assertCors(new, "true");
 }

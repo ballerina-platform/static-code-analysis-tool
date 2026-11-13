@@ -542,7 +542,7 @@ public class SecretChecker extends NodeVisitor {
         return unwrap(typeSymbol) instanceof ArrayTypeSymbol arrayType && isByte(arrayType.memberTypeDescriptor());
     }
 
-    private static boolean isMap(TypeSymbol typeSymbol) {
+    static boolean isMap(TypeSymbol typeSymbol) {
         return unwrap(typeSymbol).typeKind() == TypeDescKind.MAP;
     }
 

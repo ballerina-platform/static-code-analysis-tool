@@ -47,10 +47,8 @@ final class SecretNameMatcher {
      * A secret keyword.
      *
      * @param text       the keyword in lower case
-     * @param isEmbedded whether it is matched anywhere in the name, so that all-lowercase compounds such as
-     *                   "dbpassword" and "apikey" match, rather than as a whole word or at the end of an all-lowercase
-     *                   compound such as "accesstoken", as a keyword that starts unrelated words, such as "author" and
-     *                   "tokenizer", is
+     * @param isEmbedded whether it matches anywhere, as in "dbpassword", or only as a word or at the end of one, as
+     *                   "token" does, since it starts unrelated words such as "tokenizer"
      * @param kind       the kind of secret it names; a password is chosen by a person, so any value of it can be real
      */
     private record Keyword(String text, boolean isEmbedded, Kind kind) {
