@@ -215,7 +215,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (symbol instanceof ClassFieldSymbol classFieldSymbol) {
                 List<Qualifier> qualifiers = classFieldSymbol.qualifiers();
                 if (hasQualifier(qualifiers, PRIVATE_KEYWORD)) {
-                    if (semanticModel.references(symbol).size() == 1) {
+                    // A private field is used only in its own class or object constructor, so in this document
+                    if (semanticModel.references(symbol, document, false).isEmpty()) {
                         reportIssue(withoutMetadata(objectFieldNode), CoreRule.UNUSED_PRIVATE_CLASS_FIELD);
                     }
                 }
