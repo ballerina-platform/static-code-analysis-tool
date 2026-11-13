@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - An unknown option, such as `--bogus` or `-x`, and an option written without its value, such as `--format` at the end of the command, exit with code `2`, also when `--help` is given, and are reported as `bal scan: error: unknown option '--bogus'` or `bal scan: error: missing value for --format; expected json or sarif`, as the exit code table states. Before, the `bal` launcher rejected them before the tool ran, with exit code `1`. A value given to an on/off option, such as `--scan-report=yes`, and an option given twice are still rejected by the launcher. (backport of [#236](https://github.com/ballerina-platform/static-code-analysis-tool/pull/236); [#195](https://github.com/ballerina-platform/static-code-analysis-tool/issues/195))
+- `--fail-on-count=99999999999` and `failOnCount = 99999999999` in `Scan.toml` say that the number is too large, instead of asking for a whole number of 1 or more, and a quoted value in `Scan.toml` for a setting that does not take a string, such as `failOnCount = "5"` or `excludeTests = "true"`, says that it must not be a string. (backport of [#207](https://github.com/ballerina-platform/static-code-analysis-tool/pull/236); [#195](https://github.com/ballerina-platform/static-code-analysis-tool/issues/195))
 
 ## [0.11.2] - 2026-11-17
 

@@ -164,6 +164,9 @@ public class LauncherPicocliTest extends BaseTest {
                         "missing value for --fail-on-severity; expected BLOCKER, HIGH, MEDIUM, LOW, INFO or NONE"},
                 {new String[]{"--fail-on-count"},
                         "missing value for --fail-on-count; expected a whole number of 1 or more"},
+                {new String[]{"--fail-on-count=99999999999", file},
+                        "invalid value '99999999999' for --fail-on-count; the number is too large, expected at most "
+                                + "2147483647"},
         };
     }
 
