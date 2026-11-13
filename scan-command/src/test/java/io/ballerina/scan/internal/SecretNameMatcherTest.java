@@ -93,7 +93,7 @@ public class SecretNameMatcherTest {
                 {"passwordlessAuth", SecretNameMatcher.Kind.SECRET}, {"passwordless", SecretNameMatcher.Kind.NONE},
                 {"passwordLess", SecretNameMatcher.Kind.NONE}, {"passwordLessToken", SecretNameMatcher.Kind.SECRET},
                 {"tokenForPasswordReset", SecretNameMatcher.Kind.SECRET},
-                {"passwordPolicyApiKey", SecretNameMatcher.Kind.SECRET}
+                {"passwordPolicyApiKey", SecretNameMatcher.Kind.SECRET}, {"inPassword", SecretNameMatcher.Kind.PASSWORD}
         };
     }
 

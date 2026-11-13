@@ -466,7 +466,8 @@ public class SecretChecker extends NodeVisitor {
             }
             return;
         }
-        if (!type.map(valueType -> canHoldSecret(slotType(expressionNode, valueType))).orElse(true)) {
+        if (!valueResolver.isMapConstant(expressionNode)
+                && !type.map(valueType -> canHoldSecret(slotType(expressionNode, valueType))).orElse(true)) {
             return;
         }
         // A URL with credentials is reported once, as ballerina:13, when the literal or template is visited.

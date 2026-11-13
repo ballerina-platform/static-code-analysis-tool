@@ -144,7 +144,7 @@ final class SecretNameMatcher {
         }
         // A password named in the head of the name makes it one, as in "passwordToken", but not one that qualifies
         // another word or follows a preposition, as in "passwordPolicyApiKey" or "tokenForPasswordReset".
-        int firstPreposition = 0;
+        int firstPreposition = 1;
         while (firstPreposition < words.size() && !PREPOSITIONS.contains(words.get(firstPreposition))) {
             firstPreposition++;
         }

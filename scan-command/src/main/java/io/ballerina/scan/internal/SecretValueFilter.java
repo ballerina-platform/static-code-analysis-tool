@@ -41,8 +41,7 @@ final class SecretValueFilter {
     // A template reference inside a larger value, such as "Bearer {{token}}", also makes it a placeholder.
     private static final Pattern EMBEDDED_TEMPLATE = Pattern.compile("\\$\\{[^}]*}|\\{\\{[^}]*}}");
     private static final Pattern REPEATED_CHARACTER = Pattern.compile("(.)\\1*");
-    private static final Pattern TEMPLATE_REFERENCE = Pattern.compile(
-            "\\$\\{[^}]*}|\\{\\{[^}]*}}|<[^<>]+>|\\$[A-Z_][A-Z0-9_]*|%[A-Z_][A-Z0-9_]*%");
+    private static final Pattern ANGLE_PLACEHOLDER = Pattern.compile("<[^<>]+>");
     // A word in one case is no longer than this; a longer run, as in a base32 key, is checked for randomness.
     private static final int MAX_SINGLE_CASE_WORD_LENGTH = 15;
     private static final Pattern YOUR_PREFIX = Pattern.compile("(?i)your[-_ a-z]*(key|"
@@ -106,16 +105,12 @@ final class SecretValueFilter {
                 || DUMMY_VALUES.contains(trimmedValue.toLowerCase(Locale.ENGLISH));
     }
 
-    // The value without its template references, such as "${TOKEN}", which stand for a value given elsewhere.
-    static String withoutTemplates(String value) {
-        return TEMPLATE_REFERENCE.matcher(value).replaceAll("");
+    // The value without its placeholders such as "<token>"; a "${TOKEN}" is kept, as it makes the whole a placeholder.
+    static String withoutAnglePlaceholders(String value) {
+        return ANGLE_PLACEHOLDER.matcher(value).replaceAll("");
     }
 
-    /**
-     * Checks whether a value looks generated, as a token or a key is: at least 8 characters, not made of words only,
-     * not a run of consecutive characters such as "12345678", and with at least 2.5 bits of entropy per character.
-     * A password can be any value, so this applies only to the other secrets.
-     */
+    // Whether a value looks generated, as a token or a key does; a password can be any value.
     static boolean looksGenerated(String value) {
         String trimmedValue = value.trim();
         return trimmedValue.length() >= MIN_GENERATED_LENGTH
@@ -124,11 +119,7 @@ final class SecretValueFilter {
                 && entropy(trimmedValue) >= MIN_GENERATED_ENTROPY;
     }
 
-    /**
-     * Checks whether a value is made of words, as in "Basic", "No Proxy", "access_token" or "XMLHttpRequest". A
-     * segment of letters in one case, or in camel case words of three letters on average, is a word or words, while
-     * random letters, as in "xKqLzPmRtYvWbNcD", change case every letter or two.
-     */
+    // Random letters, as in "xKqLzPmRtYvWbNcD", change case every letter or two, unlike "XMLHttpRequest".
     private static boolean isWords(String value) {
         // A prefix or a header name, such as "sk_live_" or "Authorization: ", ends with a separator
         String letters = EDGE_SEPARATORS.matcher(value).replaceAll("");

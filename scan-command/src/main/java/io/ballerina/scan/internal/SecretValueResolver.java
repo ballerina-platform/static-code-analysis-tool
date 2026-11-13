@@ -115,8 +115,8 @@ class SecretValueResolver {
      * @param texts         the texts a fixed value can be a secret in: its placeholder parts are left out, and the
      *                      parts of a concatenation or template are joined into one text
      * @param opaque        whether a fixed value is not text, such as a byte array, which is a secret whatever it holds
-     * @param part          the text it adds to a concatenation or template, without its template references
-     * @param isPlaceholder whether that text is a placeholder; a joined text is one only when all its parts are
+     * @param part          the text it adds to a concatenation or template, without its angle-bracket placeholders
+     * @param isPlaceholder whether that text is a placeholder
      */
     record Value(Origin origin, List<String> texts, boolean opaque, String part, boolean isPlaceholder) {
         static final Value UNKNOWN = new Value(Origin.UNKNOWN, List.of(), false, "", false);
@@ -126,7 +126,7 @@ class SecretValueResolver {
         static Value text(String text) {
             boolean isPlaceholder = SecretValueFilter.isPlaceholder(text);
             return new Value(Origin.HARD_CODED, isPlaceholder ? List.of() : List.of(text), false,
-                    SecretValueFilter.withoutTemplates(text), isPlaceholder);
+                    SecretValueFilter.withoutAnglePlaceholders(text), isPlaceholder);
         }
 
         boolean isFixed() {
@@ -195,6 +195,7 @@ class SecretValueResolver {
                     .map(member -> member instanceof ExpressionNode memberExpression
                             ? resolve(memberExpression, depth, visited)
                             : Value.UNKNOWN));
+            case MAPPING_CONSTRUCTOR -> resolveMapping((MappingConstructorExpressionNode) expression, depth, visited);
             case REQUIRED_EXPRESSION -> Value.CONFIGURABLE;
             case BRACED_EXPRESSION -> resolve(((BracedExpressionNode) expression).expression(), depth, visited);
             case SIMPLE_NAME_REFERENCE, QUALIFIED_NAME_REFERENCE -> semanticModel.symbol(expression)
@@ -263,7 +264,7 @@ class SecretValueResolver {
         if (value.isFixed()) {
             return value.withOrigin(Origin.HARD_CODED);
         }
-        // A list, map or record constant resolves to its source form, which is a secret only for a byte array
+        // An imported list, map or record constant resolves to its source form, which is a secret only for a byte array
         TypeSymbol constantType = SemanticUtils.unwrap(constant.broaderTypeDescriptor());
         boolean isStructured = constantType instanceof ArrayTypeSymbol || constantType instanceof TupleTypeSymbol
                 || constantType instanceof MapTypeSymbol || constantType instanceof RecordTypeSymbol;
@@ -284,24 +285,66 @@ class SecretValueResolver {
         if (field.isEmpty()) {
             return isConfigurableRoot ? Value.CONFIGURABLE : Value.UNKNOWN;
         }
-        Value value = field.get().valueExpr()
-                .map(fieldValue -> resolve(fieldValue, depth + 1, visited))
-                .orElseGet(() -> semanticModel.symbol(field.get())
-                        .map(symbol -> resolveSymbol(symbol, depth + 1, visited))
-                        .orElse(Value.UNKNOWN));
+        Value value = resolveFieldValue(field.get(), depth, visited);
         if (!value.isFixed()) {
             return isConfigurableRoot ? Value.CONFIGURABLE : value;
-        }
-        // A field of a map of secrets is checked where it is written with the stricter of its name and the maps'.
-        Kind writtenKind = SecretNameMatcher.kind(fieldName)
-                .stricter(mapKind((MappingConstructorExpressionNode) field.get().parent()));
-        value = value.unreportedBy(writtenKind);
-        if (!value.isFixed()) {
-            return value;
         }
         boolean isConstantRoot = root.filter(symbol -> symbol.kind() == SymbolKind.CONSTANT).isPresent();
         return isConstantRoot ? value.withOrigin(Origin.HARD_CODED)
                 : isConfigurableRoot ? value : value.withOrigin(Origin.FIXED_VARIABLE);
+    }
+
+    // A map is its values, as a list is its members; a record's fields are checked by their own names.
+    private Value resolveMapping(MappingConstructorExpressionNode mapping, int depth, Set<Symbol> visited) {
+        if (!isMap(mapping)) {
+            return Value.UNKNOWN;
+        }
+        return members(mapping.fields().stream()
+                .map(field -> field instanceof SpecificFieldNode specificField
+                        ? resolveFieldValue(specificField, depth, visited)
+                        : Value.UNKNOWN));
+    }
+
+    private boolean isMap(MappingConstructorExpressionNode mapping) {
+        return mapping.parent() instanceof ConstantDeclarationNode constantDeclaration
+                ? isMapType(constantDeclaration)
+                : semanticModel.typeOf(mapping).map(SecretChecker::isMap).orElse(false);
+    }
+
+    // A map constant is typed by the shape of its value, a record, so only its declaration tells it is a map.
+    boolean isMapConstant(ExpressionNode expression) {
+        return semanticModel.symbol(expression)
+                .filter(symbol -> symbol instanceof ConstantSymbol && isDeclaredInModule(symbol))
+                .flatMap(Symbol::getLocation)
+                .flatMap(this::findNode)
+                .flatMap(SecretValueResolver::findConstantDeclaration)
+                .map(this::isMapType)
+                .orElse(false);
+    }
+
+    private boolean isMapType(ConstantDeclarationNode constantDeclaration) {
+        return constantDeclaration.typeDescriptor()
+                .map(typeDescriptor -> typeDescriptor.kind() == SyntaxKind.MAP_TYPE_DESC
+                        || semanticModel.symbol(typeDescriptor)
+                        .filter(TypeSymbol.class::isInstance)
+                        .map(type -> SecretChecker.isMap((TypeSymbol) type))
+                        .orElse(false))
+                .orElse(false);
+    }
+
+    // A field of a map of secrets is checked where it is written with the stricter of its name and the maps'.
+    private Value resolveFieldValue(SpecificFieldNode field, int depth, Set<Symbol> visited) {
+        Value value = field.valueExpr()
+                .map(fieldValue -> resolve(fieldValue, depth + 1, visited))
+                .orElseGet(() -> semanticModel.symbol(field)
+                        .map(symbol -> resolveSymbol(symbol, depth + 1, visited))
+                        .orElse(Value.UNKNOWN));
+        if (!value.isFixed()) {
+            return value;
+        }
+        Kind writtenKind = SecretNameMatcher.kind(SecretChecker.fieldNameText(field))
+                .stricter(mapKind((MappingConstructorExpressionNode) field.parent()));
+        return value.unreportedBy(writtenKind);
     }
 
     // The kind a map of secrets is checked with where it is written: the stricter of the names of the maps it is
@@ -471,7 +514,10 @@ class SecretValueResolver {
             return Value.UNKNOWN;
         }
         String text = values.stream().map(Value::part).collect(Collectors.joining());
-        boolean isPlaceholder = values.stream().allMatch(Value::isPlaceholder);
+        // A part of one character, such as ":", is a separator, which does not make the text a placeholder
+        List<Value> words = values.stream().filter(value -> value.part().length() > 1).toList();
+        boolean isPlaceholder = SecretValueFilter.isPlaceholder(text)
+                || (!words.isEmpty() && words.stream().allMatch(Value::isPlaceholder));
         return new Value(origin, isPlaceholder || text.isEmpty() ? List.of() : List.of(text),
                 values.stream().anyMatch(Value::opaque), text, isPlaceholder);
     }
@@ -520,11 +566,15 @@ class SecretValueResolver {
     }
 
     private static Optional<ExpressionNode> findConstantInitializer(Node constantNode) {
+        return findConstantDeclaration(constantNode)
+                .filter(constantDeclaration -> constantDeclaration.initializer() instanceof ExpressionNode)
+                .map(constantDeclaration -> (ExpressionNode) constantDeclaration.initializer());
+    }
+
+    private static Optional<ConstantDeclarationNode> findConstantDeclaration(Node constantNode) {
         for (Node node = constantNode; node != null; node = node.parent()) {
             if (node instanceof ConstantDeclarationNode constantDeclaration) {
-                return constantDeclaration.initializer() instanceof ExpressionNode initializer
-                        ? Optional.of(initializer)
-                        : Optional.empty();
+                return Optional.of(constantDeclaration);
             }
         }
         return Optional.empty();

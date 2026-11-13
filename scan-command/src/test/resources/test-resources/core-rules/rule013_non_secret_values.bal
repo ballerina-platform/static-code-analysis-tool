@@ -197,7 +197,7 @@ function joinedPlaceholders() returns string[] {
     connect(password = "<user>" + "<password>");
     string dbPassword = "changeme" + "changeme";
     string adminPassword = "admin" + "123"; // warning
-    string userPassword = "${ENV}-" + "Hunter2!x"; // warning
+    string userPassword = "${ENV}-" + "Hunter2!x";
     string token = "sk_live_" + <string>"51H8xKq"; // warning
     string authorization = "Bearer " + "${TOKEN}";
     final record {|string suffix;|} cfg = {suffix: "51H8xKq"};
@@ -315,7 +315,7 @@ function singleCaseKeys() returns string[] {
     return [totpSecret, hmacSecret, authToken];
 }
 
-// A map constant is not one text
+// A map constant is checked by its values, none of which looks generated
 function mapConstant() returns map<string> {
     map<string> authHeaders = AUTH_HEADERS;
     return authHeaders;
@@ -333,6 +333,54 @@ function qualifiedPasswordNames() returns string[] {
     string passwordPolicyApiKey = "true";
     string passwordLessToken = "magic";
     return [tokenForPasswordReset, passwordPolicyApiKey, passwordLessToken];
+}
+
+const map<string> DB_PASSWORDS = {primary: "hunter2"};
+const map<string> REPORTED_PASSWORDS = {password: "hunter2"}; // warning
+const ID_SUFFIX = "-prod";
+type Passwords map<string>;
+const Passwords NAMED_PASSWORDS = {primary: "hunter2"};
+const map<int> PORTS = {primary: 5432};
+
+function connectMap(map<string> passwords) {
+}
+
+function connectPorts(map<int> passwords) {
+}
+
+// A map is its values where it is used, less those reported where they are written
+function mapValues() {
+    connectMap(passwords = DB_PASSWORDS); // warning
+    connectMap(passwords = REPORTED_PASSWORDS);
+    connectMap(passwords = NAMED_PASSWORDS); // warning
+    connectPorts(passwords = PORTS);
+    map<string> users = {primary: "admin"};
+    connectMap(passwords = users); // warning: ballerina:14
+    map<string> dbPasswords = {primary: "hunter2"}; // warning
+    connectMap(passwords = dbPasswords);
+    map<string> merged = {...users};
+    connectMap(passwords = merged);
+}
+
+// Only a whole template reference is left out of a joined text, so a "$" in a key does not cut it
+function dollarInKey() returns string[] {
+    string apiKey = "sk_" + "Zq$RT9XK2LMN"; // warning
+    string authToken = "Bearer " + "<token>";
+    string bearerToken = "Bearer " + "{{token}}";
+    return [apiKey, authToken, bearerToken];
+}
+
+// A template reference in one part makes a joined text a placeholder, but a part of one character does not
+function templateInPart() returns string[] {
+    string password = "user:{{pw}}" + ID_SUFFIX;
+    string dbPassword = "p" + "w" + "1"; // warning
+    return [password, dbPassword];
+}
+
+// A name that starts with a preposition names a password
+function prepositionFirst() returns string {
+    string inPassword = "admin"; // warning
+    return inPassword;
 }
 
 public function main() {
