@@ -179,6 +179,20 @@ def ballerinaLocalDir = System.getProperty("user.home") + "/.ballerina/repositor
 def balCentralCacheDir = project.file(System.getProperty("user.home") + "/.ballerina/repositories/central.ballerina.io")
 def ballerinaToolConfigDir = System.getProperty("user.home") + "/.ballerina/.config"
 def ballerinaToolConfigToml = System.getProperty("user.home") + "/.ballerina/.config/bal-tools.toml"
+def toolReadmeFile = new File("${projectDir}/tool-scan/README.md")
+// Central shows the README without its files, so its images are served from GitHub: a release from its tag
+def toolImagesRef = tomlVersion ==~ /\d+\.\d+\.\d+/ ? "v${tomlVersion}" : "main"
+def toolImagesUrl = "https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/${toolImagesRef}/scan-command/tool-scan/images/"
+
+def packScanTool = {
+    def readme = toolReadmeFile.getText('UTF-8')
+    toolReadmeFile.setText(readme.replace("](images/", "](${toolImagesUrl}"), 'UTF-8')
+    try {
+        rootProject.runBal(file('tool-scan'), 'pack')
+    } finally {
+        toolReadmeFile.setText(readme, 'UTF-8')
+    }
+}
 
 tasks.register('updateTomlFiles') {
     // Update the Ballerina.toml and BalTool.toml files
@@ -239,7 +253,7 @@ tasks.register('buildScanTool') {
     dependsOn ':unpackBallerinaDistribution'
     doLast {
         // Pack and push to local repo of distribution
-        rootProject.runBal(file('tool-scan'), 'pack')
+        packScanTool()
         rootProject.runBal(file('tool-scan'), 'push', '--repository=local')
         println("Successfully build and pushed the scan tool to the local repository")
 
@@ -307,7 +321,7 @@ tasks.register('publishScanPackage') {
     dependsOn ':unpackBallerinaDistribution'
     mustRunAfter buildScanTool
     doLast {
-        rootProject.runBal(file('tool-scan'), 'pack')
+        packScanTool()
         rootProject.runBal(file('tool-scan'), 'push')
         println("Successfully published the scan tool package to central.")
     }

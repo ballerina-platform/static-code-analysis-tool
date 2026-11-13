@@ -177,15 +177,15 @@ This produces an HTML report and the scan results in JSON format inside the `tar
 
 The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. You can filter, search, and export the list of files.
 
-![scan-report-summary-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-summary-view.png)
+![scan-report-summary-view](images/scan-tool-html-report-summary-view.png)
 
 To investigate further, click on a file name to open the file view. This view shows the source of the file and highlights the exact lines where problems were detected. Hover over a highlight to see a summary of the issue, or click it to see the full details.
 
-![scan-report-file-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-file-view.png)
+![scan-report-file-view](images/scan-tool-html-report-file-view.png)
 
 The issues found in the file are listed in a table with the line, rule ID, name, kind, severity, CWE, and OWASP Top 10 category of each issue. Expand an issue to see its description and the full rule details, such as its location, source, and tags. From there, you can jump to the issue in the source using **Show in code**, or open the rule's documentation using **Rule documentation**.
 
-![scan-report-issue-view](https://raw.githubusercontent.com/ballerina-platform/static-code-analysis-tool/main/scan-command/tool-scan/images/scan-tool-html-report-issue-view.png)
+![scan-report-issue-view](images/scan-tool-html-report-issue-view.png)
 
 ## Configuration
 
@@ -201,7 +201,7 @@ A sample `Scan.toml`:
 ```toml
 # Rules to include or exclude in the analysis (same as --include-rules and --exclude-rules)
 [rule]
-include = ["ballerina:1", "ballerina/io:101"]
+include = ["ballerina:1", "ballerina/io:2"]
 # exclude = ["ballerina:1"]
 
 # Platform plugins that --platforms can report results to
@@ -229,7 +229,7 @@ The rules given with `--include-rules` are added to `include`, and those given w
 
 Each `[[platform]]` entry requires both a `name` and a `path`. The `path` must point to the platform plugin JAR, either as a local file path (resolved relative to the folder of the `Scan.toml` file) or as a URL to download it from. A declared platform is reported to only when it is named in `--platforms`, and `--platforms` can only name platforms declared there. The plugin JAR is checked, or downloaded, only when its platform is named; a path that is then neither an existing file nor a URL stops the scan with an error. The results are always printed and saved first, and the named platforms then run one after another. If any platform fails, the scan lists every failure and exits with code `1`.
 
-See [Scan file configurations](https://github.com/ballerina-platform/static-code-analysis-tool/blob/main/docs/static-code-analysis-tool/ScanFileConfigurations.md) for all available options.
+See [Configure the scan with Scan.toml](https://ballerina.io/learn/scan-tool/#configure-the-scan-with-scantoml) for all available options, including the `Scan.toml` of a workspace.
 
 ## Exit codes and the gate
 
