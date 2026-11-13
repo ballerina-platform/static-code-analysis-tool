@@ -32,7 +32,7 @@
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-2",
     "severity": "LOW",
     "description": "A function parameter is declared but never used within the function body.",
-    "fullDescription": "A function parameter that is declared but never referenced in the function body adds noise, misleads readers about the function's behavior, and may indicate incomplete implementation or a leftover from refactoring. A parameter is not reported when the signature is fixed elsewhere: by an external function, by an object type included with `*T`, by the type of a service declaration or object constructor, or by the function type expected where an anonymous function is used, such as the type of the parameter it is passed to or of the variable, list or mapping it is written in.",
+    "fullDescription": "A function parameter that is declared but never referenced in the function body adds noise, misleads readers about the function's behavior, and may indicate incomplete implementation or a leftover from refactoring. A parameter is not reported when the signature is fixed elsewhere: by an external function, by an object type included with `*T`, by the type of a service declaration or object constructor, or by the function type expected where an anonymous function is used, such as the type of the parameter it is passed to, of the variable, field or default value it initializes, of a type cast, or of the list or mapping it is written in.",
     "tags": [
       "unused"
     ],

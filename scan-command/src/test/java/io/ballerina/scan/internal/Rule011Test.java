@@ -60,4 +60,26 @@ public class Rule011Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(7), documentName, 101, 4, 101, 22, "ballerina:11", 11,
                 UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
     }
+
+    @Test(description = "test unused private fields of object constructors, in modules with and without anonymous "
+            + "functions")
+    void testUnusedPrivateFieldsOfObjectConstructors() {
+        for (String documentName : List.of("rule011_object_constructor_fields.bal",
+                "rule011_object_constructor_fields_with_anonymous_function.bal")) {
+            Document document = loadDocument(documentName);
+            ScannerContextImpl scannerContext =
+                    new ScannerContextImpl(List.of(CoreRule.UNUSED_PRIVATE_CLASS_FIELD.rule()));
+            StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document, scannerContext,
+                    document.module().getCompilation().getSemanticModel());
+            staticCodeAnalyzer.analyze();
+            List<Issue> issues = scannerContext.getReporter().getIssues();
+            Assert.assertEquals(issues.size(), 3, documentName);
+            assertIssue(issues.get(0), documentName, 18, 8, 18, 31, "ballerina:11", 11,
+                    UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
+            assertIssue(issues.get(1), documentName, 27, 4, 27, 27, "ballerina:11", 11,
+                    UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
+            assertIssue(issues.get(2), documentName, 34, 4, 34, 27, "ballerina:11", 11,
+                    UNUSED_CLASS_PRIVATE_FIELDS, RuleKind.CODE_SMELL);
+        }
+    }
 }

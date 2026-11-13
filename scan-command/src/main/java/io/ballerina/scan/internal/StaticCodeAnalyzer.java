@@ -64,6 +64,7 @@ import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
 import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.ImplicitNewExpressionNode;
 import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
+import io.ballerina.compiler.syntax.tree.LetVariableDeclarationNode;
 import io.ballerina.compiler.syntax.tree.ListBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.MappingBindingPatternNode;
@@ -80,6 +81,7 @@ import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
 import io.ballerina.compiler.syntax.tree.ParenthesizedArgList;
 import io.ballerina.compiler.syntax.tree.PositionalArgumentNode;
 import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
+import io.ballerina.compiler.syntax.tree.RecordFieldWithDefaultValueNode;
 import io.ballerina.compiler.syntax.tree.RequiredParameterNode;
 import io.ballerina.compiler.syntax.tree.RestBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.RestParameterNode;
@@ -90,6 +92,7 @@ import io.ballerina.compiler.syntax.tree.SpreadMemberNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.TypeCastExpressionNode;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
@@ -213,7 +216,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
             if (symbol instanceof ClassFieldSymbol classFieldSymbol) {
                 List<Qualifier> qualifiers = classFieldSymbol.qualifiers();
                 if (hasQualifier(qualifiers, PRIVATE_KEYWORD)) {
-                    if (semanticModel.references(symbol).size() == 1) {
+                    // A private field is used only in its own class or object constructor, so in this document
+                    if (semanticModel.references(symbol, document, false).isEmpty()) {
                         reportIssue(withoutMetadata(objectFieldNode), CoreRule.UNUSED_PRIVATE_CLASS_FIELD);
                     }
                 }
@@ -493,6 +497,14 @@ class StaticCodeAnalyzer extends NodeVisitor {
                                     .toList());
             case VariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
             case ModuleVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
+            case LetVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
+            case ObjectFieldNode field -> declarationType(field);
+            case RecordFieldWithDefaultValueNode field -> declarationType(field);
+            case DefaultableParameterNode parameter -> declarationType(parameter);
+            // A cast with only annotations, as in <@a> value, leaves the expected type to its context
+            case TypeCastExpressionNode cast -> cast.typeCastParam().type().isPresent()
+                    ? semanticModel.typeOf(cast).stream().toList()
+                    : contextualTypes(cast);
             case ForEachStatementNode forEach -> forEachType(forEach)
                     .map(memberType -> List.of(iterableType(memberType, expression)))
                     .orElseGet(() -> expectedTypes(expression));
@@ -516,6 +528,21 @@ class StaticCodeAnalyzer extends NodeVisitor {
                         .filter(TypeSymbol.class::isInstance)
                         .map(TypeSymbol.class::cast))
                 .stream().toList();
+    }
+
+    private List<TypeSymbol> declarationType(Node declaration) {
+        return semanticModel.symbol(declaration).flatMap(StaticCodeAnalyzer::typeDescriptor).stream().toList();
+    }
+
+    private static Optional<TypeSymbol> typeDescriptor(Symbol symbol) {
+        return Optional.ofNullable(switch (symbol) {
+            case FunctionSymbol function -> function.typeDescriptor();
+            case VariableSymbol variable -> variable.typeDescriptor();
+            case ParameterSymbol parameter -> parameter.typeDescriptor();
+            case ObjectFieldSymbol field -> field.typeDescriptor();
+            case RecordFieldSymbol field -> field.typeDescriptor();
+            default -> null;
+        });
     }
 
     private Optional<TypeSymbol> boundType(ExpressionNode constructor, ExpressionNode member) {
@@ -576,14 +603,19 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     private TypeSymbol iterableType(TypeSymbol memberType, ExpressionNode iterable) {
-        ExpressionNode source = iterable;
-        while (source instanceof BracedExpressionNode braced) {
-            source = braced.expression();
-        }
         TypeBuilder builder = semanticModel.types().builder();
-        return source instanceof MappingConstructorExpressionNode
+        return withoutBracesOrAnnotations(iterable) instanceof MappingConstructorExpressionNode
                 ? builder.MAP_TYPE.withTypeParam(memberType).build()
                 : builder.ARRAY_TYPE.withType(memberType).build();
+    }
+
+    private static ExpressionNode withoutBracesOrAnnotations(ExpressionNode expression) {
+        return switch (expression) {
+            case BracedExpressionNode braced -> withoutBracesOrAnnotations(braced.expression());
+            case TypeCastExpressionNode cast when cast.typeCastParam().type().isEmpty() ->
+                    withoutBracesOrAnnotations(cast.expression());
+            default -> expression;
+        };
     }
 
     /**
@@ -692,14 +724,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
                     .flatMap(type -> ((ClassSymbol) type).initMethod())
                     .map(MethodSymbol::typeDescriptor);
         }
-        Optional<TypeSymbol> type = semanticModel.symbol(call).flatMap(symbol -> switch (symbol) {
-            case FunctionSymbol function -> Optional.of(function.typeDescriptor());
-            case VariableSymbol variable -> Optional.of(variable.typeDescriptor());
-            case ParameterSymbol parameter -> Optional.of(parameter.typeDescriptor());
-            case ObjectFieldSymbol field -> Optional.of(field.typeDescriptor());
-            default -> Optional.empty();
-        });
-        return type.map(SemanticUtils::unwrap)
+        return semanticModel.symbol(call).flatMap(StaticCodeAnalyzer::typeDescriptor)
+                .map(SemanticUtils::unwrap)
                 .filter(FunctionTypeSymbol.class::isInstance)
                 .map(FunctionTypeSymbol.class::cast);
     }
@@ -966,19 +992,12 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private void checkUnusedFunctionParameters(FunctionSignatureNode functionSignatureNode) {
         functionSignatureNode.parameters().forEach(parameter -> {
             if (parameter instanceof IncludedRecordParameterNode includedRecordParameterNode) {
-                includedRecordParameterNode.paramName().ifPresent(name -> {
-                    reportIssueIfNodeIsUnused(name, CoreRule.UNUSED_FUNCTION_PARAMETER);
-                });
-            } else if (isUnusedNode(parameter)) {
+                includedRecordParameterNode.paramName().filter(this::isUnusedParameter)
+                        .ifPresent(name -> reportIssue(name, CoreRule.UNUSED_FUNCTION_PARAMETER));
+            } else if (isUnusedParameter(parameter)) {
                 reportIssue(withoutAnnotations(parameter), CoreRule.UNUSED_FUNCTION_PARAMETER);
             }
         });
-    }
-
-    private void reportIssueIfNodeIsUnused(Node node, CoreRule coreRule) {
-        if (isUnusedNode(node)) {
-            reportIssue(node, coreRule);
-        }
     }
 
     private void reportIssue(Node node, CoreRule coreRule) {
@@ -1027,12 +1046,12 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 TextRange.from(startOffset, endOffset - startOffset));
     }
 
-    private boolean isUnusedNode(Node node) {
-        Optional<Symbol> symbol = semanticModel.symbol(node);
-        // The compiler can give the same reference twice, as for a parameter of an object constructor method
-        return symbol.filter(value -> semanticModel.references(value).stream()
-                .map(location -> location.lineRange().fileName() + ":" + location.textRange().startOffset())
-                .distinct().count() == 1).isPresent();
+    // Valid only for a symbol declared in this document, as a parameter is. The references of a symbol, unlike its
+    // references in a document, miss or repeat the definition of a parameter of an object constructor method.
+    private boolean isUnusedParameter(Node parameter) {
+        return semanticModel.symbol(parameter)
+                .filter(symbol -> semanticModel.references(symbol, document, false).isEmpty())
+                .isPresent();
     }
 
     private Optional<Long> getIntValueFromRangeExprNode(Node rangeExprNode) {
