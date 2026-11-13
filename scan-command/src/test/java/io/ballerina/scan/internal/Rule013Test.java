@@ -300,7 +300,7 @@ public class Rule013Test extends StaticCodeAnalyzerTest {
                 .filter(issue -> issue.rule().id().equals(HARD_CODED_SECRET.rule().id())
                         || issue.rule().id().equals(NON_CONFIGURABLE_SECRET.rule().id()))
                 .toList();
-        Assert.assertEquals(issues.size(), 16);
+        Assert.assertEquals(issues.size(), 20);
         assertIssue(issues.get(0), documentName, new Location(39, 29, 39, 57), HARD_CODED_SECRET.rule());
         assertIssue(issues.get(1), documentName, new Location(44, 24, 44, 31), HARD_CODED_SECRET.rule());
         assertIssue(issues.get(2), documentName, new Location(55, 24, 55, 29), NON_CONFIGURABLE_SECRET.rule());
@@ -317,5 +317,9 @@ public class Rule013Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(13), documentName, new Location(134, 20, 134, 57), HARD_CODED_SECRET.rule());
         assertIssue(issues.get(14), documentName, new Location(146, 23, 146, 32), HARD_CODED_SECRET.rule());
         assertIssue(issues.get(15), documentName, new Location(152, 46, 152, 55), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(16), documentName, new Location(158, 29, 158, 36), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(17), documentName, new Location(168, 20, 168, 34), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(18), documentName, new Location(169, 25, 169, 55), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(19), documentName, new Location(172, 19, 172, 37), HARD_CODED_SECRET.rule());
     }
 }

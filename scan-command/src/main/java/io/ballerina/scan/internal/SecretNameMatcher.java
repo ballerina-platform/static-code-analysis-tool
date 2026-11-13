@@ -21,6 +21,7 @@ package io.ballerina.scan.internal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -79,9 +80,6 @@ final class SecretNameMatcher {
     static final List<String> WORD_KEYWORDS = KEYWORDS.stream()
             .filter(keyword -> !keyword.isEmbedded()).map(Keyword::text).toList();
 
-    private static final List<String> PASSWORD_KEYWORDS = KEYWORDS.stream()
-            .filter(keyword -> keyword.kind() == Kind.PASSWORD).map(Keyword::text).toList();
-
     // Words that contain a keyword but name something else, as in "undersecretary".
     private static final Set<String> NON_SECRET_WORDS = Set.of("secretar");
 
@@ -125,10 +123,11 @@ final class SecretNameMatcher {
     static Kind kind(String name) {
         // Escapes in an identifier or key, such as api\-key, are matched by the characters they encode.
         List<String> words = splitIntoWords(SecretValueFilter.literalValue(name));
-        int lastKeywordIndex = lastKeywordWordIndex(words);
-        if (lastKeywordIndex < 0 || words.subList(0, lastKeywordIndex).contains(HASHED)) {
+        Optional<KeywordMatch> lastKeyword = lastKeyword(words);
+        if (lastKeyword.isEmpty() || words.subList(0, lastKeyword.get().wordIndex()).contains(HASHED)) {
             return Kind.NONE;
         }
+        int lastKeywordIndex = lastKeyword.get().wordIndex();
         // The last word before any preposition names what the value is, as in "passwordFilePath" and
         // "privateKeyFileContent".
         int headWordIndex = lastKeywordIndex;
@@ -138,10 +137,17 @@ final class SecretNameMatcher {
         if (headWordIndex != lastKeywordIndex && isDescriptor(words.get(headWordIndex))) {
             return Kind.NONE;
         }
-        String throughKeyword = String.join("", words.subList(0, lastKeywordIndex + 1));
-        return PASSWORD_KEYWORDS.stream()
-                .anyMatch(keyword -> throughKeyword.endsWith(keyword) || throughKeyword.endsWith(keyword + "s"))
-                ? Kind.PASSWORD : Kind.SECRET;
+        return lastKeyword.get().kind();
+    }
+
+    /**
+     * A keyword found in a name.
+     *
+     * @param wordIndex the index of the word it ends in
+     * @param end       where it ends in the name, with the words joined
+     * @param kind      the kind of secret it names
+     */
+    private record KeywordMatch(int wordIndex, int end, Kind kind) {
     }
 
     // A descriptor or its plural, such as "urls", "hashes" or "policies".
@@ -166,26 +172,35 @@ final class SecretNameMatcher {
         return words;
     }
 
-    private static int lastKeywordWordIndex(List<String> words) {
-        int lastIndex = -1;
+    // The keyword that ends last in the name, which names the secret, as "password" in "dbpasswordvalue".
+    private static Optional<KeywordMatch> lastKeyword(List<String> words) {
+        KeywordMatch last = null;
         StringBuilder joinedWords = new StringBuilder();
         int[] wordStarts = new int[words.size() + 1];
         for (int i = 0; i < words.size(); i++) {
             String word = words.get(i);
-            // "oauth" ends with the keyword "auth" but names a protocol, as in "googleoauth".
-            if (!word.endsWith("oauth") && WORD_KEYWORDS.stream()
-                    .anyMatch(keyword -> word.endsWith(keyword) || word.endsWith(keyword + "s"))) {
-                lastIndex = i;
-            }
             wordStarts[i] = joinedWords.length();
             joinedWords.append(word);
+            // "oauth" ends with the keyword "auth" but names a protocol, as in "googleoauth".
+            if (word.endsWith("oauth")) {
+                continue;
+            }
+            for (Keyword keyword : KEYWORDS) {
+                if (!keyword.isEmbedded() && (word.endsWith(keyword.text()) || word.endsWith(keyword.text() + "s"))) {
+                    last = later(last, new KeywordMatch(i, joinedWords.length(), keyword.kind()));
+                }
+            }
         }
         wordStarts[words.size()] = joinedWords.length();
 
         String joined = joinedWords.toString();
-        for (String keyword : EMBEDDED_KEYWORDS) {
-            for (int start = joined.indexOf(keyword); start >= 0; start = joined.indexOf(keyword, start + 1)) {
-                int end = start + keyword.length();
+        for (Keyword keyword : KEYWORDS) {
+            if (!keyword.isEmbedded()) {
+                continue;
+            }
+            for (int start = joined.indexOf(keyword.text()); start >= 0;
+                 start = joined.indexOf(keyword.text(), start + 1)) {
+                int end = start + keyword.text().length();
                 int firstWord = wordAt(wordStarts, start);
                 int lastWord = wordAt(wordStarts, end - 1);
                 // A keyword spanning words, such as "apiKey" or "apiKeys", must not start or end inside one, as in
@@ -194,11 +209,15 @@ final class SecretNameMatcher {
                 boolean endsWord = nextWordStart == end || (nextWordStart == end + 1 && joined.charAt(end) == 's');
                 boolean spansWholeWords = firstWord == lastWord || (wordStarts[firstWord] == start && endsWord);
                 if (spansWholeWords && NON_SECRET_WORDS.stream().noneMatch(words.get(firstWord)::contains)) {
-                    lastIndex = Math.max(lastIndex, lastWord);
+                    last = later(last, new KeywordMatch(lastWord, end, keyword.kind()));
                 }
             }
         }
-        return lastIndex;
+        return Optional.ofNullable(last);
+    }
+
+    private static KeywordMatch later(KeywordMatch current, KeywordMatch candidate) {
+        return current == null || candidate.end() > current.end() ? candidate : current;
     }
 
     private static int wordAt(int[] wordStarts, int offset) {

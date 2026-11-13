@@ -169,8 +169,9 @@ class SecretValueResolver {
                     .map(key -> resolveField(((IndexedExpressionNode) expression).containerExpression(), key, kind,
                             depth, visited))
                     .orElse(Origin.UNKNOWN);
-            case BINARY_EXPRESSION, STRING_TEMPLATE_EXPRESSION -> fixedText(expression)
-                    .map(text -> isNotSecret(text, kind) ? Origin.PLACEHOLDER : Origin.HARD_CODED)
+            case BINARY_EXPRESSION, STRING_TEMPLATE_EXPRESSION -> fixedText(expression, depth, visited)
+                    .map(text -> isNotSecret(text.text(), kind) ? Origin.PLACEHOLDER
+                            : text.isThroughVariable() ? Origin.FIXED_VARIABLE : Origin.HARD_CODED)
                     .orElseGet(() -> expression instanceof TemplateExpressionNode template
                             ? resolveTemplate(template, kind, depth, visited)
                             : resolveConcatenation((BinaryExpressionNode) expression, kind, depth, visited));
@@ -448,36 +449,73 @@ class SecretValueResolver {
     }
 
     /**
-     * Returns the text of a value built only from string literals and string constants, by concatenation or in a
-     * template, as in {@code "sk_live_" + KEY}. Such a value is checked as a whole, as its parts can each look like
-     * text that is not a secret.
+     * A fixed text.
+     *
+     * @param text              the text
+     * @param isThroughVariable whether any part of it is reached through a variable, which makes it a fixed variable
+     *                          rather than a hard-coded value
      */
-    private Optional<String> fixedText(ExpressionNode expression) {
+    private record FixedText(String text, boolean isThroughVariable) {
+        FixedText concat(FixedText other) {
+            return new FixedText(text + other.text, isThroughVariable || other.isThroughVariable);
+        }
+    }
+
+    /**
+     * Returns the text of a value built only from string literals, string constants and variables that hold such a
+     * value, by concatenation or in a template, as in {@code "sk_live_" + KEY}. Such a value is checked as a whole,
+     * as its parts can each look like text that is not a secret.
+     */
+    private Optional<FixedText> fixedText(ExpressionNode expression, int depth, Set<Symbol> visited) {
+        if (depth > MAX_DEPTH) {
+            return Optional.empty();
+        }
         return switch (expression) {
             case BasicLiteralNode literal when literal.kind() == SyntaxKind.STRING_LITERAL ->
-                    Optional.of(SecretValueFilter.literalValue(literal.literalToken().text()));
-            case BracedExpressionNode braced -> fixedText(braced.expression());
+                    Optional.of(new FixedText(SecretValueFilter.literalValue(literal.literalToken().text()), false));
+            case BracedExpressionNode braced -> fixedText(braced.expression(), depth, visited);
             case BinaryExpressionNode binary when binary.operator().kind() == SyntaxKind.PLUS_TOKEN
                     && binary.lhsExpr() instanceof ExpressionNode lhs
-                    && binary.rhsExpr() instanceof ExpressionNode rhs ->
-                    fixedText(lhs).flatMap(lhsText -> fixedText(rhs).map(lhsText::concat));
+                    && binary.rhsExpr() instanceof ExpressionNode rhs -> fixedText(lhs, depth, visited)
+                    .flatMap(lhsText -> fixedText(rhs, depth, visited).map(lhsText::concat));
             case TemplateExpressionNode template when template.kind() == SyntaxKind.STRING_TEMPLATE_EXPRESSION -> {
-                StringBuilder text = new StringBuilder();
+                FixedText text = new FixedText("", false);
                 for (Node part : template.content()) {
-                    Optional<String> partText = part instanceof InterpolationNode interpolation
-                            ? fixedText(interpolation.expression())
-                            : Optional.of(part.toSourceCode());
+                    Optional<FixedText> partText = part instanceof InterpolationNode interpolation
+                            ? fixedText(interpolation.expression(), depth, visited)
+                            : Optional.of(new FixedText(part.toSourceCode(), false));
                     if (partText.isEmpty()) {
                         yield Optional.empty();
                     }
-                    text.append(partText.get());
+                    text = text.concat(partText.get());
                 }
-                yield Optional.of(text.toString());
+                yield Optional.of(text);
             }
-            case SimpleNameReferenceNode ignored -> constantText(expression);
-            case QualifiedNameReferenceNode ignored -> constantText(expression);
+            case SimpleNameReferenceNode ignored -> constantText(expression)
+                    .map(text -> new FixedText(text, false))
+                    .or(() -> variableText(expression, depth, visited));
+            case QualifiedNameReferenceNode ignored -> constantText(expression).map(text -> new FixedText(text, false));
             default -> Optional.empty();
         };
+    }
+
+    // A secret-named variable is checked where it is written, and a configurable can be given another value.
+    private Optional<FixedText> variableText(ExpressionNode reference, int depth, Set<Symbol> visited) {
+        Optional<VariableSymbol> variable = semanticModel.symbol(reference)
+                .filter(symbol -> symbol.kind() == SymbolKind.VARIABLE)
+                .map(VariableSymbol.class::cast)
+                .filter(symbol -> !isConfigurable(symbol)
+                        && !SecretNameMatcher.kind(symbol.getName().orElse("")).isSecret());
+        if (variable.isEmpty() || !visited.add(variable.get())) {
+            return Optional.empty();
+        }
+        try {
+            return findTracedInitializer(variable.get())
+                    .flatMap(initializer -> fixedText(initializer, depth + 1, visited))
+                    .map(text -> new FixedText(text.text(), true));
+        } finally {
+            visited.remove(variable.get());
+        }
     }
 
     private Optional<String> constantText(ExpressionNode reference) {

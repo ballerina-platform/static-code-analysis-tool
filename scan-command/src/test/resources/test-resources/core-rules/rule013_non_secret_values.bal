@@ -154,6 +154,41 @@ function spreadEntries(map<string> defaults) returns map<string> {
     return passwords;
 }
 
+// A password keyword inside a word names a password, whatever word it ends
+function embeddedPassword() returns string {
+    string dbpasswordvalue = "admin"; // warning
+    return dbpasswordvalue;
+}
+
+configurable string keyPrefix = "a8f5";
+
+// A value built from fixed variables is checked as a whole, and reported as a fixed variable
+function partsInVariables() returns string[] {
+    final string first = "a8f5";
+    final string second = "f167";
+    string apiKey = first + second; // warning: ballerina:14
+    string accessToken = string `${first}${second}f44f`; // warning: ballerina:14
+    string greeting = "No";
+    string apiSecret = greeting + " Proxy";
+    string token = "a8f5f167f44f4964"; // warning
+    string bearerToken = token + "f44f";
+    string clientSecret = keyPrefix + "f167";
+    return [apiKey, accessToken, apiSecret, bearerToken, clientSecret];
+}
+
+// A chain of variables longer than the tracing depth is not followed
+function longChain() returns string {
+    final string p1 = "a8";
+    final string p2 = p1 + "f5";
+    final string p3 = p2 + "f1";
+    final string p4 = p3 + "67";
+    final string p5 = p4 + "f4";
+    final string p6 = p5 + "4f";
+    final string p7 = p6 + "49";
+    string apiKey = p7 + "64";
+    return apiKey;
+}
+
 public function main() {
     assertCors(new, "true");
 }
