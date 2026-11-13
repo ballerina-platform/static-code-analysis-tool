@@ -10,7 +10,8 @@ jobs:
     name: Publish release
     runs-on: ubuntu-latest
 
-    if: github.repository_owner == 'ballerina-platform'
+    # A release from a tag would publish and then fail to open the sync pull request, as its base must be a branch
+    if: github.repository_owner == 'ballerina-platform' && startsWith(github.ref, 'refs/heads/')
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -55,4 +56,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
         run: |
           gh release create v$VERSION --title "scan-tool-v$VERSION"
-          gh pr create --base ${GITHUB_REF#refs/heads/} --title "[Automated] Sync ${GITHUB_REF#refs/heads/} after $VERSION release" --body "Sync ${GITHUB_REF#refs/heads/} after $VERSION release"
+          gh pr create --base "$GITHUB_REF_NAME" --title "[Automated] Sync $GITHUB_REF_NAME after $VERSION release" --body "Sync $GITHUB_REF_NAME after $VERSION release"
