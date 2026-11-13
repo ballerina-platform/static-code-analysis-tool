@@ -43,9 +43,15 @@ public class Rule001Test extends StaticCodeAnalyzerTest {
                 scannerContext, document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 1);
+        Assert.assertEquals(issues.size(), 4);
 
         assertIssue(issues.get(0), documentName, 20, 17, 20, 39, "ballerina:1", 1,
+                AVOID_CHECKPANIC, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(1), documentName, 24, 51, 24, 73, "ballerina:1", 1,
+                AVOID_CHECKPANIC, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(2), documentName, 28, 38, 28, 60, "ballerina:1", 1,
+                AVOID_CHECKPANIC, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(3), documentName, 32, 33, 32, 55, "ballerina:1", 1,
                 AVOID_CHECKPANIC, RuleKind.CODE_SMELL);
     }
 }

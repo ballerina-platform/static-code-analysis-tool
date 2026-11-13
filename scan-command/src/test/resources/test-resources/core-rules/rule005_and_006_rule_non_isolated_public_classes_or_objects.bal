@@ -75,3 +75,22 @@ public isolated service class SA3 {
 public service class SA4 { // warning
 
 }
+
+public readonly class Code {
+    public int code = 200;
+}
+
+public isolated readonly class IsolatedCode {
+    public int code = 200;
+}
+
+public type Service distinct service object {
+};
+
+public type ServiceWithMethod service object {
+    remote function onMessage(string message);
+};
+
+public type ClientObject client object { // warning
+    remote function fetch(string path) returns string;
+};
