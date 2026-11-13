@@ -33,7 +33,7 @@ import java.util.List;
 final class ScanFailure extends RuntimeException {
     static final String TOOL_PREFIX = "bal scan: ";
     private static final List<String> USAGE_HINT = List.of(
-            "Usage: bal scan [OPTIONS] [<package>|<source-file>]",
+            "Usage: bal scan [OPTIONS] [<workspace>|<package>|<source-file>]",
             "Try 'bal scan --help' for more information.");
 
     private final ExitCode exitCode;

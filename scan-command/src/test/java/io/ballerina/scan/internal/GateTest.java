@@ -52,7 +52,7 @@ import java.util.Set;
  */
 public class GateTest extends BaseTest {
     private static final String USAGE_HINT = """
-            Usage: bal scan [OPTIONS] [<package>|<source-file>]
+            Usage: bal scan [OPTIONS] [<workspace>|<package>|<source-file>]
             Try 'bal scan --help' for more information.""";
     // bal-project-with-gate-issues has 1 HIGH, 2 MEDIUM and 3 LOW issues
     private static final String ALL_ISSUES = "HIGH: 1, MEDIUM: 2, LOW: 3";
