@@ -157,7 +157,7 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertNotNull(scanTomlFile);;
         Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
         List<ScanTomlFile.Analyzer> analyzerList = new ArrayList<>(analyzers);
-        Assert.assertEquals(analyzerList.size(), 4);
+        Assert.assertEquals(analyzerList.size(), 3);
         ScanTomlFile.Analyzer analyzer = analyzerList.get(0);
         assertAnalyzer(analyzer, "exampleOrg", "example_module_static_code_analyzer", null, null);
         analyzer = analyzerList.get(1);

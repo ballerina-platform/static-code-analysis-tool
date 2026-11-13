@@ -32,6 +32,16 @@ The path to the configuration file can also be specified in the `Ballerina.toml`
 configPath = "path/to/Scan.toml"
 ```
 
+A `Scan.toml` file can have the `[[analyzer]]`, `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` and `[analysis]` tables described below, and nothing else. `bal scan` checks the whole file, whether it is local or downloaded from a URL, and stops with exit code `1` on any mistake, listing every error at once with its line and column: an unknown table or key, such as `[gates]`, `[rules]` or `foo = 1`, which would otherwise turn its settings off without notice; a value of the wrong type; and an invalid `[[analyzer]]` entry. For example:
+
+```text
+bal scan: error: Scan.toml has 2 errors
+Scan.toml:1:1: error: unknown table 'gates'; expected [[analyzer]], [[platform]], [rule], [suppression], [gate] or [analysis]
+Scan.toml:5:1: error: 'name' is required in [[analyzer]]
+```
+
+`bal scan --list-rules` stops only on the errors that change the available rules: a TOML syntax error and an invalid `[[analyzer]]` entry. The editor ignores invalid settings.
+
 # Configuration for Platform Plugins
 
 Users can configure platform plugins in a `Scan.toml` file by specifying the plugin JAR path to report analysis results.
@@ -42,7 +52,7 @@ name = "sonarqube"
 path = "path/to/sonar_platform_plugin.jar"
 ```
 
-Both `name` and `path` are required. A platform entry without a `path` is ignored. The `path` can be a local file path, resolved relative to the folder of the `Scan.toml` file, or a URL, in which case the scan tool downloads the plugin JAR. The paths in a remote `Scan.toml` file are resolved relative to the package root.
+Both `name` and `path` are required. A platform entry without a `path` is ignored, and naming it in `--platforms` stops the scan with an error that says its `path` is missing. The entries must be written as `[[platform]]` tables. The `path` can be a local file path, resolved relative to the folder of the `Scan.toml` file, or a URL, in which case the scan tool downloads the plugin JAR. The paths in a remote `Scan.toml` file are resolved relative to the package root.
 
 A declared platform is reported to only when it is named in `--platforms`, for example `bal scan --platforms=sonarqube`. A plain `bal scan` never reports to a platform. The plugin JAR is checked, or downloaded, only when its platform is named, so a `Scan.toml` can declare a platform whose JAR exists only on CI. A path of a named platform that is neither an existing file nor a URL stops the scan with an error.
 
@@ -63,7 +73,7 @@ sonarProjectPropertiesPath = "sonar-project.properties"
 
 An argument whose name ends with `Path`, such as `sonarProjectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file is passed to the plugin as the absolute path of that file. Any other value, such as a URL or a file the plugin creates, is passed to the plugin unchanged.
 
-The results are always printed and saved before the platforms run, so a failed upload does not hide them. The named platforms then run one after another, and a platform that fails does not stop the others. If any platform fails, the scan lists every failure and exits with code `1`, and the gate is not checked, since an error wins over the gate. A name in `--platforms` that no `[[platform]]` entry declares also fails the scan. In a workspace, platforms can be set only in the `Scan.toml` of each package; a package that does not declare a named platform is skipped with a warning, and the scan fails only when no package declares it. A single Ballerina file cannot report to platforms, so `--platforms` with a single file is a usage error (exit code `2`).
+The results are always printed and saved before the platforms run, so a failed upload does not hide them. The named platforms then run one after another, and a platform that fails does not stop the others. If any platform fails, the scan lists every failure and exits with code `1`, and the gate is not checked, since an error wins over the gate. A name in `--platforms` that no `[[platform]]` entry declares also fails the scan. In a workspace, platforms can be set only in the `Scan.toml` of each package; a package that does not declare a named platform, or declares it without a `path`, is skipped with a warning, and the scan fails only when no package declares it with a `path`. A single Ballerina file cannot report to platforms, so `--platforms` with a single file is a usage error (exit code `2`).
 
 # Configuration for Static Code Analyzer Plugins
 
@@ -81,9 +91,18 @@ For locally available static code analyzer plugins, the following configuration 
 [[analyzer]]
 org = "org2"
 name = "name2"
-version = "version"
+version = "1.0.0"
 repository = "local"
 ```
+
+Each entry must be written as an `[[analyzer]]` table, and accepts only these keys:
+
+- `org` - Required. The organization of the analyzer package.
+- `name` - Required. The name of the analyzer package.
+- `version` - Optional. A version, such as `"1.0.0"`, which is the minimum version of the package to use, as for a dependency in `Ballerina.toml`.
+- `repository` - Optional. Only `"local"` is supported, to use the package from the local repository, and it requires a `version`.
+
+A missing `org` or `name`, a value that is not a valid organization name, package name or version, and an unknown key stop the scan with an error that gives its line and column.
 
 # Configuration for Static Code Analyzer Rules
 
@@ -190,6 +209,6 @@ The command-line options then apply to the file each package uses:
 | `[suppression]` | `--ignore-suppressions`, `--require-suppression-reason`, `--require-suppression-rule-id` | Each one tightens its own setting, and cannot undo `Scan.toml` |
 | `[analysis]` | `--exclude-tests[=<true\|false>]` | Overrides `excludeTests` either way |
 
-The gate applies to each package on its own, with the issues of that package only. Each package that fails its gate is listed in the error, and the scan exits with code `1`. When a rule a package inherits from the workspace `[rule]` table is not provided to the package, for example because only some packages use the analyzer that defines it, the package is named in a warning.
+The gate applies to each package on its own, with the issues of that package only. Each package that fails its gate is listed in the error, and the scan exits with code `1`. When a rule a package inherits from the workspace `[rule]` table is not provided to the package, for example because only some packages use the analyzer that defines it, the package is named in a warning. An unknown table in the workspace `Scan.toml` is an error as it is in a package `Scan.toml`.
 
 A workspace `Scan.toml` cannot set `[[platform]]`, since each package reports to a project of its own on the platform. The scan stops with an error that gives the location of the table. Each package that reports to a platform sets the platform in its own `Scan.toml`.

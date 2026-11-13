@@ -74,6 +74,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -216,6 +217,8 @@ public class ScanCmd implements BLauncherCmd {
     private final ConsoleLayout layout = new ConsoleLayout();
     // Warnings are held until the next section, so that the configuration of every package is loaded as one block
     private final List<String> pendingWarnings = new ArrayList<>();
+    // The platforms named in --platforms that a workspace package declares without a path
+    private final Set<String> pathlessWorkspacePlatforms = new LinkedHashSet<>();
 
     public ScanCmd() {
         this(System.out, System.err);
@@ -982,7 +985,22 @@ public class ScanCmd implements BLauncherCmd {
         if (requested.isEmpty()) {
             return List.of();
         }
+        List<String> withoutPath = requested.stream().filter(name -> !declared.containsKey(name))
+                .filter(scanTomlFile.getPlatformsWithoutPath()::contains).toList();
+        if (!withoutPath.isEmpty()) {
+            List<String> names = withoutPath.stream().map(name -> "'" + name + "'").toList();
+            if (!scanningWorkspace) {
+                throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_PATH_MISSING, names.size(),
+                        joinWithAnd(names)));
+            }
+            // As with a platform the package does not declare, the package is skipped and the others still report
+            pathlessWorkspacePlatforms.addAll(withoutPath);
+            WorkspaceProject workspaceProject = project.workspaceProject().orElseThrow();
+            warn(DiagnosticLog.warning(DiagnosticCode.PLATFORM_PATH_MISSING_SKIPPED,
+                    packageLabel(workspaceProject, project), names.size(), joinWithAnd(names)));
+        }
         List<String> undeclared = requested.stream().filter(name -> !declared.containsKey(name))
+                .filter(name -> !withoutPath.contains(name))
                 .map(name -> "'" + name + "'").toList();
         if (!undeclared.isEmpty()) {
             if (!scanningWorkspace) {
@@ -1033,10 +1051,17 @@ public class ScanCmd implements BLauncherCmd {
      */
     private void failOnUndeclaredWorkspacePlatforms() {
         List<String> missing = platforms.stream().distinct().filter(name -> !declaredPlatforms.contains(name))
+                .filter(name -> !pathlessWorkspacePlatforms.contains(name))
                 .map(name -> "'" + name + "'").toList();
         if (!missing.isEmpty()) {
             throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, missing.size(),
                     joinWithAnd(missing)));
+        }
+        List<String> withoutPath = platforms.stream().distinct().filter(name -> !declaredPlatforms.contains(name))
+                .map(name -> "'" + name + "'").toList();
+        if (!withoutPath.isEmpty()) {
+            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_PATH_MISSING, withoutPath.size(),
+                    joinWithAnd(withoutPath)));
         }
     }
 

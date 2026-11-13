@@ -23,26 +23,7 @@ include = [
     "ballerinax/example_module_static_code_analyzer:1",
 ]
 
-# Invalid use cases which are filtered by scan tool
-[[analyzer]]
-org = "org3"
-name = "name3"
-version = "version" # version will be ignored
-
-[[analyzer]]
-org = ""
-name = ""
-version = ""
-repository = ""
-
-[[analyzer]]
-org = 10
-name = 20
-version = 30
-repository = 40
-
-[[analyzer]]
-
+# Platforms without a name or path are not loaded
 [[platform]]
 name = ""
 path = "https://example.com/example-platform-analyzer-1.0.jar"
