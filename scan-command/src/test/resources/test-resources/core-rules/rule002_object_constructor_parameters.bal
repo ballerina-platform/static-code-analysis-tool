@@ -64,3 +64,66 @@ function typedObject() returns int {
 function plain(int p) returns int { // warning
     return 1;
 }
+
+type Named object {
+    function name() returns string;
+};
+
+class Holder {
+    final Op finalField = object {
+        function m(int p) returns int => 1;
+    };
+    Op plainField = object {
+        function m(int p) returns int => 1;
+    };
+    Named namedField = object {
+        function name() returns string => "named";
+
+        function m(int p) returns int => 1; // warning
+    };
+    object {} emptyTypeField = object {
+        function m(int p) returns int => 1; // warning
+    };
+}
+
+type WithDefaults record {|
+    Op op = object {
+        function m(int p) returns int => 1;
+    };
+    object {} emptyTypeValue = object {
+        function m(int p) returns int => 1; // warning
+    };
+|};
+
+function withDefault(Op op = object {
+            function m(int p) returns int => 1;
+        }, object {} emptyTypeValue = object {
+            function m(int p) returns int => 1; // warning
+        }) returns int {
+    _ = emptyTypeValue;
+    return op.m(1);
+}
+
+function withLet() returns int => let Op op = object {
+            function m(int p) returns int => 1;
+        }, var untyped = object {
+            function m(int p) returns int => 1; // warning
+        } in op.m(1) + untyped.m(1);
+
+function returned() returns Op {
+    return object {
+        function m(int p) returns int => 1;
+    };
+}
+
+function returnedByExpression() returns Op => object {
+    function m(int p) returns int => 1;
+};
+
+function assigned() returns int {
+    Op op;
+    op = object {
+        function m(int p) returns int => 1;
+    };
+    return op.m(1);
+}

@@ -63,6 +63,7 @@ import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
 import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.ImplicitNewExpressionNode;
 import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
+import io.ballerina.compiler.syntax.tree.LetVariableDeclarationNode;
 import io.ballerina.compiler.syntax.tree.ListBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.MappingBindingPatternNode;
@@ -79,6 +80,7 @@ import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
 import io.ballerina.compiler.syntax.tree.ParenthesizedArgList;
 import io.ballerina.compiler.syntax.tree.PositionalArgumentNode;
 import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
+import io.ballerina.compiler.syntax.tree.RecordFieldWithDefaultValueNode;
 import io.ballerina.compiler.syntax.tree.RequiredParameterNode;
 import io.ballerina.compiler.syntax.tree.RestBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.RestParameterNode;
@@ -492,6 +494,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
                                     .toList());
             case VariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
             case ModuleVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
+            case LetVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
+            case ObjectFieldNode field -> declarationType(field);
+            case RecordFieldWithDefaultValueNode field -> declarationType(field);
+            case DefaultableParameterNode parameter -> declarationType(parameter);
             case ForEachStatementNode forEach -> forEachType(forEach)
                     .map(memberType -> List.of(iterableType(memberType, expression)))
                     .orElseGet(() -> expectedTypes(expression));
@@ -515,6 +521,15 @@ class StaticCodeAnalyzer extends NodeVisitor {
                         .filter(TypeSymbol.class::isInstance)
                         .map(TypeSymbol.class::cast))
                 .stream().toList();
+    }
+
+    private List<TypeSymbol> declarationType(Node declaration) {
+        return semanticModel.symbol(declaration).flatMap(symbol -> switch (symbol) {
+            case ObjectFieldSymbol field -> Optional.of(field.typeDescriptor());
+            case RecordFieldSymbol field -> Optional.of(field.typeDescriptor());
+            case ParameterSymbol parameter -> Optional.of(parameter.typeDescriptor());
+            default -> Optional.<TypeSymbol>empty();
+        }).stream().toList();
     }
 
     private Optional<TypeSymbol> boundType(ExpressionNode constructor, ExpressionNode member) {

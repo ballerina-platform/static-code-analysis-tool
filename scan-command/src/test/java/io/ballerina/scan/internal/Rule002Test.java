@@ -172,11 +172,12 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
 
-    @Test(description = "test unused parameters of object constructor methods in a module without anonymous functions")
+    @Test(description = "test unused parameters of object constructor methods in a module without anonymous "
+            + "functions, including constructors that initialize fields, default values and let variables")
     void testObjectConstructorParameters() {
         String documentName = "rule002_object_constructor_parameters.bal";
         List<Issue> issues = analyze(documentName, List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
-        Assert.assertEquals(issues.size(), 7);
+        Assert.assertEquals(issues.size(), 12);
 
         assertIssue(issues.get(0), documentName, 28, 15, 28, 20, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
@@ -192,6 +193,23 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
         assertIssue(issues.get(6), documentName, 63, 15, 63, 20, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(7), documentName, 81, 19, 81, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(8), documentName, 84, 19, 84, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(9), documentName, 93, 19, 93, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(10), documentName, 100, 23, 100, 28, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(11), documentName, 109, 23, 109, 28, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test methods of an object constructor that initializes a typed class field")
+    void testObjectConstructorOfClassField() {
+        List<Issue> issues = analyze("rule002_object_constructor_field.bal",
+                List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        Assert.assertEquals(issues.size(), 0);
     }
 
     @Test(description = "test unused parameters of object constructor methods in a package without anonymous functions")
