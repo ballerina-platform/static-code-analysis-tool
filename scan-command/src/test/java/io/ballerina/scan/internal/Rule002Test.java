@@ -176,4 +176,73 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(2), documentName, 116, 31, 116, 40, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
+
+    @Test(description = "test unused parameters of object constructor methods, including constructors that "
+            + "initialize fields, default values and let variables")
+    void testObjectConstructorParameters() {
+        String documentName = "rule002_object_constructor_parameters.bal";
+        Document document = loadDocument(documentName);
+        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document,
+                scannerContext, document.module().getCompilation().getSemanticModel());
+        staticCodeAnalyzer.analyze();
+        List<Issue> issues = scannerContext.getReporter().getIssues();
+        Assert.assertEquals(issues.size(), 12);
+
+        assertIssue(issues.get(0), documentName, 28, 15, 28, 20, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(1), documentName, 33, 19, 33, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(2), documentName, 38, 19, 38, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(3), documentName, 41, 39, 41, 50, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(4), documentName, 49, 40, 49, 50, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(5), documentName, 51, 19, 51, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(6), documentName, 63, 15, 63, 20, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(7), documentName, 81, 19, 81, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(8), documentName, 84, 19, 84, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(9), documentName, 93, 19, 93, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(10), documentName, 100, 23, 100, 28, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(11), documentName, 109, 23, 109, 28, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test methods of an object constructor that initializes a typed class field")
+    void testObjectConstructorOfClassField() {
+        Document document = loadDocument("rule002_object_constructor_field.bal");
+        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document,
+                scannerContext, document.module().getCompilation().getSemanticModel());
+        staticCodeAnalyzer.analyze();
+        Assert.assertEquals(scannerContext.getReporter().getIssues().size(), 0);
+    }
+
+    @Test(description = "test anonymous functions typed by a type cast, a field, a default value or a let variable")
+    void testTypeCastsAndInitializers() {
+        String documentName = "rule002_type_casts_and_initializers.bal";
+        Document document = loadDocument(documentName);
+        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document,
+                scannerContext, document.module().getCompilation().getSemanticModel());
+        staticCodeAnalyzer.analyze();
+        List<Issue> issues = scannerContext.getReporter().getIssues();
+        Assert.assertEquals(issues.size(), 4);
+
+        assertIssue(issues.get(0), documentName, 42, 37, 42, 42, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(1), documentName, 43, 49, 43, 54, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(2), documentName, 49, 38, 49, 43, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(3), documentName, 59, 38, 59, 43, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+    }
 }

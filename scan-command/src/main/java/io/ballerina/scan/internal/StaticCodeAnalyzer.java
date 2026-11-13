@@ -64,6 +64,7 @@ import io.ballerina.compiler.syntax.tree.FunctionSignatureNode;
 import io.ballerina.compiler.syntax.tree.ImplicitAnonymousFunctionExpressionNode;
 import io.ballerina.compiler.syntax.tree.ImplicitNewExpressionNode;
 import io.ballerina.compiler.syntax.tree.IncludedRecordParameterNode;
+import io.ballerina.compiler.syntax.tree.LetVariableDeclarationNode;
 import io.ballerina.compiler.syntax.tree.ListBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.MappingBindingPatternNode;
@@ -80,6 +81,7 @@ import io.ballerina.compiler.syntax.tree.ObjectFieldNode;
 import io.ballerina.compiler.syntax.tree.ParenthesizedArgList;
 import io.ballerina.compiler.syntax.tree.PositionalArgumentNode;
 import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
+import io.ballerina.compiler.syntax.tree.RecordFieldWithDefaultValueNode;
 import io.ballerina.compiler.syntax.tree.RequiredParameterNode;
 import io.ballerina.compiler.syntax.tree.RestBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.RestParameterNode;
@@ -90,6 +92,7 @@ import io.ballerina.compiler.syntax.tree.SpreadMemberNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.TypeCastExpressionNode;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
@@ -484,6 +487,14 @@ class StaticCodeAnalyzer extends NodeVisitor {
                                     .toList());
             case VariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
             case ModuleVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
+            case LetVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
+            case ObjectFieldNode field -> declarationType(field);
+            case RecordFieldWithDefaultValueNode field -> declarationType(field);
+            case DefaultableParameterNode parameter -> declarationType(parameter);
+            // A cast with only annotations, as in <@a> value, leaves the expected type to its context
+            case TypeCastExpressionNode cast -> cast.typeCastParam().type().isPresent()
+                    ? semanticModel.typeOf(cast).stream().toList()
+                    : contextualTypes(cast);
             case ForEachStatementNode forEach -> forEachType(forEach)
                     .map(memberType -> List.of(iterableType(memberType, expression)))
                     .orElseGet(() -> expectedTypes(expression));
@@ -507,6 +518,21 @@ class StaticCodeAnalyzer extends NodeVisitor {
                         .filter(TypeSymbol.class::isInstance)
                         .map(TypeSymbol.class::cast))
                 .stream().toList();
+    }
+
+    private List<TypeSymbol> declarationType(Node declaration) {
+        return semanticModel.symbol(declaration).flatMap(StaticCodeAnalyzer::typeDescriptor).stream().toList();
+    }
+
+    private static Optional<TypeSymbol> typeDescriptor(Symbol symbol) {
+        return Optional.ofNullable(switch (symbol) {
+            case FunctionSymbol function -> function.typeDescriptor();
+            case VariableSymbol variable -> variable.typeDescriptor();
+            case ParameterSymbol parameter -> parameter.typeDescriptor();
+            case ObjectFieldSymbol field -> field.typeDescriptor();
+            case RecordFieldSymbol field -> field.typeDescriptor();
+            default -> null;
+        });
     }
 
     private Optional<TypeSymbol> boundType(ExpressionNode constructor, ExpressionNode member) {
@@ -567,14 +593,19 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     private TypeSymbol iterableType(TypeSymbol memberType, ExpressionNode iterable) {
-        ExpressionNode source = iterable;
-        while (source instanceof BracedExpressionNode braced) {
-            source = braced.expression();
-        }
         TypeBuilder builder = semanticModel.types().builder();
-        return source instanceof MappingConstructorExpressionNode
+        return withoutBracesOrAnnotations(iterable) instanceof MappingConstructorExpressionNode
                 ? builder.MAP_TYPE.withTypeParam(memberType).build()
                 : builder.ARRAY_TYPE.withType(memberType).build();
+    }
+
+    private static ExpressionNode withoutBracesOrAnnotations(ExpressionNode expression) {
+        return switch (expression) {
+            case BracedExpressionNode braced -> withoutBracesOrAnnotations(braced.expression());
+            case TypeCastExpressionNode cast when cast.typeCastParam().type().isEmpty() ->
+                    withoutBracesOrAnnotations(cast.expression());
+            default -> expression;
+        };
     }
 
     /**
@@ -683,14 +714,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
                     .flatMap(type -> ((ClassSymbol) type).initMethod())
                     .map(MethodSymbol::typeDescriptor);
         }
-        Optional<TypeSymbol> type = semanticModel.symbol(call).flatMap(symbol -> switch (symbol) {
-            case FunctionSymbol function -> Optional.of(function.typeDescriptor());
-            case VariableSymbol variable -> Optional.of(variable.typeDescriptor());
-            case ParameterSymbol parameter -> Optional.of(parameter.typeDescriptor());
-            case ObjectFieldSymbol field -> Optional.of(field.typeDescriptor());
-            default -> Optional.empty();
-        });
-        return type.map(SemanticUtils::unwrap)
+        return semanticModel.symbol(call).flatMap(StaticCodeAnalyzer::typeDescriptor)
+                .map(SemanticUtils::unwrap)
                 .filter(FunctionTypeSymbol.class::isInstance)
                 .map(FunctionTypeSymbol.class::cast);
     }
