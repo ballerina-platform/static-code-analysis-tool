@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `ballerina:1` and the other rules check the body of an arrow function, such as `(total, value) => total + checkpanic f()` or `() => checkpanic f()`.
 - An issue in the default value of a parameter, such as `int value = checkpanic f()`, is reported once instead of twice.
 - `ballerina:2` reports unused parameters of object constructor methods, whose references the compiler gives twice.
+- Output printed to `System.out` by a compiler plugin while the package compiles, or by a platform plugin, is written to standard error, so `bal scan > issues.json` saves valid JSON, also with `--platforms`. Before, it was appended to the results on standard output. A process started by a platform plugin writes to the streams directly, so a plugin must not let it inherit standard output, as the platform plugin guide now states. ([#175](https://github.com/ballerina-platform/static-code-analysis-tool/pull/175))
 
 ### Changed
 
