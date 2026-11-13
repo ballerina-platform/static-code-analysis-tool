@@ -227,6 +227,8 @@ excludeTests = true
 
 The rules given with `--include-rules` are added to `include`, and those given with `--exclude-rules` are added to `exclude`, for that run. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes both rules. Including and excluding rules at the same time is not allowed, so an option that conflicts with the other setting in `Scan.toml` is a usage error: with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` exits with code `2`.
 
+`bal scan` checks the whole `Scan.toml` file and reports every mistake at once with its line and column, exiting with code `1`: an unknown table or key, such as `[gates]`, and a value of the wrong type.
+
 Each `[[platform]]` entry requires both a `name` and a `path`. The `path` must point to the platform plugin JAR, either as a local file path (resolved relative to the folder of the `Scan.toml` file) or as a URL to download it from. A declared platform is reported to only when it is named in `--platforms`, and `--platforms` can only name platforms declared there. The plugin JAR is checked, or downloaded, only when its platform is named; a path that is then neither an existing file nor a URL stops the scan with an error. The results are always printed and saved first, and the named platforms then run one after another. If any platform fails, the scan lists every failure and exits with code `1`.
 
 See [Scan file configurations](https://github.com/ballerina-platform/static-code-analysis-tool/blob/main/docs/static-code-analysis-tool/ScanFileConfigurations.md) for all available options.

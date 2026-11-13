@@ -190,6 +190,11 @@ public final class ScanUtils {
     public static final String GATE_COUNT_VALUES = "a whole number of 1 or more";
 
     private static final String RULE_LIST_VALUES = "an array of rule IDs, such as [\"ballerina:1\"]";
+    private static final List<String> TOP_LEVEL_TABLES = List.of(ANALYZER_TABLE, PLATFORM_TABLE, RULES_TABLE,
+            SUPPRESSION_TABLE, GATE_TABLE, ANALYSIS_TABLE);
+    private static final String TABLE_VALUES = "[[analyzer]], [[platform]], [rule], [suppression], [gate] or "
+            + "[analysis]";
+    private static final String WORKSPACE_TABLE_VALUES = "[[analyzer]], [rule], [suppression], [gate] or [analysis]";
 
     private ScanUtils() {
     }
@@ -1467,10 +1472,13 @@ public final class ScanUtils {
                 errors.add(DiagnosticLog.fileError(displayPath, platformNode.location().lineRange(),
                         DiagnosticLog.error(DiagnosticCode.WORKSPACE_PLATFORM_NOT_ALLOWED)));
             }
-        } else {
+        } else if (platformNode instanceof TomlTableArrayNode) {
             for (Toml platformTable : scanTomlDocumentContent.getTables(PLATFORM_TABLE)) {
                 loadPlatform(platformTable, scanTomlFile, baseDir);
             }
+        } else if (platformNode != null && !isEmptyArray(platformNode)) {
+            errors.add(DiagnosticLog.fileError(displayPath, platformNode.location().lineRange(),
+                    DiagnosticLog.error(DiagnosticCode.INVALID_PLATFORM_LIST)));
         }
         TopLevelNode analyzerNode = entries.get(ANALYZER_TABLE);
         if (analyzerNode instanceof TomlTableArrayNode) {
@@ -1521,6 +1529,15 @@ public final class ScanUtils {
             scanTomlDocumentContent.getTable(ANALYSIS_TABLE)
                     .ifPresent(analysisTable -> loadAnalysis(analysisTable, scanTomlFile, displayPath, errors));
         }
+        // A misspelled table, such as [gates], would otherwise turn its settings off without notice
+        entries.forEach((key, node) -> {
+            if (!TOP_LEVEL_TABLES.contains(key)) {
+                int entryKind = node instanceof TomlKeyValueNode ? 0 : 1;
+                errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_ENTRY, entryKind, key,
+                                workspace ? WORKSPACE_TABLE_VALUES : TABLE_VALUES)));
+            }
+        });
         switch (validation) {
             case ALL -> failOnConfigErrors(displayPath, errors);
             case RULES -> failOnConfigErrors(displayPath, analyzerErrors);
@@ -1650,6 +1667,11 @@ public final class ScanUtils {
         }
     }
 
+    private static boolean isEmptyArray(TopLevelNode node) {
+        return node instanceof TomlKeyValueNode keyValue && keyValue.value() instanceof TomlArrayValueNode array
+                && array.elements().isEmpty();
+    }
+
     /**
      * Loads an analyzer to the {@link ScanTomlFile} representation of the Scan.toml
      * file.
@@ -1697,7 +1719,11 @@ public final class ScanUtils {
         Optional<String> path = (platformPath instanceof String) ? Optional.of(platformPath.toString())
                 : Optional.empty();
 
-        if (name.isEmpty() || name.get().isEmpty() || path.isEmpty()) {
+        if (name.isEmpty() || name.get().isEmpty()) {
+            return;
+        }
+        if (path.isEmpty()) {
+            scanTomlFile.addPlatformWithoutPath(name.get());
             return;
         }
 
