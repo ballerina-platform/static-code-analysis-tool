@@ -23,6 +23,7 @@ Built against Ballerina 2201.12.0.
 - A package is scanned, or has its rules listed, only when its dependencies are locked in `Dependencies.toml`; otherwise the scan asks to run `bal build` first.
 - `bal scan --list-rules` prints "Resolving scan rules from package dependencies" instead of "Running Scans", and fails when the package does not compile.
 - The `fileName` of an issue in a single Ballerina file is the file name, without a `./` prefix.
+- The `location` of each issue in `scan_results.json` and in the JSON printed to standard output gives one-based lines and columns, as the SARIF report and the compiler's diagnostics do, and the path of the file relative to the package root instead of only its file name. Consumers that added one to the lines or columns, or matched files by name, need to be updated. `ScanUtils.convertIssuesToJsonString(List, Project, Map)` is added, and `convertIssuesToJsonString(List)` is deprecated, as it can give only the file name. (backport of [#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174); [#172](https://github.com/ballerina-platform/static-code-analysis-tool/issues/172), [#152](https://github.com/ballerina-platform/static-code-analysis-tool/issues/152))
 
 ### Deprecated
 
@@ -44,6 +45,7 @@ Built against Ballerina 2201.12.0.
 - `ballerina:1` and the other rules check the body of an arrow function, such as `(total, value) => total + checkpanic f()` or `() => checkpanic f()`. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
 - An issue in the default value of a parameter, such as `int value = checkpanic f()`, is reported once instead of twice. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
 - `ballerina:2` reports unused parameters of object constructor methods, whose references the compiler gives twice. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
+- The SARIF report gives the file name as the `uri` of a single Ballerina file instead of an empty path. (backport of [#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174))
 
 ## [0.11.0] - 2025-08-06
 

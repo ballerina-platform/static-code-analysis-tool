@@ -767,7 +767,7 @@ public class ScanCmd implements BLauncherCmd {
     private void printIssues(List<Issue> issues, Project project) {
         section(Section.RESULTS);
         outputStream.println(ReportFormat.SARIF.equals(reportFormat)
-                ? convertIssuesToSarifString(issues, project) : convertIssuesToJsonString(issues));
+                ? convertIssuesToSarifString(issues, project) : convertIssuesToJsonString(issues, project, Map.of()));
         outputStream.flush();
     }
 
