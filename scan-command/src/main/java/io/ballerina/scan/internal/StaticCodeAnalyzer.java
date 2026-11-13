@@ -587,14 +587,19 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     private TypeSymbol iterableType(TypeSymbol memberType, ExpressionNode iterable) {
-        ExpressionNode source = iterable;
-        while (source instanceof BracedExpressionNode braced) {
-            source = braced.expression();
-        }
         TypeBuilder builder = semanticModel.types().builder();
-        return source instanceof MappingConstructorExpressionNode
+        return withoutBracesOrAnnotations(iterable) instanceof MappingConstructorExpressionNode
                 ? builder.MAP_TYPE.withTypeParam(memberType).build()
                 : builder.ARRAY_TYPE.withType(memberType).build();
+    }
+
+    private static ExpressionNode withoutBracesOrAnnotations(ExpressionNode expression) {
+        return switch (expression) {
+            case BracedExpressionNode braced -> withoutBracesOrAnnotations(braced.expression());
+            case TypeCastExpressionNode cast when cast.typeCastParam().type().isEmpty() ->
+                    withoutBracesOrAnnotations(cast.expression());
+            default -> expression;
+        };
     }
 
     /**
