@@ -8,6 +8,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Built against Ballerina 2201.12.0.
 
+### Changed
+
+- The `location` of each issue in `scan_results.json` and in the JSON printed to standard output gives one-based lines and columns, as the SARIF report and the compiler's diagnostics do, and the path of the file relative to the package root instead of only its file name. Consumers that added one to the lines or columns, or matched files by name, need to be updated. `ScanUtils.convertIssuesToJsonString(List, Project, Map)` is added, and `convertIssuesToJsonString(List)` is deprecated, as it can give only the file name. (backport of [#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174); [#172](https://github.com/ballerina-platform/static-code-analysis-tool/issues/172), [#152](https://github.com/ballerina-platform/static-code-analysis-tool/issues/152))
+
+### Deprecated
+
+- `ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference`, which matches the prefix a module is imported with instead of the module, and is no longer used by the core rules.
+
+### Fixed
+
+- Output printed to `System.out` by a compiler plugin while the package compiles, or by a platform plugin, is written to standard error, so `bal scan > issues.json` saves valid JSON, also with `--platforms`. Before, it was appended to the results on standard output. A process started by a platform plugin writes to the streams directly, so a plugin must not let it inherit standard output, as the platform plugin guide now states. (backport of [#175](https://github.com/ballerina-platform/static-code-analysis-tool/pull/175))
+- `ballerina:2` no longer reports parameters whose signature is fixed elsewhere: methods that implement a method of an object type included with `*T` or of the type of an object constructor, resource methods of a service declaration typed by a service contract, and anonymous functions used where a function type is expected, such as an argument to `reduce`, to a function of the package or to an optional function-typed parameter, or a member of a list or mapping of functions, including one that is destructured or iterated by a `foreach` that declares a named type. An anonymous function with no expected type, such as the value of a `var` variable or a member of a `var` list, is still reported. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#169](https://github.com/ballerina-platform/static-code-analysis-tool/issues/169))
+- `ballerina:3` to `ballerina:6` no longer report public constructs in test sources, which are not part of the public API of the package. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#179](https://github.com/ballerina-platform/static-code-analysis-tool/issues/179))
+- `ballerina:5` no longer reports `readonly` classes, and `ballerina:6` no longer reports public `service object` types. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#170](https://github.com/ballerina-platform/static-code-analysis-tool/issues/170), [#171](https://github.com/ballerina-platform/static-code-analysis-tool/issues/171))
+- `ballerina:7` and `ballerina:8` report a comparison with `int:MAX_VALUE`, `int:MIN_VALUE`, `float:Infinity` or `-float:Infinity` on either side of the operator, with any prefix for the `lang.int` and `lang.float` modules, and with a `+` sign or braces. `x <= float:Infinity` is no longer reported as always true, as it is false when `x` is `NaN`, nor is `x <= int:MAX_VALUE` when `x` can be nil. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#87](https://github.com/ballerina-platform/static-code-analysis-tool/issues/87))
+- `ballerina:12` reports invalid ranges written with hexadecimal literals or with values outside the 32-bit range. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#88](https://github.com/ballerina-platform/static-code-analysis-tool/issues/88))
+- `ballerina:1` and the other rules check the body of an arrow function, such as `(total, value) => total + checkpanic f()` or `() => checkpanic f()`. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
+- An issue in the default value of a parameter, such as `int value = checkpanic f()`, is reported once instead of twice. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
+- `ballerina:2` reports unused parameters of object constructor methods, whose references the compiler gives twice. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
+- The SARIF report gives the file name as the `uri` of a single Ballerina file instead of an empty path. (backport of [#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174))
+
+## [0.11.1] - 2026-11-10
+
+Built against Ballerina 2201.12.0.
+
 ### Added
 
 - In-source suppression of scan findings with the `@scan:Suppress` annotation. Suppressed findings are left out of the console output and stay reviewable in the saved reports. ([#119](https://github.com/ballerina-platform/static-code-analysis-tool/pull/119), backport of [#115](https://github.com/ballerina-platform/static-code-analysis-tool/pull/115))
@@ -23,11 +48,6 @@ Built against Ballerina 2201.12.0.
 - A package is scanned, or has its rules listed, only when its dependencies are locked in `Dependencies.toml`; otherwise the scan asks to run `bal build` first.
 - `bal scan --list-rules` prints "Resolving scan rules from package dependencies" instead of "Running Scans", and fails when the package does not compile.
 - The `fileName` of an issue in a single Ballerina file is the file name, without a `./` prefix.
-- The `location` of each issue in `scan_results.json` and in the JSON printed to standard output gives one-based lines and columns, as the SARIF report and the compiler's diagnostics do, and the path of the file relative to the package root instead of only its file name. Consumers that added one to the lines or columns, or matched files by name, need to be updated. `ScanUtils.convertIssuesToJsonString(List, Project, Map)` is added, and `convertIssuesToJsonString(List)` is deprecated, as it can give only the file name. (backport of [#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174); [#172](https://github.com/ballerina-platform/static-code-analysis-tool/issues/172), [#152](https://github.com/ballerina-platform/static-code-analysis-tool/issues/152))
-
-### Deprecated
-
-- `ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference`, which matches the prefix a module is imported with instead of the module, and is no longer used by the core rules.
 
 ### Fixed
 
@@ -36,16 +56,6 @@ Built against Ballerina 2201.12.0.
 - The published tool package contains up-to-date tool TOML files. ([#122](https://github.com/ballerina-platform/static-code-analysis-tool/pull/122))
 - `bal scan --exclude-tests` no longer fails with `NoClassDefFoundError` on the picocli version bundled with the `bal` launcher.
 - `bal scan .` scans the package in the current directory instead of failing with "'.' is already within a Ballerina package".
-- Output printed to `System.out` by a compiler plugin while the package compiles, or by a platform plugin, is written to standard error, so `bal scan > issues.json` saves valid JSON, also with `--platforms`. Before, it was appended to the results on standard output. A process started by a platform plugin writes to the streams directly, so a plugin must not let it inherit standard output, as the platform plugin guide now states. (backport of [#175](https://github.com/ballerina-platform/static-code-analysis-tool/pull/175))
-- `ballerina:2` no longer reports parameters whose signature is fixed elsewhere: methods that implement a method of an object type included with `*T` or of the type of an object constructor, resource methods of a service declaration typed by a service contract, and anonymous functions used where a function type is expected, such as an argument to `reduce`, to a function of the package or to an optional function-typed parameter, or a member of a list or mapping of functions, including one that is destructured or iterated by a `foreach` that declares a named type. An anonymous function with no expected type, such as the value of a `var` variable or a member of a `var` list, is still reported. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#169](https://github.com/ballerina-platform/static-code-analysis-tool/issues/169))
-- `ballerina:3` to `ballerina:6` no longer report public constructs in test sources, which are not part of the public API of the package. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#179](https://github.com/ballerina-platform/static-code-analysis-tool/issues/179))
-- `ballerina:5` no longer reports `readonly` classes, and `ballerina:6` no longer reports public `service object` types. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#170](https://github.com/ballerina-platform/static-code-analysis-tool/issues/170), [#171](https://github.com/ballerina-platform/static-code-analysis-tool/issues/171))
-- `ballerina:7` and `ballerina:8` report a comparison with `int:MAX_VALUE`, `int:MIN_VALUE`, `float:Infinity` or `-float:Infinity` on either side of the operator, with any prefix for the `lang.int` and `lang.float` modules, and with a `+` sign or braces. `x <= float:Infinity` is no longer reported as always true, as it is false when `x` is `NaN`, nor is `x <= int:MAX_VALUE` when `x` can be nil. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#87](https://github.com/ballerina-platform/static-code-analysis-tool/issues/87))
-- `ballerina:12` reports invalid ranges written with hexadecimal literals or with values outside the 32-bit range. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173); [#88](https://github.com/ballerina-platform/static-code-analysis-tool/issues/88))
-- `ballerina:1` and the other rules check the body of an arrow function, such as `(total, value) => total + checkpanic f()` or `() => checkpanic f()`. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
-- An issue in the default value of a parameter, such as `int value = checkpanic f()`, is reported once instead of twice. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
-- `ballerina:2` reports unused parameters of object constructor methods, whose references the compiler gives twice. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
-- The SARIF report gives the file name as the `uri` of a single Ballerina file instead of an empty path. (backport of [#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174))
 
 ## [0.11.0] - 2025-08-06
 
@@ -95,7 +105,8 @@ Built against Ballerina 2201.10.2.
 - Rule selection with `--include-rules`, `--exclude-rules` and `--list-rules`, and configuration through `Scan.toml`, including remote configurations.
 - Loading analyzers from compiler plugins and reporting to static code analysis platforms with `--platforms`.
 
-[Unreleased]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.11.0...support/dist-2201.12/0.11.x
+[Unreleased]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.11.1...support/dist-2201.12/0.11.x
+[0.11.1]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.5.0...v0.9.0
