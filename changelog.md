@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The `location` of each issue in `scan_results.json` and in the JSON printed to standard output gives one-based lines and columns, as the SARIF report and the compiler's diagnostics do, and the path of the file relative to the package root, or to the workspace root in the output and combined report of a workspace scan, instead of only its file name. The `scan_results.json` of each workspace package gives paths relative to the root of that package. Consumers that added one to the lines or columns, or matched files by name, need to be updated. `ScanUtils.convertIssuesToJsonString(List, Project, Map)` is added, and the overloads without the project are deprecated, as they can give only the file name. ([#172](https://github.com/ballerina-platform/static-code-analysis-tool/issues/172), [#152](https://github.com/ballerina-platform/static-code-analysis-tool/issues/152))
+- The full descriptions of `ballerina:2`, `ballerina:5` and `ballerina:6` state which constructs they skip, and the description of `ballerina:1` explains why a `checkpanic` inside a `trap` is still reported. ([#168](https://github.com/ballerina-platform/static-code-analysis-tool/issues/168))
+
+### Deprecated
+
+- `ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference`, which matches the prefix a module is imported with instead of the module, and is no longer used by the core rules.
+
 ### Fixed
 
 - `ballerina:2` no longer reports parameters whose signature is fixed elsewhere: methods that implement a method of an object type included with `*T` or of the type of an object constructor, resource methods of a service declaration typed by a service contract, and anonymous functions used where a function type is expected, such as an argument to `reduce`, to a function of the package or to an optional function-typed parameter, or a member of a list or mapping of functions, including one that is destructured or iterated by a `foreach` that declares a named type. An anonymous function with no expected type, such as the value of a `var` variable or a member of a `var` list, is still reported. ([#169](https://github.com/ballerina-platform/static-code-analysis-tool/issues/169))
@@ -16,15 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `ballerina:1` and the other rules check the body of an arrow function, such as `(total, value) => total + checkpanic f()` or `() => checkpanic f()`.
 - An issue in the default value of a parameter, such as `int value = checkpanic f()`, is reported once instead of twice.
 - `ballerina:2` reports unused parameters of object constructor methods, whose references the compiler gives twice.
+- The SARIF report gives the file name as the `uri` of a single Ballerina file instead of an empty path, and of a file outside the project root instead of a `../` path. ([#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174))
 - Output printed to `System.out` by a compiler plugin while the package compiles, or by a platform plugin, is written to standard error, so `bal scan > issues.json` saves valid JSON, also with `--platforms`. Before, it was appended to the results on standard output. A process started by a platform plugin writes to the streams directly, so a plugin must not let it inherit standard output, as the platform plugin guide now states. ([#175](https://github.com/ballerina-platform/static-code-analysis-tool/pull/175))
-
-### Changed
-
-- The full descriptions of `ballerina:2`, `ballerina:5` and `ballerina:6` state which constructs they skip, and the description of `ballerina:1` explains why a `checkpanic` inside a `trap` is still reported. ([#168](https://github.com/ballerina-platform/static-code-analysis-tool/issues/168))
-
-### Deprecated
-
-- `ScanCodeAnalyzerUtils.isDefinedQualifiedNameReference`, which matches the prefix a module is imported with instead of the module, and is no longer used by the core rules.
 
 ## [0.13.0] - 2026-11-05
 
