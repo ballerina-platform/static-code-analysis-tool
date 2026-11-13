@@ -271,6 +271,29 @@ function splitPlaceholders() returns string[] {
     return [dbPassword, adminPassword];
 }
 
+function connectWith(string? password) {
+}
+
+// A map inside a map of passwords is checked as passwords where it is written, and not again where it is used
+function nestedMapOfPasswords() {
+    map<map<string>> passwords = {tokens: {github: "hunter2"}}; // warning
+    connectWith(passwords["tokens"]["github"]);
+}
+
+const VERSION = 20;
+
+// A number or boolean constant is text in a template, not a fixed value of another kind
+function scalarConstants() returns string {
+    string authHeaderValue = string `v${VERSION}`;
+    return authHeaderValue;
+}
+
+// A word that contains a keyword but means the opposite does not name a password
+function passwordlessNames() returns string {
+    string passwordlessAuth = "enabled";
+    return passwordlessAuth;
+}
+
 public function main() {
     assertCors(new, "true");
 }

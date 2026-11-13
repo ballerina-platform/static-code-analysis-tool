@@ -80,7 +80,7 @@ final class SecretNameMatcher {
             .filter(keyword -> !keyword.isEmbedded()).map(Keyword::text).toList();
 
     // Words that contain a keyword but name something else, as in "undersecretary".
-    private static final Set<String> NON_SECRET_WORDS = Set.of("secretar");
+    private static final Set<String> NON_SECRET_WORDS = Set.of("secretar", "passwordless");
 
     // A hashed secret, as in "hashedPassword", is no longer the secret itself.
     private static final String HASHED = "hashed";
@@ -107,19 +107,16 @@ final class SecretNameMatcher {
      */
     enum Kind {
         NONE,
-        PASSWORD,
-        SECRET;
+        SECRET,
+        PASSWORD;
 
         boolean isSecret() {
             return this != NONE;
         }
 
-        // A password is the stricter kind, as any value of it can be real.
+        // A password is the strictest kind, as any value of it can be real.
         Kind stricter(Kind other) {
-            if (this == PASSWORD || other == PASSWORD) {
-                return PASSWORD;
-            }
-            return this == SECRET || other == SECRET ? SECRET : NONE;
+            return compareTo(other) >= 0 ? this : other;
         }
     }
 

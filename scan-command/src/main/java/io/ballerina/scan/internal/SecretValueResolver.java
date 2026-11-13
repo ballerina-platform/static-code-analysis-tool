@@ -19,13 +19,13 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.symbols.ArrayTypeSymbol;
 import io.ballerina.compiler.api.symbols.ConstantSymbol;
 import io.ballerina.compiler.api.symbols.Qualifier;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.SymbolKind;
-import io.ballerina.compiler.api.symbols.TypeDescKind;
+import io.ballerina.compiler.api.symbols.TupleTypeSymbol;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
-import io.ballerina.compiler.api.symbols.UnionTypeSymbol;
 import io.ballerina.compiler.api.symbols.VariableSymbol;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
@@ -239,8 +239,9 @@ class SecretValueResolver {
         if (value.isFixed()) {
             return value.withOrigin(Origin.HARD_CODED);
         }
-        // Only a string constant is text; a byte array or a list constant resolves to its source form
-        boolean isText = isString(constant.broaderTypeDescriptor());
+        // A byte array or a list constant resolves to its source form, which is not the text of a secret
+        TypeSymbol constantType = SemanticUtils.unwrap(constant.broaderTypeDescriptor());
+        boolean isText = !(constantType instanceof ArrayTypeSymbol || constantType instanceof TupleTypeSymbol);
         return constant.resolvedValue()
                 .map(SecretValueFilter::literalValue)
                 .map(text -> isText ? Value.text(text)
@@ -272,10 +273,9 @@ class SecretValueResolver {
         if (!value.isFixed()) {
             return isConfigurableRoot ? Value.CONFIGURABLE : value;
         }
-        // A field of a map of secrets is checked where it is written with the stricter of its name and the map's.
-        Kind writtenKind = SecretNameMatcher.kind(fieldName).stricter(
-                mapName((MappingConstructorExpressionNode) field.get().parent())
-                        .map(SecretNameMatcher::kind).orElse(Kind.NONE));
+        // A field of a map of secrets is checked where it is written with the stricter of its name and the maps'.
+        Kind writtenKind = SecretNameMatcher.kind(fieldName)
+                .stricter(mapKind((MappingConstructorExpressionNode) field.get().parent()));
         if (isReportedWhereWritten(writtenKind, value)) {
             return Value.UNKNOWN;
         }
@@ -284,29 +284,21 @@ class SecretValueResolver {
                 : isConfigurableRoot ? value : value.withOrigin(Origin.FIXED_VARIABLE);
     }
 
-    // The name a map is written to, whose kind its values are checked with, as for passwords in passwords = {...}.
-    // A map inside a map of secrets is checked with the outer name, as in tokens = {github: {dev: "..."}}.
-    private Optional<String> mapName(MappingConstructorExpressionNode mapping) {
+    // The kind a map of secrets is checked with where it is written: the stricter of the names of the maps it is
+    // in, as in passwords = {tokens: {github: "..."}}, as SecretChecker checks a map's values.
+    private Kind mapKind(MappingConstructorExpressionNode mapping) {
         if (!semanticModel.typeOf(mapping).map(SecretChecker::isMap).orElse(true)) {
-            return Optional.empty();
+            return Kind.NONE;
         }
-        Optional<String> name = switch (mapping.parent()) {
-            case VariableDeclarationNode variable -> Optional.of(SecretChecker.variableName(
-                    variable.typedBindingPattern()));
-            case ModuleVariableDeclarationNode variable -> Optional.of(SecretChecker.variableName(
-                    variable.typedBindingPattern()));
-            case SpecificFieldNode field -> Optional.of(SecretChecker.fieldNameText(field));
-            case null, default -> Optional.empty();
+        return switch (mapping.parent()) {
+            case VariableDeclarationNode variable ->
+                    SecretNameMatcher.kind(SecretChecker.variableName(variable.typedBindingPattern()));
+            case ModuleVariableDeclarationNode variable ->
+                    SecretNameMatcher.kind(SecretChecker.variableName(variable.typedBindingPattern()));
+            case SpecificFieldNode field -> SecretNameMatcher.kind(SecretChecker.fieldNameText(field))
+                    .stricter(mapKind((MappingConstructorExpressionNode) field.parent()));
+            case null, default -> Kind.NONE;
         };
-        if (name.map(SecretNameMatcher::kind).filter(Kind::isSecret).isEmpty()
-                && mapping.parent() instanceof SpecificFieldNode field
-                && field.parent() instanceof MappingConstructorExpressionNode outer) {
-            Optional<String> outerName = mapName(outer);
-            if (outerName.map(SecretNameMatcher::kind).filter(Kind::isSecret).isPresent()) {
-                return outerName;
-            }
-        }
-        return name;
     }
 
     // The variable or constant that a field access or member access chain starts at, as in DEFAULTS["db"].
@@ -604,15 +596,6 @@ class SecretValueResolver {
         return Optional.ofNullable(documentsByName.get(location.lineRange().fileName()))
                 .map(Document::syntaxTree)
                 .map(syntaxTree -> ((ModulePartNode) syntaxTree.rootNode()).findNode(location.textRange(), true));
-    }
-
-    // A string type, or a union of string types, as in "live"|"test".
-    private static boolean isString(TypeSymbol typeSymbol) {
-        TypeSymbol type = SemanticUtils.unwrap(typeSymbol);
-        if (type instanceof UnionTypeSymbol union) {
-            return union.memberTypeDescriptors().stream().allMatch(SecretValueResolver::isString);
-        }
-        return type.typeKind() == TypeDescKind.STRING || type.typeKind() == TypeDescKind.STRING_CHAR;
     }
 
     // An enum member whose value is its own name, such as BASIC in enum AuthScheme { BASIC }, names a choice.
