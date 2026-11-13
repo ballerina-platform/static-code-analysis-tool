@@ -1154,12 +1154,14 @@ public class ScanCmd implements BLauncherCmd {
         List<Issue> externalIssues = projectAnalyzer.runExternalAnalyzers(rules.externalAnalyzers());
         failOnCompilationErrors(projectAnalyzer);
 
-        List<Issue> issues = projectAnalyzer.analyze(rules.coreRules());
-        issues.addAll(externalIssues);
+        List<Issue> foundIssues = projectAnalyzer.analyze(rules.coreRules());
+        foundIssues.addAll(externalIssues);
 
         PackageConfig config = packageScan.config();
         RuleSelection ruleSelection = config.ruleSelection();
-        issues.removeIf(issue -> !ruleSelection.selects(issue.rule().id()));
+        foundIssues.removeIf(issue -> !ruleSelection.selects(issue.rule().id()));
+        // Platforms receive the issues in the order the reports list them
+        List<Issue> issues = ScanUtils.inReportOrder(foundIssues);
 
         SuppressionOutcome suppressionOutcome = SuppressionFilter.apply(project, issues,
                 ProjectAnalyzer.rules(rules.coreRules(), rules.externalAnalyzers()), ruleSelection,

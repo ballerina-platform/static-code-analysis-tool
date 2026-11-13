@@ -382,9 +382,10 @@ public class ScanCmdTest extends BaseTest {
         JsonArray scannedFiles = scanData.getAsJsonArray("scannedFiles");
         Assert.assertEquals(scannedFiles.size(), 2);
         JsonObject mainFile = findScannedFile(scannedFiles, validBalProject.resolve("main.bal"));
-        // Project documents come first in analysis order; files only known through issues follow.
-        Assert.assertEquals(scannedFiles.get(0).getAsJsonObject(), mainFile);
         JsonObject secondFile = findScannedFile(scannedFiles, otherFile);
+        // Files are listed by path, whether they are project documents or known only through issues
+        Assert.assertEquals(scannedFiles.get(0).getAsJsonObject(), secondFile);
+        Assert.assertEquals(scannedFiles.get(1).getAsJsonObject(), mainFile);
         Assert.assertEquals(mainFile.getAsJsonArray("issues").size(), 2);
         Assert.assertEquals(secondFile.getAsJsonArray("issues").size(), 1);
         Assert.assertEquals(secondFile.get("fileContent").getAsString(),
