@@ -86,4 +86,41 @@ function testRangeOperator() {
     _ = from int i in -2..<2 select 1;
 
     var val = 10 ... 3; // warning
+
+    foreach int i in 0x14 ... 0x10 { // warning
+    }
+
+    foreach int i in 0x10 ..< 0x10 { // warning
+    }
+
+    foreach int i in 0x10 ... 0x14 {
+    }
+
+    foreach int i in -0x1 ... -0x2 { // warning
+    }
+
+    foreach int i in 3000000000 ... 1 { // warning
+    }
+
+    foreach int i in 1 ... 3000000000 {
+    }
+
+    int n = 5;
+    foreach int i in n ... 1 { // no warning: a variable bound is not evaluated
+    }
+
+    foreach int i in 1 ... n {
+    }
+
+    foreach int i in ~1 ... -5 { // no warning: only a sign is evaluated
+    }
+
+    foreach int i in +5 ... 1 { // warning
+    }
+
+    foreach int i in -9223372036854775807 ... -9223372036854775807 {
+    }
+
+    foreach int i in 9223372036854775807 ..< -9223372036854775807 { // warning
+    }
 }

@@ -20,3 +20,16 @@ public function main() {
     // Non-compliant
     int result = checkpanic getResult();
 }
+
+function sum(int[] values) returns int {
+    return values.reduce((total, value) => total + checkpanic getResult(), 0); // Non-compliant
+}
+
+function first() returns int {
+    function () returns int f = () => checkpanic getResult(); // Non-compliant
+    return f();
+}
+
+function withDefault(int value = checkpanic getResult()) returns int { // Non-compliant
+    return value;
+}

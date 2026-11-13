@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.utils;
 
+import com.google.gson.ExclusionStrategy;
+import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -199,7 +201,7 @@ public final class ScanUtils {
      * @param issues       generated issues
      * @param outputStream print stream
      * @deprecated the leading blank line it prints does not fit the console layout of the scan; print
-     * {@link #convertIssuesToJsonString(List)} instead
+     * {@link #convertIssuesToJsonString(List, Project, Map)} instead
      */
     @Deprecated(since = "0.11.1")
     public static void printToConsole(List<Issue> issues, PrintStream outputStream) {
@@ -214,7 +216,8 @@ public final class ScanUtils {
      * @param printSarif   whether to print SARIF format instead of default BALLERINA format
      * @param project      Ballerina project (required for SARIF format)
      * @deprecated the leading blank line it prints does not fit the console layout of the scan; print
-     * {@link #convertIssuesToJsonString(List)} or {@link #convertIssuesToSarifString(List, Project)} instead
+     * {@link #convertIssuesToJsonString(List, Project, Map)} or {@link #convertIssuesToSarifString(List, Project)}
+     * instead
      */
     @Deprecated(since = "0.11.1")
     public static void printToConsole(List<Issue> issues, PrintStream outputStream, boolean printSarif,
@@ -223,7 +226,7 @@ public final class ScanUtils {
         if (printSarif && project != null) {
             output = convertIssuesToSarifString(issues, project);
         } else {
-            output = convertIssuesToJsonString(issues);
+            output = convertIssuesToJsonString(issues, project, Map.of());
         }
         outputStream.println();
         outputStream.println(output);
@@ -234,9 +237,13 @@ public final class ScanUtils {
      *
      * @param issues generated issues
      * @return json string array of generated issues
+     * @deprecated without the project, the {@code location.filePath} of an issue is only its file name; use
+     * {@link #convertIssuesToJsonString(List, Project, Map)} instead. Since 0.11.1, the lines and columns of the
+     * {@code location} are one-based, as in the SARIF report, instead of zero-based.
      */
+    @Deprecated(since = "0.11.1")
     public static String convertIssuesToJsonString(List<Issue> issues) {
-        return convertIssuesToJsonString(issues, Map.of());
+        return convertIssuesToJsonString(issues, null, Map.of());
     }
 
     /**
@@ -260,21 +267,45 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the json {@link String} array of generated issues, where each suppressed issue carries a
-     * {@code suppressions} entry mirroring the SARIF suppression object.
+     * Returns the json {@link String} array of generated issues. The {@code location} of each issue holds one-based
+     * lines and columns, as the SARIF report and the compiler's diagnostics do, and the path of the file relative to
+     * the root of the project, so that files of the same name in different modules stay distinct. Each suppressed
+     * issue carries a {@code suppressions} entry mirroring the SARIF suppression object.
      *
      * @param issues       generated issues, including suppressed ones
+     * @param project      the package the issues were found in, or null to give only the file name
      * @param suppressions the suppressed issues, keyed by the issue they suppress
      * @return json string array of generated issues
+     * @since 0.11.1
      */
-    private static String convertIssuesToJsonString(List<Issue> issues, Map<Issue, SuppressedIssue> suppressions) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+    public static String convertIssuesToJsonString(List<Issue> issues, Project project,
+                                                   Map<Issue, SuppressedIssue> suppressions) {
+        // The location is built by toLocationJson instead of serializing the compiler's location
+        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping()
+                .setExclusionStrategies(new ExclusionStrategy() {
+                    @Override
+                    public boolean shouldSkipField(FieldAttributes field) {
+                        return field.getDeclaringClass() == IssueImpl.class && field.getName().equals("location");
+                    }
+
+                    @Override
+                    public boolean shouldSkipClass(Class<?> type) {
+                        return false;
+                    }
+                })
+                .create();
         JsonArray issuesAsJson = gson.toJsonTree(issues).getAsJsonArray();
+        Path root = project == null ? null : project.sourceRoot().toAbsolutePath().normalize();
         Map<String, Optional<String>> fileContentCache = new HashMap<>();
         for (int i = 0; i < issues.size(); i++) {
             Issue issue = issues.get(i);
             JsonObject issueAsJson = issuesAsJson.get(i).getAsJsonObject();
             if (issue instanceof IssueImpl issueImpl) {
+                JsonObject withLocation = new JsonObject();
+                withLocation.add("location", toLocationJson(issueImpl, root));
+                issueAsJson.entrySet().forEach(field -> withLocation.add(field.getKey(), field.getValue()));
+                issuesAsJson.set(i, withLocation);
+                issueAsJson = withLocation;
                 String snippetText = SnippetExtractor.extract(issueImpl, fileContentCache);
                 if (snippetText != null) {
                     issueAsJson.getAsJsonObject("location").addProperty("snippet", snippetText);
@@ -286,6 +317,35 @@ public final class ScanUtils {
             }
         }
         return gson.toJson(issuesAsJson);
+    }
+
+    /**
+     * Builds the location of an issue. It is built here instead of serializing the compiler's location, whose lines
+     * and columns are zero-based and whose path is only the file name.
+     */
+    private static JsonObject toLocationJson(IssueImpl issue, Path root) {
+        LineRange lineRange = issue.location().lineRange();
+        TextRange textRange = issue.location().textRange();
+        JsonObject location = new JsonObject();
+        location.addProperty("filePath", root == null ? lineRange.fileName() : toReportPath(issue, root));
+        location.addProperty("startLine", lineRange.startLine().line() + 1);
+        location.addProperty("endLine", lineRange.endLine().line() + 1);
+        location.addProperty("startColumn", lineRange.startLine().offset() + 1);
+        location.addProperty("endColumn", lineRange.endLine().offset() + 1);
+        location.addProperty("startOffset", textRange.startOffset());
+        location.addProperty("length", textRange.length());
+        return location;
+    }
+
+    /**
+     * Returns the path of the file of an issue relative to the root of the project, with forward slashes. The file
+     * name is given instead for a single file project, whose root is the file itself, for a file outside the root,
+     * and for a document with no path on disk, whose path is only its name.
+     */
+    private static String toReportPath(IssueImpl issue, Path root) {
+        Path path = Paths.get(issue.filePath());
+        String relativePath = path.isAbsolute() ? toRelativePath(root, path) : null;
+        return relativePath == null || relativePath.isEmpty() ? issue.location().lineRange().fileName() : relativePath;
     }
 
     private static JsonArray toSuppressionsJson(SuppressedIssue suppressedIssue) {
@@ -323,6 +383,7 @@ public final class ScanUtils {
     private static String convertIssuesToSarifString(List<Issue> issues, Project project,
                                                      Map<Issue, SuppressedIssue> suppressions) {
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+        Path root = project.sourceRoot().toAbsolutePath().normalize();
 
         // Create SARIF root object
         JsonObject sarif = new JsonObject();
@@ -400,7 +461,7 @@ public final class ScanUtils {
             JsonObject physicalLocation = new JsonObject();
 
             JsonObject artifactLocation = new JsonObject();
-            artifactLocation.addProperty("uri", toArtifactUri(project.sourceRoot(), issueImpl.filePath()));
+            artifactLocation.addProperty("uri", toReportPath(issueImpl, root));
             physicalLocation.add("artifactLocation", artifactLocation);
 
             JsonObject region = new JsonObject();
@@ -477,20 +538,6 @@ public final class ScanUtils {
     }
 
     /**
-     * Returns the SARIF artifact URI of a file: its path relative to the source root, or its file name when it is
-     * outside the source root.
-     */
-    private static String toArtifactUri(Path sourceRoot, String filePath) {
-        Path path = Paths.get(filePath);
-        String relativePath = toRelativePath(sourceRoot, path);
-        if (relativePath != null) {
-            return relativePath;
-        }
-        Path fileName = path.getFileName();
-        return fileName != null ? fileName.toString() : filePath;
-    }
-
-    /**
      * Returns the {@link Path} of the json analysis report where generated issues
      * are saved.
      * Optionally generates a SARIF format report in the same directory.
@@ -524,7 +571,7 @@ public final class ScanUtils {
             Path reportPath = target.getReportPath();
 
             // Save JSON report
-            String jsonOutput = convertIssuesToJsonString(issues, suppressions);
+            String jsonOutput = convertIssuesToJsonString(issues, project, suppressions);
             File jsonFile = new File(reportPath.resolve(RESULTS_JSON_FILE).toString());
             try (FileOutputStream fileOutputStream = new FileOutputStream(jsonFile);
                  Writer writer = new OutputStreamWriter(fileOutputStream, StandardCharsets.UTF_8)) {

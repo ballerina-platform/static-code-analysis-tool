@@ -96,6 +96,14 @@ public class ScanCodeAnalyzerUtils {
         return true;
     }
 
+    /**
+     * Checks whether the node is a qualified name reference with the given module prefix and identifier.
+     *
+     * @deprecated the prefix a module is imported with can differ from its name, so a reference to a lang library
+     * constant, such as {@code int:MAX_VALUE}, is missed when the module is imported with an alias; resolve the
+     * symbol of the node with the semantic model instead
+     */
+    @Deprecated(since = "0.13.1", forRemoval = true)
     public static boolean isDefinedQualifiedNameReference(Node node, String module, String identifier) {
         if (node instanceof QualifiedNameReferenceNode ref) {
             return ref.modulePrefix() != null && ref.identifier() != null

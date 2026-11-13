@@ -195,6 +195,8 @@ bal scan --fail-on-severity=MEDIUM --fail-on-count=5
 bal scan --exclude-tests
 ```
 
+Each issue in the JSON output has a `location` with one-based lines and columns, as the compiler's diagnostics and the SARIF report do, and the path of the file relative to the package root, such as `modules/db/db.bal`. A single Ballerina file gives its file name. The top-level `filePath` is the path of the file as the scan loaded it.
+
 Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON, or SARIF with `--format=sarif`. Progress messages, warnings, the issue summary, such as `3 issue(s)`, report paths, and the blank lines between sections are written to standard error.
 
 The console output is printed as sections, in this order, with one blank line between them: configuration, warnings, progress, issues, issue summary, report locations, platform output and the gate result. A section that prints nothing is left out, and warnings raised during the scan, such as unmatched suppressions, are printed before the section that follows them.

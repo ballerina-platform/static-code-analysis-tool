@@ -14,8 +14,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
+// The parameters of an anonymous function used where a function type is expected are fixed by that type,
+// so they are not reported even when unused.
+
 function testExprFunctions(int a, int b, int c) { // warning * 2
-   [1,2].forEach(element => ()); // warning
+   [1,2].forEach(element => ());
    [1,2].forEach(element => doNothing(element + c));
 }
 
@@ -25,27 +28,27 @@ function (int, int) returns int anonFunc2 = function (int x, int y) returns int 
 
 function anonFunc3(int a) => [1,2].forEach(element => doNothing(element)); // warning
 
-function anonFunc4(int a) => [1,2].forEach(element => doNothing(a)); // warning
+function anonFunc4(int a) => [1,2].forEach(element => doNothing(a));
 
-function (int, int) returns int anonFunc5 = (x, y) => x; // warning
+function (int, int) returns int anonFunc5 = (x, y) => x;
 
-function (int, int) returns int anonFunc6 = function (int x, int y) returns int => x; // warning
+function (int, int) returns int anonFunc6 = function (int x, int y) returns int => x;
 
-function anonFunc7(int a, int b) => [1,2].forEach(element => doNothing(b)); // warning * 2
+function anonFunc7(int a, int b) => [1,2].forEach(element => doNothing(b)); // warning
 
 type F function (int, int) returns int;
 
 type R record {
-    F f = (a, b) => a; // BUG: https://github.com/ballerina-platform/ballerina-lang/issues/43474
-    F anotherF = function(int a, int b) returns int { // warning
+    F f = (a, b) => a;
+    F anotherF = function(int a, int b) returns int {
         return b;
     };
 };
 
 function testInlineFunctionDecl() {
     F[] _ = [
-        (a, b) => a, // warning
-        function(int a, int b) returns int { // warning
+        (a, b) => a,
+        function(int a, int b) returns int {
             return b;
         }
     ];
@@ -54,7 +57,7 @@ function testInlineFunctionDecl() {
 function main(int a, int b, int c) { // warning
     _ = doNothing(a);
     _ = doNothing(c);
-    [1,2].forEach((element) => ()); // warning
+    [1,2].forEach((element) => ());
     [1,2].forEach((element) => doNothing(element));
 }
 
@@ -64,4 +67,4 @@ function doNothing(any a) { // warning
 
 function (int a , int b) returns int v = (x, y) => x + y;
 
-function (int a , int b) returns int v2 = (x, y) => x; // warning
+function (int a , int b) returns int v2 = (x, y) => x;

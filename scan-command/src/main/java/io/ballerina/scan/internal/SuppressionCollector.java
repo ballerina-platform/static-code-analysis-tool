@@ -31,7 +31,6 @@ import io.ballerina.compiler.api.symbols.TypeDefinitionSymbol;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
 import io.ballerina.compiler.api.values.ConstantValue;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
-import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.ClassDefinitionNode;
 import io.ballerina.compiler.syntax.tree.DistinctTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ExplicitAnonymousFunctionExpressionNode;
@@ -56,7 +55,6 @@ import io.ballerina.compiler.syntax.tree.QualifiedNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.ReturnTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
 import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
-import io.ballerina.compiler.syntax.tree.Token;
 import io.ballerina.compiler.syntax.tree.TupleTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
@@ -79,8 +77,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
@@ -98,8 +94,6 @@ final class SuppressionCollector {
     private static final String ANNOTATION_NAME = "Suppress";
     private static final String RULES_FIELD = "rules";
     private static final String REASON_FIELD = "reason";
-    private static final Pattern NUMERIC_ESCAPE = Pattern.compile("\\\\u\\{([0-9A-Fa-f]+)}");
-    private static final Pattern CHARACTER_ESCAPE = Pattern.compile("\\\\(.)");
 
     private SuppressionCollector() {
     }
@@ -239,7 +233,7 @@ final class SuppressionCollector {
             return Optional.empty();
         }
         for (MappingFieldNode field : annotation.annotValue().get().fields()) {
-            if (field instanceof SpecificFieldNode specific && fieldName(specific).equals(RULES_FIELD)) {
+            if (field instanceof SpecificFieldNode specific && SemanticUtils.fieldName(specific).equals(RULES_FIELD)) {
                 // A shorthand field such as `{rules}` takes the value of the constant its name refers to
                 return Optional.of(specific.valueExpr().map(Node.class::cast).orElse(specific.fieldName()));
             }
@@ -248,21 +242,6 @@ final class SuppressionCollector {
     }
 
     // `rules`, `'rules`, `"rules"` and their escaped forms all name the same field
-    private static String fieldName(SpecificFieldNode field) {
-        Node name = field.fieldName();
-        String text = name instanceof BasicLiteralNode literal ? literal.literalToken().text() : ((Token) name).text();
-        if (text.startsWith("\"")) {
-            return unescape(text.substring(1, text.length() - 1));
-        }
-        return unescape(text.startsWith("'") ? text.substring(1) : text);
-    }
-
-    // io.ballerina.identifier does not export its unescaping to this module
-    private static String unescape(String text) {
-        String decoded = NUMERIC_ESCAPE.matcher(text).replaceAll(escape ->
-                Matcher.quoteReplacement(Character.toString(Integer.parseInt(escape.group(1), 16))));
-        return CHARACTER_ESCAPE.matcher(decoded).replaceAll("$1");
-    }
 
     // The resolved value of a @scan:Suppress annotation, absent for any other annotation
     private static Optional<Map<?, ?>> resolve(SemanticModel semanticModel, AnnotationNode annotation) {
