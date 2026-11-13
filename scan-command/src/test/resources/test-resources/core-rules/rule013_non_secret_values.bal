@@ -122,6 +122,38 @@ function manyParts() returns string {
     return clientSecret;
 }
 
+const byte[] KEY_BYTES = [97, 56, 102, 53];
+
+enum AuthScheme {
+    BASIC
+}
+
+// A constant of another module is checked by its value
+function importedConstants() returns string[] {
+    string authToken = http:AUTH_SCHEME_BEARER;
+    string dbPassword = http:AUTH_SCHEME_BASIC; // warning
+    string apiKey = "a8f5f167f44f4964" + http:AUTH_HEADER; // warning
+    return [authToken, dbPassword, apiKey];
+}
+
+// A part that is not text, such as an enum member that names a choice, leaves the value unknown
+function otherParts() returns string[] {
+    string authToken = "x7Kq9pZmA1" + BASIC;
+    return [authToken];
+}
+
+// A byte array constant is not text, so only a placeholder is skipped
+function byteArrayConstant() returns byte[] {
+    byte[] secretKey = KEY_BYTES; // warning
+    return secretKey;
+}
+
+// A spread entry of a map of secrets is not a field, and is checked where its map is written
+function spreadEntries(map<string> defaults) returns map<string> {
+    map<string> passwords = {...defaults, db: "hunter2"}; // warning
+    return passwords;
+}
+
 public function main() {
     assertCors(new, "true");
 }
