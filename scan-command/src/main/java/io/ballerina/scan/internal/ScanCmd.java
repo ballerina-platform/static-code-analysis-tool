@@ -602,6 +602,13 @@ public class ScanCmd implements BLauncherCmd {
         if (requested.isEmpty()) {
             return List.of();
         }
+        List<String> withoutPath = requested.stream().filter(name -> !declared.containsKey(name))
+                .filter(scanTomlFile.getPlatformsWithoutPath()::contains)
+                .map(name -> "'" + name + "'").toList();
+        if (!withoutPath.isEmpty()) {
+            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_PATH_MISSING, withoutPath.size(),
+                    joinWithAnd(withoutPath)));
+        }
         List<String> undeclared = requested.stream().filter(name -> !declared.containsKey(name))
                 .map(name -> "'" + name + "'").toList();
         if (!undeclared.isEmpty()) {

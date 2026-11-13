@@ -235,6 +235,8 @@ The issues found in the file are listed in a table with the line, rule ID, kind 
 
 Every failure other than an interrupt is reported on standard error as `bal scan: error: <message>`, followed by the problems that caused it, such as `Scan.toml:2:18: error: <message>`. Warnings printed by the scan tool are reported as `bal scan: warning: <message>` and never change the exit code.
 
+`bal scan` checks the whole `Scan.toml` file and reports every mistake at once with its line and column, exiting with code `1`: an unknown table or key, such as `[gates]`, a value of the wrong type, and an invalid `[[analyzer]]` entry.
+
 By default no gate is set, so findings never fail the scan. The gate is set with `--fail-on-severity` and `--fail-on-count`, or with the `[gate]` table of `Scan.toml`, and fails the scan when the number of issues at or above the severity reaches the count:
 
 | --fail-on-severity | --fail-on-count | Fails when |

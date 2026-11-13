@@ -31,8 +31,10 @@ import io.ballerina.projects.ModuleId;
 import io.ballerina.projects.Package;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
+import io.ballerina.projects.SemanticVersion;
 import io.ballerina.projects.TomlDocument;
 import io.ballerina.projects.internal.model.Target;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
@@ -79,7 +81,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
+import java.util.function.Predicate;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -92,7 +94,6 @@ import static io.ballerina.scan.utils.Constants.ANALYZER_ORG;
 import static io.ballerina.scan.utils.Constants.ANALYZER_REPOSITORY;
 import static io.ballerina.scan.utils.Constants.ANALYZER_TABLE;
 import static io.ballerina.scan.utils.Constants.ANALYZER_VERSION;
-import static io.ballerina.scan.utils.Constants.CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN;
 import static io.ballerina.scan.utils.Constants.EXCLUDE_KEY;
 import static io.ballerina.scan.utils.Constants.GATE_FAIL_ON_COUNT;
 import static io.ballerina.scan.utils.Constants.GATE_FAIL_ON_SEVERITY;
@@ -175,6 +176,14 @@ public final class ScanUtils {
     public static final String GATE_COUNT_VALUES = "a whole number of 1 or more";
 
     private static final String RULE_LIST_VALUES = "an array of rule IDs, such as [\"ballerina:1\"]";
+    private static final List<String> TOP_LEVEL_TABLES = List.of(ANALYZER_TABLE, PLATFORM_TABLE, RULES_TABLE,
+            SUPPRESSION_TABLE, GATE_TABLE, ANALYSIS_TABLE);
+    private static final String TABLE_VALUES = "[[analyzer]], [[platform]], [rule], [suppression], [gate] or "
+            + "[analysis]";
+    private static final String ANALYZER_KEY_VALUES = "org, name, version or repository";
+    private static final String ANALYZER_ORG_VALUES = "an organization name, such as \"ballerina\"";
+    private static final String ANALYZER_NAME_VALUES = "a package name, such as \"example_analyzer\"";
+    private static final String ANALYZER_VERSION_VALUES = "a version, such as \"1.0.0\"";
 
     private ScanUtils() {
     }
@@ -1072,19 +1081,25 @@ public final class ScanUtils {
         List<String> errors = new ArrayList<>();
         List<String> analyzerErrors = new ArrayList<>();
 
-        for (Toml platformTable : scanTomlDocumentContent.getTables(PLATFORM_TABLE)) {
-            loadPlatform(platformTable, scanTomlFile, baseDir);
+        TopLevelNode platformNode = entries.get(PLATFORM_TABLE);
+        if (platformNode instanceof TomlTableArrayNode) {
+            for (Toml platformTable : scanTomlDocumentContent.getTables(PLATFORM_TABLE)) {
+                loadPlatform(platformTable, scanTomlFile, baseDir);
+            }
+        } else if (platformNode != null && !isEmptyArray(platformNode)) {
+            errors.add(DiagnosticLog.fileError(displayPath, platformNode.location().lineRange(),
+                    DiagnosticLog.error(DiagnosticCode.INVALID_PLATFORM_LIST)));
         }
         TopLevelNode analyzerNode = entries.get(ANALYZER_TABLE);
         if (analyzerNode instanceof TomlTableArrayNode) {
-            scanTomlDocumentContent.getTables(ANALYZER_TABLE).forEach(loadAnalyzer(scanTomlFile));
-        } else if (analyzerNode != null && !(analyzerNode instanceof TomlKeyValueNode keyValue
-                && keyValue.value() instanceof TomlArrayValueNode array && array.elements().isEmpty())) {
-            String error = DiagnosticLog.fileError(displayPath, analyzerNode.location().lineRange(),
-                    DiagnosticLog.error(DiagnosticCode.INVALID_ANALYZER_LIST));
-            errors.add(error);
-            analyzerErrors.add(error);
+            for (Toml analyzerTable : scanTomlDocumentContent.getTables(ANALYZER_TABLE)) {
+                loadAnalyzer(analyzerTable, scanTomlFile, displayPath, analyzerErrors);
+            }
+        } else if (analyzerNode != null && !isEmptyArray(analyzerNode)) {
+            analyzerErrors.add(DiagnosticLog.fileError(displayPath, analyzerNode.location().lineRange(),
+                    DiagnosticLog.error(DiagnosticCode.INVALID_ANALYZER_LIST)));
         }
+        errors.addAll(analyzerErrors);
         TopLevelNode ruleNode = entries.get(RULES_TABLE);
         if (ruleNode != null && ruleNode.kind() != TomlType.TABLE) {
             errors.add(DiagnosticLog.fileError(displayPath, ruleNode.location().lineRange(),
@@ -1124,6 +1139,14 @@ public final class ScanUtils {
             scanTomlDocumentContent.getTable(ANALYSIS_TABLE)
                     .ifPresent(analysisTable -> loadAnalysis(analysisTable, scanTomlFile, displayPath, errors));
         }
+        // A misspelled table, such as [gates], would otherwise turn its settings off without notice
+        entries.forEach((key, node) -> {
+            if (!TOP_LEVEL_TABLES.contains(key)) {
+                int entryKind = node instanceof TomlKeyValueNode ? 0 : 1;
+                errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_ENTRY, entryKind, key, TABLE_VALUES)));
+            }
+        });
         switch (validation) {
             case ALL -> failOnConfigErrors(displayPath, errors);
             case RULES -> failOnConfigErrors(displayPath, analyzerErrors);
@@ -1253,35 +1276,89 @@ public final class ScanUtils {
         }
     }
 
-    /**
-     * Loads an analyzer to the {@link ScanTomlFile} representation of the Scan.toml
-     * file.
-     *
-     * @param scanTomlFile the in-memory representation of the Scan.toml file
-     */
-    private static Consumer<Toml> loadAnalyzer(ScanTomlFile scanTomlFile) {
-        return analyzerTable -> {
-            Map<String, Object> properties = analyzerTable.toMap();
-            Object analyzerOrg = properties.remove(ANALYZER_ORG);
-            String org = (analyzerOrg instanceof String) ? analyzerOrg.toString() : null;
-            Object analyzerName = properties.remove(ANALYZER_NAME);
-            String name = (analyzerName instanceof String) ? analyzerName.toString() : null;
-            Pattern versionPattern = Pattern.compile(CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN);
-            Object analyzerVersion = properties.remove(ANALYZER_VERSION);
-            String version = (analyzerVersion instanceof String) && versionPattern.matcher(analyzerVersion.toString())
-                    .matches() ? analyzerVersion.toString() : null;
-            Object analyzerRepository = properties.remove(ANALYZER_REPOSITORY);
-            String repository = (analyzerRepository instanceof String) ? analyzerRepository.toString() : null;
+    private static boolean isEmptyArray(TopLevelNode node) {
+        return node instanceof TomlKeyValueNode keyValue && keyValue.value() instanceof TomlArrayValueNode array
+                && array.elements().isEmpty();
+    }
 
-            if (org == null || org.isEmpty() || name == null || name.isEmpty()) {
-                return;
+    /**
+     * Loads an [[analyzer]] table, adding an error for an unknown key, a missing or invalid org or name, an invalid
+     * version or repository, and a local repository without a version. An analyzer without a valid org and name is
+     * skipped; an invalid version or repository is left out.
+     */
+    private static void loadAnalyzer(Toml analyzerTable, ScanTomlFile scanTomlFile, String displayPath,
+                                     List<String> errors) {
+        List<String> keys = List.of(ANALYZER_ORG, ANALYZER_NAME, ANALYZER_VERSION, ANALYZER_REPOSITORY);
+        analyzerTable.rootNode().entries().forEach((key, node) -> {
+            if (!keys.contains(key)) {
+                errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_KEY, key, "[" + ANALYZER_TABLE + "]",
+                                ANALYZER_KEY_VALUES)));
             }
-            boolean isLocalRepository = repository != null && repository.equals(LOCAL_REPOSITORY_NAME) &&
-                    version != null && !version.isEmpty();
-            String repo = isLocalRepository ? repository : null;
-            ScanTomlFile.Analyzer analyzer = new ScanTomlFile.Analyzer(org, name, version, repo);
-            scanTomlFile.setAnalyzer(analyzer);
-        };
+        });
+        LineRange tableRange = analyzerTable.rootNode().location().lineRange();
+        Optional<String> org = analyzerName(analyzerTable, ANALYZER_ORG, ProjectUtils::validateOrgName,
+                ANALYZER_ORG_VALUES, tableRange, displayPath, errors);
+        Optional<String> name = analyzerName(analyzerTable, ANALYZER_NAME, ProjectUtils::validatePackageName,
+                ANALYZER_NAME_VALUES, tableRange, displayPath, errors);
+        Optional<String> version = analyzerTable.get(ANALYZER_VERSION).flatMap(value -> {
+            if (value.kind() == TomlType.STRING && isVersion(value.toNativeValue().toString())) {
+                return Optional.of(value.toNativeValue().toString());
+            }
+            errors.add(invalidConfigValue(displayPath, value, ANALYZER_VERSION, ANALYZER_VERSION_VALUES));
+            return Optional.empty();
+        });
+        Optional<String> repository = analyzerTable.get(ANALYZER_REPOSITORY).flatMap(value -> {
+            if (value.kind() == TomlType.STRING && LOCAL_REPOSITORY_NAME.equals(value.toNativeValue())) {
+                return Optional.of(LOCAL_REPOSITORY_NAME);
+            }
+            errors.add(invalidConfigValue(displayPath, value, ANALYZER_REPOSITORY,
+                    "\"" + LOCAL_REPOSITORY_NAME + "\""));
+            return Optional.empty();
+        });
+        // A package is found in the local repository only by its exact version, as in a Ballerina.toml dependency
+        if (repository.isPresent() && analyzerTable.get(ANALYZER_VERSION).isEmpty()) {
+            errors.add(DiagnosticLog.fileError(displayPath, tableRange,
+                    DiagnosticLog.error(DiagnosticCode.MISSING_CONFIG_KEY, ANALYZER_VERSION,
+                            "[[" + ANALYZER_TABLE + "]] with " + ANALYZER_REPOSITORY + " = \""
+                                    + LOCAL_REPOSITORY_NAME + "\"")));
+        }
+        if (org.isEmpty() || name.isEmpty()) {
+            return;
+        }
+        String repo = version.isPresent() ? repository.orElse(null) : null;
+        scanTomlFile.setAnalyzer(new ScanTomlFile.Analyzer(org.get(), name.get(), version.orElse(null), repo));
+    }
+
+    /**
+     * Returns the org or name of an [[analyzer]] table, adding an error when it is missing or not a valid name.
+     */
+    private static Optional<String> analyzerName(Toml analyzerTable, String key, Predicate<String> isValid,
+                                                 String expected, LineRange tableRange, String displayPath,
+                                                 List<String> errors) {
+        Optional<TomlValueNode> value = analyzerTable.get(key);
+        if (value.isEmpty()) {
+            errors.add(DiagnosticLog.fileError(displayPath, tableRange, DiagnosticLog.error(
+                    DiagnosticCode.MISSING_CONFIG_KEY, key, "[[" + ANALYZER_TABLE + "]]")));
+            return Optional.empty();
+        }
+        if (value.get().kind() == TomlType.STRING) {
+            String text = value.get().toNativeValue().toString();
+            if (!text.isEmpty() && isValid.test(text)) {
+                return Optional.of(text);
+            }
+        }
+        errors.add(invalidConfigValue(displayPath, value.get(), key, expected));
+        return Optional.empty();
+    }
+
+    private static boolean isVersion(String version) {
+        try {
+            SemanticVersion.from(version);
+            return true;
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     /**
@@ -1300,7 +1377,11 @@ public final class ScanUtils {
         Optional<String> path = (platformPath instanceof String) ? Optional.of(platformPath.toString())
                 : Optional.empty();
 
-        if (name.isEmpty() || name.get().isEmpty() || path.isEmpty()) {
+        if (name.isEmpty() || name.get().isEmpty()) {
+            return;
+        }
+        if (path.isEmpty()) {
+            scanTomlFile.addPlatformWithoutPath(name.get());
             return;
         }
 

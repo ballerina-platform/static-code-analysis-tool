@@ -31,6 +31,16 @@ The path to the configuration file can also be specified in the `Ballerina.toml`
 configPath = "path/to/Scan.toml"
 ```
 
+A `Scan.toml` file can have the `[[analyzer]]`, `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` and `[analysis]` tables described below, and nothing else. `bal scan` checks the whole file, whether it is local or downloaded from a URL, and stops with exit code `1` on any mistake, listing every error at once with its line and column: an unknown table or key, such as `[gates]`, `[rules]` or `foo = 1`, which would otherwise turn its settings off without notice; a value of the wrong type; and an invalid `[[analyzer]]` entry. For example:
+
+```text
+bal scan: error: Scan.toml has 2 errors
+Scan.toml:1:1: error: unknown table 'gates'; expected [[analyzer]], [[platform]], [rule], [suppression], [gate] or [analysis]
+Scan.toml:5:1: error: 'name' is required in [[analyzer]]
+```
+
+`bal scan --list-rules` stops only on the errors that change the available rules: a TOML syntax error and an invalid `[[analyzer]]` entry. The editor ignores invalid settings.
+
 # Configuration for Platform Plugins
 
 Users can configure platform plugins in a `Scan.toml` file by specifying the plugin JAR path to report analysis results.
@@ -41,7 +51,7 @@ name = "sonarqube"
 path = "path/to/sonar_platform_plugin"
 ```
 
-Both `name` and `path` are required. A platform entry without a `path` is ignored. The `path` can be a local file path, resolved relative to the folder of the `Scan.toml` file, or a URL, in which case the scan tool downloads the plugin JAR. The paths in a remote `Scan.toml` file are resolved relative to the package root.
+Both `name` and `path` are required. A platform entry without a `path` is ignored, and naming it in `--platforms` stops the scan with an error that says its `path` is missing. The entries must be written as `[[platform]]` tables. The `path` can be a local file path, resolved relative to the folder of the `Scan.toml` file, or a URL, in which case the scan tool downloads the plugin JAR. The paths in a remote `Scan.toml` file are resolved relative to the package root.
 
 A declared platform is reported to only when it is named in `--platforms`, for example `bal scan --platforms=sonarqube`. A plain `bal scan` never reports to a platform. The plugin JAR is checked, or downloaded, only when its platform is named, so a `Scan.toml` can declare a platform whose JAR exists only on CI. A path of a named platform that is neither an existing file nor a URL stops the scan with an error.
 
@@ -74,9 +84,18 @@ For locally available static code analyzer plugins, the following configuration 
 [[analyzer]]
 org = "org2"
 name = "name2"
-version = "version"
+version = "1.0.0"
 repository = "local"
 ```
+
+Each entry must be written as an `[[analyzer]]` table, and accepts only these keys:
+
+- `org` - Required. The organization of the analyzer package.
+- `name` - Required. The name of the analyzer package.
+- `version` - Optional. A version, such as `"1.0.0"`, which is the minimum version of the package to use, as for a dependency in `Ballerina.toml`.
+- `repository` - Optional. Only `"local"` is supported, to use the package from the local repository, and it requires a `version`.
+
+A missing `org` or `name`, a value that is not a valid organization name, package name or version, and an unknown key stop the scan with an error that gives its line and column.
 
 # Configuration for Static Code Analyzer Rules
 

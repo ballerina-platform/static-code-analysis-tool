@@ -28,6 +28,7 @@ Built against Ballerina 2201.12.0.
 - An issue in the default value of a parameter, such as `int value = checkpanic f()`, is reported once instead of twice. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
 - `ballerina:2` reports unused parameters of object constructor methods, whose references the compiler gives twice. (backport of [#173](https://github.com/ballerina-platform/static-code-analysis-tool/pull/173))
 - The SARIF report gives the file name as the `uri` of a single Ballerina file instead of an empty path. (backport of [#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174))
+- An unknown table or key in `Scan.toml`, such as `[gates]`, `[rules]` or `foo = 1`, and an invalid `[[analyzer]]` entry, with a missing or invalid `org` or `name`, an invalid `version`, a `repository` other than `"local"`, `repository = "local"` without a `version`, or an unknown key, are reported with their line and column along with the other errors of the file, instead of being ignored. `[platform]` written as a table instead of `[[platform]]` tables is reported too. A pre-release version, such as `"1.0.0-alpha"`, is now accepted for an analyzer. `--platforms` naming a `[[platform]]` entry that has no `path` says that the `path` is missing. (backport of [#209](https://github.com/ballerina-platform/static-code-analysis-tool/pull/209); [#190](https://github.com/ballerina-platform/static-code-analysis-tool/issues/190))
 
 ## [0.11.1] - 2026-11-10
 
