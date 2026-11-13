@@ -1163,6 +1163,44 @@ public class ScanCmdTest extends BaseTest {
         }
     }
 
+    @Test(description = "test a workspace package whose [[platform]] has no path is skipped with a warning")
+    void testWorkspacePlatformWithoutPath() throws IOException {
+        Path workspacePath = testResources.resolve("test-resources").resolve("workspace-with-platforms");
+        Path firstScanToml = workspacePath.resolve("first-package").resolve("Scan.toml");
+        Path secondScanToml = workspacePath.resolve("second-package").resolve("Scan.toml");
+        String pathlessPlatform = """
+                [[platform]]
+                name = "examplePlatform"
+                """;
+        try {
+            Files.writeString(firstScanToml, platformConfiguration(""));
+            Files.writeString(secondScanToml, pathlessPlatform);
+            String[] streams = scanWorkspace(workspacePath, "--platforms=examplePlatform");
+            Assert.assertEquals(streams[1].split("Reporting issues to: ", -1).length - 1, 1, streams[1]);
+            Assert.assertTrue(streams[1].contains("bal scan: warning: second-package has no 'path' for platform "
+                    + "'examplePlatform' in its Scan.toml and is not reported to it"), streams[1]);
+            Assert.assertFalse(streams[1].contains("error:"), streams[1]);
+
+            // When no package gives the platform a path, the scan fails before it starts, saying the path is missing
+            Files.writeString(firstScanToml, pathlessPlatform);
+            streams = scanWorkspace(workspacePath, "--platforms=examplePlatform");
+            Assert.assertTrue(streams[1].contains("bal scan: error: platform 'examplePlatform' has no 'path' in the "
+                    + "[[platform]] table of Scan.toml; set it to the plugin JAR"), streams[1]);
+            Assert.assertFalse(streams[1].contains("Running scans on"), streams[1]);
+
+            // A platform no package declares is reported in the same run as one declared without a path
+            streams = scanWorkspace(workspacePath, "--platforms=examplePlatform,otherPlatform");
+            Assert.assertTrue(streams[1].contains("bal scan: error: platform 'otherPlatform' is not available; add "
+                    + "its plugin to the [[platform]] table of Scan.toml\nbal scan: error: platform 'examplePlatform' "
+                    + "has no 'path' in the [[platform]] table of Scan.toml; set it to the plugin JAR"), streams[1]);
+        } finally {
+            Files.deleteIfExists(firstScanToml);
+            Files.deleteIfExists(secondScanToml);
+            Files.deleteIfExists(workspacePath.resolve("analysis-issues.json"));
+            Files.deleteIfExists(workspacePath.resolve("platform-arguments.json"));
+        }
+    }
+
     @Test(description = "test a failed platform fails the scan after every platform has run, naming each failure")
     void testPlatformFailureFailsTheScan() throws IOException {
         Path workspacePath = testResources.resolve("test-resources").resolve("workspace-with-platforms");

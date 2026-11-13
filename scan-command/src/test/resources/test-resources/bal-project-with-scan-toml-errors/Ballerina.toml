@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "bal_project_with_scan_toml_errors"
+version = "0.1.0"
