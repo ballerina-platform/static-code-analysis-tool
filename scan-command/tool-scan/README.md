@@ -22,10 +22,10 @@ All options are optional. Rule filters and platforms can also be configured in a
 
 | Option | Description |
 |--------|-------------|
-| `--target-dir=<path>` | Target directory path for saving analysis reports (only for Ballerina projects). Default is the package's `target` directory. A relative path is resolved against the package root. In a workspace, each package saves its results in `<path>/report` under its own root, and the combined results are saved in `<path>/report` under the workspace root; by default, in the `target` directory of each package and of the workspace. |
+| `--target-dir=<path>` | Target directory path for saving analysis reports (only for Ballerina projects). Default is the `target` directory of the package, or in a workspace, of each package and of the workspace. A relative path is resolved against the package root: in a workspace, each package saves its results in `<path>/report` under its own root, and the combined results are saved in `<path>/report` under the workspace root. |
 | `--scan-report` | Generate an HTML report containing the analysis results (only for Ballerina projects). Disabled by default. |
 | `--format=<json\|sarif>` | Specify the format of the report. Default is `json`. |
-| `--list-rules` | List the rules available to the workspace, package or source file, along with their kind and severity. Lists the core rules and the rules contributed by the project's dependencies (library tools and static code analyzer plugins) only. |
+| `--list-rules` | List the rules available to the workspace, package or source file, along with their kind and severity. Lists only the core rules and the rules contributed by the dependencies (library tools and static code analyzer plugins), and for a package or workspace, by the analyzers declared in `Scan.toml`. |
 | `--include-rules=<rule1, ...>` | Run analysis for a specific set of rules. By default, all available rules are included. A rule that is not available to the project is an error. |
 | `--exclude-rules=<rule1, ...>` | Exclude analysis for a specific set of rules. By default, no rules are excluded. A rule that is not available to the project is an error. |
 | `--platforms=<platformName1, ...>` | Define platform(s) to report results to. More than one platform can be defined. By default, results are not reported to any platform. Not supported for a single Ballerina file. |
@@ -95,7 +95,7 @@ bal scan --fail-on-severity=MEDIUM --fail-on-count=5
 
 ### Example output
 
-Running `bal scan --list-rules` inside a Ballerina project prints a table of the rules available to it with their kind and severity:
+Running `bal scan --list-rules` prints a table of the rules available to the workspace, package or source file, with their kind and severity:
 
 ```
 RuleID       | Rule Kind     | Severity | Rule Description
@@ -173,7 +173,7 @@ To generate a detailed HTML report of the analysis results, use the `--scan-repo
 bal scan --scan-report
 ```
 
-This produces an HTML report and the scan results in JSON format inside the `target/report` directory (or the directory given via `--target-dir`). The report is only generated for Ballerina projects, not for standalone Ballerina files. It is generated even when the results are also reported to a platform.
+This produces an HTML report and the scan results in JSON format inside the `target/report` directory, or in the `report` directory under the path given with `--target-dir`. The report is only generated for Ballerina projects, not for standalone Ballerina files. It is generated even when the results are also reported to a platform.
 
 The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. You can filter, search, and export the list of files.
 

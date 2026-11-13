@@ -18,11 +18,11 @@ DESCRIPTION
 OPTIONS
         --target-dir=<path>
                 Target directory path for saving analysis reports (only for Ballerina projects).
-                Default is the target directory of the package. A relative path is resolved
-                against the package root. In a workspace, each package saves its results in
-                <path>/report under its own root, and the combined results are saved in
-                <path>/report under the workspace root; by default, in the target directory
-                of each package and of the workspace.
+                Default is the target directory of the package, or in a workspace, of each
+                package and of the workspace. A relative path is resolved against the package
+                root: in a workspace, each package saves its results in <path>/report under its
+                own root, and the combined results are saved in <path>/report under the
+                workspace root.
 
         --scan-report
                 Generate an HTML report containing the analysis results (only for Ballerina projects).
@@ -33,7 +33,8 @@ OPTIONS
         --list-rules
                 List the rules available to the workspace, package or source file, along with
                 their kind and severity. Lists only the core rules and the rules contributed by
-                the dependencies and the analyzers declared in Scan.toml.
+                the dependencies, and for a package or workspace, by the analyzers declared in
+                Scan.toml.
 
         --include-rules=<rule1, ...>
                 Run analysis for a specific set of rules. Added to 'include' in the [rule] table of
@@ -104,16 +105,16 @@ EXAMPLES
                 $ bal scan --list-rules
 
         Run analysis for a specific rule.
-                $ bal scan --include-rules="ballerina:101"
+                $ bal scan --include-rules="ballerina:1"
 
         Run analysis for a specific set of rules.
-                $ bal scan --include-rules="ballerina:101, ballerina/io:101"
+                $ bal scan --include-rules="ballerina:1, ballerina/io:2"
 
         Exclude analysis for a specific rule.
-                $ bal scan --exclude-rules="ballerina:101"
+                $ bal scan --exclude-rules="ballerina:1"
 
         Exclude analysis for a specific set of rules.
-                $ bal scan --exclude-rules="ballerina:101, ballerina/io:101"
+                $ bal scan --exclude-rules="ballerina:1, ballerina/io:2"
 
         Run analysis and report to sonarqube
                 $ bal scan --platforms=sonarqube
