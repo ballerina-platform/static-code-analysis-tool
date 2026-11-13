@@ -1723,7 +1723,8 @@ public final class ScanUtils {
             return;
         }
         String repo = version.isPresent() ? repository.orElse(null) : null;
-        scanTomlFile.setAnalyzer(new ScanTomlFile.Analyzer(org.get(), name.get(), version.orElse(null), repo));
+        scanTomlFile.setAnalyzer(new ScanTomlFile.Analyzer(org.get(), name.get(), version.orElse(null), repo),
+                tableRange);
     }
 
     /**

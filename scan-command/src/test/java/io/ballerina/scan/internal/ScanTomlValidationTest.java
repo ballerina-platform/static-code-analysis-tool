@@ -635,6 +635,85 @@ public class ScanTomlValidationTest extends BaseTest {
         Assert.assertFalse(run.output().contains("Running Scans"), run.output());
     }
 
+    @Test(description = "test an analyzer of the workspace Scan.toml that cannot be resolved is reported once")
+    void testUnresolvedWorkspaceAnalyzerReportedOnce() throws IOException {
+        pkgAOriginal = Files.readString(pkgAScanToml, StandardCharsets.UTF_8);
+        pkgBOriginal = Files.readString(pkgBScanToml, StandardCharsets.UTF_8);
+        Files.delete(pkgAScanToml);
+        Files.delete(pkgBScanToml);
+        Files.writeString(workspaceScanToml, """
+                [[analyzer]]
+                org = "nosuchorgxyz"
+                name = "nosuchpkg"
+                """);
+        ScanRun run = scan(workspace);
+        Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertEquals(run.errorReport(), """
+                bal scan: error: Scan.toml has 1 error
+                Scan.toml:1:1: error: analyzer 'nosuchorgxyz/nosuchpkg' cannot be resolved""");
+
+        run = scan(workspace, "--list-rules");
+        Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertEquals(run.errorReport(), """
+                bal scan: error: Scan.toml has 1 error
+                Scan.toml:1:1: error: analyzer 'nosuchorgxyz/nosuchpkg' cannot be resolved""");
+    }
+
+    @Test(description = "test a workspace Scan.toml can name a package of the workspace as an analyzer")
+    void testWorkspaceAnalyzerOfTheWorkspace() throws IOException {
+        pkgAOriginal = Files.readString(pkgAScanToml, StandardCharsets.UTF_8);
+        pkgBOriginal = Files.readString(pkgBScanToml, StandardCharsets.UTF_8);
+        Files.delete(pkgAScanToml);
+        Files.delete(pkgBScanToml);
+        Files.writeString(workspaceScanToml, """
+                [[analyzer]]
+                org = "ballerina"
+                name = "pkg_a"
+                """);
+        ScanRun run = scan(workspace);
+        Assert.assertEquals(run.exitCode(), 0, run.output());
+        Assert.assertFalse(run.output().contains("cannot be resolved"), run.output());
+    }
+
+    @Test(description = "test an analyzer named by a module of its package, such as \"pkg.mod\", is resolved")
+    void testAnalyzerNamedByModule() throws IOException {
+        pkgAOriginal = Files.readString(pkgAScanToml, StandardCharsets.UTF_8);
+        pkgBOriginal = Files.readString(pkgBScanToml, StandardCharsets.UTF_8);
+        Path moduleDir = workspace.resolve("pkg-a").resolve("modules").resolve("utils");
+        try {
+            Files.delete(pkgAScanToml);
+            Files.delete(pkgBScanToml);
+            Files.createDirectories(moduleDir);
+            Files.writeString(moduleDir.resolve("utils.bal"), "public function id(int value) returns int {\n"
+                    + "    return value;\n}\n");
+            Files.writeString(workspaceScanToml, """
+                    [[analyzer]]
+                    org = "ballerina"
+                    name = "pkg_a.utils"
+                    """);
+            ScanRun run = scan(workspace);
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertFalse(run.output().contains("cannot be resolved"), run.output());
+        } finally {
+            ProjectUtils.deleteDirectory(workspace.resolve("pkg-a").resolve("modules"));
+        }
+    }
+
+    @Test(description = "test the resolution diagnostic of an analyzer is matched by its whole org, name and version")
+    void testAnalyzerReasonMatchesWholeNames() {
+        ScanTomlFile.Analyzer analyzer = new ScanTomlFile.Analyzer("ballerina", "io", "1.0.0", "local");
+        Assert.assertTrue(ProjectAnalyzer.namesAnalyzer(
+                "Dependency version (1.0.0) cannot be found in the local repository. org: `ballerina` name: io",
+                analyzer));
+        Assert.assertTrue(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerina/io:1.0.0.", analyzer));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerina/ioutil:1.0.0", analyzer));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerina/io.file:1.0.0", analyzer));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerina/io:1.0.01", analyzer));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerinax/io:1.0.0", analyzer));
+        Assert.assertTrue(ProjectAnalyzer.namesAnalyzer("cannot resolve module 'ballerina/io as _'",
+                new ScanTomlFile.Analyzer("ballerina", "io", null, null)));
+    }
+
     @Test(description = "test the workspace [rule] warnings are kept, unfiltered, when another package fails")
     void testWorkspaceRuleWarningsWithPackageFailure() throws IOException {
         pkgAOriginal = Files.readString(pkgAScanToml, StandardCharsets.UTF_8);
@@ -714,6 +793,60 @@ public class ScanTomlValidationTest extends BaseTest {
                 pkg-b: error: Scan.toml has 1 error
                 Scan.toml:5:12: error: unknown rule 'ballerina:999'; it is not a rule of the package
                 """ + LIST_RULES_HINT);
+    }
+
+    @DataProvider(name = "unresolved-analyzers")
+    public Object[][] unresolvedAnalyzers() {
+        return new Object[][]{
+                {"""
+                        [[analyzer]]
+                        org = "nosuchorgxyz"
+                        name = "nosuchpkg"
+                        """, "Scan.toml:1:1: error: analyzer 'nosuchorgxyz/nosuchpkg' cannot be resolved"},
+                {"""
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "example_module_static_code_analyzer"
+                        version = "9.9.9"
+                        """, "Scan.toml:1:1: error: analyzer 'exampleOrg/example_module_static_code_analyzer:9.9.9' "
+                        + "cannot be resolved"},
+                {"""
+                        [[analyzer]]
+                        org = "ballerinax"
+                        name = "example_module_static_code_analyzer"
+                        version = "9.9.9"
+                        repository = "local"
+                        """, "Scan.toml:1:1: error: analyzer 'ballerinax/example_module_static_code_analyzer:9.9.9 "
+                        + "from the local repository' cannot be resolved: Dependency version (9.9.9) cannot be found "
+                        + "in the local repository. org: `ballerinax` name: example_module_static_code_analyzer"},
+                // The analyzers that resolve are not reported
+                {"""
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "example_module_static_code_analyzer"
+
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "nosuchpkg"
+                        """, "Scan.toml:5:1: error: analyzer 'exampleOrg/nosuchpkg' cannot be resolved"},
+        };
+    }
+
+    @Test(description = "test an [[analyzer]] that cannot be resolved fails the scan and the rule listing",
+            dataProvider = "unresolved-analyzers")
+    void testUnresolvedAnalyzer(String content, String error) throws IOException {
+        Files.writeString(scanToml, content);
+        ScanRun run = scan(project);
+        Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertTrue(run.errorReport().startsWith("bal scan: error: Scan.toml has 1 error\n" + error),
+                run.output());
+        Assert.assertEquals(run.errorReport().lines().count(), 2, run.output());
+        Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+
+        run = scan(project, "--list-rules");
+        Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertTrue(run.errorReport().startsWith("bal scan: error: Scan.toml has 1 error\n" + error),
+                run.output());
     }
 
     private ScanRun scan(Path target, String... args) throws IOException {

@@ -59,13 +59,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.ballerina.projects.util.ProjectConstants.IMPORT_PREFIX;
@@ -91,6 +95,7 @@ public class ProjectAnalyzer {
     private final Gson gson = new Gson();
     private String pluginImportsDocumentName;
     private Set<String> excludedFilePaths;
+    private final Map<ScanTomlFile.Analyzer, String> unresolvedAnalyzers = new LinkedHashMap<>();
 
     /**
      * Creates an analyzer that scans the sources selected by {@code [analysis] excludeTests} in the Scan.toml file.
@@ -185,8 +190,12 @@ public class ProjectAnalyzer {
         StringBuilder newImports = new StringBuilder();
         StringBuilder tomlDependencies = new StringBuilder();
         Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
+        PackageManifest currentManifest = project.currentPackage().manifest();
         for (ScanTomlFile.Analyzer analyzer : analyzers) {
-            extractAnalyzerImportsAndDependencies(analyzer, newImports, tomlDependencies);
+            // A workspace Scan.toml can name a package of the workspace, which cannot import itself
+            if (!isPackageOf(analyzer, currentManifest)) {
+                extractAnalyzerImportsAndDependencies(analyzer, newImports, tomlDependencies);
+            }
         }
 
         Module defaultModule = project.currentPackage().getDefaultModule();
@@ -204,8 +213,11 @@ public class ProjectAnalyzer {
                 .compilationOptions());
         ResolvedPackageDependency rootPkgNode = new ResolvedPackageDependency(project.currentPackage(),
                 PackageDependencyScope.DEFAULT);
+        Collection<ResolvedPackageDependency> directDependencies = packageResolution.dependencyGraph()
+                .getDirectDependencies(rootPkgNode);
+        findUnresolvedAnalyzers(analyzers, directDependencies, packageResolution);
         Map<String, List<Rule>> externalAnalyzers = new HashMap<>();
-        packageResolution.dependencyGraph().getDirectDependencies(rootPkgNode).stream()
+        directDependencies.stream()
                 .map(ResolvedPackageDependency::packageInstance).forEach(pkgDependency -> {
                     PackageManifest pkgManifest = pkgDependency.manifest();
                     String org = pkgManifest.org().value();
@@ -223,6 +235,57 @@ public class ProjectAnalyzer {
                     externalAnalyzers.put(pluginDesc.plugin().getClassName(), externalRules);
                 });
         return externalAnalyzers;
+    }
+
+    /**
+     * Records each analyzer of the Scan.toml file that did not resolve to a direct dependency, with the resolution
+     * diagnostic that names it, if any.
+     */
+    private void findUnresolvedAnalyzers(Set<ScanTomlFile.Analyzer> analyzers,
+                                         Collection<ResolvedPackageDependency> directDependencies,
+                                         PackageResolution packageResolution) {
+        unresolvedAnalyzers.clear();
+        List<PackageManifest> resolved = new ArrayList<>();
+        directDependencies.forEach(dependency -> resolved.add(dependency.packageInstance().manifest()));
+        resolved.add(project.currentPackage().manifest());
+        for (ScanTomlFile.Analyzer analyzer : analyzers) {
+            if (resolved.stream().anyMatch(manifest -> isPackageOf(analyzer, manifest))) {
+                continue;
+            }
+            // Such as a version missing from the local repository, which resolution reports only as a warning
+            String reason = packageResolution.diagnosticResult().diagnostics().stream()
+                    .map(Diagnostic::message)
+                    .filter(message -> namesAnalyzer(message, analyzer))
+                    .findFirst()
+                    .orElse("");
+            unresolvedAnalyzers.put(analyzer, reason);
+        }
+    }
+
+    // The name of an analyzer is that of its package, or of a module of it, such as "pkg.mod"
+    private static boolean isPackageOf(ScanTomlFile.Analyzer analyzer, PackageManifest manifest) {
+        String packageName = manifest.name().value();
+        return analyzer.org().equals(manifest.org().value())
+                && (analyzer.name().equals(packageName) || analyzer.name().startsWith(packageName + "."));
+    }
+
+    // Whether a resolution diagnostic names an analyzer by its whole org, name and version
+    static boolean namesAnalyzer(String message, ScanTomlFile.Analyzer analyzer) {
+        return containsToken(message, analyzer.org()) && containsToken(message, analyzer.name())
+                && (analyzer.version() == null || containsToken(message, analyzer.version()));
+    }
+
+    // Whether a value appears as a whole token, so that a short name such as "io" does not match other words
+    private static boolean containsToken(String message, String value) {
+        return Pattern.compile("(?<![\\w.])" + Pattern.quote(value) + "(?!\\w|\\.\\w)").matcher(message).find();
+    }
+
+    /**
+     * Returns the analyzers of the Scan.toml file that could not be resolved by {@link #getExternalAnalyzers}, each
+     * with the resolution diagnostic that names it, or an empty string when there is none.
+     */
+    Map<ScanTomlFile.Analyzer, String> getUnresolvedAnalyzers() {
+        return Collections.unmodifiableMap(unresolvedAnalyzers);
     }
 
     private void extractAnalyzerImportsAndDependencies(ScanTomlFile.Analyzer analyzer, StringBuilder imports,

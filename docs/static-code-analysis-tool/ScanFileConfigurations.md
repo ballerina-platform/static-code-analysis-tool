@@ -41,7 +41,7 @@ Scan.toml:5:12: error: unknown rule 'ballerina:999'; it is not a rule of the pac
   Run 'bal scan --list-rules' to see the available rules.
 ```
 
-`bal scan --list-rules` stops only on the errors that change the available rules: a TOML syntax error and an invalid `[[analyzer]]` entry. The editor ignores invalid settings.
+`bal scan --list-rules` stops only on the errors that change the available rules: a TOML syntax error, an invalid `[[analyzer]]` entry, and an analyzer that cannot be resolved. The editor ignores invalid settings.
 
 # Configuration for Platform Plugins
 
@@ -103,7 +103,7 @@ Each entry must be written as an `[[analyzer]]` table, and accepts only these ke
 - `version` - Optional. A version, such as `"1.0.0"`, which is the minimum version of the package to use, as for a dependency in `Ballerina.toml`.
 - `repository` - Optional. Only `"local"` is supported, to use the package from the local repository, and it requires a `version`.
 
-A missing `org` or `name`, a value that is not a valid organization name, package name or version, and an unknown key stop the scan with an error that gives its line and column.
+A missing `org` or `name`, a value that is not a valid organization name, package name or version, and an unknown key stop the scan with an error that gives its line and column. The `name` can also name a module of the analyzer package, such as `"pkg.mod"`. An analyzer that cannot be resolved, such as one whose org or name is misspelled or whose version does not exist, also stops the scan, with the location of its entry, since scanning without it would look clean without its rules.
 
 # Configuration for Static Code Analyzer Rules
 
@@ -212,6 +212,6 @@ The command-line options then apply to the file each package uses:
 | `[suppression]` | `--ignore-suppressions`, `--require-suppression-reason`, `--require-suppression-rule-id` | Each one tightens its own setting, and cannot undo `Scan.toml` |
 | `[analysis]` | `--exclude-tests[=<true\|false>]` | Overrides `excludeTests` either way |
 
-The gate applies to each package on its own, with the issues of that package only. Each package that fails its gate is listed in the error, and the scan exits with code `1`. When a rule a package inherits from the workspace `[rule]` table is not provided to the package, for example because only some packages use the analyzer that defines it, the package is named in a warning. A mistyped rule stops the scan with an error in the workspace `Scan.toml`, checked against the rules of every package, and the errors of the workspace `Scan.toml` are reported together with those of the packages. An unknown table in the workspace `Scan.toml` is an error as it is in a package `Scan.toml`. A package whose `configPath` names the workspace `Scan.toml` uses it as the workspace file.
+The gate applies to each package on its own, with the issues of that package only. Each package that fails its gate is listed in the error, and the scan exits with code `1`. When a rule a package inherits from the workspace `[rule]` table is not provided to the package, for example because only some packages use the analyzer that defines it, the package is named in a warning. A mistyped rule stops the scan with an error in the workspace `Scan.toml`, checked against the rules of every package, and the errors of the workspace `Scan.toml` are reported together with those of the packages. An unknown table in the workspace `Scan.toml` is an error as it is in a package `Scan.toml`, and an analyzer that cannot be resolved is reported once. A package whose `configPath` names the workspace `Scan.toml` uses it as the workspace file. An analyzer of the workspace `Scan.toml` that is a package of the workspace is not engaged for that package itself.
 
 A workspace `Scan.toml` cannot set `[[platform]]`, since each package reports to a project of its own on the platform. The scan stops with an error that gives the location of the table. Each package that reports to a platform sets the platform in its own `Scan.toml`.

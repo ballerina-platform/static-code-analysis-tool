@@ -52,6 +52,7 @@ public class ScanTomlFile {
     private final Set<RuleToFilter> rulesToInclude = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToExclude = new LinkedHashSet<>();
     private final Map<String, LineRange> ruleLocations = new LinkedHashMap<>();
+    private final Map<Analyzer, LineRange> analyzerLocations = new LinkedHashMap<>();
     private final Set<String> platformsWithoutPath = new LinkedHashSet<>();
     // Each setting the file writes, keyed by its name, with its value as written in TOML
     private final Map<String, String> writtenSettings = new LinkedHashMap<>();
@@ -231,6 +232,11 @@ public class ScanTomlFile {
         writtenSettings.put(ANALYZER_SETTING + id, "");
     }
 
+    void setAnalyzer(Analyzer analyzer, LineRange location) {
+        setAnalyzer(analyzer);
+        analyzerLocations.putIfAbsent(analyzer, location);
+    }
+
     void setRuleToInclude(RuleToFilter rule) {
         rulesToInclude.add(rule);
     }
@@ -256,6 +262,17 @@ public class ScanTomlFile {
      */
     public Optional<LineRange> getRuleLocation(String ruleId) {
         return Optional.ofNullable(ruleLocations.get(ruleId));
+    }
+
+    /**
+     * Returns where an analyzer is written in the file.
+     *
+     * @param analyzer the analyzer
+     * @return the location of its [[analyzer]] table, or empty when the file does not declare it
+     * @since 0.14.0
+     */
+    public Optional<LineRange> getAnalyzerLocation(Analyzer analyzer) {
+        return Optional.ofNullable(analyzerLocations.get(analyzer));
     }
 
     /**
