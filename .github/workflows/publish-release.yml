@@ -55,4 +55,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
         run: |
           gh release create v$VERSION --title "scan-tool-v$VERSION"
-          gh pr create --base ${GITHUB_REF##*/} --title "[Automated] Sync ${GITHUB_REF##*/} after $VERSION release" --body "Sync ${GITHUB_REF##*/} after $VERSION release"
+          gh pr create --base ${GITHUB_REF#refs/heads/} --title "[Automated] Sync ${GITHUB_REF#refs/heads/} after $VERSION release" --body "Sync ${GITHUB_REF#refs/heads/} after $VERSION release"
