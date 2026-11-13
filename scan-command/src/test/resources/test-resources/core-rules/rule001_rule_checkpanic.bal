@@ -33,3 +33,8 @@ function first() returns int {
 function withDefault(int value = checkpanic getResult()) returns int { // Non-compliant
     return value;
 }
+
+function trapped() returns int? {
+    int|error result = trap checkpanic getResult(); // Non-compliant
+    return result is int ? result : ();
+}
