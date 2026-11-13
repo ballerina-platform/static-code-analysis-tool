@@ -69,6 +69,8 @@ The `ScannerPlatformPlugin` interface consists of the following methods:
 - `init(PlatformPluginContext platformPluginContext)` - Initializes the platform plugin with configurations from the `PlatformPluginContext`.
 - `onScan(List<Issue> issues)` - Pass analysis results to the platform plugin.
 
+Anything the plugin prints to `System.out` or `System.err` is written to standard error, as standard output holds only the scan results, which users redirect to a file such as `issues.json`. A child process started by the plugin writes to the streams of the process directly, so it must not inherit standard output: instead of `ProcessBuilder.inheritIO()`, read its output and print it to `System.err`, for example with `redirectErrorStream(true)` and a thread that copies `process.getInputStream()` to `System.err`. Wait for the process to exit and join the copying thread before `onScan` returns, so that no output is printed after the scan has moved on.
+
 ## `PlatformPluginContext` interface
 
 The `PlatformPluginContext` consists of platform-specific configurations that are passed to the platform plugin during initialization.

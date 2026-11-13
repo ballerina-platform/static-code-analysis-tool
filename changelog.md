@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - The SARIF report gives the file name as the `uri` of a single Ballerina file instead of an empty path, and of a file outside the project root instead of a `../` path. ([#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174))
+- Output printed to `System.out` by a compiler plugin while the package compiles, or by a platform plugin, is written to standard error, so `bal scan > issues.json` saves valid JSON, also with `--platforms`. Before, it was appended to the results on standard output. A process started by a platform plugin writes to the streams directly, so a plugin must not let it inherit standard output, as the platform plugin guide now states. ([#175](https://github.com/ballerina-platform/static-code-analysis-tool/pull/175))
 
 ## [0.13.0] - 2026-11-05
 
