@@ -25,10 +25,10 @@ bal scan [OPTIONS] [<package>|<source-file>]
 --scan-report
 ```
 
-- Specify the output format (ballerina or sarif). Default is ballerina.
+- Specify the output format (json or sarif). Default is json.
 
 ```text
---format=<ballerina|sarif>
+--format=<json|sarif>
 ```
 
 -  List all available rules
@@ -132,25 +132,25 @@ bal scan --list-rules
 - Run analysis for a specific rule.
 
 ```bash
-bal scan --include-rules="ballerina:101"
+bal scan --include-rules="ballerina:1"
 ```
 
 - Run analysis for a specific set of rules.
 
 ```bash
-bal scan --include-rules="ballerina:101, ballerina/io:101"
+bal scan --include-rules="ballerina:1, ballerina/io:2"
 ```
 
 - Exclude analysis for a specific rule.
 
 ```bash
-bal scan --exclude-rules="ballerina/io:101"
+bal scan --exclude-rules="ballerina/io:2"
 ```
 
 - Exclude analysis for a specific set of rules.
 
 ```bash
-bal scan --exclude-rules="ballerina:101, ballerina/io:101"
+bal scan --exclude-rules="ballerina:1, ballerina/io:2"
 ```
 
 - Run analysis and report to sonarqube
