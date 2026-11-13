@@ -1465,6 +1465,7 @@ public final class ScanUtils {
         Toml scanTomlDocumentContent = readTomlFile(scanTomlFilePath, displayPath, validation);
         ScanTomlFile scanTomlFile = new ScanTomlFile();
         scanTomlFile.setPath(scanTomlFilePath);
+        scanTomlFile.setWorkspaceFile(workspace);
         Map<String, TopLevelNode> entries = scanTomlDocumentContent.rootNode().entries();
         List<String> errors = new ArrayList<>();
         List<String> analyzerErrors = new ArrayList<>();
@@ -1853,6 +1854,8 @@ public final class ScanUtils {
             return;
         }
         List<String> ruleIds = rulesArray.toNativeValue().stream().map(Object::toString).toList();
+        rulesArray.elements().forEach(element ->
+                scanTomlFile.setRuleLocation(element.toNativeValue().toString(), element.location().lineRange()));
         ruleIds.forEach(rule -> {
             ScanTomlFile.RuleToFilter ruleToFilter = new ScanTomlFile.RuleToFilter(rule);
             if (includeRules) {

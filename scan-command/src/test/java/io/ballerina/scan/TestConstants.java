@@ -21,6 +21,13 @@ package io.ballerina.scan;
 public class TestConstants {
     public static final String WINDOWS_LINE_SEPARATOR = "\r\n";
     public static final String LINUX_LINE_SEPARATOR = "\n";
+    // Engages the analyzer whose rule 1 the workspace tests name in a workspace [rule] table
+    public static final String EXAMPLE_ORG_ANALYZER = """
+
+            [[analyzer]]
+            org = "exampleOrg"
+            name = "example_module_static_code_analyzer"
+            """;
 
     private TestConstants() {
     }

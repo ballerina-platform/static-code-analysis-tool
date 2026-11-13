@@ -201,7 +201,7 @@ A sample `Scan.toml`:
 ```toml
 # Rules to include or exclude in the analysis (same as --include-rules and --exclude-rules)
 [rule]
-include = ["ballerina:1", "ballerina/io:101"]
+include = ["ballerina:1", "ballerina:2"]
 # exclude = ["ballerina:1"]
 
 # Platform plugins that --platforms can report results to
@@ -227,7 +227,7 @@ excludeTests = true
 
 The rules given with `--include-rules` are added to `include`, and those given with `--exclude-rules` are added to `exclude`, for that run. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes both rules. Including and excluding rules at the same time is not allowed, so an option that conflicts with the other setting in `Scan.toml` is a usage error: with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` exits with code `2`.
 
-`bal scan` checks the whole `Scan.toml` file and reports every mistake at once with its line and column, exiting with code `1`: an unknown table or key, such as `[gates]`, a value of the wrong type, and an invalid `[[analyzer]]` entry.
+`bal scan` checks the whole `Scan.toml` file and reports every mistake at once with its line and column, exiting with code `1`: an unknown table or key, such as `[gates]`, a value of the wrong type, an invalid `[[analyzer]]` entry, and a mistyped rule in `[rule]`: a malformed rule ID, a core rule that does not exist, or a rule that an analyzer the package uses does not define. A rule of an analyzer that the package does not use, as a shared `Scan.toml` can name, is a warning.
 
 Each `[[platform]]` entry requires both a `name` and a `path`. The `path` must point to the platform plugin JAR, either as a local file path (resolved relative to the folder of the `Scan.toml` file) or as a URL to download it from. A declared platform is reported to only when it is named in `--platforms`, and `--platforms` can only name platforms declared there. The plugin JAR is checked, or downloaded, only when its platform is named; a path that is then neither an existing file nor a URL stops the scan with an error. The results are always printed and saved first, and the named platforms then run one after another. If any platform fails, the scan lists every failure and exits with code `1`.
 
@@ -241,7 +241,7 @@ See [Scan file configurations](https://github.com/ballerina-platform/static-code
 |------|---------|
 | `0` | The scan completed, and no gate is set or the gate was not tripped. |
 | `1` | The gate was tripped, or the scan could not be completed, for example because of an invalid `Scan.toml`, a package that cannot be loaded, such as one whose `Ballerina.toml` has an error, a compilation error, an empty package (an empty workspace member is skipped with a warning), a plugin failure, an invalid suppression or a report that cannot be written. |
-| `2` | Invalid command-line input, such as an invalid option value, an unknown option, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, `--platforms` with a single Ballerina file, or an unknown rule ID. |
+| `2` | Invalid command-line input, such as an invalid option value, an unknown option, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, `--platforms` with a single Ballerina file, or an unknown rule ID in `--include-rules` or `--exclude-rules`. A mistyped rule ID in `Scan.toml` is an invalid `Scan.toml`. |
 | `3` | The path is not a Ballerina package, workspace or standalone file, or is a `.bal` file inside a package. |
 | `130` | The scan was interrupted. |
 

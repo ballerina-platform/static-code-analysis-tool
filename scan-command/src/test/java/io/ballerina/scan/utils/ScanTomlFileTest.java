@@ -21,6 +21,7 @@ package io.ballerina.scan.utils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -48,5 +49,25 @@ public class ScanTomlFileTest {
                 ScanTomlFile.ANALYSIS_EXCLUDE_TESTS_SETTING, "true"));
         Assert.assertTrue(scanToml.getWrittenValue(ScanTomlFile.GATE_FAIL_ON_COUNT_SETTING).isEmpty());
         Assert.assertTrue(scanToml.isSuppressionEnabled(), "a setting not written keeps its default");
+    }
+
+    @Test(description = "test two files are the same when read from the same normalized path or the same URL")
+    void testIsSameFile() {
+        ScanTomlFile workspaceFile = new ScanTomlFile();
+        workspaceFile.setPath(Path.of("workspace", "Scan.toml"));
+        ScanTomlFile packageFile = new ScanTomlFile();
+        packageFile.setPath(Path.of("workspace", "pkg", "..", "Scan.toml"));
+        Assert.assertTrue(packageFile.isSameFile(workspaceFile));
+        packageFile.setPath(Path.of("workspace", "pkg", "Scan.toml"));
+        Assert.assertFalse(packageFile.isSameFile(workspaceFile));
+        Assert.assertFalse(new ScanTomlFile().isSameFile(workspaceFile), "a package without a file");
+
+        ScanTomlFile remoteFile = new ScanTomlFile();
+        remoteFile.setPath(Path.of("workspace", "Scan.toml"));
+        remoteFile.setRemoteLocation("https://example.com/Scan.toml");
+        Assert.assertFalse(remoteFile.isSameFile(workspaceFile), "a cached copy is not the local file");
+        ScanTomlFile otherRemoteFile = new ScanTomlFile();
+        otherRemoteFile.setRemoteLocation("https://example.com/Scan.toml");
+        Assert.assertTrue(otherRemoteFile.isSameFile(remoteFile));
     }
 }

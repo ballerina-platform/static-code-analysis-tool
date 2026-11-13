@@ -45,6 +45,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static io.ballerina.scan.TestConstants.EXAMPLE_ORG_ANALYZER;
+
 /**
  * Tests for the exit codes, error reports and gate of the scan command.
  *
@@ -603,6 +605,8 @@ public class GateTest extends BaseTest {
     void testWorkspaceRuleDefault() throws IOException {
         Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        Path otherScanToml = gatedWorkspace.resolve("pkg-b").resolve("Scan.toml");
+        String otherOriginal = Files.readString(otherScanToml, StandardCharsets.UTF_8);
         try {
             // pkg-a has no Scan.toml, so it uses the workspace exclusion of its HIGH issue
             Files.delete(packageScanToml);
@@ -617,6 +621,8 @@ public class GateTest extends BaseTest {
                     [rule]
                     exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
                     """);
+            // pkg-b provides the rule through an analyzer of its own, so the workspace entry is valid
+            Files.writeString(otherScanToml, otherOriginal + EXAMPLE_ORG_ANALYZER);
             run = scan(gatedWorkspace);
             Assert.assertTrue(run.output().contains("bal scan: warning: 'exampleOrg/example_module_static_code_"
                     + "analyzer:1' in [rule] of Scan.toml is not a rule of pkg-a\n"), run.output());
@@ -634,6 +640,7 @@ public class GateTest extends BaseTest {
         } finally {
             Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
             Files.writeString(packageScanToml, original);
+            Files.writeString(otherScanToml, otherOriginal);
         }
     }
 
@@ -679,8 +686,11 @@ public class GateTest extends BaseTest {
     void testUnavailableWorkspaceRuleWithRuleOption() throws IOException {
         Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        Path otherScanToml = gatedWorkspace.resolve("pkg-b").resolve("Scan.toml");
+        String otherOriginal = Files.readString(otherScanToml, StandardCharsets.UTF_8);
         try {
             Files.delete(packageScanToml);
+            Files.writeString(otherScanToml, otherOriginal + EXAMPLE_ORG_ANALYZER);
             writeWorkspaceScanToml("""
                     [rule]
                     exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
@@ -693,6 +703,7 @@ public class GateTest extends BaseTest {
         } finally {
             Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
             Files.writeString(packageScanToml, original);
+            Files.writeString(otherScanToml, otherOriginal);
         }
     }
 

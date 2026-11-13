@@ -18,12 +18,15 @@
 
 package io.ballerina.scan.utils;
 
+import io.ballerina.tools.text.LineRange;
+
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -48,6 +51,7 @@ public class ScanTomlFile {
     private final Set<Analyzer> analyzers = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToInclude = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToExclude = new LinkedHashSet<>();
+    private final Map<String, LineRange> ruleLocations = new LinkedHashMap<>();
     private final Set<String> platformsWithoutPath = new LinkedHashSet<>();
     // Each setting the file writes, keyed by its name, with its value as written in TOML
     private final Map<String, String> writtenSettings = new LinkedHashMap<>();
@@ -59,8 +63,23 @@ public class ScanTomlFile {
     private boolean excludeTests;
     private Path path;
     private String remoteLocation;
+    private boolean workspaceFile;
 
     ScanTomlFile() {
+    }
+
+    void setWorkspaceFile(boolean workspaceFile) {
+        this.workspaceFile = workspaceFile;
+    }
+
+    /**
+     * Returns whether this is the Scan.toml file of a workspace, which applies to every package without one of its own.
+     *
+     * @return true for the Scan.toml file of a workspace
+     * @since 0.14.0
+     */
+    public boolean isWorkspaceFile() {
+        return workspaceFile;
     }
 
     void setRemoteLocation(String remoteLocation) {
@@ -158,6 +177,21 @@ public class ScanTomlFile {
     }
 
     /**
+     * Returns whether this file and another were read from the same local file or URL.
+     *
+     * @param other the other Scan.toml file
+     * @return true when both were read from the same place
+     * @since 0.14.0
+     */
+    public boolean isSameFile(ScanTomlFile other) {
+        if (remoteLocation != null || other.remoteLocation != null) {
+            return Objects.equals(remoteLocation, other.remoteLocation);
+        }
+        return path != null && other.path != null
+                && path.toAbsolutePath().normalize().equals(other.path.toAbsolutePath().normalize());
+    }
+
+    /**
      * Returns the location of the file as shown to the user: the URL of a remote file, or the path relative to a
      * root.
      *
@@ -197,8 +231,31 @@ public class ScanTomlFile {
         writtenSettings.put(ANALYZER_SETTING + id, "");
     }
 
+    void setRuleToInclude(RuleToFilter rule) {
+        rulesToInclude.add(rule);
+    }
+
+    void setRuleToExclude(RuleToFilter rule) {
+        rulesToExclude.add(rule);
+    }
+
+    void setRuleLocation(String ruleId, LineRange location) {
+        ruleLocations.putIfAbsent(ruleId, location);
+    }
+
     void addPlatformWithoutPath(String name) {
         platformsWithoutPath.add(name);
+    }
+
+    /**
+     * Returns where a rule of the [rule] table is written in the file.
+     *
+     * @param ruleId the rule ID
+     * @return the location of its first entry, or empty when the file does not name the rule
+     * @since 0.14.0
+     */
+    public Optional<LineRange> getRuleLocation(String ruleId) {
+        return Optional.ofNullable(ruleLocations.get(ruleId));
     }
 
     /**
@@ -209,14 +266,6 @@ public class ScanTomlFile {
      */
     public Set<String> getPlatformsWithoutPath() {
         return Collections.unmodifiableSet(platformsWithoutPath);
-    }
-
-    void setRuleToInclude(RuleToFilter rule) {
-        rulesToInclude.add(rule);
-    }
-
-    void setRuleToExclude(RuleToFilter rule) {
-        rulesToExclude.add(rule);
     }
 
     void setSuppressionEnabled(boolean enabled) {

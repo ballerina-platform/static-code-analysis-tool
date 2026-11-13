@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.function.BiFunction;
 
+import static io.ballerina.scan.TestConstants.EXAMPLE_ORG_ANALYZER;
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
 
@@ -169,9 +170,13 @@ public class ConsoleLayoutTest extends BaseTest {
         Path packageScanToml = workspace.resolve("pkg-a").resolve("Scan.toml");
         Path workspaceScanToml = workspace.resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        Path otherScanToml = workspace.resolve("pkg-b").resolve("Scan.toml");
+        String otherOriginal = Files.readString(otherScanToml, StandardCharsets.UTF_8);
         try {
-            // pkg-a uses the workspace file, which names a rule pkg-a lacks; pkg-b's own file leaves it out
+            // pkg-a uses the workspace file, which names a rule pkg-a lacks; pkg-b's own file leaves it out and
+            // engages the analyzer that provides it
             Files.delete(packageScanToml);
+            Files.writeString(otherScanToml, otherOriginal + EXAMPLE_ORG_ANALYZER);
             Files.writeString(workspaceScanToml, """
                     [rule]
                     exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
@@ -204,6 +209,7 @@ public class ConsoleLayoutTest extends BaseTest {
         } finally {
             Files.deleteIfExists(workspaceScanToml);
             Files.writeString(packageScanToml, original);
+            Files.writeString(otherScanToml, otherOriginal);
         }
     }
 

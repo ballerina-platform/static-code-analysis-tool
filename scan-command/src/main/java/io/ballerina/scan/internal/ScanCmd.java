@@ -83,6 +83,8 @@ import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_RULE_PREFIX;
@@ -91,6 +93,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.LOADING_CONFIGURATION
 import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_WORKSPACE_DEPENDENCIES_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_WORKSPACE_SCAN_RULES_LOG;
+import static io.ballerina.scan.internal.ScanToolConstants.RULE_ID_PATTERN;
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_PACKAGE_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
@@ -109,6 +112,8 @@ public class ScanCmd implements BLauncherCmd {
     private static final String FAIL_ON_COUNT_OPTION = "--fail-on-count";
     private static final String EXCLUDE_TESTS_OPTION = "--exclude-tests";
     private static final String LIST_RULES_HINT = "  Run 'bal scan --list-rules' to see the available rules.";
+    private static final String PACKAGE_SCOPE = "the package";
+    private static final String WORKSPACE_SCOPE = "any package of the workspace";
 
     private final PrintStream outputStream;
     private final PrintStream errorStream;
@@ -217,6 +222,8 @@ public class ScanCmd implements BLauncherCmd {
     private final ConsoleLayout layout = new ConsoleLayout();
     // Warnings are held until the next section, so that the configuration of every package is loaded as one block
     private final List<String> pendingWarnings = new ArrayList<>();
+    // The rules of the workspace [rule] table that each package using it does not provide
+    private final Map<Project, List<String>> unavailableWorkspaceRules = new LinkedHashMap<>();
     // The platforms named in --platforms that a workspace package declares without a path
     private final Set<String> pathlessWorkspacePlatforms = new LinkedHashSet<>();
 
@@ -522,8 +529,9 @@ public class ScanCmd implements BLauncherCmd {
         // The analyzer rules are known only once each package is loaded, so only core rule IDs are checked up front
         addRules(CoreRule.rules());
         failOnUnknownRuleOptions(true);
-        // The run fails anyway, so the other packages are not compiled and scanned
-        failOnPackageFailures(workspaceProject, failures);
+        // The run fails anyway, so the other packages are not compiled and scanned. A mistyped core rule of the
+        // workspace Scan.toml is known already, and is reported with the packages that failed
+        failOnWorkspaceErrors(workspaceProject, workspaceRuleErrors(workspaceProject), failures);
 
         // Each package's analyzers are loaded just before it is scanned and released after it, and its result once it
         // is reported
@@ -533,7 +541,9 @@ public class ScanCmd implements BLauncherCmd {
             BuildProject buildProject = (BuildProject) packageScan.project();
             try {
                 printRunningScans(buildProject);
-                PackageResult result = scanPackage(packageScan, loadRules(packageScan));
+                PackageRules rules = loadRules(packageScan);
+                checkConfigRules(packageScan, rules);
+                PackageResult result = scanPackage(packageScan, rules);
                 results.add(result);
                 if (result.suppressionFailure() != null) {
                     failures.put(buildProject, result.suppressionFailure());
@@ -543,11 +553,15 @@ public class ScanCmd implements BLauncherCmd {
             }
         }
         // A package that failed to load has no rules, so the analyzer rule IDs are complete only without failures
-        if (failures.isEmpty()) {
+        boolean allRulesKnown = failures.isEmpty();
+        List<String> workspaceErrors = new ArrayList<>();
+        if (allRulesKnown) {
             failOnUnknownRuleOptions(false);
+            workspaceErrors.addAll(workspaceRuleErrors(workspaceProject));
         }
+        warnUnavailableWorkspaceRules(workspaceProject, allRulesKnown);
         // Nothing is reported until every package is scanned without an error
-        failOnPackageFailures(workspaceProject, failures);
+        failOnWorkspaceErrors(workspaceProject, workspaceErrors, failures);
         section(Section.COMBINING);
         errorStream.println(COMBINING_RESULTS_LOG + results.size() + (results.size() == 1 ? " package" : " packages"));
 
@@ -679,9 +693,37 @@ public class ScanCmd implements BLauncherCmd {
      */
     private static void failOnPackageFailures(WorkspaceProject workspaceProject,
                                               Map<BuildProject, ScanFailure> failures) {
-        if (failures.isEmpty()) {
+        if (!failures.isEmpty()) {
+            throw packageFailures(workspaceProject, failures);
+        }
+    }
+
+    /**
+     * Fails the scan with the errors of the workspace Scan.toml that are known only once its packages are loaded,
+     * together with the errors of every package that failed, so that all of them are reported at once.
+     */
+    private void failOnWorkspaceErrors(WorkspaceProject workspaceProject, List<String> workspaceErrors,
+                                       Map<BuildProject, ScanFailure> failures) {
+        if (workspaceErrors.isEmpty()) {
+            failOnPackageFailures(workspaceProject, failures);
             return;
         }
+        String displayPath = workspaceDefaults.getDisplayPath(workspaceProject.sourceRoot())
+                .orElse(Constants.SCAN_FILE);
+        long errorCount = workspaceErrors.stream().filter(error -> !error.equals(LIST_RULES_HINT)).count();
+        String message = DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath, errorCount);
+        if (failures.isEmpty()) {
+            throw ScanFailure.runtime(message, workspaceErrors);
+        }
+        ScanFailure packageFailure = packageFailures(workspaceProject, failures);
+        List<String> diagnostics = new ArrayList<>(workspaceErrors);
+        diagnostics.addAll(packageFailure.details());
+        throw ScanFailure.of(packageFailure.exitCode(), DiagnosticLog.error(
+                DiagnosticCode.WORKSPACE_FILE_AND_PACKAGES_FAILED, message, failures.size()), diagnostics);
+    }
+
+    private static ScanFailure packageFailures(WorkspaceProject workspaceProject,
+                                               Map<BuildProject, ScanFailure> failures) {
         List<String> diagnostics = new ArrayList<>();
         ExitCode exitCode = ExitCode.RUNTIME_ERROR;
         for (Map.Entry<BuildProject, ScanFailure> entry : failures.entrySet()) {
@@ -692,7 +734,7 @@ public class ScanCmd implements BLauncherCmd {
                 exitCode = ExitCode.INVALID_TARGET;
             }
         }
-        throw ScanFailure.of(exitCode, DiagnosticLog.error(DiagnosticCode.PACKAGES_FAILED, failures.size()),
+        return ScanFailure.of(exitCode, DiagnosticLog.error(DiagnosticCode.PACKAGES_FAILED, failures.size()),
                 diagnostics);
     }
 
@@ -734,6 +776,7 @@ public class ScanCmd implements BLauncherCmd {
         PackageScan packageScan = preparePackage(project);
         PackageRules rules = loadRules(packageScan);
         failOnUnknownRuleOptions(false);
+        checkConfigRules(packageScan, rules);
         if (listRules) {
             section(Section.RULES);
             ScanUtils.printRulesToConsole(allRules, outputStream);
@@ -801,12 +844,49 @@ public class ScanCmd implements BLauncherCmd {
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
         addRules(coreRules);
         externalAnalyzers.values().forEach(this::addRules);
-
-        boolean usesWorkspaceFile = scanningWorkspace && workspaceDefaults != null && scanTomlFile == workspaceDefaults;
-        if (!listRules && usesWorkspaceFile) {
-            warnUnavailableWorkspaceRules(project, scanTomlFile, ProjectAnalyzer.rules(coreRules, externalAnalyzers));
-        }
         return new PackageRules(projectAnalyzer, coreRules, externalAnalyzers);
+    }
+
+    /**
+     * Checks the rules of the [rule] table of the Scan.toml file a package uses against the rules of the package. A
+     * mistyped rule fails the scan, and a rule of an analyzer the package does not use is a warning, since a shared
+     * Scan.toml can name rules of analyzers that only some packages use. The rules of the workspace file are checked
+     * against every package once all of them are loaded.
+     */
+    private void checkConfigRules(PackageScan packageScan, PackageRules rules) {
+        if (listRules) {
+            return;
+        }
+        Project project = packageScan.project();
+        ScanTomlFile scanTomlFile = packageScan.scanTomlFile();
+        Set<String> packageRuleIds = new HashSet<>();
+        ProjectAnalyzer.rules(rules.coreRules(), rules.externalAnalyzers())
+                .forEach(rule -> packageRuleIds.add(rule.id()));
+        if (scanningWorkspace && scanTomlFile.isWorkspaceFile()) {
+            recordUnavailableWorkspaceRules(project, scanTomlFile, packageRuleIds);
+            return;
+        }
+        String displayPath = scanTomlFile.getDisplayPath(scanTomlRoot(project, scanTomlFile))
+                .orElse(Constants.SCAN_FILE);
+        Set<String> mistypedRules = mistypedRules(scanTomlFile, packageRuleIds);
+        List<String> unavailableRules = configRuleIds(scanTomlFile)
+                .filter(ruleId -> !packageRuleIds.contains(ruleId) && !mistypedRules.contains(ruleId))
+                .map(ruleId -> "'" + ruleId + "'")
+                .toList();
+        if (!unavailableRules.isEmpty()) {
+            String packageLabel = project.workspaceProject()
+                    .map(workspaceProject -> packageLabel(workspaceProject, project))
+                    .orElse(PACKAGE_SCOPE);
+            String scanTomlLabel = project.workspaceProject()
+                    .flatMap(workspaceProject -> scanTomlFile.getDisplayPath(workspaceProject.sourceRoot()))
+                    .orElse(displayPath);
+            warn(DiagnosticLog.warning(DiagnosticCode.WORKSPACE_RULE_NOT_AVAILABLE, joinWithAnd(unavailableRules),
+                    scanTomlLabel, unavailableRules.size(), packageLabel));
+        }
+        if (!mistypedRules.isEmpty()) {
+            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath,
+                    mistypedRules.size()), ruleErrors(scanTomlFile, displayPath, mistypedRules, PACKAGE_SCOPE));
+        }
     }
 
     /**
@@ -863,10 +943,11 @@ public class ScanCmd implements BLauncherCmd {
         if (workspaceFile == null) {
             return packageFile;
         }
-        if (packageFile.getPath().isEmpty()) {
+        // A package whose configPath names the workspace file uses it as the workspace file
+        if (packageFile.getPath().isEmpty() || packageFile.isSameFile(workspaceFile)) {
             return workspaceFile;
         }
-        if (!listRules && !packageFile.getPath().equals(workspaceFile.getPath())) {
+        if (!listRules) {
             warnWorkspaceFileOverridden(workspace, project, packageFile, workspaceFile);
         }
         return packageFile;
@@ -950,26 +1031,103 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * Warns about the rules of the workspace [rule] table that a package does not provide, since they may come from an
+     * Records the rules of the workspace [rule] table that a package does not provide, since they may come from an
      * analyzer that only some packages use.
      */
-    private void warnUnavailableWorkspaceRules(Project project, ScanTomlFile workspaceFile, List<Rule> packageRules) {
-        Set<String> packageRuleIds = new HashSet<>();
-        packageRules.forEach(rule -> packageRuleIds.add(rule.id()));
-        List<String> unavailableRules = Stream.concat(workspaceFile.getRulesToInclude().stream(),
-                        workspaceFile.getRulesToExclude().stream())
-                .map(ScanTomlFile.RuleToFilter::id)
+    private void recordUnavailableWorkspaceRules(Project project, ScanTomlFile workspaceFile,
+                                                 Set<String> packageRuleIds) {
+        List<String> unavailableRules = configRuleIds(workspaceFile)
                 .filter(ruleId -> !packageRuleIds.contains(ruleId))
-                .distinct()
-                .map(ruleId -> "'" + ruleId + "'")
                 .toList();
-        if (unavailableRules.isEmpty()) {
+        if (!unavailableRules.isEmpty()) {
+            unavailableWorkspaceRules.put(project, unavailableRules);
+        }
+    }
+
+    /**
+     * Warns about each package that does not provide a rule of the workspace [rule] table. When the rules of every
+     * package are known, a mistyped rule fails the scan instead.
+     */
+    private void warnUnavailableWorkspaceRules(WorkspaceProject workspaceProject, boolean allRulesKnown) {
+        if (workspaceDefaults == null) {
             return;
         }
-        WorkspaceProject workspaceProject = project.workspaceProject().orElseThrow();
-        warn(DiagnosticLog.warning(DiagnosticCode.WORKSPACE_RULE_NOT_AVAILABLE, joinWithAnd(unavailableRules),
-                workspaceFile.getDisplayPath(workspaceProject.sourceRoot()).orElse(Constants.SCAN_FILE),
-                unavailableRules.size(), packageLabel(workspaceProject, project)));
+        Set<String> mistypedRules = allRulesKnown ? mistypedRules(workspaceDefaults, allRuleIds) : Set.of();
+        String scanTomlLabel = workspaceDefaults.getDisplayPath(workspaceProject.sourceRoot())
+                .orElse(Constants.SCAN_FILE);
+        unavailableWorkspaceRules.forEach((project, ruleIds) -> {
+            List<String> unavailableRules = ruleIds.stream()
+                    .filter(ruleId -> !mistypedRules.contains(ruleId))
+                    .map(ruleId -> "'" + ruleId + "'")
+                    .toList();
+            if (!unavailableRules.isEmpty()) {
+                warn(DiagnosticLog.warning(DiagnosticCode.WORKSPACE_RULE_NOT_AVAILABLE, joinWithAnd(unavailableRules),
+                        scanTomlLabel, unavailableRules.size(), packageLabel(workspaceProject, project)));
+            }
+        });
+        unavailableWorkspaceRules.clear();
+    }
+
+    /**
+     * Returns the errors of the mistyped rules of the workspace [rule] table, checked against the rules known so far.
+     */
+    private List<String> workspaceRuleErrors(WorkspaceProject workspaceProject) {
+        if (workspaceDefaults == null) {
+            return List.of();
+        }
+        String displayPath = workspaceDefaults.getDisplayPath(workspaceProject.sourceRoot())
+                .orElse(Constants.SCAN_FILE);
+        Set<String> mistypedRules = mistypedRules(workspaceDefaults, allRuleIds);
+        return mistypedRules.isEmpty() ? List.of()
+                : ruleErrors(workspaceDefaults, displayPath, mistypedRules, WORKSPACE_SCOPE);
+    }
+
+    /**
+     * Returns the rules of the [rule] table that are mistyped: a rule ID that is not well formed, or one that is not
+     * among the known rules although its provider, the core rules or an analyzer, is known. A rule of an analyzer
+     * that provides no known rules cannot be checked, as it may be used only by other packages.
+     */
+    private static Set<String> mistypedRules(ScanTomlFile scanTomlFile, Set<String> knownRuleIds) {
+        Set<String> providers = knownRuleIds.stream()
+                .map(ruleId -> ruleId.substring(0, ruleId.lastIndexOf(':')))
+                .collect(Collectors.toSet());
+        return configRuleIds(scanTomlFile)
+                .filter(ruleId -> !knownRuleIds.contains(ruleId))
+                .filter(ruleId -> {
+                    Matcher matcher = RULE_ID_PATTERN.matcher(ruleId);
+                    return !matcher.matches() || providers.contains(matcher.group(1));
+                })
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static List<String> ruleErrors(ScanTomlFile scanTomlFile, String displayPath, Set<String> ruleIds,
+                                           String scope) {
+        List<String> errors = new ArrayList<>();
+        for (String ruleId : ruleIds) {
+            errors.add(DiagnosticLog.fileError(displayPath, scanTomlFile.getRuleLocation(ruleId).orElseThrow(),
+                    DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_RULE, ruleId, scope)));
+        }
+        errors.add(LIST_RULES_HINT);
+        return errors;
+    }
+
+    private static Stream<String> configRuleIds(ScanTomlFile scanTomlFile) {
+        return Stream.concat(scanTomlFile.getRulesToInclude().stream(), scanTomlFile.getRulesToExclude().stream())
+                .map(ScanTomlFile.RuleToFilter::id)
+                .distinct();
+    }
+
+    /**
+     * Returns the root that the path of a Scan.toml file is shown relative to: the workspace root for the workspace
+     * file, and the package root otherwise.
+     */
+    private static Path scanTomlRoot(Project project, ScanTomlFile scanTomlFile) {
+        if (!scanTomlFile.isWorkspaceFile()) {
+            return project.sourceRoot();
+        }
+        return project.workspaceProject().map(Project::sourceRoot)
+                .or(() -> ScanUtils.enclosingWorkspaceRoot(project.sourceRoot()))
+                .orElse(project.sourceRoot());
     }
 
     /**
