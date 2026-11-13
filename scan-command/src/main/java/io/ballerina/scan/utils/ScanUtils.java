@@ -70,6 +70,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -175,12 +177,24 @@ public final class ScanUtils {
     public static final String GATE_COUNT_VALUES = "a whole number of 1 or more";
 
     private static final String RULE_LIST_VALUES = "an array of rule IDs, such as [\"ballerina:1\"]";
-    private static final List<String> TOP_LEVEL_TABLES = List.of(ANALYZER_TABLE, PLATFORM_TABLE, RULES_TABLE,
-            SUPPRESSION_TABLE, GATE_TABLE, ANALYSIS_TABLE);
-    private static final String TABLE_VALUES = "[[analyzer]], [[platform]], [rule], [suppression], [gate] or "
-            + "[analysis]";
+    // The top-level tables of a Scan.toml file, each written as it is expected
+    private static final Map<String, String> TOP_LEVEL_TABLES = tableForms(List.of(ANALYZER_TABLE, PLATFORM_TABLE),
+            List.of(RULES_TABLE, SUPPRESSION_TABLE, GATE_TABLE, ANALYSIS_TABLE));
+    private static final String TABLE_VALUES = joinWithOr(TOP_LEVEL_TABLES.values());
 
     private ScanUtils() {
+    }
+
+    private static Map<String, String> tableForms(List<String> tableArrays, List<String> tables) {
+        Map<String, String> forms = new LinkedHashMap<>();
+        tableArrays.forEach(name -> forms.put(name, "[[" + name + "]]"));
+        tables.forEach(name -> forms.put(name, "[" + name + "]"));
+        return Collections.unmodifiableMap(forms);
+    }
+
+    private static String joinWithOr(Collection<String> values) {
+        List<String> items = List.copyOf(values);
+        return String.join(", ", items.subList(0, items.size() - 1)) + " or " + items.get(items.size() - 1);
     }
 
     /**
@@ -1079,7 +1093,7 @@ public final class ScanUtils {
         TopLevelNode platformNode = entries.get(PLATFORM_TABLE);
         if (platformNode instanceof TomlTableArrayNode) {
             for (Toml platformTable : scanTomlDocumentContent.getTables(PLATFORM_TABLE)) {
-                loadPlatform(platformTable, scanTomlFile, baseDir);
+                loadPlatform(platformTable, scanTomlFile, baseDir, displayPath, errors);
             }
         } else if (platformNode != null && !isEmptyArray(platformNode)) {
             errors.add(DiagnosticLog.fileError(displayPath, platformNode.location().lineRange(),
@@ -1088,8 +1102,7 @@ public final class ScanUtils {
         TopLevelNode analyzerNode = entries.get(ANALYZER_TABLE);
         if (analyzerNode instanceof TomlTableArrayNode) {
             scanTomlDocumentContent.getTables(ANALYZER_TABLE).forEach(loadAnalyzer(scanTomlFile));
-        } else if (analyzerNode != null && !(analyzerNode instanceof TomlKeyValueNode keyValue
-                && keyValue.value() instanceof TomlArrayValueNode array && array.elements().isEmpty())) {
+        } else if (analyzerNode != null && !isEmptyArray(analyzerNode)) {
             String error = DiagnosticLog.fileError(displayPath, analyzerNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_ANALYZER_LIST));
             errors.add(error);
@@ -1136,12 +1149,13 @@ public final class ScanUtils {
         }
         // A misspelled table, such as [gates], would otherwise turn its settings off without notice
         entries.forEach((key, node) -> {
-            if (!TOP_LEVEL_TABLES.contains(key)) {
+            if (!TOP_LEVEL_TABLES.containsKey(key)) {
                 int entryKind = node instanceof TomlKeyValueNode ? 0 : 1;
                 errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
                         DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_ENTRY, entryKind, key, TABLE_VALUES)));
             }
         });
+        errors.sort(byPosition(displayPath));
         switch (validation) {
             case ALL -> failOnConfigErrors(displayPath, errors);
             case RULES -> failOnConfigErrors(displayPath, analyzerErrors);
@@ -1170,6 +1184,16 @@ public final class ScanUtils {
                 .toList();
         failOnConfigErrors(displayPath, syntaxErrors);
         return scanTomlDocumentContent;
+    }
+
+    /**
+     * Orders the errors of a file, each written as {@code <path>:<line>:<column>: error: <message>}, by their position.
+     */
+    private static Comparator<String> byPosition(String displayPath) {
+        return Comparator.comparingLong(error -> {
+            String[] parts = error.substring(displayPath.length() + 1).split(":", 3);
+            return ((long) Integer.parseInt(parts[0]) << Integer.SIZE) + Integer.parseInt(parts[1]);
+        });
     }
 
     /**
@@ -1314,7 +1338,19 @@ public final class ScanUtils {
      * @param scanTomlFile the in-memory representation of the Scan.toml file
      * @param baseDir      the directory relative paths are resolved against
      */
-    private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path baseDir) {
+    private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path baseDir, String displayPath,
+                                     List<String> errors) {
+        // A name or path of another type would otherwise read as missing
+        int errorCount = errors.size();
+        platformTable.get(PLATFORM_NAME).filter(value -> value.kind() != TomlType.STRING)
+                .ifPresent(value -> errors.add(invalidConfigValue(displayPath, value, PLATFORM_NAME,
+                        "a platform name, such as \"sonarqube\"")));
+        platformTable.get(PLATFORM_PATH).filter(value -> value.kind() != TomlType.STRING)
+                .ifPresent(value -> errors.add(invalidConfigValue(displayPath, value, PLATFORM_PATH,
+                        "the path or URL of the plugin JAR")));
+        if (errors.size() > errorCount) {
+            return;
+        }
         Map<String, Object> properties = platformTable.toMap();
         Object platformName = properties.remove(PLATFORM_NAME);
         Optional<String> name = (platformName instanceof String) ? Optional.of(platformName.toString())
