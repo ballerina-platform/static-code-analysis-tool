@@ -4,6 +4,12 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. Releases for older distributions are maintained on the `support/*` branches, which keep their own changelog.
 
+## [Unreleased]
+
+### Changed
+
+- The JSON and SARIF reports, the JSON and SARIF printed to standard output and the HTML report list issues in the same order in every run: by file path, start line, start column, end line, end column and rule ID. Before, the order followed the order the modules and packages were scanned in, which changed between runs. The HTML report also lists its files and workspace packages by path. ([#193](https://github.com/ballerina-platform/static-code-analysis-tool/issues/193))
+
 ## [0.14.0] - 2026-11-17
 
 Built against Ballerina 2201.13.2.
