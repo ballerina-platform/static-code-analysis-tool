@@ -21,7 +21,9 @@ package io.ballerina.scan.internal;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.api.symbols.ArrayTypeSymbol;
 import io.ballerina.compiler.api.symbols.ConstantSymbol;
+import io.ballerina.compiler.api.symbols.MapTypeSymbol;
 import io.ballerina.compiler.api.symbols.Qualifier;
+import io.ballerina.compiler.api.symbols.RecordTypeSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.SymbolKind;
 import io.ballerina.compiler.api.symbols.TupleTypeSymbol;
@@ -71,6 +73,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -87,6 +90,7 @@ import java.util.stream.Stream;
  */
 class SecretValueResolver {
     private static final int MAX_DEPTH = 5;
+    private static final Pattern NUMERIC_LIST = Pattern.compile("\\[\\s*\\d+(\\s*,\\s*\\d+)*\\s*]");
     private static final Set<String> TRANSPARENT_CONVERSIONS = Set.of("toBytes", "toBase64", "toBase16", "trim",
             "toLowerAscii", "toUpperAscii");
 
@@ -107,33 +111,52 @@ class SecretValueResolver {
     /**
      * A resolved value.
      *
-     * @param origin where the value comes from
-     * @param texts  the texts a fixed value can be a secret in: its placeholder parts are left out, and the parts of
-     *               a concatenation or template are joined into one text
-     * @param opaque whether a fixed value is not text, such as a byte array, which can be a secret whatever it holds
+     * @param origin        where the value comes from
+     * @param texts         the texts a fixed value can be a secret in: its placeholder parts are left out, and the
+     *                      parts of a concatenation or template are joined into one text
+     * @param opaque        whether a fixed value is not text, such as a byte array, which is a secret whatever it holds
+     * @param part          the text it adds to a concatenation or template, without its template references
+     * @param isPlaceholder whether that text is a placeholder; a joined text is one only when all its parts are
      */
-    record Value(Origin origin, List<String> texts, boolean opaque) {
-        static final Value UNKNOWN = new Value(Origin.UNKNOWN, List.of(), false);
-        static final Value CONFIGURABLE = new Value(Origin.CONFIGURABLE, List.of(), false);
-        static final Value OPAQUE = new Value(Origin.HARD_CODED, List.of(), true);
+    record Value(Origin origin, List<String> texts, boolean opaque, String part, boolean isPlaceholder) {
+        static final Value UNKNOWN = new Value(Origin.UNKNOWN, List.of(), false, "", false);
+        static final Value CONFIGURABLE = new Value(Origin.CONFIGURABLE, List.of(), false, "", false);
+        static final Value OPAQUE = new Value(Origin.HARD_CODED, List.of(), true, "", false);
 
         static Value text(String text) {
-            return new Value(Origin.HARD_CODED, SecretValueFilter.isPlaceholder(text) ? List.of() : List.of(text),
-                    false);
+            boolean isPlaceholder = SecretValueFilter.isPlaceholder(text);
+            return new Value(Origin.HARD_CODED, isPlaceholder ? List.of() : List.of(text), false,
+                    SecretValueFilter.withoutTemplates(text), isPlaceholder);
         }
 
         boolean isFixed() {
             return origin == Origin.HARD_CODED || origin == Origin.FIXED_VARIABLE;
         }
 
-        // Any fixed text can be a password, but only a text that looks generated can be another secret.
         boolean isReported(Kind kind) {
-            return isFixed() && (opaque || texts.stream().anyMatch(text -> !SecretValueFilter.isPlaceholder(text)
-                    && (kind == Kind.PASSWORD || SecretValueFilter.looksGenerated(text))));
+            return isFixed() && (opaque || texts.stream().anyMatch(text -> isReported(text, kind)));
+        }
+
+        // Any fixed text can be a password, but only a text that looks generated can be another secret.
+        static boolean isReported(String text, Kind kind) {
+            return !SecretValueFilter.isPlaceholder(text)
+                    && (kind == Kind.PASSWORD || SecretValueFilter.looksGenerated(text));
         }
 
         Value withOrigin(Origin fixedOrigin) {
-            return isFixed() ? new Value(fixedOrigin, texts, opaque) : this;
+            return isFixed() ? new Value(fixedOrigin, texts, opaque, part, isPlaceholder) : this;
+        }
+
+        // What reaches past a name that reported it where it is written: nothing, or for a list the other members.
+        Value unreportedBy(Kind writtenKind) {
+            if (!writtenKind.isSecret() || !isReported(writtenKind)) {
+                return this;
+            }
+            if (opaque || texts.size() <= 1) {
+                return UNKNOWN;
+            }
+            return new Value(origin, texts.stream().filter(text -> !isReported(text, writtenKind)).toList(), false,
+                    "", false);
         }
     }
 
@@ -214,8 +237,9 @@ class SecretValueResolver {
             if (!value.isFixed()) {
                 return isConfigurable(variable) ? Value.CONFIGURABLE : value;
             }
-            if (isReportedWhereWritten(SecretNameMatcher.kind(variable.getName().orElse("")), value)) {
-                return Value.UNKNOWN;
+            value = value.unreportedBy(SecretNameMatcher.kind(variable.getName().orElse("")));
+            if (!value.isFixed()) {
+                return value;
             }
             // A configurable's fixed default is a fallback for the secret, which keeps the origin of the default.
             return isConfigurable(variable) ? value : value.withOrigin(Origin.FIXED_VARIABLE);
@@ -239,20 +263,15 @@ class SecretValueResolver {
         if (value.isFixed()) {
             return value.withOrigin(Origin.HARD_CODED);
         }
-        // A byte array or a list constant resolves to its source form, which is not the text of a secret
+        // A list, map or record constant resolves to its source form, which is a secret only for a byte array
         TypeSymbol constantType = SemanticUtils.unwrap(constant.broaderTypeDescriptor());
-        boolean isText = !(constantType instanceof ArrayTypeSymbol || constantType instanceof TupleTypeSymbol);
+        boolean isStructured = constantType instanceof ArrayTypeSymbol || constantType instanceof TupleTypeSymbol
+                || constantType instanceof MapTypeSymbol || constantType instanceof RecordTypeSymbol;
         return constant.resolvedValue()
                 .map(SecretValueFilter::literalValue)
-                .map(text -> isText ? Value.text(text)
-                        : SecretValueFilter.isPlaceholder(text) ? Value.text("") : Value.OPAQUE)
-                .orElse(Value.OPAQUE);
-    }
-
-    // A fixed value reaching the target through a secret-named variable or field is reported where it is written,
-    // when it passes the check of that name, and not again at the target.
-    private static boolean isReportedWhereWritten(Kind writtenKind, Value value) {
-        return writtenKind.isSecret() && value.isReported(writtenKind);
+                .map(text -> !isStructured ? Value.text(text)
+                        : NUMERIC_LIST.matcher(text).matches() ? Value.OPAQUE : Value.UNKNOWN)
+                .orElse(Value.UNKNOWN);
     }
 
     private Value resolveField(ExpressionNode container, String fieldName, int depth, Set<Symbol> visited) {
@@ -276,8 +295,9 @@ class SecretValueResolver {
         // A field of a map of secrets is checked where it is written with the stricter of its name and the maps'.
         Kind writtenKind = SecretNameMatcher.kind(fieldName)
                 .stricter(mapKind((MappingConstructorExpressionNode) field.get().parent()));
-        if (isReportedWhereWritten(writtenKind, value)) {
-            return Value.UNKNOWN;
+        value = value.unreportedBy(writtenKind);
+        if (!value.isFixed()) {
+            return value;
         }
         boolean isConstantRoot = root.filter(symbol -> symbol.kind() == SymbolKind.CONSTANT).isPresent();
         return isConstantRoot ? value.withOrigin(Origin.HARD_CODED)
@@ -450,8 +470,10 @@ class SecretValueResolver {
         if (origin == Origin.UNKNOWN) {
             return Value.UNKNOWN;
         }
-        String text = values.stream().map(value -> String.join("", value.texts())).collect(Collectors.joining());
-        return new Value(origin, text.isEmpty() ? List.of() : List.of(text), values.stream().anyMatch(Value::opaque));
+        String text = values.stream().map(Value::part).collect(Collectors.joining());
+        boolean isPlaceholder = values.stream().allMatch(Value::isPlaceholder);
+        return new Value(origin, isPlaceholder || text.isEmpty() ? List.of() : List.of(text),
+                values.stream().anyMatch(Value::opaque), text, isPlaceholder);
     }
 
     // The members of a list are separate values, any of which can be the secret.
@@ -462,7 +484,7 @@ class SecretValueResolver {
             return Value.UNKNOWN;
         }
         return new Value(origin, values.stream().flatMap(value -> value.texts().stream()).toList(),
-                values.stream().anyMatch(Value::opaque));
+                values.stream().anyMatch(Value::opaque), "", false);
     }
 
     // A value built from fixed parts is fixed, and hard-coded only when no part is reached through a variable.

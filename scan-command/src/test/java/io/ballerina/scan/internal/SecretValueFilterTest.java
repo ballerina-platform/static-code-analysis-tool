@@ -53,7 +53,8 @@ public class SecretValueFilterTest {
         return new Object[][]{
                 {"PJz0UhTJMrHOo68QQNpvnqAY_3Aa"}, {"Basic dXNlcjpwYXNzd29yZA=="}, {"sk_live_51H8xKqLz9"},
                 {"ghp_a1B2c3D4e5F6g7H8"}, {"s3cr3t-value"}, {"9f8a7b6c5d4e"}, {"a8f5f167f44f4964"}, {"AKIA1234"},
-                {"xKqLzPmRtYvWbNcD"}, {"secret12"}, {"admin:admin"}, {"Kq9z/x8F2mPq/Lw7R"}
+                {"xKqLzPmRtYvWbNcD"}, {"secret12"}, {"admin:admin"}, {"Kq9z/x8F2mPq/Lw7R"},
+                {"JBSWYDPEHPKPXPQR"}, {"qwhdkfjsleiruthg"}
         };
     }
 

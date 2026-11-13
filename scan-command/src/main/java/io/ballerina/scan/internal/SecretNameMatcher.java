@@ -96,7 +96,7 @@ final class SecretNameMatcher {
             "placeholder", "field", "param", "scheme", "mode", "provider", "issuer", "audience", "format",
             "encoding", "version", "alias", "ref", "arn", "store", "vault", "scope", "scopes", "location", "prefix",
             "suffix", "template", "handler", "strength", "validator", "status", "valid", "flag", "user", "username",
-            "host", "hostname", "server", "alg", "algorithm", "supported");
+            "host", "hostname", "server", "alg", "algorithm", "supported", "less");
 
     private SecretNameMatcher() {
     }
@@ -142,8 +142,17 @@ final class SecretNameMatcher {
         if (headWordIndex != lastKeywordIndex && isDescriptor(words.get(headWordIndex))) {
             return Kind.NONE;
         }
-        // A name that mentions a password names one, as in "passwordToken", since any value of it can be real
-        return keywords.stream().anyMatch(keyword -> keyword.kind() == Kind.PASSWORD) ? Kind.PASSWORD : Kind.SECRET;
+        // A password named in the head of the name makes it one, as in "passwordToken", but not one that qualifies
+        // another word or follows a preposition, as in "passwordPolicyApiKey" or "tokenForPasswordReset".
+        int firstPreposition = 0;
+        while (firstPreposition < words.size() && !PREPOSITIONS.contains(words.get(firstPreposition))) {
+            firstPreposition++;
+        }
+        int headEnd = firstPreposition;
+        return keywords.stream().anyMatch(keyword -> keyword.kind() == Kind.PASSWORD
+                && keyword.wordIndex() < headEnd
+                && (keyword.wordIndex() + 1 >= words.size() || !isDescriptor(words.get(keyword.wordIndex() + 1))))
+                ? Kind.PASSWORD : Kind.SECRET;
     }
 
     /**

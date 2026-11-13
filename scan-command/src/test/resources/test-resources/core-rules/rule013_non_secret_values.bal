@@ -294,6 +294,47 @@ function passwordlessNames() returns string {
     return passwordlessAuth;
 }
 
+const USER = "admin";
+const PASS = "secret";
+const map<string> AUTH_HEADERS = {"Accept": "application/json"};
+
+function connectAll(string[] passwords) {
+}
+
+// A separator part is kept when a value is joined, as the same value written as one literal
+function joinedWithSeparator() returns string {
+    string authorization = USER + ":" + PASS; // warning
+    return authorization;
+}
+
+// A long run of letters in one case is not a word, as in a base32 or hexadecimal key
+function singleCaseKeys() returns string[] {
+    string totpSecret = "JBSWYDPEHPKPXPQR"; // warning
+    string hmacSecret = "qwhdkfjsleiruthg"; // warning
+    string authToken = "authorization";
+    return [totpSecret, hmacSecret, authToken];
+}
+
+// A map constant is not one text
+function mapConstant() returns map<string> {
+    map<string> authHeaders = AUTH_HEADERS;
+    return authHeaders;
+}
+
+// Only the members of a list reported where it is written are left out where the list is used
+function listMembers() {
+    string[] apiKeys = ["admin", "Xk9qLz2PmRtY"]; // warning
+    connectAll(passwords = apiKeys); // warning: ballerina:14
+}
+
+// A password that qualifies another word, or follows a preposition, does not make the name a password
+function qualifiedPasswordNames() returns string[] {
+    string tokenForPasswordReset = "reset";
+    string passwordPolicyApiKey = "true";
+    string passwordLessToken = "magic";
+    return [tokenForPasswordReset, passwordPolicyApiKey, passwordLessToken];
+}
+
 public function main() {
     assertCors(new, "true");
 }

@@ -41,6 +41,10 @@ final class SecretValueFilter {
     // A template reference inside a larger value, such as "Bearer {{token}}", also makes it a placeholder.
     private static final Pattern EMBEDDED_TEMPLATE = Pattern.compile("\\$\\{[^}]*}|\\{\\{[^}]*}}");
     private static final Pattern REPEATED_CHARACTER = Pattern.compile("(.)\\1*");
+    private static final Pattern TEMPLATE_REFERENCE = Pattern.compile(
+            "\\$\\{[^}]*}|\\{\\{[^}]*}}|<[^<>]+>|\\$[A-Z_][A-Z0-9_]*|%[A-Z_][A-Z0-9_]*%");
+    // A word in one case is no longer than this; a longer run, as in a base32 key, is checked for randomness.
+    private static final int MAX_SINGLE_CASE_WORD_LENGTH = 15;
     private static final Pattern YOUR_PREFIX = Pattern.compile("(?i)your[-_ a-z]*(key|"
             + String.join("|", Stream.concat(SecretNameMatcher.EMBEDDED_KEYWORDS.stream(),
             SecretNameMatcher.WORD_KEYWORDS.stream()).toList()) + ")s?([-_ ]?here)?");
@@ -102,6 +106,11 @@ final class SecretValueFilter {
                 || DUMMY_VALUES.contains(trimmedValue.toLowerCase(Locale.ENGLISH));
     }
 
+    // The value without its template references, such as "${TOKEN}", which stand for a value given elsewhere.
+    static String withoutTemplates(String value) {
+        return TEMPLATE_REFERENCE.matcher(value).replaceAll("");
+    }
+
     /**
      * Checks whether a value looks generated, as a token or a key is: at least 8 characters, not made of words only,
      * not a run of consecutive characters such as "12345678", and with at least 2.5 bits of entropy per character.
@@ -128,6 +137,9 @@ final class SecretValueFilter {
         }
         for (String segment : SEGMENT_SEPARATOR.split(letters)) {
             if (SINGLE_CASE_WORD.matcher(segment).matches()) {
+                if (segment.length() > MAX_SINGLE_CASE_WORD_LENGTH) {
+                    return false;
+                }
                 continue;
             }
             long words = CAMEL_CASE_WORD.matcher(segment).results().count();

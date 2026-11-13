@@ -90,7 +90,10 @@ public class SecretNameMatcherTest {
                 {"dbpasswordvalue", SecretNameMatcher.Kind.PASSWORD},
                 {"passwordtoken", SecretNameMatcher.Kind.PASSWORD}, {"apikeypasswd", SecretNameMatcher.Kind.PASSWORD},
                 {"dbpasswordsecretvalue", SecretNameMatcher.Kind.PASSWORD},
-                {"passwordlessAuth", SecretNameMatcher.Kind.SECRET}, {"passwordless", SecretNameMatcher.Kind.NONE}
+                {"passwordlessAuth", SecretNameMatcher.Kind.SECRET}, {"passwordless", SecretNameMatcher.Kind.NONE},
+                {"passwordLess", SecretNameMatcher.Kind.NONE}, {"passwordLessToken", SecretNameMatcher.Kind.SECRET},
+                {"tokenForPasswordReset", SecretNameMatcher.Kind.SECRET},
+                {"passwordPolicyApiKey", SecretNameMatcher.Kind.SECRET}
         };
     }
 
