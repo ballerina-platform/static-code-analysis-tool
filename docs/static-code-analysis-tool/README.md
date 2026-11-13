@@ -31,15 +31,16 @@ sequenceDiagram
     activate User
     deactivate User
     activate Ballerina Scan Tool
-    Ballerina Scan Tool ->> StaticCodeAnalysisPlatformPlugin: Initialize Platform Plugins
-    activate StaticCodeAnalysisPlatformPlugin
     Ballerina Scan Tool ->> Ballerina Scan Tool: Perform core static code analysis
     Ballerina Scan Tool ->> CompilerPlugin: Engage plugins that extend CompilerPlugin
     activate CompilerPlugin
     CompilerPlugin ->> CompilerPlugin: Perform plugin specific static code analysis
     CompilerPlugin ->> Ballerina Scan Tool: Report issues
     deactivate CompilerPlugin
-    Ballerina Scan Tool ->> StaticCodeAnalysisPlatformPlugin: Report analysis results to each platform plugin
+    Ballerina Scan Tool ->> Ballerina Scan Tool: Print and save analysis results
+    Ballerina Scan Tool ->> StaticCodeAnalysisPlatformPlugin: Initialize each named platform plugin
+    activate StaticCodeAnalysisPlatformPlugin
+    Ballerina Scan Tool ->> StaticCodeAnalysisPlatformPlugin: Report analysis results to each named platform plugin
     StaticCodeAnalysisPlatformPlugin ->> Platform: Report analysis results in a platform specific format
     activate Platform
     deactivate Platform
@@ -47,13 +48,13 @@ sequenceDiagram
     deactivate Ballerina Scan Tool
 ```
 
-The Ballerina static code analysis tool performs analysis on both single `BAL` files and Ballerina projects and identifies potential code smells, bugs, and vulnerabilities without executing them.
+The Ballerina static code analysis tool performs analysis on single `BAL` files, Ballerina packages, and identifies potential code smells, bugs, and vulnerabilities without executing them.
 
-The tool performs the analysis against a core set of rules based on the core language. If compiler plugins that perform additional static analysis are available, the tool will engage them and finally report the analysis results to static analysis platforms via platform plugins.
+The tool performs the analysis against a core set of rules based on the core language. If compiler plugins that perform additional static analysis are available, the tool will engage them. It then prints and saves the analysis results, and reports them to the static analysis platforms named in `--platforms` via platform plugins.
 
 # Features
 
-1. Run analysis against all Ballerina documents in a Ballerina project.
+1. Run analysis against all Ballerina documents in a Ballerina package.
 
 ```bash
 bal scan
@@ -65,7 +66,7 @@ bal scan
 bal scan main.bal
 ```
 
-> Note: Analyzing individual Ballerina files of a package is not allowed.
+> Note: Analyzing individual Ballerina files of a package is not allowed; scan the package instead.
 
 3. Run analysis and save analysis results in a specified directory.
 
@@ -79,13 +80,13 @@ bal scan --target-dir="results"
 bal scan --scan-report
 ```
 
-5. Run analysis and specify the output format (ballerina or sarif).
+5. Run analysis and specify the output format (json or sarif).
 
 ```bash
 bal scan --format=sarif
 ```
 
-> Note: The default format is ballerina. The tool supports both ballerina and sarif formats for analysis results.
+> Note: The default format is json, which is also accepted as `ballerina`.
 
 6. View all available rules.
 
@@ -96,25 +97,25 @@ bal scan --list-rules
 7. Run analysis for a specific rule.
 
 ```bash
-bal scan --include-rules="ballerina:101"
+bal scan --include-rules="ballerina:1"
 ```
 
 8. Run analysis for a specific set of rules.
 
 ```bash
-bal scan --include-rules="ballerina:101, ballerina/io:101"
+bal scan --include-rules="ballerina:1, ballerina/io:2"
 ```
 
 9. Exclude analysis for a specific rule.
 
 ```bash
-bal scan --exclude-rules="ballerina:101"
+bal scan --exclude-rules="ballerina:1"
 ```
 
 10. Exclude analysis for a specific set of rules.
 
 ```bash
-bal scan --exclude-rules="ballerina:101, ballerina/io:101"
+bal scan --exclude-rules="ballerina:1, ballerina/io:2"
 ```
 
 11. Run analysis and report to a static analysis platform (e.g., SonarQube).
@@ -123,7 +124,7 @@ bal scan --exclude-rules="ballerina:101, ballerina/io:101"
 bal scan --platforms=sonarqube
 ```
 
-> Note: If the Platform Plugin path is not provided in a `Scan.toml` file, the tool will attempt to download the Platform Plugin for plugins developed by the Ballerina team.
+> Note: The platform and the path to its plugin JAR must be declared in a `[[platform]]` entry of the `Scan.toml` file. A declared platform is reported to only when it is named in `--platforms`, so a plain `bal scan` never reports to a platform.
 
 12. Run analysis and report to multiple static analysis platforms.
 
@@ -131,7 +132,25 @@ bal scan --platforms=sonarqube
 bal scan --platforms="sonarqube, semgrep, codeql"
 ```
 
-13. Configuring the tool's behavior using a configuration file. (e.g., `Scan.toml`)
+13. Accept issues in the source with the `@scan:Suppress` annotation, or report every issue regardless of the annotations.
+
+```bash
+bal scan --ignore-suppressions
+```
+
+14. Fail the scan, with exit code `1`, when the number of issues at or above a severity reaches a count.
+
+```bash
+bal scan --fail-on-severity=HIGH --fail-on-count=5
+```
+
+15. Leave the test sources out of the scan.
+
+```bash
+bal scan --exclude-tests
+```
+
+16. Configuring the tool's behavior using a configuration file. (e.g., `Scan.toml`)
 
 ```md
 📦ballerina_project
@@ -173,6 +192,8 @@ For reporting analysis results to static code analysis platforms, the `StaticCod
 ```java
 package io.ballerina.scan;
 
+import java.util.List;
+
 public interface StaticCodeAnalysisPlatformPlugin {
    String platform();
    void init(PlatformPluginContext platformPluginContext);
@@ -180,7 +201,7 @@ public interface StaticCodeAnalysisPlatformPlugin {
 }
 ```
 
-The scan tool will initialize each platform plugin by calling their `init` method. It uses the `platform` method to identify the platform plugin to pass platform-specific arguments, provided by the user (specified via CLI or '`Scan.toml`'), via the platform plugin context during initialization. After completing the scans, the tool will invoke the Platform Plugins' `onScan` method to notify identified issues. The plugin can then report issues to the relevant platform in the expected format.
+For each platform named in `--platforms`, the scan tool uses the `platform` method to find the plugin in the JAR declared for that platform in `Scan.toml`. After completing the scans and saving the results, the tool initializes the plugin by calling its `init` method with a platform plugin context, which holds the platform-specific arguments that the user sets in the `[[platform]]` entry of `Scan.toml`. It then invokes the plugin's `onScan` method to notify identified issues. The plugin can then report issues to the relevant platform in the expected format.
 
 For more information on reporting analysis results to static analysis platforms, refer to creating a [Static Code Analysis Platform Plugin.](StaticCodeAnalysisPlatformPlugin.md)
 

@@ -13,7 +13,7 @@
 
 # Overview
 
-A `Scan.toml` file can be created to configure the behavior of the Ballerina static code analysis tool. The configuration file is picked if there’s one in the working directory.
+A `Scan.toml` file can be created to configure the behavior of the Ballerina static code analysis tool. The configuration file is picked if there’s one in the root of the package whatever the working directory is. A single Ballerina file is scanned without a `Scan.toml` file.
 
 ```text
 📦ballerina_project
@@ -24,7 +24,7 @@ A `Scan.toml` file can be created to configure the behavior of the Ballerina sta
  ┗ 📜Scan.toml
 ```
 
-The path to the configuration file can also be specified in the `Ballerina.toml` file as follows:
+The path to the configuration file, a local path or a URL, can also be specified in the `Ballerina.toml` file as follows:
 
 ```toml
 [scan]
@@ -54,7 +54,7 @@ path = "path/to/sonar_platform_plugin"
 sonarProjectPropertiesPath = "sonar-project.properties"
 ```
 
-An argument whose name ends with `Path`, such as `sonarProjectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file is passed to the plugin as the absolute path of that file. Any other value, such as a URL or a file the plugin creates, is passed to the plugin unchanged.
+An argument whose name ends with `Path`, such as `sonarProjectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file is passed to the plugin as the absolute path of that file. Any other value, such as a URL or a file the plugin creates, is passed to the plugin unchanged. Every value is passed as a string; see [Static Code Analysis Platform Plugin](StaticCodeAnalysisPlatformPlugin.md#platform-arguments).
 
 The results are always printed and saved before the platforms run, so a failed upload does not hide them. The named platforms then run one after another, and a platform that fails does not stop the others. If any platform fails, the scan lists every failure and exits with code `1`, and the gate is not checked, since an error wins over the gate. A name in `--platforms` that no `[[platform]]` entry declares also fails the scan. A single Ballerina file cannot report to platforms, so `--platforms` with a single file is a usage error (exit code `2`).
 

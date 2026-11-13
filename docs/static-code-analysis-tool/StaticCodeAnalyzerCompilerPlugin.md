@@ -107,7 +107,7 @@ It consists of the following types:
 ## `RuleFactory` class
 
 ```java
-package io.ballerina.scan;
+package io.ballerina.scan.internal;
 
 class RuleFactory {
    private RuleFactory() {}
@@ -119,7 +119,7 @@ class RuleFactory {
 }
 ```
 
-When the `createRule` method of the `RulesFactory` is called by the static code analysis tool, it combines the organization and package names of the compiler plugin with the rules’ numeric identifier to create a `Rule` with a unique fully qualified identifier.
+`RuleFactory` is internal to the static code analysis tool. When its `createRule` method is called by the tool, it combines the organization and package names of the compiler plugin with the rules’ numeric identifier to create a `Rule` with a unique fully qualified identifier.
 
 ## `ScannerContext` interface
 
@@ -128,10 +128,12 @@ package io.ballerina.scan;
 
 public interface ScannerContext {
    Reporter getReporter();
+   Map<String, Object> userData();
+   default boolean isExcludeTests() { return false; }
 }
 ```
 
-When the `getReporter` method of the `ScannerContext` is called by the static code analyzer compiler plugin, it returns the `Reporter` interface that allows reporting static analysis issues.
+When the `getReporter` method of the `ScannerContext` is called by the static code analyzer compiler plugin, it returns the `Reporter` interface that allows reporting static analysis issues. `isExcludeTests()` returns `true` when the test sources are left out of the scan with `--exclude-tests` or `excludeTests = true` in `Scan.toml`. The scan tool drops the issues reported in test sources either way, so an analyzer can use it only to skip analyzing them.
 
 The static code analysis tool creates a new scanner context that contains the in-memory rules for each static code analyzer plugin for reporting issues.
 
@@ -197,56 +199,27 @@ There are three steps to follow to create a static code analyzer compiler plugin
 - Implementing the compiler plugin classes to perform static code analysis.
 
 ## Step 1: Add the static code analysis tool dependencies to the project
-- Clone the static code analysis tool repository:
 
-```bash
-git clone https://github.com/ballerina-platform/static-code-analysis-tool.git
-```
-
-- Build the static code analysis tool:
-
-```bash
-cd static-code-analysis-tool
-./gradlew clean build
-```
-
-- Publish the static code analysis tool to the local Maven repository:
-
-```bash
-./gradlew publishToMavenLocal
-```
-
-- Add the following dependencies to the `build.gradle` file of the new project:
+Each release of the scan tool publishes the `io.ballerina.scan:scan-command` artifact to the GitHub Packages Maven registry of this repository. GitHub Packages requires authentication even for public packages, so use a GitHub user and a personal access token with the `read:packages` scope:
 
 ```groovy
 repositories {
-    mavenLocal()
-}
-
-dependencies {
-    implementation group: 'io.ballerina.scan', name: 'scan-command', version: '0.1.0'
-}
-```
-
-> Note: Once the static code analysis tool is published to the GitHub package registry, only adding the following dependencies to the `build.gradle` file is sufficient:
-
-```groovy
-repositories {
+    mavenCentral()
     maven {
-        maven {
-            url = 'https://maven.pkg.github.com/ballerina-platform/*'
-            credentials {
-            username System.getenv("packageUser")
-            password System.getenv("packagePAT")
-            }
+        url = 'https://maven.pkg.github.com/ballerina-platform/static-code-analysis-tool'
+        credentials {
+            username = System.getenv("packageUser")
+            password = System.getenv("packagePAT")
         }
     }
 }
 
 dependencies {
-    implementation group: 'io.ballerina.scan', name: 'scan-command', version: '0.1.0'
+    implementation group: 'io.ballerina.scan', name: 'scan-command', version: '0.11.1'
 }
 ```
+
+Use the version of the scan tool the plugin is built for, from the [releases](https://github.com/ballerina-platform/static-code-analysis-tool/releases). To build against unreleased changes of the scan tool, run `./gradlew :scan-command:publishToMavenLocal` in a clone of this repository, add `mavenLocal()` to the repositories, and use the `version` in the `gradle.properties` file of the repository, such as `0.11.2-SNAPSHOT`.
 
 ## Step 2: Defining the static code analysis rules
 
@@ -256,26 +229,26 @@ Create a `rules.json` file in the resources directory with static analysis rules
 [
   {
     "id": 1,
-    "ruleKind": "CODE_SMELL",
+    "kind": "CODE_SMELL",
     "description": "rule 1"
   },
   {
     "id": 2,
-    "ruleKind": "BUG",
+    "kind": "BUG",
     "description": "rule 2"
   },
   {
     "id": 3,
-    "ruleKind": "VULNERABILITY",
+    "kind": "VULNERABILITY",
     "description": "rule 3"
   }
 ]
 ```
 
-Each static code analysis rule consists of three parts:
+Each static code analysis rule requires three fields:
 
 - `id` - Integer numeric identifier of the rule.
-- `ruleKind` - Can be one of the following types:
+- `kind` - Can be one of the following types:
   - CODE_SMELL
   - BUG
   - VULNERABILITY
