@@ -4,6 +4,12 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. This branch maintains the 0.11.x line for Ballerina 2201.12 (Update 12). Releases for newer distributions are made from `main`.
 
+## [Unreleased]
+
+### Fixed
+
+- An unknown option, such as `--bogus` or `-x`, and an option written without its value, such as `--format` at the end of the command, exit with code `2`, also when `--help` is given, and are reported as `bal scan: error: unknown option '--bogus'` or `bal scan: error: missing value for --format; expected json or sarif`, as the exit code table states. Before, the `bal` launcher rejected them before the tool ran, with exit code `1`. A value given to an on/off option, such as `--scan-report=yes`, and an option given twice are still rejected by the launcher. (backport of [#236](https://github.com/ballerina-platform/static-code-analysis-tool/pull/236); [#195](https://github.com/ballerina-platform/static-code-analysis-tool/issues/195))
+
 ## [0.11.2] - 2026-11-17
 
 Built against Ballerina 2201.12.0.
