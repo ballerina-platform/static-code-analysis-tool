@@ -85,6 +85,19 @@ public class ScanTomlValidationTest extends BaseTest {
                         path = "plugin.jar"
                         """, List.of("Scan.toml:1:1: error: 'platform' must be written as [[platform]] tables, or as "
                         + "platform = []")},
+                // A name or path of another type would otherwise read as missing
+                {"""
+                        [[platform]]
+                        name = "examplePlatform"
+                        path = 10
+                        """, List.of("Scan.toml:3:8: error: invalid value '10' for 'path'; expected the path or URL of "
+                        + "the plugin JAR")},
+                {"""
+                        [[platform]]
+                        name = 10
+                        path = "plugin.jar"
+                        """, List.of("Scan.toml:2:8: error: invalid value '10' for 'name'; expected a platform name, "
+                        + "such as \"sonarqube\"")},
                 {"""
                         platform = "plugin.jar"
                         """, List.of("Scan.toml:1:1: error: 'platform' must be written as [[platform]] tables, or as "
@@ -107,7 +120,7 @@ public class ScanTomlValidationTest extends BaseTest {
         Assert.assertFalse(run.output().contains("Running Scans"), run.output());
     }
 
-    @Test(description = "test every error of a Scan.toml file is reported at once")
+    @Test(description = "test every error of a Scan.toml file is reported at once, in the order of the file")
     void testAllErrorsReportedAtOnce() throws IOException {
         Files.writeString(scanToml, """
                 foo = 1
@@ -122,9 +135,9 @@ public class ScanTomlValidationTest extends BaseTest {
         Assert.assertEquals(run.exitCode(), 1, run.output());
         Assert.assertEquals(run.errorReport(), """
                 bal scan: error: Scan.toml has 3 errors
-                Scan.toml:7:15: error: invalid value '0' for 'failOnCount'; expected a whole number of 1 or more
                 Scan.toml:1:1: error: unknown key 'foo'; expected\s""" + TABLES + "\n"
-                + "Scan.toml:3:1: error: unknown table 'gates'; expected " + TABLES);
+                + "Scan.toml:3:1: error: unknown table 'gates'; expected " + TABLES + "\n"
+                + "Scan.toml:7:15: error: invalid value '0' for 'failOnCount'; expected a whole number of 1 or more");
     }
 
     @Test(description = "test every documented table and key is accepted, with the extra keys of [[platform]]")
@@ -239,6 +252,23 @@ public class ScanTomlValidationTest extends BaseTest {
                 or [analysis]""");
     }
 
+    @Test(description = "test a workspace Scan.toml accepts platform = [], which declares no platform")
+    void testWorkspaceEmptyPlatformList() throws IOException {
+        Files.writeString(workspaceScanToml, """
+                platform = []
+                """);
+        ScanRun run = scan(workspace);
+        Assert.assertFalse(run.output().contains("Scan.toml has"), run.output());
+
+        Files.writeString(workspaceScanToml, """
+                platform = ["plugin.jar"]
+                """);
+        run = scan(workspace);
+        Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertTrue(run.errorReport().startsWith("bal scan: error: Scan.toml has 1 error\nScan.toml:1:1: error: "
+                + "[[platform]] cannot be set in a workspace Scan.toml"), run.output());
+    }
+
     @Test(description = "test a platform named in --platforms whose [[platform]] has no path is reported as such")
     void testPlatformWithoutPath() throws IOException {
         Files.writeString(scanToml, """
@@ -254,6 +284,16 @@ public class ScanTomlValidationTest extends BaseTest {
         Assert.assertEquals(run.exitCode(), 1, run.output());
         Assert.assertEquals(run.errorReport(), "bal scan: error: platform 'otherPlatform' is not available; add its "
                 + "plugin to the [[platform]] table of Scan.toml");
+
+        // A platform without a path and one that is not declared are reported in the same run
+        run = scan(project, "--platforms=examplePlatform,otherPlatform");
+        Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertTrue(run.output().endsWith("""
+                bal scan: error: platform 'otherPlatform' is not available; add its plugin to the [[platform]] table \
+                of Scan.toml
+                bal scan: error: platform 'examplePlatform' has no 'path' in the [[platform]] table of Scan.toml; set \
+                it to the plugin JAR
+                """), run.output());
 
         run = scan(project);
         Assert.assertEquals(run.exitCode(), 0, "a platform without a path is ignored until it is named: "

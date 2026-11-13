@@ -1187,6 +1187,12 @@ public class ScanCmdTest extends BaseTest {
             Assert.assertTrue(streams[1].contains("bal scan: error: platform 'examplePlatform' has no 'path' in the "
                     + "[[platform]] table of Scan.toml; set it to the plugin JAR"), streams[1]);
             Assert.assertFalse(streams[1].contains("Running scans on"), streams[1]);
+
+            // A platform no package declares is reported in the same run as one declared without a path
+            streams = scanWorkspace(workspacePath, "--platforms=examplePlatform,otherPlatform");
+            Assert.assertTrue(streams[1].contains("bal scan: error: platform 'otherPlatform' is not available; add "
+                    + "its plugin to the [[platform]] table of Scan.toml\nbal scan: error: platform 'examplePlatform' "
+                    + "has no 'path' in the [[platform]] table of Scan.toml; set it to the plugin JAR"), streams[1]);
         } finally {
             Files.deleteIfExists(firstScanToml);
             Files.deleteIfExists(secondScanToml);
