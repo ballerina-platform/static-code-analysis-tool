@@ -229,13 +229,13 @@ The issues found in the file are listed in a table with the line, rule ID, kind 
 |------|---------|
 | `0` | The scan completed, and no gate is set or the gate was not tripped. |
 | `1` | The gate was tripped, or the scan could not be completed, for example because of an invalid `Scan.toml`, a package that cannot be loaded, such as one whose `Ballerina.toml` has an error, a compilation error, an empty package, a platform or plugin failure, an invalid suppression or a report that cannot be written. |
-| `2` | Invalid command-line input, such as an invalid option value, too many arguments, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, an unknown option, `--platforms` with a single Ballerina file, or an unknown rule ID. |
+| `2` | Invalid command-line input, such as an invalid option value, too many arguments, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, an unknown option, `--platforms` with a single Ballerina file, or an unknown rule ID in `--include-rules` or `--exclude-rules`. A mistyped rule ID in `Scan.toml` is an invalid `Scan.toml`. |
 | `3` | The path is not a Ballerina package or standalone file, or is a `.bal` file inside a package. |
 | `130` | The scan was interrupted. |
 
 Every failure other than an interrupt is reported on standard error as `bal scan: error: <message>`, followed by the problems that caused it, such as `Scan.toml:2:18: error: <message>`. Warnings printed by the scan tool are reported as `bal scan: warning: <message>` and never change the exit code.
 
-`bal scan` checks the whole `Scan.toml` file and reports every mistake at once with its line and column, exiting with code `1`: an unknown table or key, such as `[gates]`, a value of the wrong type, and an invalid `[[analyzer]]` entry.
+`bal scan` checks the whole `Scan.toml` file and reports every mistake at once with its line and column, exiting with code `1`: an unknown table or key, such as `[gates]`, a value of the wrong type, an invalid `[[analyzer]]` entry, and a mistyped rule in `[rule]`: a malformed rule ID, a core rule that does not exist, or a rule that an analyzer the package uses does not define. A rule of an analyzer that the package does not use, as a shared `Scan.toml` can name, is a warning.
 
 By default no gate is set, so findings never fail the scan. The gate is set with `--fail-on-severity` and `--fail-on-count`, or with the `[gate]` table of `Scan.toml`, and fails the scan when the number of issues at or above the severity reaches the count:
 

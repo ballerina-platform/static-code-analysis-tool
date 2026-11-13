@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.utils;
 
+import io.ballerina.tools.text.LineRange;
+
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
@@ -48,6 +50,7 @@ public class ScanTomlFile {
     private final Set<Analyzer> analyzers = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToInclude = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToExclude = new LinkedHashSet<>();
+    private final Map<String, LineRange> ruleLocations = new LinkedHashMap<>();
     private final Set<String> platformsWithoutPath = new LinkedHashSet<>();
     // Each setting the file writes, keyed by its name, with its value as written in TOML
     private final Map<String, String> writtenSettings = new LinkedHashMap<>();
@@ -197,8 +200,31 @@ public class ScanTomlFile {
         writtenSettings.put(ANALYZER_SETTING + id, "");
     }
 
+    void setRuleToInclude(RuleToFilter rule) {
+        rulesToInclude.add(rule);
+    }
+
+    void setRuleToExclude(RuleToFilter rule) {
+        rulesToExclude.add(rule);
+    }
+
+    void setRuleLocation(String ruleId, LineRange location) {
+        ruleLocations.putIfAbsent(ruleId, location);
+    }
+
     void addPlatformWithoutPath(String name) {
         platformsWithoutPath.add(name);
+    }
+
+    /**
+     * Returns where a rule of the [rule] table is written in the file.
+     *
+     * @param ruleId the rule ID
+     * @return the location of its first entry, or empty when the file does not name the rule
+     * @since 0.11.2
+     */
+    public Optional<LineRange> getRuleLocation(String ruleId) {
+        return Optional.ofNullable(ruleLocations.get(ruleId));
     }
 
     /**
@@ -209,14 +235,6 @@ public class ScanTomlFile {
      */
     public Set<String> getPlatformsWithoutPath() {
         return Collections.unmodifiableSet(platformsWithoutPath);
-    }
-
-    void setRuleToInclude(RuleToFilter rule) {
-        rulesToInclude.add(rule);
-    }
-
-    void setRuleToExclude(RuleToFilter rule) {
-        rulesToExclude.add(rule);
     }
 
     void setSuppressionEnabled(boolean enabled) {

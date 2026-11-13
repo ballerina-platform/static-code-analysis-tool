@@ -65,6 +65,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -74,9 +75,12 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG;
+import static io.ballerina.scan.internal.ScanToolConstants.RULE_ID_PATTERN;
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 import static io.ballerina.scan.utils.ScanUtils.convertIssuesToJsonString;
@@ -93,6 +97,7 @@ public class ScanCmd implements BLauncherCmd {
     private static final String FAIL_ON_COUNT_OPTION = "--fail-on-count";
     private static final String EXCLUDE_TESTS_OPTION = "--exclude-tests";
     private static final String LIST_RULES_HINT = "  Run 'bal scan --list-rules' to see the available rules.";
+    private static final String PACKAGE_SCOPE = "the package";
     // The JSON report has been named both json and ballerina, and --help documents json
     private static final String JSON_FORMAT = "json";
 
@@ -452,6 +457,7 @@ public class ScanCmd implements BLauncherCmd {
         }
         PackageRules rules = loadRules(packageScan);
         failOnUnknownRuleOptions();
+        checkConfigRules(packageScan, rules);
 
         printRunningScans();
         PackageResult result = scanPackage(packageScan, rules);
@@ -692,6 +698,67 @@ public class ScanCmd implements BLauncherCmd {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.UNKNOWN_RULE_OPTION,
                     joinWithAnd(unknownRules), unknownRules.size()), LIST_RULES_HINT);
         }
+    }
+
+    /**
+     * Checks the rules of the [rule] table of the Scan.toml file against the rules of the package. A mistyped rule
+     * fails the scan, and a rule of an analyzer the package does not use is a warning, since a shared Scan.toml can
+     * name rules of analyzers that only some packages use.
+     */
+    private void checkConfigRules(PackageScan packageScan, PackageRules rules) {
+        Project project = packageScan.project();
+        ScanTomlFile scanTomlFile = packageScan.scanTomlFile();
+        Set<String> packageRuleIds = new HashSet<>();
+        ProjectAnalyzer.rules(rules.coreRules(), rules.externalAnalyzers())
+                .forEach(rule -> packageRuleIds.add(rule.id()));
+        String displayPath = scanTomlFile.getDisplayPath(project.sourceRoot()).orElse(Constants.SCAN_FILE);
+        Set<String> mistypedRules = mistypedRules(scanTomlFile, packageRuleIds);
+        List<String> unavailableRules = configRuleIds(scanTomlFile)
+                .filter(ruleId -> !packageRuleIds.contains(ruleId) && !mistypedRules.contains(ruleId))
+                .map(ruleId -> "'" + ruleId + "'")
+                .toList();
+        if (!unavailableRules.isEmpty()) {
+            warn(DiagnosticLog.warning(DiagnosticCode.WORKSPACE_RULE_NOT_AVAILABLE, joinWithAnd(unavailableRules),
+                    displayPath, unavailableRules.size(), PACKAGE_SCOPE));
+        }
+        if (!mistypedRules.isEmpty()) {
+            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath,
+                    mistypedRules.size()), ruleErrors(scanTomlFile, displayPath, mistypedRules));
+        }
+    }
+
+    /**
+     * Returns the rules of the [rule] table that are mistyped: a rule ID that is not well formed, or one that is not
+     * among the known rules although its provider, the core rules or an analyzer, is known. A rule of an analyzer
+     * that provides no known rules cannot be checked, as it may be used only by other packages.
+     */
+    private static Set<String> mistypedRules(ScanTomlFile scanTomlFile, Set<String> knownRuleIds) {
+        Set<String> providers = knownRuleIds.stream()
+                .map(ruleId -> ruleId.substring(0, ruleId.lastIndexOf(':')))
+                .collect(Collectors.toSet());
+        return configRuleIds(scanTomlFile)
+                .filter(ruleId -> !knownRuleIds.contains(ruleId))
+                .filter(ruleId -> {
+                    Matcher matcher = RULE_ID_PATTERN.matcher(ruleId);
+                    return !matcher.matches() || providers.contains(matcher.group(1));
+                })
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static List<String> ruleErrors(ScanTomlFile scanTomlFile, String displayPath, Set<String> ruleIds) {
+        List<String> errors = new ArrayList<>();
+        for (String ruleId : ruleIds) {
+            errors.add(DiagnosticLog.fileError(displayPath, scanTomlFile.getRuleLocation(ruleId).orElseThrow(),
+                    DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_RULE, ruleId, PACKAGE_SCOPE)));
+        }
+        errors.add(LIST_RULES_HINT);
+        return errors;
+    }
+
+    private static Stream<String> configRuleIds(ScanTomlFile scanTomlFile) {
+        return Stream.concat(scanTomlFile.getRulesToInclude().stream(), scanTomlFile.getRulesToExclude().stream())
+                .map(ScanTomlFile.RuleToFilter::id)
+                .distinct();
     }
 
     /**

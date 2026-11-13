@@ -1490,6 +1490,8 @@ public final class ScanUtils {
             return;
         }
         List<String> ruleIds = rulesArray.toNativeValue().stream().map(Object::toString).toList();
+        rulesArray.elements().forEach(element ->
+                scanTomlFile.setRuleLocation(element.toNativeValue().toString(), element.location().lineRange()));
         ruleIds.forEach(rule -> {
             ScanTomlFile.RuleToFilter ruleToFilter = new ScanTomlFile.RuleToFilter(rule);
             if (includeRules) {

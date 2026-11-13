@@ -36,8 +36,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static io.ballerina.scan.internal.ScanToolConstants.RULE_ID_PATTERN;
 
 /**
  * Applies the {@code @scan:Suppress} annotations of a package to its issues.
@@ -46,7 +47,6 @@ import java.util.stream.Collectors;
  */
 final class SuppressionFilter {
 
-    private static final Pattern RULE_ID = Pattern.compile("(ballerina|[A-Za-z0-9_.]+/[A-Za-z0-9_.]+):[1-9][0-9]*");
 
     private SuppressionFilter() {
     }
@@ -139,7 +139,7 @@ final class SuppressionFilter {
                 unknown.add(error(suppression, DiagnosticLog.error(DiagnosticCode.EMPTY_RULE_LIST)));
             }
             for (String rule : new LinkedHashSet<>(suppression.rules())) {
-                Matcher matcher = RULE_ID.matcher(rule);
+                Matcher matcher = RULE_ID_PATTERN.matcher(rule);
                 if (!matcher.matches()) {
                     unknown.add(error(suppression, suppression.ruleLocation(rule),
                             DiagnosticLog.error(DiagnosticCode.INVALID_RULE_ID, rule)));

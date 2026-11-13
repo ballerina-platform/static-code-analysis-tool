@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.internal;
 
+import java.util.regex.Pattern;
+
 /**
  * {@code ScanToolConstants} contains the constant variables used within the Ballerina scan tool.
  *
@@ -26,6 +28,8 @@ package io.ballerina.scan.internal;
 public class ScanToolConstants {
     static final String SCAN_COMMAND = "scan";
     static final String BALLERINA_RULE_PREFIX = "ballerina:";
+    // A core rule ID, or the ID of a rule of an analyzer package, with the provider as its first group
+    static final Pattern RULE_ID_PATTERN = Pattern.compile("(ballerina|[A-Za-z0-9_.]+/[A-Za-z0-9_.]+):[1-9][0-9]*");
     static final String BALLERINA_ORG = "ballerina";
     static final String BALLERINAI_ORG = "ballerinai";
     static final String BALLERINAX_ORG = "ballerinax";

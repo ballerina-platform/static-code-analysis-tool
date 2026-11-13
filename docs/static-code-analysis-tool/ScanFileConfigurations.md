@@ -31,12 +31,13 @@ The path to the configuration file can also be specified in the `Ballerina.toml`
 configPath = "path/to/Scan.toml"
 ```
 
-A `Scan.toml` file can have the `[[analyzer]]`, `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` and `[analysis]` tables described below, and nothing else. `bal scan` checks the whole file, whether it is local or downloaded from a URL, and stops with exit code `1` on any mistake, listing every error at once with its line and column: an unknown table or key, such as `[gates]`, `[rules]` or `foo = 1`, which would otherwise turn its settings off without notice; a value of the wrong type; and an invalid `[[analyzer]]` entry. For example:
+A `Scan.toml` file can have the `[[analyzer]]`, `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` and `[analysis]` tables described below, and nothing else. `bal scan` checks the whole file, whether it is local or downloaded from a URL, and stops with exit code `1` on any mistake, listing every error at once with its line and column: an unknown table or key, such as `[gates]`, `[rules]` or `foo = 1`, which would otherwise turn its settings off without notice; a value of the wrong type; an invalid `[[analyzer]]` entry; and a mistyped rule in `[rule]`. For example:
 
 ```text
 bal scan: error: Scan.toml has 2 errors
 Scan.toml:1:1: error: unknown table 'gates'; expected [[analyzer]], [[platform]], [rule], [suppression], [gate] or [analysis]
-Scan.toml:5:1: error: 'name' is required in [[analyzer]]
+Scan.toml:5:12: error: unknown rule 'ballerina:999'; it is not a rule of the package
+  Run 'bal scan --list-rules' to see the available rules.
 ```
 
 `bal scan --list-rules` stops only on the errors that change the available rules: a TOML syntax error and an invalid `[[analyzer]]` entry. The editor ignores invalid settings.
@@ -105,15 +106,17 @@ Define the rules to include in the analysis:
 
 ```toml
 [rule]
-include = ["ballerina:101", "ballerina/io:101"]
+include = ["ballerina:1", "ballerina/http:1"]
 ```
 
 Define the rules to exclude in the analysis:
 
 ```toml
 [rule]
-exclude = ["ballerina:101", "ballerina/io:101"]
+exclude = ["ballerina:1", "ballerina/http:1"]
 ```
+
+The rules of a package are the core rules and the rules of the analyzers that the package uses, through the `[[analyzer]]` table or as direct dependencies. A mistyped rule stops the scan with an error in `Scan.toml` (exit code `1`) that gives its line and column: a malformed rule ID, a core rule that does not exist, such as `ballerina:999`, or a rule that an analyzer the package uses does not define. A rule of an analyzer that the package does not use cannot be checked, since a `Scan.toml` shared by several packages through a `configPath` can name the rules of analyzers that only some of them use; such a rule is named in a warning. `bal scan --list-rules` shows the rules of the package.
 
 Rules can be either included or excluded, not both: a `[rule]` table that sets both stops the scan with an error that gives its location, and so does using `--include-rules` together with `--exclude-rules`. A value that is not an array of rule IDs, or an unknown key in the `[rule]` table, also stops the scan with an error that gives its location.
 
