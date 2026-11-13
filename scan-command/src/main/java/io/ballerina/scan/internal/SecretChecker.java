@@ -155,7 +155,7 @@ public class SecretChecker extends NodeVisitor {
         semanticModel.symbol(specificFieldNode)
                 .filter(symbol -> !(symbol instanceof VariableSymbol variable)
                         || canHoldSecret(variable.typeDescriptor()))
-                .ifPresent(symbol -> report(specificFieldNode, valueResolver.resolveSymbol(symbol, kind)));
+                .ifPresent(symbol -> report(specificFieldNode, valueResolver.resolveSymbol(symbol), kind));
     }
 
     @Override
@@ -445,7 +445,7 @@ public class SecretChecker extends NodeVisitor {
             return;
         }
         if (expressionNode.kind() == SyntaxKind.STRING_LITERAL) {
-            report(expressionNode, valueResolver.resolve(expressionNode, kind));
+            report(expressionNode, valueResolver.resolve(expressionNode), kind);
             return;
         }
         Optional<TypeSymbol> type = semanticModel.typeOf(expressionNode);
@@ -473,7 +473,7 @@ public class SecretChecker extends NodeVisitor {
         if (containsUrlWithCredentials(expressionNode)) {
             return;
         }
-        report(expressionNode, valueResolver.resolve(expressionNode, kind));
+        report(expressionNode, valueResolver.resolve(expressionNode), kind);
     }
 
     // A list constant is typed by the shape of its value, so the type of the slot it is given to tells int[] from
@@ -487,17 +487,21 @@ public class SecretChecker extends NodeVisitor {
                 .orElse(valueType);
     }
 
-    // A field whose own name is secret-named is checked with the kind of its name when the field is visited.
+    // A field of a map of secrets is checked with the stricter of its own kind and the map's, as a token in a map of
+    // passwords can hold any value of a password.
     private void validateMapValue(MappingFieldNode field, SecretNameMatcher.Kind kind) {
-        if (field instanceof SpecificFieldNode specificField
-                && !kind(fieldNameText(specificField)).isSecret()) {
-            specificField.valueExpr().ifPresentOrElse(value -> validateExpression(value, kind),
-                    () -> validateShorthandNotation(specificField, kind));
+        if (field instanceof SpecificFieldNode specificField) {
+            SecretNameMatcher.Kind fieldKind = kind(fieldNameText(specificField)).stricter(kind);
+            specificField.valueExpr().ifPresentOrElse(value -> validateExpression(value, fieldKind),
+                    () -> validateShorthandNotation(specificField, fieldKind));
         }
     }
 
-    private void report(Node node, SecretValueResolver.Origin origin) {
-        switch (origin) {
+    private void report(Node node, SecretValueResolver.Value value, SecretNameMatcher.Kind kind) {
+        if (!value.isReported(kind)) {
+            return;
+        }
+        switch (value.origin()) {
             case HARD_CODED -> reportHardCodedSecret(node);
             case FIXED_VARIABLE -> reportNonConfigurableSecret(node);
             default -> { }

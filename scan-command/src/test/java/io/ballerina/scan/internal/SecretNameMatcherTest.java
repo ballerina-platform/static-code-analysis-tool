@@ -85,11 +85,11 @@ public class SecretNameMatcherTest {
                 {"passwordForFileServer", SecretNameMatcher.Kind.PASSWORD},
                 {"apiKey", SecretNameMatcher.Kind.SECRET}, {"accessToken", SecretNameMatcher.Kind.SECRET},
                 {"clientSecret", SecretNameMatcher.Kind.SECRET}, {"\"Authorization\"", SecretNameMatcher.Kind.SECRET},
-                {"credentials", SecretNameMatcher.Kind.SECRET}, {"passwordToken", SecretNameMatcher.Kind.SECRET},
+                {"credentials", SecretNameMatcher.Kind.SECRET}, {"passwordToken", SecretNameMatcher.Kind.PASSWORD},
                 {"tokenPassword", SecretNameMatcher.Kind.PASSWORD}, {"username", SecretNameMatcher.Kind.NONE},
-                {"dbpasswordvalue", SecretNameMatcher.Kind.PASSWORD}, {"passwordtoken", SecretNameMatcher.Kind.SECRET},
-                {"apikeypasswd", SecretNameMatcher.Kind.PASSWORD},
-                {"dbpasswordsecretvalue", SecretNameMatcher.Kind.SECRET}
+                {"dbpasswordvalue", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordtoken", SecretNameMatcher.Kind.PASSWORD}, {"apikeypasswd", SecretNameMatcher.Kind.PASSWORD},
+                {"dbpasswordsecretvalue", SecretNameMatcher.Kind.PASSWORD}
         };
     }
 

@@ -19,6 +19,7 @@
 package io.ballerina.scan.internal;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -112,6 +113,14 @@ final class SecretNameMatcher {
         boolean isSecret() {
             return this != NONE;
         }
+
+        // A password is the stricter kind, as any value of it can be real.
+        Kind stricter(Kind other) {
+            if (this == PASSWORD || other == PASSWORD) {
+                return PASSWORD;
+            }
+            return this == SECRET || other == SECRET ? SECRET : NONE;
+        }
     }
 
     static boolean isSecretName(String name) {
@@ -121,7 +130,8 @@ final class SecretNameMatcher {
     static Kind kind(String name) {
         // Escapes in an identifier or key, such as api\-key, are matched by the characters they encode.
         List<String> words = splitIntoWords(SecretValueFilter.literalValue(name));
-        Optional<KeywordMatch> lastKeyword = lastKeyword(words);
+        List<KeywordMatch> keywords = keywords(words);
+        Optional<KeywordMatch> lastKeyword = keywords.stream().max(Comparator.comparingInt(KeywordMatch::end));
         if (lastKeyword.isEmpty() || words.subList(0, lastKeyword.get().wordIndex()).contains(HASHED)) {
             return Kind.NONE;
         }
@@ -135,7 +145,8 @@ final class SecretNameMatcher {
         if (headWordIndex != lastKeywordIndex && isDescriptor(words.get(headWordIndex))) {
             return Kind.NONE;
         }
-        return lastKeyword.get().kind();
+        // A name that mentions a password names one, as in "passwordToken", since any value of it can be real
+        return keywords.stream().anyMatch(keyword -> keyword.kind() == Kind.PASSWORD) ? Kind.PASSWORD : Kind.SECRET;
     }
 
     /**
@@ -170,9 +181,9 @@ final class SecretNameMatcher {
         return words;
     }
 
-    // The keyword that ends last in the name, which names the secret, as "password" in "dbpasswordvalue".
-    private static Optional<KeywordMatch> lastKeyword(List<String> words) {
-        KeywordMatch last = null;
+    // The keywords found in the name, wherever they end, as "password" in "dbpasswordvalue".
+    private static List<KeywordMatch> keywords(List<String> words) {
+        List<KeywordMatch> matches = new ArrayList<>();
         StringBuilder joinedWords = new StringBuilder();
         int[] wordStarts = new int[words.size() + 1];
         for (int i = 0; i < words.size(); i++) {
@@ -185,7 +196,7 @@ final class SecretNameMatcher {
             }
             for (Keyword keyword : KEYWORDS) {
                 if (!keyword.isEmbedded() && (word.endsWith(keyword.text()) || word.endsWith(keyword.text() + "s"))) {
-                    last = later(last, new KeywordMatch(i, joinedWords.length(), keyword.kind()));
+                    matches.add(new KeywordMatch(i, joinedWords.length(), keyword.kind()));
                 }
             }
         }
@@ -207,15 +218,11 @@ final class SecretNameMatcher {
                 boolean endsWord = nextWordStart == end || (nextWordStart == end + 1 && joined.charAt(end) == 's');
                 boolean spansWholeWords = firstWord == lastWord || (wordStarts[firstWord] == start && endsWord);
                 if (spansWholeWords && NON_SECRET_WORDS.stream().noneMatch(words.get(firstWord)::contains)) {
-                    last = later(last, new KeywordMatch(lastWord, end, keyword.kind()));
+                    matches.add(new KeywordMatch(lastWord, end, keyword.kind()));
                 }
             }
         }
-        return Optional.ofNullable(last);
-    }
-
-    private static KeywordMatch later(KeywordMatch current, KeywordMatch candidate) {
-        return current == null || candidate.end() > current.end() ? candidate : current;
+        return matches;
     }
 
     private static int wordAt(int[] wordStarts, int offset) {

@@ -70,9 +70,10 @@ function assembledValues() returns string[] {
     return [apiKey, accessToken, clientSecret];
 }
 
-// A key in a map of secrets is checked with the kind of its own name
+// A key in a map of secrets is checked with the stricter of its own kind and the map's, so a map of passwords
+// reports any value
 function mapsOfSecrets() returns map<string>[] {
-    map<string> passwords = {apiKey: "true"};
+    map<string> passwords = {apiKey: "true"}; // warning
     map<string> tokens = {db: "Welcome1"}; // warning
     return [passwords, tokens];
 }
@@ -161,6 +162,7 @@ function embeddedPassword() returns string {
 }
 
 configurable string keyPrefix = "a8f5";
+configurable string requiredPart = ?;
 
 // A value built from fixed variables is checked as a whole, and reported as a fixed variable
 function partsInVariables() returns string[] {
@@ -172,8 +174,9 @@ function partsInVariables() returns string[] {
     string apiSecret = greeting + " Proxy";
     string token = "a8f5f167f44f4964"; // warning
     string bearerToken = token + "f44f";
-    string clientSecret = keyPrefix + "f167";
-    return [apiKey, accessToken, apiSecret, bearerToken, clientSecret];
+    string clientSecret = keyPrefix + "f167"; // warning: a configurable's default is hard-coded
+    string authToken = "a8f5" + requiredPart;
+    return [apiKey, accessToken, apiSecret, bearerToken, clientSecret, authToken];
 }
 
 // A chain of variables longer than the tracing depth is not followed
@@ -244,14 +247,28 @@ const Suffix SUFFIX = {suffix: "51H8xKq"};
 
 function suffix() returns Suffix => {suffix: "51H8xKq"};
 
-// A field part is joined with the origin of its mapping, unless it can be replaced or was reported where written
+// A field part is joined with the origin of its mapping, unless it is unknown or was reported where written
 function fieldParts() returns string[] {
-    string apiKey = "sk_live_" + configuredSuffix.suffix;
+    string apiKey = "sk_live_" + configuredSuffix.suffix; // warning: a configurable's default is hard-coded
     string accessToken = "sk_live_" + suffix().suffix;
     final Credentials credentials = {token: "51H8xKqLz9Pm"}; // warning
     string bearerToken = "sk_" + credentials.token;
     string clientSecret = "sk_live_" + SUFFIX.suffix; // warning
     return [apiKey, accessToken, bearerToken, clientSecret];
+}
+
+// A name that mentions a password names one, whatever keyword it ends with
+function passwordNames() returns string[] {
+    string dbPasswordSecret = "hunter2"; // warning
+    string passwordToken = "admin"; // warning
+    return [dbPasswordSecret, passwordToken];
+}
+
+// A placeholder made of several parts is a placeholder as a whole
+function splitPlaceholders() returns string[] {
+    string dbPassword = "change" + "me";
+    string adminPassword = "your-" + "password";
+    return [dbPassword, adminPassword];
 }
 
 public function main() {
