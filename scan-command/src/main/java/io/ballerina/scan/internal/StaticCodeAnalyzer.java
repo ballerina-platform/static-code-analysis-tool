@@ -197,16 +197,11 @@ class StaticCodeAnalyzer extends NodeVisitor {
             return;
         }
 
-        if (operator.kind() == DOUBLE_DOT_LT_TOKEN) {
-            if (lhsValue.get() >= rhsValue.get()) {
-                scannerContext.getReporter().reportIssue(document, location,
-                        CoreRule.INVALID_RANGE_EXPRESSION.rule());
-            }
-        } else if (operator.kind() == ELLIPSIS_TOKEN) {
-            if (lhsValue.get() > rhsValue.get()) {
-                scannerContext.getReporter().reportIssue(document, location,
-                        CoreRule.INVALID_RANGE_EXPRESSION.rule());
-            }
+        boolean isEmpty = operator.kind() == DOUBLE_DOT_LT_TOKEN
+                ? lhsValue.get() >= rhsValue.get()
+                : lhsValue.get() > rhsValue.get();
+        if (isEmpty) {
+            scannerContext.getReporter().reportIssue(document, location, CoreRule.INVALID_RANGE_EXPRESSION.rule());
         }
     }
     
@@ -352,17 +347,27 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     private Optional<TypeBound> typeBound(Node node) {
-        if (node instanceof UnaryExpressionNode unary && unary.unaryOperator().kind() == SyntaxKind.MINUS_TOKEN) {
-            return langLibConstant(unary.expression())
+        Node operand = withoutPlusOrBraces(node);
+        if (operand instanceof UnaryExpressionNode unary && unary.unaryOperator().kind() == SyntaxKind.MINUS_TOKEN) {
+            return langLibConstant(withoutPlusOrBraces(unary.expression()))
                     .filter(constant -> constant.equals(Constants.Token.FLOAT + ":" + Constants.Token.INFINITY))
                     .map(constant -> TypeBound.FLOAT_LOWER);
         }
-        return langLibConstant(node).flatMap(constant -> switch (constant) {
+        return langLibConstant(operand).flatMap(constant -> switch (constant) {
             case Constants.Token.INT + ":" + Constants.Token.MAX_VALUE -> Optional.of(TypeBound.INT_UPPER);
             case Constants.Token.INT + ":" + Constants.Token.MIN_VALUE -> Optional.of(TypeBound.INT_LOWER);
             case Constants.Token.FLOAT + ":" + Constants.Token.INFINITY -> Optional.of(TypeBound.FLOAT_UPPER);
             default -> Optional.empty();
         });
+    }
+
+    private static Node withoutPlusOrBraces(Node node) {
+        return switch (node) {
+            case BracedExpressionNode braced -> withoutPlusOrBraces(braced.expression());
+            case UnaryExpressionNode unary when unary.unaryOperator().kind() == SyntaxKind.PLUS_TOKEN ->
+                    withoutPlusOrBraces(unary.expression());
+            default -> node;
+        };
     }
 
     /**

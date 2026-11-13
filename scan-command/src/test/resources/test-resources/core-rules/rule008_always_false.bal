@@ -141,4 +141,10 @@ function testBoundOnTheLeft() {
     result = -float:Infinity < y;
     int? maybe = ();
     result = maybe > int:MAX_VALUE; // warning
+    result = x > +int:MAX_VALUE; // warning
+    result = y > +float:Infinity; // warning
+    result = x < -int:MAX_VALUE; // no warning: not the smallest int
+    result = y < -float:PI;
+    result = y < -+float:Infinity; // warning
+    result = y < -(float:Infinity); // warning
 }

@@ -1,3 +1,4 @@
+import ballerina/http;
 import ballerina/lang.'int as i;
 
 function testSimpleVariableReference() {
@@ -76,6 +77,21 @@ function testOperators() {
     int? maybe = ();
     result = maybe <= int:MAX_VALUE; // no warning: false when maybe is nil
     result = int:MIN_VALUE <= maybe; // no warning: false when maybe is nil
+}
+
+function testOtherBounds() {
+    int x = 1;
+    float y = 2.3f;
+    boolean result;
+    result = x <= +int:MAX_VALUE; // warning
+    result = +int:MIN_VALUE <= x; // warning
+    result = x >= -int:MAX_VALUE; // no warning: not the smallest int
+    result = x <= int:SIGNED32_MAX_VALUE; // no warning: not the largest int
+    result = y <= float:PI;
+    result = x >= ~int:MAX_VALUE; // no warning: not a sign
+    result = x <= (int:MAX_VALUE); // warning
+    result = x <= http:STATUS_OK; // no warning: not a lang library constant
+    result = x != int:MAX_VALUE; // no warning: not a relational operator
 }
 
 function testRelationaOperatorsWithoutWarnings() {

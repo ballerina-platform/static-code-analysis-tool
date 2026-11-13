@@ -43,7 +43,7 @@ public class Rule012Test extends StaticCodeAnalyzerTest {
                 scannerContext, document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 16);
+        Assert.assertEquals(issues.size(), 18);
         assertIssue(issues.get(0), documentName, 25, 21, 25, 27, "ballerina:12", 12,
                 INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
         assertIssue(issues.get(1), documentName, 29, 21, 29, 27, "ballerina:12", 12,
@@ -75,6 +75,10 @@ public class Rule012Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(14), documentName, 98, 21, 98, 34, "ballerina:12", 12,
                 INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
         assertIssue(issues.get(15), documentName, 101, 21, 101, 37, "ballerina:12", 12,
+                INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(16), documentName, 117, 21, 117, 29, "ballerina:12", 12,
+                INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(17), documentName, 123, 21, 123, 65, "ballerina:12", 12,
                 INVALID_RANGE_EXPRESSION, RuleKind.CODE_SMELL);
     }
 }

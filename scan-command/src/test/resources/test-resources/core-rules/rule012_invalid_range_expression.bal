@@ -104,4 +104,23 @@ function testRangeOperator() {
 
     foreach int i in 1 ... 3000000000 {
     }
+
+    int n = 5;
+    foreach int i in n ... 1 { // no warning: a variable bound is not evaluated
+    }
+
+    foreach int i in 1 ... n {
+    }
+
+    foreach int i in ~1 ... -5 { // no warning: only a sign is evaluated
+    }
+
+    foreach int i in +5 ... 1 { // warning
+    }
+
+    foreach int i in -9223372036854775807 ... -9223372036854775807 {
+    }
+
+    foreach int i in 9223372036854775807 ..< -9223372036854775807 { // warning
+    }
 }
