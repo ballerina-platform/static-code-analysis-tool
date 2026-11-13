@@ -74,6 +74,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG;
@@ -602,12 +603,9 @@ public class ScanCmd implements BLauncherCmd {
         if (requested.isEmpty()) {
             return List.of();
         }
-        List<String> undeclared = requested.stream().filter(name -> !declared.containsKey(name))
-                .map(name -> "'" + name + "'").toList();
-        if (!undeclared.isEmpty()) {
-            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE,
-                    undeclared.size(), joinWithAnd(undeclared)));
-        }
+        Map<Boolean, List<String>> missing = requested.stream().filter(name -> !declared.containsKey(name))
+                .collect(Collectors.partitioningBy(scanTomlFile.getPlatformsWithoutPath()::contains));
+        failOnMissingPlatforms(quoted(missing.get(false)), quoted(missing.get(true)));
         List<ScanTomlFile.Platform> selected = requested.stream().map(declared::get).toList();
 
         // Each JAR is loaded on its own, so that a broken one is blamed on the platform that names it
@@ -631,6 +629,30 @@ public class ScanCmd implements BLauncherCmd {
                     new PlatformPluginContextImpl(platformArgs, platformTriggered)));
         }
         return selectedPlatforms;
+    }
+
+    /**
+     * Fails the scan with every named platform that is not declared and every one declared without a path, in one
+     * failure, so that all of them are reported in the same run.
+     */
+    private static void failOnMissingPlatforms(List<String> undeclared, List<String> withoutPath) {
+        List<String> messages = new ArrayList<>();
+        if (!undeclared.isEmpty()) {
+            messages.add(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, undeclared.size(),
+                    joinWithAnd(undeclared)));
+        }
+        if (!withoutPath.isEmpty()) {
+            messages.add(DiagnosticLog.error(DiagnosticCode.PLATFORM_PATH_MISSING, withoutPath.size(),
+                    joinWithAnd(withoutPath)));
+        }
+        if (!messages.isEmpty()) {
+            throw ScanFailure.runtime(messages.get(0),
+                    messages.subList(1, messages.size()).stream().map(ScanFailure::error).toList());
+        }
+    }
+
+    private static List<String> quoted(List<String> names) {
+        return names.stream().map(name -> "'" + name + "'").toList();
     }
 
     /**
