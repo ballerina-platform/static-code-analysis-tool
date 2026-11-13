@@ -2,13 +2,15 @@ NAME
         ballerina-scan - Static code analyzer
 
 SYNOPSIS
-        bal scan [OPTIONS] [<package>|<source-file>]
+        bal scan [OPTIONS] [<workspace>|<package>|<source-file>]
 
 DESCRIPTION
         Compile and perform static code analysis, print results to the console, and report results.
 
-        Analyzes the source code defined in each module when compiling a package or analyzes the given
-        source file when compiling a single Ballerina file.
+        Analyzes the source code defined in each module when compiling a package, analyzes each package in
+        dependency order when compiling a workspace, or analyzes the given source file when compiling a
+        single Ballerina file. Without a path, the workspace or package in the current directory is
+        scanned.
 
         Note: Analyzing individual Ballerina files of a package is not allowed.
 
@@ -16,6 +18,11 @@ DESCRIPTION
 OPTIONS
         --target-dir=<path>
                 Target directory path for saving analysis reports (only for Ballerina projects).
+                Default is the target directory of the package, or in a workspace, of each
+                package and of the workspace. A relative path is resolved against the package
+                root: in a workspace, each package saves its results in <path>/report under its
+                own root, and the combined results are saved in <path>/report under the
+                workspace root.
 
         --scan-report
                 Generate an HTML report containing the analysis results (only for Ballerina projects).
@@ -24,9 +31,10 @@ OPTIONS
                 Specify the format of the report. Default is json.
 
         --list-rules
-                List the rules available to the project, along with their kind and severity.
-                Only works inside a Ballerina project, and lists only the core rules and the
-                rules contributed by the project's dependencies.
+                List the rules available to the workspace, package or source file, along with
+                their kind and severity. Lists only the core rules and the rules contributed by
+                the dependencies, and for a package or workspace, by the analyzers declared in
+                Scan.toml.
 
         --include-rules=<rule1, ...>
                 Run analysis for a specific set of rules. Added to 'include' in the [rule] table of
@@ -97,16 +105,16 @@ EXAMPLES
                 $ bal scan --list-rules
 
         Run analysis for a specific rule.
-                $ bal scan --include-rules="ballerina:101"
+                $ bal scan --include-rules="ballerina:1"
 
         Run analysis for a specific set of rules.
-                $ bal scan --include-rules="ballerina:101, ballerina/io:101"
+                $ bal scan --include-rules="ballerina:1, ballerina/io:2"
 
         Exclude analysis for a specific rule.
-                $ bal scan --exclude-rules="ballerina:101"
+                $ bal scan --exclude-rules="ballerina:1"
 
         Exclude analysis for a specific set of rules.
-                $ bal scan --exclude-rules="ballerina:101, ballerina/io:101"
+                $ bal scan --exclude-rules="ballerina:1, ballerina/io:2"
 
         Run analysis and report to sonarqube
                 $ bal scan --platforms=sonarqube
