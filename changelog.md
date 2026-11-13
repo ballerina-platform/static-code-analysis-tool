@@ -4,6 +4,12 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. Releases for older distributions are maintained on the `support/*` branches, which keep their own changelog.
 
+## [Unreleased]
+
+### Changed
+
+- In a workspace scan, `--target-dir` names one directory for the whole workspace, as it does for `bal build`: the combined results and the HTML report are saved in `<dir>/report` and the results of each package in `<dir>/<package path>/report`, or in `<dir>/_external/<org>/<name>/report` for a package outside the workspace root. Before, an absolute directory made every package write its results to the same file, which the combined results then replaced, so the results of the packages were lost, and a relative directory was created in each package, as `<package>/<dir>/report`. Scripts that read the results of a package from there need to read them from `<dir>/<package path>/report`. Without `--target-dir`, each package still saves its results in its own `target/report`. ([#192](https://github.com/ballerina-platform/static-code-analysis-tool/issues/192))
+
 ## [0.14.0] - 2026-11-17
 
 Built against Ballerina 2201.13.2.
