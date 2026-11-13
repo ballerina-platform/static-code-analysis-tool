@@ -51,9 +51,7 @@ import java.util.Set;
  * @since 0.13.0
  */
 public class GateTest extends BaseTest {
-    private static final String USAGE_HINT = """
-            Usage: bal scan [OPTIONS] [<workspace>|<package>|<source-file>]
-            Try 'bal scan --help' for more information.""";
+    private static final String USAGE_HINT = String.join("\n", ScanFailure.USAGE_HINT);
     // bal-project-with-gate-issues has 1 HIGH, 2 MEDIUM and 3 LOW issues
     private static final String ALL_ISSUES = "HIGH: 1, MEDIUM: 2, LOW: 3";
     private static final int TOTAL_ISSUES = 6;

@@ -32,7 +32,8 @@ import java.util.List;
  */
 final class ScanFailure extends RuntimeException {
     static final String TOOL_PREFIX = "bal scan: ";
-    private static final List<String> USAGE_HINT = List.of(
+    // Package-private, so that tests check the usage hint and the help SYNOPSIS against one copy
+    static final List<String> USAGE_HINT = List.of(
             "Usage: bal scan [OPTIONS] [<workspace>|<package>|<source-file>]",
             "Try 'bal scan --help' for more information.");
 

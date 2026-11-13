@@ -155,9 +155,7 @@ public class ConsoleLayoutTest extends BaseTest {
 
                     bal scan: error: unknown rule 'ballerina:99'
                       Run 'bal scan --list-rules' to see the available rules.
-                    Usage: bal scan [OPTIONS] [<workspace>|<package>|<source-file>]
-                    Try 'bal scan --help' for more information.
-                    """, output);
+                    """ + usageHint(), output);
         } finally {
             Files.deleteIfExists(scanToml);
         }
@@ -417,9 +415,7 @@ public class ConsoleLayoutTest extends BaseTest {
         Assert.assertEquals(output, """
                 bal scan: error: reporting to platforms is not supported with single bal files; scan a package to \
                 use --platforms
-                Usage: bal scan [OPTIONS] [<workspace>|<package>|<source-file>]
-                Try 'bal scan --help' for more information.
-                """);
+                """ + usageHint());
     }
 
     @Test(description = "test --platforms on a single file is a usage error before the file is loaded")
@@ -583,5 +579,9 @@ public class ConsoleLayoutTest extends BaseTest {
 
     private interface ThrowingRunnable {
         void run() throws IOException;
+    }
+
+    private static String usageHint() {
+        return String.join("\n", ScanFailure.USAGE_HINT) + "\n";
     }
 }
