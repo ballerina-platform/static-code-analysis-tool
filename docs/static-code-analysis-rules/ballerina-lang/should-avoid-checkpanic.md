@@ -54,22 +54,6 @@ public function getResult() returns json|error {
 }
 ```
 
-- Do not pair `checkpanic` with `trap`. `trap` catches the panic, but `checkpanic` only turns the error into a panic so that `trap` can turn it back into an error. Test the value instead.
-
-```ballerina
-// Noncompliant
-function getAll(cache:Cache cache, string key) returns Response[]? {
-    Response[]|error entry = trap <Response[]> checkpanic cache.get(key);
-    return entry is Response[] ? entry : ();
-}
-
-// Compliant
-function getAll(cache:Cache cache, string key) returns Response[]? {
-    any|error entry = cache.get(key);
-    return entry is Response[] ? entry : ();
-}
-```
-
 ### Additional information
 
 - [Ballerina Checking expression](https://ballerina.io/spec/lang/2021R1/#section_6.33)
