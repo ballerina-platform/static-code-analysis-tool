@@ -215,6 +215,27 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(scanCmd.exitCode(), 2);
     }
 
+    @Test(description = "test a target that starts with a dash is an unknown option unless it follows --")
+    void testDashTargets() throws IOException {
+        Path singleFileProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
+        System.setProperty("user.dir", singleFileProject.toString());
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            new CommandLine(scanCmd).parseArgs("-x", "--", "-x");
+            scanCmd.execute();
+            Assert.assertEquals(scanCmd.exitCode(), 2);
+            Assert.assertTrue(readOutput(true).startsWith("bal scan: error: unknown option '-x'\nUsage: "));
+
+            scanCmd = new ScanCmd(printStream);
+            new CommandLine(scanCmd).parseArgs("--", "-x");
+            scanCmd.execute();
+            Assert.assertEquals(scanCmd.exitCode(), 3);
+            Assert.assertTrue(readOutput(true).contains("not a Ballerina package or source file: -x"));
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
+    }
+
     @Test(description = "test scan command with method for saving results to file when analysis issues are present")
     void testScanCommandSaveToDirectoryMethodWhenIssuePresent() throws IOException {
         Rule coreRule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);

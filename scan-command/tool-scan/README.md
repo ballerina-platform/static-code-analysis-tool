@@ -231,11 +231,13 @@ The issues found in the file are listed in a table with the line, rule ID, kind 
 |------|---------|
 | `0` | The scan completed, and no gate is set or the gate was not tripped. |
 | `1` | The gate was tripped, or the scan could not be completed, for example because of an invalid `Scan.toml`, a package that cannot be loaded, such as one whose `Ballerina.toml` has an error, a compilation error, an empty package, a platform or plugin failure, an invalid suppression or a report that cannot be written. |
-| `2` | Invalid command-line input, such as an invalid option value, too many arguments, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, an unknown option, `--platforms` with a single Ballerina file, or an unknown rule ID. |
+| `2` | Invalid command-line input, such as an invalid option value, too many arguments, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, an unknown option, an option written without its value, such as `--format` alone, `--platforms` with a single Ballerina file, or an unknown rule ID. |
 | `3` | The path is not a Ballerina package or standalone file, or is a `.bal` file inside a package. |
 | `130` | The scan was interrupted. |
 
 Every failure other than an interrupt is reported on standard error as `bal scan: error: <message>`, followed by the problems that caused it, such as `Scan.toml:2:18: error: <message>`. Warnings printed by the scan tool are reported as `bal scan: warning: <message>` and never change the exit code.
+
+The `bal` launcher parses the options before the tool runs, and rejects two kinds of input itself, which exit with `1` and are reported as `ballerina: <message>`: a value given to an on/off option other than `true` or `false`, such as `--scan-report=yes`, and an option given twice, such as `--format=json --format=sarif` or `--scan-report --scan-report`. Only `--include-rules`, `--exclude-rules` and `--platforms` can be given more than once, and their values are combined.
 
 By default no gate is set, so findings never fail the scan. The gate is set with `--fail-on-severity` and `--fail-on-count`, or with the `[gate]` table of `Scan.toml`, and fails the scan when the number of issues at or above the severity reaches the count:
 

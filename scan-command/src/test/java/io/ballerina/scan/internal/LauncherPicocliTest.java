@@ -138,6 +138,99 @@ public class LauncherPicocliTest extends BaseTest {
         }
     }
 
+    @DataProvider(name = "launcher-usage-errors")
+    public Object[][] launcherUsageErrors() {
+        String file = singleFile.toString();
+        return new Object[][]{
+                {new String[]{"--bogus"}, "unknown option '--bogus'"},
+                {new String[]{"--bogus=1", file}, "unknown option '--bogus=1'"},
+                {new String[]{"-x", file}, "unknown option '-x'"},
+                {new String[]{"-x", "--", file}, "unknown option '-x'"},
+                {new String[]{"-x", "--", "-x"}, "unknown option '-x'"},
+                {new String[]{"--help", "--bogus"}, "unknown option '--bogus'"},
+                {new String[]{"--format", "--help"}, "missing value for --format; expected json or sarif"},
+                {new String[]{file, "--bogus", "-y"}, "unknown options '--bogus' and '-y'"},
+                {new String[]{"--format", "--bogus"}, "invalid value '--bogus' for --format; expected json or sarif"},
+                {new String[]{"--format"}, "missing value for --format; expected json or sarif"},
+                {new String[]{"--format", "--scan-report", file}, "missing value for --format; expected json or sarif"},
+                {new String[]{file, "--target-dir"}, "missing value for --target-dir; expected a directory path"},
+                {new String[]{"--include-rules"},
+                        "missing value for --include-rules; expected a comma-separated list of rule IDs"},
+                {new String[]{"--exclude-rules", "--list-rules"},
+                        "missing value for --exclude-rules; expected a comma-separated list of rule IDs"},
+                {new String[]{"--platforms"},
+                        "missing value for --platforms; expected a comma-separated list of platform names"},
+                {new String[]{"--fail-on-severity"},
+                        "missing value for --fail-on-severity; expected BLOCKER, HIGH, MEDIUM, LOW, INFO or NONE"},
+                {new String[]{"--fail-on-count"},
+                        "missing value for --fail-on-count; expected a whole number of 1 or more"},
+        };
+    }
+
+    @Test(description = "test unknown options and missing option values exit as usage errors of the tool through "
+            + "the picocli version of the launcher", dataProvider = "launcher-usage-errors")
+    void testLauncherUsageErrors(String[] args, String message) throws IOException, ReflectiveOperationException {
+        int exitCode = runAsLauncher(testResourcesRoot, args);
+        String output = readOutput(true);
+        Assert.assertEquals(exitCode, 2, output);
+        Assert.assertEquals(output.trim(), "bal scan: error: " + message + "\n"
+                + "Usage: bal scan [OPTIONS] [<package>|<source-file>]\n"
+                + "Try 'bal scan --help' for more information.");
+    }
+
+    @DataProvider(name = "launcher-valid-arguments")
+    public Object[][] launcherValidArguments() {
+        String file = singleFile.toString();
+        return new Object[][]{
+                {new String[]{"--format", "sarif", file}, "\"$schema\""},
+                {new String[]{"--format=sarif", file}, "\"$schema\""},
+                {new String[]{file, "--include-rules", "ballerina:1"}, "Running Scans"},
+                {new String[]{"--exclude-rules=ballerina:1,ballerina:2", file}, "Running Scans"},
+                {new String[]{"--fail-on-count", "2147483647", file}, "Running Scans"},
+                {new String[]{"--fail-on-severity", "NONE", "--", file}, "Running Scans"},
+                {new String[]{"--list-rules", file}, "ballerina:1"},
+        };
+    }
+
+    @Test(description = "test options with values still take them, written either way, through the picocli version "
+            + "of the launcher", dataProvider = "launcher-valid-arguments")
+    void testLauncherValidArguments(String[] args, String expectedOutput)
+            throws IOException, ReflectiveOperationException {
+        int exitCode = runAsLauncher(testResourcesRoot, args);
+        String output = readOutput(true);
+        Assert.assertEquals(exitCode, 0, output);
+        Assert.assertTrue(output.contains(expectedOutput), output);
+    }
+
+    @Test(description = "test a target that starts with a dash is a path after the end of the options, and a "
+            + "single dash is always a path", dataProvider = "dash-targets")
+    void testDashTargets(String[] args, String target) throws IOException, ReflectiveOperationException {
+        int exitCode = runAsLauncher(testResourcesRoot, args);
+        String output = readOutput(true);
+        Assert.assertEquals(exitCode, 3, output);
+        Assert.assertTrue(output.contains("bal scan: error: not a Ballerina package or source file: "
+                + target), output);
+    }
+
+    @DataProvider(name = "dash-targets")
+    public Object[][] dashTargets() {
+        return new Object[][]{
+                {new String[]{"--", "-x"}, "-x"},
+                {new String[]{"--target-dir", "-foo", "--", "-foo"}, "-foo"},
+                {new String[]{"-"}, "-"},
+        };
+    }
+
+    @Test(description = "test --help prints the help whatever the targets")
+    void testHelp() throws IOException, ReflectiveOperationException {
+        for (String[] args : List.of(new String[]{"--help"}, new String[]{"--help", "a.bal", "b.bal"})) {
+            int exitCode = runAsLauncher(testResourcesRoot, args);
+            String output = readOutput(true);
+            Assert.assertEquals(exitCode, 0, output);
+            Assert.assertTrue(output.contains("SYNOPSIS"), output);
+        }
+    }
+
     @DataProvider(name = "exclude-tests-package-arguments")
     public Object[][] excludeTestsPackageArguments() {
         return new Object[][]{
@@ -191,6 +284,9 @@ public class LauncherPicocliTest extends BaseTest {
             Object rootSpec = commandSpecClass.getMethod("create").invoke(null);
             Object root = commandLineClass.getConstructor(Object.class).newInstance(rootSpec);
             commandLineClass.getMethod("addSubcommand", String.class, Object.class).invoke(root, "scan", scanCmd);
+            // As the launcher does after adding the tool's command
+            scanCmdClass.getMethod("setParentCmdParser", commandLineClass).invoke(scanCmd, root);
+            commandLineClass.getMethod("setPosixClusteredShortOptionsAllowed", boolean.class).invoke(root, false);
             String[] launcherArgs = Stream.concat(Stream.of("scan"), Stream.of(args)).toArray(String[]::new);
             commandLineClass.getMethod("parseArgs", String[].class).invoke(root, (Object) launcherArgs);
 
