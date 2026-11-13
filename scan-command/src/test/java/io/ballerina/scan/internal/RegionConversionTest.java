@@ -127,6 +127,23 @@ public class RegionConversionTest extends BaseTest {
                 balProject.resolve("main.bal"), otherProject, "main.bal");
     }
 
+    @Test(description = "test the deprecated JSON overloads without a project give one-based positions and the file "
+            + "name")
+    @SuppressWarnings("deprecation")
+    void testDeprecatedJsonOverloads() {
+        Issue issue = new IssueImpl(new BLangDiagnosticLocation("vault.bal", 5, 5, 10, 11, 100, 1),
+                CoreRule.AVOID_CHECKPANIC.rule(), Source.BUILT_IN, "vault.bal",
+                testResourcesDir.resolve("bal-project-with-secret-tracing").resolve("modules").resolve("vault")
+                        .resolve("vault.bal").toString());
+        for (String json : List.of(ScanUtils.convertIssuesToJsonString(List.of(issue)),
+                ScanUtils.convertIssuesToJsonString(List.of(issue), Map.of()))) {
+            JsonObject location = JsonParser.parseString(json).getAsJsonArray().get(0).getAsJsonObject()
+                    .getAsJsonObject("location");
+            assertRegion(location, 6, 11, 6, 12);
+            Assert.assertEquals(location.get("filePath").getAsString(), "vault.bal");
+        }
+    }
+
     private void assertFilePath(BLangDiagnosticLocation location, Path filePath, Path projectPath,
                                 String expectedPath) {
         JsonObject[] locations = locations(location, filePath, projectPath);
