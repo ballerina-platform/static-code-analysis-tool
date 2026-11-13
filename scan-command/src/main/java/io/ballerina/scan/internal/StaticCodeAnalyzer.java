@@ -521,12 +521,18 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     private List<TypeSymbol> declarationType(Node declaration) {
-        return semanticModel.symbol(declaration).flatMap(symbol -> switch (symbol) {
-            case ObjectFieldSymbol field -> Optional.of(field.typeDescriptor());
-            case RecordFieldSymbol field -> Optional.of(field.typeDescriptor());
-            case ParameterSymbol parameter -> Optional.of(parameter.typeDescriptor());
-            default -> Optional.<TypeSymbol>empty();
-        }).stream().toList();
+        return semanticModel.symbol(declaration).flatMap(StaticCodeAnalyzer::typeDescriptor).stream().toList();
+    }
+
+    private static Optional<TypeSymbol> typeDescriptor(Symbol symbol) {
+        return Optional.ofNullable(switch (symbol) {
+            case FunctionSymbol function -> function.typeDescriptor();
+            case VariableSymbol variable -> variable.typeDescriptor();
+            case ParameterSymbol parameter -> parameter.typeDescriptor();
+            case ObjectFieldSymbol field -> field.typeDescriptor();
+            case RecordFieldSymbol field -> field.typeDescriptor();
+            default -> null;
+        });
     }
 
     private Optional<TypeSymbol> boundType(ExpressionNode constructor, ExpressionNode member) {
@@ -708,14 +714,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
                     .flatMap(type -> ((ClassSymbol) type).initMethod())
                     .map(MethodSymbol::typeDescriptor);
         }
-        Optional<TypeSymbol> type = semanticModel.symbol(call).flatMap(symbol -> switch (symbol) {
-            case FunctionSymbol function -> Optional.of(function.typeDescriptor());
-            case VariableSymbol variable -> Optional.of(variable.typeDescriptor());
-            case ParameterSymbol parameter -> Optional.of(parameter.typeDescriptor());
-            case ObjectFieldSymbol field -> Optional.of(field.typeDescriptor());
-            default -> Optional.empty();
-        });
-        return type.map(SemanticUtils::unwrap)
+        return semanticModel.symbol(call).flatMap(StaticCodeAnalyzer::typeDescriptor)
+                .map(SemanticUtils::unwrap)
                 .filter(FunctionTypeSymbol.class::isInstance)
                 .map(FunctionTypeSymbol.class::cast);
     }
