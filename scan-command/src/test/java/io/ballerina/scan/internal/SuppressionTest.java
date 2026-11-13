@@ -166,7 +166,7 @@ public class SuppressionTest extends BaseTest {
         }
         Assert.assertEquals(console.split(Pattern.quote(warning), -1).length - 1, 3, console);
         // A suppression on a declaration does not reach the members of the object it constructs
-        Assert.assertTrue(console.contains("\"startLine\": 34"), console);
+        Assert.assertTrue(console.contains("\"startLine\": 35"), console);
         Assert.assertTrue(console.contains("2 issue(s)"), console);
         Assert.assertFalse(console.contains("suppressed"), console);
     }

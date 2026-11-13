@@ -2,10 +2,10 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 23,
-      "startColumn": 17,
-      "endColumn": 1,
+      "startLine": 17,
+      "endLine": 24,
+      "startColumn": 18,
+      "endColumn": 2,
       "startOffset": 748,
       "length": 4
     },
@@ -22,10 +22,10 @@
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 16,
-      "endLine": 23,
-      "startColumn": 17,
-      "endColumn": 1,
+      "startLine": 17,
+      "endLine": 24,
+      "startColumn": 18,
+      "endColumn": 2,
       "startOffset": 748,
       "length": 4
     },

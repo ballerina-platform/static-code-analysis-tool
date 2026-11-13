@@ -115,10 +115,10 @@ Running `bal scan` reports each finding as a JSON issue with its location and fu
   {
     "location": {
       "filePath": "main.bal",
-      "startLine": 22,
-      "endLine": 22,
-      "startColumn": 16,
-      "endColumn": 43,
+      "startLine": 23,
+      "endLine": 23,
+      "startColumn": 17,
+      "endColumn": 44,
       "startOffset": 875,
       "length": 27,
       "snippet": "checkpanic parseCount(\"12\")"
@@ -156,6 +156,8 @@ Running `bal scan` reports each finding as a JSON issue with its location and fu
   }
 ]
 ```
+
+The `location` gives one-based lines and columns, as the compiler's diagnostics and the SARIF report do, and the path of the file relative to the package root, such as `modules/db/db.bal`, or to the workspace root in the output and combined report of a workspace scan. The `scan_results.json` of each workspace package gives paths relative to the root of that package, and a single Ballerina file gives its file name. The top-level `filePath` is the path of the file as the scan loaded it.
 
 Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON, or SARIF with `--format=sarif`. Progress messages, warnings, the issue summary, such as `3 issue(s)`, report paths, and the blank lines between sections are written to standard error.
 
