@@ -76,4 +76,37 @@ public class SecretNameMatcherTest {
     void testNonSecretName(String name) {
         Assert.assertFalse(SecretNameMatcher.isSecretName(name), name);
     }
+
+    @DataProvider
+    Object[][] secretKinds() {
+        return new Object[][]{
+                {"password", SecretNameMatcher.Kind.PASSWORD}, {"dbPassword", SecretNameMatcher.Kind.PASSWORD},
+                {"dbpwd", SecretNameMatcher.Kind.PASSWORD}, {"passCodes", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordForFileServer", SecretNameMatcher.Kind.PASSWORD},
+                {"apiKey", SecretNameMatcher.Kind.SECRET}, {"accessToken", SecretNameMatcher.Kind.SECRET},
+                {"clientSecret", SecretNameMatcher.Kind.SECRET}, {"\"Authorization\"", SecretNameMatcher.Kind.SECRET},
+                {"credentials", SecretNameMatcher.Kind.SECRET}, {"passwordToken", SecretNameMatcher.Kind.PASSWORD},
+                {"tokenPassword", SecretNameMatcher.Kind.PASSWORD}, {"username", SecretNameMatcher.Kind.NONE},
+                {"dbpasswordvalue", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordtoken", SecretNameMatcher.Kind.PASSWORD}, {"apikeypasswd", SecretNameMatcher.Kind.PASSWORD},
+                {"dbpasswordsecretvalue", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordlessAuth", SecretNameMatcher.Kind.SECRET}, {"passwordless", SecretNameMatcher.Kind.NONE},
+                {"passwordLess", SecretNameMatcher.Kind.NONE}, {"passwordLessToken", SecretNameMatcher.Kind.SECRET},
+                {"tokenForPasswordReset", SecretNameMatcher.Kind.SECRET},
+                {"passwordPolicyApiKey", SecretNameMatcher.Kind.SECRET},
+                {"inPassword", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordResetToken", SecretNameMatcher.Kind.SECRET},
+                {"passwordChangeToken", SecretNameMatcher.Kind.SECRET},
+                {"passwordGrantClientSecret", SecretNameMatcher.Kind.SECRET},
+                {"passwordApiToken", SecretNameMatcher.Kind.SECRET},
+                {"dbPasswordKey", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordPrivateKey", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordAccessKey", SecretNameMatcher.Kind.PASSWORD}
+        };
+    }
+
+    @Test(dataProvider = "secretKinds")
+    void testSecretKind(String name, SecretNameMatcher.Kind kind) {
+        Assert.assertEquals(SecretNameMatcher.kind(name), kind, name);
+    }
 }

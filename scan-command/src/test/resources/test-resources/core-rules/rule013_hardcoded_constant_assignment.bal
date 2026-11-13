@@ -16,7 +16,7 @@
 
 import ballerina/io;
 
-const DEFAULT_VALUE = "secret";
+const DEFAULT_VALUE = "tGsBfdAMR9tL";
 const URL_WITH_CREDENTIAL = "http://username:securepass@localhost";
 
 public type Credential record {

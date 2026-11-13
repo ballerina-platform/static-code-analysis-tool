@@ -61,7 +61,7 @@ public class SecretValueChecksTest extends StaticCodeAnalyzerTest {
         assertSecretIssues("rule013_value_checks_collections.bal", List.of(
                 hardCoded(27, 27, 27, 39),
                 hardCoded(27, 53, 27, 64),
-                hardCoded(28, 26, 28, 34),
+                hardCoded(28, 26, 28, 40),
                 hardCoded(29, 27, 29, 43),
                 hardCoded(30, 38, 30, 50),
                 hardCoded(31, 25, 31, 39),

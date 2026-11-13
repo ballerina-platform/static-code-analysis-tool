@@ -21,15 +21,15 @@ type Octet byte;
 const API_KEY = "changeme";
 const password = "s3cr3t-constant";
 
-string fixedValue = "fixed-secret";
+string fixedValue = "WBhaZC5LpT7u";
 Octet[] fixedBytes = [1, 2, 3];
-"live-key"|"test-key" environmentValue = "live-key";
+"iEYa3Z6B"|"test-key" environmentValue = "iEYa3Z6B";
 final readonly & byte[] frozenBytes = [4, 5, 6];
 
 public function main() {
     string[] apiTokens = ["ghp_live1", "ghp_live2"];
-    map<string> tokens = {github: "ghp_x", slack: "xoxb-y"};
-    anydata apiKey = "anydata-secret";
+    map<string> tokens = {github: "yCUtbfyULh8f", slack: "jcWdx5nTWyhs"};
+    anydata apiKey = "wRs2hkWDWXgCY5";
     json clientSecret = fixedValue;
     string|error accessToken = fixedValue;
     Octet[] secretKey = fixedBytes;
@@ -38,7 +38,7 @@ public function main() {
     string dbUrl = "postgres://admin:${DB_PASSWORD}@db:5432/app";
     string otherUrl = "https://user:changeme@host";
     string realUrl = "postgres://admin:hunter22@db/app";
-    string slack = "xoxb-z";
+    string slack = "wbN9XUnxRTBH";
     map<string> webhookTokens = {slack};
     string? apiSecret = environmentValue;
     byte[] secretBytes = frozenBytes;

@@ -18,7 +18,7 @@ const string[] DEFAULT_VALUES = ["a1b2c3d4"];
 const byte[] KEY_BYTES = [12, 34, 56];
 const int[] TOKEN_RETRY_DELAYS = [1, 2, 5];
 const int maxTokens = 3600;
-final string[] KEYS = ["ghp_realtoken"];
+final string[] KEYS = ["PYUcBbQy8DgdZ"];
 
 enum AuthScheme {
     BASIC,

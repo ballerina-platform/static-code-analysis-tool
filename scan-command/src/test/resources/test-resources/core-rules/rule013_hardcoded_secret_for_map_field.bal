@@ -28,5 +28,5 @@ public type Config record {
 public function main() {
     Credential credential = {username: "sabthar", password: "password"};
     Config config = {nested: {credential: {username: "sabthar", password: "pwd"}}};
-    json clientConfig = {clientId: "xyz", clientSecret: "password"};
+    json clientConfig = {clientId: "xyz", clientSecret: "2ZWUwjVg"};
 }

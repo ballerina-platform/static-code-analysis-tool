@@ -35,7 +35,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_ORG;
 /**
  * Helpers on symbols and names shared by the core rules and the suppression of their findings.
  *
- * @since 0.13.1
+ * @since 0.14.0
  */
 final class SemanticUtils {
 

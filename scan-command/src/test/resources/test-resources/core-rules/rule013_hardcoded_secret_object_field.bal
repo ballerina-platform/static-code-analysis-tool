@@ -15,6 +15,6 @@
 // under the License.
 
 class Client {
-    final string secret = "default secret";
+    final string secret = "FbRZG6G7MLVLZD";
     final string pwd = "default pwd";
 }

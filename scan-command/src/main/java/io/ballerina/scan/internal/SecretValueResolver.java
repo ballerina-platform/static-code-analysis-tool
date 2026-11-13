@@ -19,10 +19,15 @@
 package io.ballerina.scan.internal;
 
 import io.ballerina.compiler.api.SemanticModel;
+import io.ballerina.compiler.api.symbols.ArrayTypeSymbol;
 import io.ballerina.compiler.api.symbols.ConstantSymbol;
+import io.ballerina.compiler.api.symbols.MapTypeSymbol;
 import io.ballerina.compiler.api.symbols.Qualifier;
+import io.ballerina.compiler.api.symbols.RecordTypeSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.SymbolKind;
+import io.ballerina.compiler.api.symbols.TupleTypeSymbol;
+import io.ballerina.compiler.api.symbols.TypeSymbol;
 import io.ballerina.compiler.api.symbols.VariableSymbol;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
@@ -36,6 +41,7 @@ import io.ballerina.compiler.syntax.tree.FunctionCallExpressionNode;
 import io.ballerina.compiler.syntax.tree.IndexedExpressionNode;
 import io.ballerina.compiler.syntax.tree.InterpolationNode;
 import io.ballerina.compiler.syntax.tree.ListConstructorExpressionNode;
+import io.ballerina.compiler.syntax.tree.MapTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.MappingConstructorExpressionNode;
 import io.ballerina.compiler.syntax.tree.MappingFieldNode;
 import io.ballerina.compiler.syntax.tree.MethodCallExpressionNode;
@@ -58,6 +64,8 @@ import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Module;
+import io.ballerina.projects.ModuleId;
+import io.ballerina.scan.internal.SecretNameMatcher.Kind;
 import io.ballerina.tools.diagnostics.Location;
 import io.ballerina.tools.text.TextRange;
 
@@ -67,7 +75,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * {@code SecretValueResolver} traces the value given to a secret-named target back to where it comes from, so that
@@ -82,6 +93,8 @@ import java.util.stream.Stream;
  */
 class SecretValueResolver {
     private static final int MAX_DEPTH = 5;
+    private static final Pattern SEPARATORS_ONLY = Pattern.compile("[^A-Za-z0-9]*");
+    private static final Pattern NUMERIC_LIST = Pattern.compile("\\[\\s*\\d+(\\s*,\\s*\\d+)*\\s*]");
     private static final Set<String> TRANSPARENT_CONVERSIONS = Set.of("toBytes", "toBase64", "toBase16", "trim",
             "toLowerAscii", "toUpperAscii");
 
@@ -95,15 +108,82 @@ class SecretValueResolver {
         FIXED_VARIABLE,
         // A configurable variable without a fixed default.
         CONFIGURABLE,
-        // An empty, template or dummy value, which is not a secret on its own but can be part of one.
-        PLACEHOLDER,
         // A value computed at run time, a parameter, or a value already reported where it is written.
         UNKNOWN
+    }
+
+    /**
+     * A resolved value.
+     *
+     * @param origin        where the value comes from
+     * @param texts         the texts a fixed value can be a secret in: its placeholder parts are left out, and the
+     *                      parts of a concatenation or template are joined into one text
+     * @param opaque        whether a fixed value is not text, such as a byte array, which is a secret whatever it holds
+     * @param part          the text it adds to a concatenation or template, without its angle-bracket placeholders
+     * @param isPlaceholder whether that text is a placeholder
+     */
+    record Value(Origin origin, List<String> texts, boolean opaque, String part, boolean isPlaceholder) {
+        static final Value UNKNOWN = new Value(Origin.UNKNOWN, List.of(), false, "", false);
+        static final Value CONFIGURABLE = new Value(Origin.CONFIGURABLE, List.of(), false, "", false);
+        static final Value OPAQUE = new Value(Origin.HARD_CODED, List.of(), true, "", false);
+
+        // A text is checked without its "<...>" placeholders, as in "Bearer <token>".
+        static Value text(String text) {
+            String part = SecretValueFilter.withoutAnglePlaceholders(text);
+            boolean isPlaceholder = isPlaceholder(text, part);
+            return new Value(Origin.HARD_CODED, isPlaceholder ? List.of() : List.of(part), false, part,
+                    isPlaceholder);
+        }
+
+        // A text with a "${X}" or "{{x}}" reference is a placeholder only when nothing but separators is left.
+        private static boolean isPlaceholder(String text, String part) {
+            if (SecretValueFilter.hasTemplateReference(part)) {
+                return SEPARATORS_ONLY.matcher(SecretValueFilter.withoutTemplateReferences(part)).matches();
+            }
+            return SecretValueFilter.isPlaceholder(text)
+                    || (!part.equals(text) && SEPARATORS_ONLY.matcher(part).matches());
+        }
+
+        boolean isFixed() {
+            return origin == Origin.HARD_CODED || origin == Origin.FIXED_VARIABLE;
+        }
+
+        boolean isReported(Kind kind) {
+            return isFixed() && (opaque || texts.stream().anyMatch(text -> isReported(text, kind)));
+        }
+
+        // Any fixed text can be a password, but only a text that looks generated can be another secret. A password
+        // with a template reference is given elsewhere, while the rest of a key or token can still be hard-coded.
+        static boolean isReported(String text, Kind kind) {
+            if (SecretValueFilter.hasTemplateReference(text)) {
+                return kind != Kind.PASSWORD
+                        && SecretValueFilter.looksGenerated(SecretValueFilter.withoutTemplateReferences(text));
+            }
+            return kind == Kind.PASSWORD || SecretValueFilter.looksGenerated(text);
+        }
+
+        Value withOrigin(Origin fixedOrigin) {
+            return isFixed() ? new Value(fixedOrigin, texts, opaque, part, isPlaceholder) : this;
+        }
+
+        // What reaches past a name that reported it where it is written: nothing, or for a list the other members.
+        Value unreportedBy(Kind writtenKind) {
+            if (!writtenKind.isSecret() || !isReported(writtenKind)) {
+                return this;
+            }
+            if (opaque || texts.size() <= 1) {
+                return UNKNOWN;
+            }
+            return new Value(origin, texts.stream().filter(text -> !isReported(text, writtenKind)).toList(), false,
+                    "", false);
+        }
     }
 
     private final SemanticModel semanticModel;
     private final Module module;
     private final Map<Symbol, Optional<ExpressionNode>> tracedInitializers = new HashMap<>();
+    private final Map<ConstantSymbol, Value> constantValues = new HashMap<>();
+    private final Map<ModuleId, SecretValueResolver> moduleResolvers = new HashMap<>();
     private final Map<Symbol, Boolean> assignedVariables = new HashMap<>();
     private final Map<Symbol, Boolean> sharedMappings = new HashMap<>();
     private Map<String, Document> documentsByName;
@@ -113,45 +193,44 @@ class SecretValueResolver {
         this.module = module;
     }
 
-    Origin resolve(ExpressionNode expression) {
+    Value resolve(ExpressionNode expression) {
         return resolve(expression, 0, new HashSet<>());
     }
 
-    Origin resolveSymbol(Symbol symbol) {
+    Value resolveSymbol(Symbol symbol) {
         return resolveSymbol(symbol, 0, new HashSet<>());
     }
 
-    private Origin resolve(ExpressionNode expression, int depth, Set<Symbol> visited) {
+    private Value resolve(ExpressionNode expression, int depth, Set<Symbol> visited) {
         if (depth > MAX_DEPTH) {
-            return Origin.UNKNOWN;
+            return Value.UNKNOWN;
         }
         return switch (expression.kind()) {
-            case STRING_LITERAL -> SecretValueFilter.isPlaceholder(
-                    SecretValueFilter.literalValue(((BasicLiteralNode) expression).literalToken().text()))
-                    ? Origin.PLACEHOLDER
-                    : Origin.HARD_CODED;
+            case STRING_LITERAL ->
+                    Value.text(SecretValueFilter.literalValue(((BasicLiteralNode) expression).literalToken().text()));
             case TYPE_CAST_EXPRESSION -> resolve(((TypeCastExpressionNode) expression).expression(), depth, visited);
-            case BYTE_ARRAY_LITERAL -> Origin.HARD_CODED;
+            case BYTE_ARRAY_LITERAL -> Value.OPAQUE;
             case LIST_CONSTRUCTOR -> isNumericList((ListConstructorExpressionNode) expression)
-                    ? Origin.HARD_CODED
-                    : combine(((ListConstructorExpressionNode) expression).expressions().stream()
+                    ? Value.OPAQUE
+                    : members(((ListConstructorExpressionNode) expression).expressions().stream()
                     .map(member -> member instanceof ExpressionNode memberExpression
                             ? resolve(memberExpression, depth, visited)
-                            : Origin.UNKNOWN));
-            case REQUIRED_EXPRESSION -> Origin.CONFIGURABLE;
+                            : Value.UNKNOWN));
+            case MAPPING_CONSTRUCTOR -> resolveMapping((MappingConstructorExpressionNode) expression, depth, visited);
+            case REQUIRED_EXPRESSION -> Value.CONFIGURABLE;
             case BRACED_EXPRESSION -> resolve(((BracedExpressionNode) expression).expression(), depth, visited);
             case SIMPLE_NAME_REFERENCE, QUALIFIED_NAME_REFERENCE -> semanticModel.symbol(expression)
                     .map(symbol -> resolveSymbol(symbol, depth, visited))
-                    .orElse(Origin.UNKNOWN);
+                    .orElse(Value.UNKNOWN);
             case FIELD_ACCESS -> resolveField(((FieldAccessExpressionNode) expression).expression(),
                     ((FieldAccessExpressionNode) expression).fieldName().toSourceCode().trim(), depth, visited);
             case OPTIONAL_FIELD_ACCESS -> resolveField(((OptionalFieldAccessExpressionNode) expression).expression(),
                     ((OptionalFieldAccessExpressionNode) expression).fieldName().toSourceCode().trim(), depth,
                     visited);
             case INDEXED_EXPRESSION -> memberKey((IndexedExpressionNode) expression)
-                    .map(key -> resolveField(((IndexedExpressionNode) expression).containerExpression(), key, depth,
-                            visited))
-                    .orElse(Origin.UNKNOWN);
+                    .map(key -> resolveField(((IndexedExpressionNode) expression).containerExpression(), key,
+                            depth, visited))
+                    .orElse(Value.UNKNOWN);
             case BINARY_EXPRESSION -> resolveConcatenation((BinaryExpressionNode) expression, depth, visited);
             case STRING_TEMPLATE_EXPRESSION -> resolveTemplate((TemplateExpressionNode) expression, depth, visited);
             case METHOD_CALL -> resolveConversion(expression, ((MethodCallExpressionNode) expression).methodName(),
@@ -161,46 +240,98 @@ class SecretValueResolver {
             case FUNCTION_CALL -> resolveConversion(expression,
                     ((FunctionCallExpressionNode) expression).functionName(),
                     singlePositionalArgument((FunctionCallExpressionNode) expression), depth, visited);
-            default -> Origin.UNKNOWN;
+            default -> Value.UNKNOWN;
         };
     }
 
-    private Origin resolveSymbol(Symbol symbol, int depth, Set<Symbol> visited) {
-        // A constant is a hard-coded value wherever it is used; its declaration is not a secret on its own.
+    private Value resolveSymbol(Symbol symbol, int depth, Set<Symbol> visited) {
         if (symbol instanceof ConstantSymbol constant) {
-            if (isNamedChoice(constant)) {
-                return Origin.UNKNOWN;
-            }
-            return isPlaceholder(constant) ? Origin.PLACEHOLDER : Origin.HARD_CODED;
+            return resolveConstant(constant);
         }
         if (symbol.kind() != SymbolKind.VARIABLE || !visited.add(symbol)) {
-            return Origin.UNKNOWN;
+            return Value.UNKNOWN;
         }
         try {
             VariableSymbol variable = (VariableSymbol) symbol;
-            Origin initializerOrigin = findTracedInitializer(variable)
-                    .map(value -> resolve(value, depth + 1, visited))
-                    .orElse(Origin.UNKNOWN);
-            if (isConfigurable(variable)) {
-                // A configurable's fixed default is a fallback for the secret, which keeps the origin of the default.
-                return isFixed(initializerOrigin) ? reachedThrough(variable, initializerOrigin) : Origin.CONFIGURABLE;
+            Value value = findTracedInitializer(variable)
+                    .map(initializer -> resolve(initializer, depth + 1, visited))
+                    .orElse(Value.UNKNOWN);
+            if (!value.isFixed()) {
+                return isConfigurable(variable) ? Value.CONFIGURABLE : value;
             }
-            return isFixed(initializerOrigin) ? reachedThrough(variable, Origin.FIXED_VARIABLE) : initializerOrigin;
+            value = value.unreportedBy(SecretNameMatcher.kind(variable.getName().orElse("")));
+            if (!value.isFixed()) {
+                return value;
+            }
+            // A configurable's fixed default is a fallback for the secret, which keeps the origin of the default.
+            return isConfigurable(variable) ? value : value.withOrigin(Origin.FIXED_VARIABLE);
         } finally {
             visited.remove(symbol);
         }
     }
 
-    private static boolean isFixed(Origin origin) {
-        return origin == Origin.HARD_CODED || origin == Origin.FIXED_VARIABLE;
+    // A constant is a hard-coded value wherever it is used; its declaration is not a secret on its own. Its value
+    // does not depend on where it is used, and constants cannot refer to each other in a cycle.
+    private Value resolveConstant(ConstantSymbol constant) {
+        Value value = constantValues.get(constant);
+        if (value == null) {
+            value = computeConstant(constant);
+            constantValues.put(constant, value);
+        }
+        return value;
     }
 
-    // A secret-named variable is reported where it is declared, so the values that reach a target through it are not.
-    private static Origin reachedThrough(Symbol variable, Origin origin) {
-        return SecretNameMatcher.isSecretName(variable.getName().orElse("")) ? Origin.UNKNOWN : origin;
+    private Value computeConstant(ConstantSymbol constant) {
+        if (isNamedChoice(constant)) {
+            return Value.UNKNOWN;
+        }
+        boolean isDeclaredInModule = isDeclaredInModule(constant);
+        if (!isDeclaredInModule) {
+            Optional<SecretValueResolver> owner = ownerOf(constant);
+            if (owner.isPresent()) {
+                return owner.get().resolveConstant(constant);
+            }
+        }
+        // The initializer of a constant of this module is resolved as written, as for a list of texts
+        Value value = isDeclaredInModule
+                ? constant.getLocation().flatMap(this::findNode)
+                        .flatMap(SecretValueResolver::findConstantInitializer)
+                        .map(initializer -> resolve(initializer, 1, new HashSet<>()))
+                        .orElse(Value.UNKNOWN)
+                : Value.UNKNOWN;
+        if (value.isFixed()) {
+            return value.withOrigin(Origin.HARD_CODED);
+        }
+        TypeSymbol constantType = SemanticUtils.unwrap(constant.typeDescriptor());
+        boolean isStructured = constantType instanceof ArrayTypeSymbol || constantType instanceof TupleTypeSymbol
+                || constantType instanceof MapTypeSymbol || constantType instanceof RecordTypeSymbol;
+        Optional<String> text = constant.resolvedValue().map(SecretValueFilter::literalValue);
+        if (!isStructured) {
+            return text.map(Value::text).orElse(Value.UNKNOWN);
+        }
+        if (text.filter(resolved -> NUMERIC_LIST.matcher(resolved).matches()).isPresent()) {
+            return Value.OPAQUE;
+        }
+        // A list or map constant of another package resolves to its source form, which is a secret only for a byte
+        // array.
+        return Value.UNKNOWN;
     }
 
-    private Origin resolveField(ExpressionNode container, String fieldName, int depth, Set<Symbol> visited) {
+    // A constant of another module of the package is resolved by that module's resolver, from its declaration.
+    private Optional<SecretValueResolver> ownerOf(Symbol symbol) {
+        if (isDeclaredInModule(symbol)) {
+            return Optional.of(this);
+        }
+        return symbol.getModule().flatMap(moduleSymbol -> StreamSupport.stream(
+                        module.packageInstance().modules().spliterator(), false)
+                .filter(other -> moduleSymbol.id().orgName().equals(other.descriptor().org().value())
+                        && moduleSymbol.id().moduleName().equals(other.descriptor().name().toString()))
+                .findFirst()
+                .map(other -> moduleResolvers.computeIfAbsent(other.moduleId(),
+                        id -> new SecretValueResolver(other.getCompilation().getSemanticModel(), other))));
+    }
+
+    private Value resolveField(ExpressionNode container, String fieldName, int depth, Set<Symbol> visited) {
         Optional<Symbol> root = semanticModel.symbol(rootExpression(container));
         boolean isConfigurableRoot = root.filter(symbol -> symbol.kind() == SymbolKind.VARIABLE)
                 .map(symbol -> isConfigurable((VariableSymbol) symbol))
@@ -208,23 +339,117 @@ class SecretValueResolver {
         Optional<SpecificFieldNode> field = findMapping(container, depth, visited, true)
                 .flatMap(mapping -> findField(mapping, fieldName));
         if (field.isEmpty()) {
-            return isConfigurableRoot ? Origin.CONFIGURABLE : Origin.UNKNOWN;
+            return isConfigurableRoot ? Value.CONFIGURABLE : Value.UNKNOWN;
         }
-        Origin origin = field.get().valueExpr()
-                .map(value -> resolve(value, depth + 1, visited))
-                .orElseGet(() -> semanticModel.symbol(field.get())
-                        .map(symbol -> resolveSymbol(symbol, depth + 1, visited))
-                        .orElse(Origin.UNKNOWN));
-        if (!isFixed(origin)) {
-            return isConfigurableRoot ? Origin.CONFIGURABLE : origin;
-        }
-        // A secret-named field is reported where it is written. Any other fixed field of a constant or of a
-        // configurable's default keeps its origin, and is otherwise reached through the variable that holds it.
-        if (SecretNameMatcher.isSecretName(fieldName)) {
-            return Origin.UNKNOWN;
+        Value value = resolveFieldValue(field.get(), depth, visited);
+        if (!value.isFixed()) {
+            return isConfigurableRoot ? Value.CONFIGURABLE : value;
         }
         boolean isConstantRoot = root.filter(symbol -> symbol.kind() == SymbolKind.CONSTANT).isPresent();
-        return isConstantRoot || isConfigurableRoot ? origin : Origin.FIXED_VARIABLE;
+        return isConstantRoot ? value.withOrigin(Origin.HARD_CODED)
+                : isConfigurableRoot ? value : value.withOrigin(Origin.FIXED_VARIABLE);
+    }
+
+    // A map is its values, as a list is its members; a record's fields are checked by their own names.
+    private Value resolveMapping(MappingConstructorExpressionNode mapping, int depth, Set<Symbol> visited) {
+        if (!isMap(mapping)) {
+            return Value.UNKNOWN;
+        }
+        return members(mapping.fields().stream()
+                .map(field -> field instanceof SpecificFieldNode specificField
+                        ? resolveFieldValue(specificField, depth, visited)
+                        : Value.UNKNOWN));
+    }
+
+    private boolean isMap(MappingConstructorExpressionNode mapping) {
+        return isConstantMap(mapping)
+                .orElseGet(() -> semanticModel.typeOf(mapping).map(SecretChecker::isMap).orElse(false));
+    }
+
+    // A mapping in a constant is typed by the shape of its value, so the constant's declared type tells a map.
+    Optional<Boolean> isConstantMap(MappingConstructorExpressionNode mapping) {
+        int depth = 0;
+        Node outermost = mapping;
+        while (outermost.parent() instanceof SpecificFieldNode field
+                && field.parent() instanceof MappingConstructorExpressionNode outer) {
+            depth++;
+            outermost = outer;
+        }
+        if (outermost.parent() instanceof ConstantDeclarationNode constantDeclaration) {
+            int levels = depth;
+            return Optional.of(constantDeclaration.typeDescriptor().map(type -> isMapType(type, levels)).orElse(false));
+        }
+        return Optional.empty();
+    }
+
+    // A map constant is typed by the shape of its value, a record, so only its declaration tells it is a map.
+    boolean isMapConstant(ExpressionNode expression) {
+        return semanticModel.symbol(expression)
+                .filter(ConstantSymbol.class::isInstance)
+                .flatMap(constant -> ownerOf(constant).map(owner -> owner.isDeclaredMap(constant)))
+                .orElse(false);
+    }
+
+    private boolean isDeclaredMap(Symbol constant) {
+        return constant.getLocation()
+                .flatMap(this::findNode)
+                .flatMap(SecretValueResolver::findConstantDeclaration)
+                .flatMap(ConstantDeclarationNode::typeDescriptor)
+                .map(type -> isMapType(type, 0))
+                .orElse(false);
+    }
+
+    // Whether a type is a map, and so are its value types for the given number of levels, as in map<map<string>>.
+    private boolean isMapType(Node typeDescriptor, int levels) {
+        if (typeDescriptor instanceof MapTypeDescriptorNode mapType) {
+            return levels == 0 || isMapType(mapType.mapTypeParamsNode().typeNode(), levels - 1);
+        }
+        return semanticModel.symbol(typeDescriptor)
+                .filter(TypeSymbol.class::isInstance)
+                .map(type -> isMapType((TypeSymbol) type, levels))
+                .orElse(false);
+    }
+
+    private static boolean isMapType(TypeSymbol type, int levels) {
+        return SemanticUtils.unwrap(type) instanceof MapTypeSymbol mapType
+                && (levels == 0 || isMapType(mapType.typeParam(), levels - 1));
+    }
+
+    // A field of a map of secrets is checked where it is written with the stricter of its name and the maps'.
+    private Value resolveFieldValue(SpecificFieldNode field, int depth, Set<Symbol> visited) {
+        Value value = field.valueExpr()
+                .map(fieldValue -> resolve(fieldValue, depth + 1, visited))
+                .orElseGet(() -> semanticModel.symbol(field)
+                        .map(symbol -> resolveSymbol(symbol, depth + 1, visited))
+                        .orElse(Value.UNKNOWN));
+        if (!value.isFixed()) {
+            return value;
+        }
+        Kind writtenKind = SecretNameMatcher.kind(SecretChecker.fieldNameText(field))
+                .stricter(mapKind((MappingConstructorExpressionNode) field.parent()));
+        return value.unreportedBy(writtenKind);
+    }
+
+    // The kind a map of secrets is checked with where it is written: the stricter of the names of the maps it is
+    // in, as in passwords = {tokens: {github: "..."}}, as SecretChecker checks a map's values.
+    private Kind mapKind(MappingConstructorExpressionNode mapping) {
+        if (!isConstantMap(mapping)
+                .orElseGet(() -> semanticModel.typeOf(mapping).map(SecretChecker::isMap).orElse(true))) {
+            return Kind.NONE;
+        }
+        Node parent = mapping.parent();
+        while (parent instanceof BracedExpressionNode || parent instanceof TypeCastExpressionNode) {
+            parent = parent.parent();
+        }
+        return switch (parent) {
+            case VariableDeclarationNode variable ->
+                    SecretNameMatcher.kind(SecretChecker.variableName(variable.typedBindingPattern()));
+            case ModuleVariableDeclarationNode variable ->
+                    SecretNameMatcher.kind(SecretChecker.variableName(variable.typedBindingPattern()));
+            case SpecificFieldNode field when field.parent() instanceof MappingConstructorExpressionNode outer ->
+                    SecretNameMatcher.kind(SecretChecker.fieldNameText(field)).stricter(mapKind(outer));
+            case null, default -> Kind.NONE;
+        };
     }
 
     // The variable or constant that a field access or member access chain starts at, as in DEFAULTS["db"].
@@ -351,58 +576,74 @@ class SecretValueResolver {
         return Optional.empty();
     }
 
-    private Origin resolveConcatenation(BinaryExpressionNode binaryExpression, int depth, Set<Symbol> visited) {
+    private Value resolveConcatenation(BinaryExpressionNode binaryExpression, int depth, Set<Symbol> visited) {
         if (binaryExpression.operator().kind() != SyntaxKind.PLUS_TOKEN) {
-            return Origin.UNKNOWN;
+            return Value.UNKNOWN;
         }
-        return combine(Stream.of(binaryExpression.lhsExpr(), binaryExpression.rhsExpr())
+        return joined(Stream.of(binaryExpression.lhsExpr(), binaryExpression.rhsExpr())
                 .map(operand -> operand instanceof ExpressionNode expression
                         ? resolve(expression, depth, visited)
-                        : Origin.UNKNOWN));
+                        : Value.UNKNOWN));
     }
 
-    private Origin resolveTemplate(TemplateExpressionNode template, int depth, Set<Symbol> visited) {
-        String text = template.content().stream()
-                .filter(node -> node.kind() == SyntaxKind.TEMPLATE_STRING)
-                .map(Node::toSourceCode)
-                .reduce("", String::concat);
-        List<Origin> interpolations = template.content().stream()
-                .filter(InterpolationNode.class::isInstance)
-                .map(interpolation -> resolve(((InterpolationNode) interpolation).expression(), depth, visited))
-                .toList();
-        Origin textOrigin = SecretValueFilter.isPlaceholder(text) ? Origin.PLACEHOLDER : Origin.HARD_CODED;
-        return combine(Stream.concat(Stream.of(textOrigin), interpolations.stream()));
+    private Value resolveTemplate(TemplateExpressionNode template, int depth, Set<Symbol> visited) {
+        return joined(template.content().stream()
+                .map(part -> part instanceof InterpolationNode interpolation
+                        ? resolve(interpolation.expression(), depth, visited)
+                        : Value.text(part.toSourceCode())));
     }
 
-    // A value built from fixed parts is fixed, and hard-coded only when no part is reached through a variable. It
-    // is a placeholder when every part is, as in "" + "" or "${DB}" + "${PW}".
-    private static Origin combine(Stream<Origin> parts) {
-        Set<Origin> origins = new HashSet<>();
-        parts.forEach(origins::add);
-        if (origins.contains(Origin.UNKNOWN) || origins.contains(Origin.CONFIGURABLE)) {
+    // The parts of a concatenation or template form one text, checked as a whole, as each part can look like text
+    // that is not a secret, as in "sk_live_" + KEY.
+    private static Value joined(Stream<Value> parts) {
+        List<Value> values = parts.toList();
+        Origin origin = combinedOrigin(values);
+        if (origin == Origin.UNKNOWN) {
+            return Value.UNKNOWN;
+        }
+        String text = values.stream().map(Value::part).collect(Collectors.joining());
+        // A part of one character, such as ":", is a separator, which does not make the text a placeholder
+        List<Value> words = values.stream().filter(value -> value.part().length() > 1).toList();
+        boolean isPlaceholder = Value.isPlaceholder(text, text)
+                || (!words.isEmpty() && words.stream().allMatch(Value::isPlaceholder));
+        return new Value(origin, isPlaceholder || text.isEmpty() ? List.of() : List.of(text),
+                values.stream().anyMatch(Value::opaque), text, isPlaceholder);
+    }
+
+    // The members of a list are separate values, any of which can be the secret.
+    private static Value members(Stream<Value> members) {
+        List<Value> values = members.toList();
+        Origin origin = combinedOrigin(values);
+        if (origin == Origin.UNKNOWN) {
+            return Value.UNKNOWN;
+        }
+        return new Value(origin, values.stream().flatMap(value -> value.texts().stream()).toList(),
+                values.stream().anyMatch(Value::opaque), "", false);
+    }
+
+    // A value built from fixed parts is fixed, and hard-coded only when no part is reached through a variable.
+    private static Origin combinedOrigin(List<Value> values) {
+        if (!values.stream().allMatch(Value::isFixed)) {
             return Origin.UNKNOWN;
         }
-        origins.remove(Origin.PLACEHOLDER);
-        if (origins.isEmpty()) {
-            return Origin.PLACEHOLDER;
-        }
-        return origins.contains(Origin.FIXED_VARIABLE) ? Origin.FIXED_VARIABLE : Origin.HARD_CODED;
+        return values.stream().anyMatch(value -> value.origin() == Origin.FIXED_VARIABLE)
+                ? Origin.FIXED_VARIABLE : Origin.HARD_CODED;
     }
 
     // A value converted by a lang library function, such as "secret".toBytes() or string:trim(secret), keeps the
     // origin of the value.
-    private Origin resolveConversion(ExpressionNode call, Node functionName, Optional<ExpressionNode> value,
-                                     int depth, Set<Symbol> visited) {
+    private Value resolveConversion(ExpressionNode call, Node functionName, Optional<ExpressionNode> value,
+                                    int depth, Set<Symbol> visited) {
         String name = functionName instanceof QualifiedNameReferenceNode qualifiedName
                 ? qualifiedName.identifier().text()
                 : functionName.toSourceCode().trim();
         boolean isLangLibConversion = value.isPresent() && TRANSPARENT_CONVERSIONS.contains(name)
                 && semanticModel.symbol(call).filter(SemanticUtils::isLangLib).isPresent();
         if (!isLangLibConversion) {
-            return Origin.UNKNOWN;
+            return Value.UNKNOWN;
         }
-        Origin origin = resolve(value.get(), depth, visited);
-        return origin == Origin.UNKNOWN || origin == Origin.CONFIGURABLE ? Origin.UNKNOWN : origin;
+        Value converted = resolve(value.get(), depth, visited);
+        return converted.isFixed() ? converted : Value.UNKNOWN;
     }
 
     private static Optional<ExpressionNode> singlePositionalArgument(FunctionCallExpressionNode functionCall) {
@@ -413,11 +654,15 @@ class SecretValueResolver {
     }
 
     private static Optional<ExpressionNode> findConstantInitializer(Node constantNode) {
+        return findConstantDeclaration(constantNode)
+                .filter(constantDeclaration -> constantDeclaration.initializer() instanceof ExpressionNode)
+                .map(constantDeclaration -> (ExpressionNode) constantDeclaration.initializer());
+    }
+
+    private static Optional<ConstantDeclarationNode> findConstantDeclaration(Node constantNode) {
         for (Node node = constantNode; node != null; node = node.parent()) {
             if (node instanceof ConstantDeclarationNode constantDeclaration) {
-                return constantDeclaration.initializer() instanceof ExpressionNode initializer
-                        ? Optional.of(initializer)
-                        : Optional.empty();
+                return Optional.of(constantDeclaration);
             }
         }
         return Optional.empty();
@@ -511,13 +756,6 @@ class SecretValueResolver {
         return Optional.ofNullable(documentsByName.get(location.lineRange().fileName()))
                 .map(Document::syntaxTree)
                 .map(syntaxTree -> ((ModulePartNode) syntaxTree.rootNode()).findNode(location.textRange(), true));
-    }
-
-    private static boolean isPlaceholder(ConstantSymbol constant) {
-        return constant.resolvedValue()
-                .map(SecretValueFilter::literalValue)
-                .map(SecretValueFilter::isPlaceholder)
-                .orElse(false);
     }
 
     // An enum member whose value is its own name, such as BASIC in enum AuthScheme { BASIC }, names a choice.

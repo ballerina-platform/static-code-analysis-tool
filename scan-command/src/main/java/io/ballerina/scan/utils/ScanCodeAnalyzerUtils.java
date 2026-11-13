@@ -103,7 +103,7 @@ public class ScanCodeAnalyzerUtils {
      * constant, such as {@code int:MAX_VALUE}, is missed when the module is imported with an alias; resolve the
      * symbol of the node with the semantic model instead
      */
-    @Deprecated(since = "0.13.1", forRemoval = true)
+    @Deprecated(since = "0.14.0", forRemoval = true)
     public static boolean isDefinedQualifiedNameReference(Node node, String module, String identifier) {
         if (node instanceof QualifiedNameReferenceNode ref) {
             return ref.modulePrefix() != null && ref.identifier() != null

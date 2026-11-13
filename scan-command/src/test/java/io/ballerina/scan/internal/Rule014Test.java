@@ -200,7 +200,7 @@ public class Rule014Test extends StaticCodeAnalyzerTest {
                 .toList();
         Assert.assertEquals(issues.size(), 6);
         assertIssue(issues.get(5), documentName, new Location(60, 39, 60, 56), HARD_CODED_SECRET.rule());
-        assertIssue(issues.get(0), documentName, new Location(48, 23, 48, 40), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(0), documentName, new Location(48, 24, 48, 39), HARD_CODED_SECRET.rule());
         assertIssue(issues.get(1), documentName, new Location(50, 23, 50, 36), NON_CONFIGURABLE_SECRET.rule());
         assertIssue(issues.get(2), documentName, new Location(52, 23, 52, 35), NON_CONFIGURABLE_SECRET.rule());
         assertIssue(issues.get(3), documentName, new Location(54, 23, 54, 35), NON_CONFIGURABLE_SECRET.rule());

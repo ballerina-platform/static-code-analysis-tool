@@ -19,12 +19,12 @@ public function main() {
     string creds = "user:pass-1";
     string passcode = "482913";
     string privateKey = "private-key-1";
-    string accessKey = "access-key-1";
+    string accessKey = "MLb9eJf8UyaH";
     string clientKey = "client-key-1";
     string bearer = "bearer-token-1";
     string oauthToken = "oauth-token-1";
     string jwtSecret = "jwt-secret-1";
-    map<string> headers = {"Authorization": "Bearer abc123", "x-api-key": "api-key-1", "apikey": "api-key-2"};
+    map<string> headers = {"Authorization": "Bearer abc123", "x-api-key": "rqPUk7JwG", "apikey": "UX7Y2Zj8r"};
     string apiSecret = string `hunter2-template`;
     string pass\u{0077}ord = "escaped-name-secret";
 }

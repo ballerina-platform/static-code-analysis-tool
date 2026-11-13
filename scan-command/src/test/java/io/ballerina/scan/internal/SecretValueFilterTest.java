@@ -48,6 +48,27 @@ public class SecretValueFilterTest {
         };
     }
 
+    @DataProvider
+    Object[][] generatedValues() {
+        return new Object[][]{
+                {"PJz0UhTJMrHOo68QQNpvnqAY_3Aa"}, {"Basic dXNlcjpwYXNzd29yZA=="}, {"sk_live_51H8xKqLz9"},
+                {"ghp_a1B2c3D4e5F6g7H8"}, {"s3cr3t-value"}, {"9f8a7b6c5d4e"}, {"a8f5f167f44f4964"}, {"AKIA1234"},
+                {"xKqLzPmRtYvWbNcD"}, {"secret12"}, {"admin:admin"}, {"Kq9z/x8F2mPq/Lw7R"},
+                {"JBSWYDPEHPKPXPQR"}, {"qwhdkfjsleiruthg"}
+        };
+    }
+
+    @DataProvider
+    Object[][] notGeneratedValues() {
+        return new Object[][]{
+                {"true"}, {"false"}, {"Basic"}, {"Basic "}, {"Bearer"}, {"No Proxy"}, {"Authorization"},
+                {"access_token"}, {"admin"}, {"aaaaaaaa1"}, {"abc123"}, {"12345678"}, {"abcdefg1"}, {"1234567890"},
+                {"XMLHttpRequest"}, {"ProxyAuthorization"}, {"x-api-key"}, {"my-super-secret-key"}, {"abababababab"},
+                {"Authorization: "}, {"sk_live_"}, {"x-api-key:"}, {"api_key="}, {"Authorization: Bearer"},
+                {"oauth/token"}, {"Content-Type, Authorization"}
+        };
+    }
+
     @Test(dataProvider = "placeholderValues")
     void testPlaceholderValue(String value) {
         Assert.assertTrue(SecretValueFilter.isPlaceholder(value), value);
@@ -56,5 +77,15 @@ public class SecretValueFilterTest {
     @Test(dataProvider = "secretValues")
     void testSecretValue(String value) {
         Assert.assertFalse(SecretValueFilter.isPlaceholder(value), value);
+    }
+
+    @Test(dataProvider = "generatedValues")
+    void testGeneratedValue(String value) {
+        Assert.assertTrue(SecretValueFilter.looksGenerated(value), value);
+    }
+
+    @Test(dataProvider = "notGeneratedValues")
+    void testNotGeneratedValue(String value) {
+        Assert.assertFalse(SecretValueFilter.looksGenerated(value), value);
     }
 }

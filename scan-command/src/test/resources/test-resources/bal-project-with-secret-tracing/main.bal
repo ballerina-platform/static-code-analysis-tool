@@ -27,6 +27,33 @@ public function main() {
     connect(password = vault:finalValue);
     connect(password = vault:mutableValue);
     connect(password = vault:SHARED_CONSTANT);
+    connectAll(apiKeys = vault:API_KEYS);
+    connectMap(passwords = vault:DB_PASSWORDS);
+    connectMap(passwords = vault:FIELD_PASSWORDS);
+    connectNested(passwords = vault:NESTED_PASSWORDS);
+    connectPorts(passwords = vault:PORTS);
+    sign(secretKey = vault:KEY_BYTES);
+    connectMap(passwords = vault:DEFAULT_CREDS);
+}
+
+function sign(byte[] secretKey) {
+    printValue(secretKey);
+}
+
+function connectAll(string[] apiKeys) {
+    printValue(apiKeys);
+}
+
+function connectMap(map<string> passwords) {
+    printValue(passwords);
+}
+
+function connectNested(map<map<string>> passwords) {
+    printValue(passwords);
+}
+
+function connectPorts(map<int> passwords) {
+    printValue(passwords);
 }
 
 function connect(string password) {

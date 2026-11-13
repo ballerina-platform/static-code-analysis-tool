@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-string defaultValue = "default-secret";
+string defaultValue = "jLS3nJKT8ahu3p";
 
 public function main() {
     string password = defaultValue;

@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-string defaultValue = "password";
+string defaultValue = "jrx6Qeyc";
 
 public type Credential record {
     string username;

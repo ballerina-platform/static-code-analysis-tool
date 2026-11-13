@@ -22,18 +22,18 @@ type Account record {|
     string password;
 |};
 
-const FIXED_VALUE = "hunter22";
+const FIXED_VALUE = "SqH5z6ht";
 
 public function main() {
-    string[] appSecrets = ["key-one-17", "changeme", FIXED_VALUE, ""];
-    string[][] tokens = [["tok-a1", "<token>"], []];
+    string[] appSecrets = ["nP4WJkfHoZ", "changeme", FIXED_VALUE, ""];
+    string[][] tokens = [["MFNJoT4gZDGJ", "<token>"], []];
     [string, int] token = ["tuple-secret-1", 3];
     readonly & string[] secretKeys = ["ro-key-123"];
     json[] authTokens = ["json-tok-123", 5, true, ()];
     anydata accessTokens = ["any-tok-123", 1.5];
     map<string> secrets = {github: "ghp_123abc", slack: "<slack-token>", gitlab: FIXED_VALUE};
     map<map<string>> clientSecrets = {github: {live: "ghp_live99", test: "${GH_TEST}"}};
-    map<string[]> apiTokens = {svc: ["svc-key-77", "dummy"]};
+    map<string[]> apiTokens = {svc: ["ZN6keDQFv5", "dummy"]};
     map<string>[] passwords = [{admin: "adm-pass-31"}, {}];
     map<Account> accountSecrets = {
         admin: {username: "admin", password: "adm1n-pass"},

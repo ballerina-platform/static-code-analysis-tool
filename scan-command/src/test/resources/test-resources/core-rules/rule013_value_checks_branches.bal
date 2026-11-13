@@ -20,7 +20,7 @@ const TOO_LARGE = [99999999999, 1];
 string[] base = ["base-value"];
 
 public function main() {
-    string[] tokens = [...base, "spread-secret"];
+    string[] tokens = [...base, "59HHNhsxGSDQJ"];
     json secretRange = OUT_OF_RANGE;
     json secretLarge = TOO_LARGE;
     printValue(tokens, secretRange, secretLarge);

@@ -19,10 +19,13 @@
 package io.ballerina.scan.internal;
 
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -38,11 +41,27 @@ final class SecretValueFilter {
     // A template reference inside a larger value, such as "Bearer {{token}}", also makes it a placeholder.
     private static final Pattern EMBEDDED_TEMPLATE = Pattern.compile("\\$\\{[^}]*}|\\{\\{[^}]*}}");
     private static final Pattern REPEATED_CHARACTER = Pattern.compile("(.)\\1*");
+    private static final Pattern ANGLE_PLACEHOLDER = Pattern.compile("<[^<>]+>");
+    // A word in one case is no longer than this; a longer run, as in a base32 key, is checked for randomness.
+    private static final int MAX_SINGLE_CASE_WORD_LENGTH = 15;
     private static final Pattern YOUR_PREFIX = Pattern.compile("(?i)your[-_ a-z]*(key|"
             + String.join("|", Stream.concat(SecretNameMatcher.EMBEDDED_KEYWORDS.stream(),
             SecretNameMatcher.WORD_KEYWORDS.stream()).toList()) + ")s?([-_ ]?here)?");
     private static final Set<String> DUMMY_VALUES = Set.of("changeme", "change_me", "change-me", "changeit",
             "dummy", "placeholder", "example", "sample", "redacted", "todo", "tbd");
+    // A generated secret, such as a token or a key, is at least this long and this random, in bits per character.
+    // Six distinct characters in eight reach it, as do random hexadecimal digits.
+    private static final int MIN_GENERATED_LENGTH = 8;
+    private static final double MIN_GENERATED_ENTROPY = 2.5;
+    // Words are separated as in text, a header or a path, as in "Authorization: Bearer" or "auth/token", but a
+    // colon alone joins a user and a password, as in "admin:admin"
+    private static final Pattern LETTER_SEGMENTS = Pattern.compile("[A-Za-z]+(?:(?:: |[ _./,-])+[A-Za-z]+)*");
+    private static final Pattern SEGMENT_SEPARATOR = Pattern.compile("(?:: |[ _./,-])+");
+    private static final Pattern EDGE_SEPARATORS = Pattern.compile("^[^A-Za-z0-9]+|[^A-Za-z0-9]+$");
+    private static final Pattern SINGLE_CASE_WORD = Pattern.compile("[a-z]+|[A-Z]+|[A-Z][a-z]+");
+    // The words of a camel case segment, such as "XML", "Http" and "Request" in "XMLHttpRequest".
+    private static final Pattern CAMEL_CASE_WORD = Pattern.compile("[A-Z]+(?![a-z])|[A-Z]?[a-z]+");
+    private static final double MIN_AVERAGE_WORD_LENGTH = 3;
 
     private static final Pattern ESCAPE = Pattern.compile("\\\\(?:u\\{([0-9A-Fa-f]+)}|(.))");
 
@@ -84,5 +103,71 @@ final class SecretValueFilter {
                 || REPEATED_CHARACTER.matcher(trimmedValue).matches()
                 || YOUR_PREFIX.matcher(trimmedValue).matches()
                 || DUMMY_VALUES.contains(trimmedValue.toLowerCase(Locale.ENGLISH));
+    }
+
+    static boolean hasTemplateReference(String value) {
+        return EMBEDDED_TEMPLATE.matcher(value).find();
+    }
+
+    static String withoutTemplateReferences(String value) {
+        return EMBEDDED_TEMPLATE.matcher(value).replaceAll("");
+    }
+
+    // The value without its placeholders such as "<token>"; a "${TOKEN}" is kept, as it makes the whole a placeholder.
+    static String withoutAnglePlaceholders(String value) {
+        return ANGLE_PLACEHOLDER.matcher(value).replaceAll("");
+    }
+
+    // Whether a value looks generated, as a token or a key does; a password can be any value.
+    static boolean looksGenerated(String value) {
+        String trimmedValue = value.trim();
+        return trimmedValue.length() >= MIN_GENERATED_LENGTH
+                && !isWords(trimmedValue)
+                && !isConsecutive(trimmedValue)
+                && entropy(trimmedValue) >= MIN_GENERATED_ENTROPY;
+    }
+
+    // Random letters, as in "xKqLzPmRtYvWbNcD", change case every letter or two, unlike "XMLHttpRequest".
+    private static boolean isWords(String value) {
+        // A prefix or a header name, such as "sk_live_" or "Authorization: ", ends with a separator
+        String letters = EDGE_SEPARATORS.matcher(value).replaceAll("");
+        if (!LETTER_SEGMENTS.matcher(letters).matches()) {
+            return false;
+        }
+        for (String segment : SEGMENT_SEPARATOR.split(letters)) {
+            if (SINGLE_CASE_WORD.matcher(segment).matches()) {
+                if (segment.length() > MAX_SINGLE_CASE_WORD_LENGTH) {
+                    return false;
+                }
+                continue;
+            }
+            long words = CAMEL_CASE_WORD.matcher(segment).results().count();
+            if ((double) segment.length() / words < MIN_AVERAGE_WORD_LENGTH) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // A run of consecutive characters, such as "12345678" or "abcdefg1", with at most one break in the run.
+    private static boolean isConsecutive(String value) {
+        int steps = 0;
+        for (int i = 1; i < value.length(); i++) {
+            if (Math.abs(value.charAt(i) - value.charAt(i - 1)) == 1) {
+                steps++;
+            }
+        }
+        return steps >= value.length() - 2;
+    }
+
+    // The Shannon entropy of the characters of a value, in bits per character.
+    static double entropy(String value) {
+        Map<Integer, Long> counts = value.codePoints().boxed()
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+        double length = value.codePointCount(0, value.length());
+        return counts.values().stream()
+                .mapToDouble(count -> count / length)
+                .map(probability -> -probability * Math.log(probability) / Math.log(2))
+                .sum();
     }
 }

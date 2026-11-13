@@ -19,6 +19,6 @@ public function main() {
     string passwd = "passwd";
     string pwd = "pwd";
     string passphrase = "passphrase";
-    string secret = "secret";
-    string clientSecret = "clientSecret";
+    string secret = "doPXkAFpKhC3";
+    string clientSecret = "HRiJN2tBFRbG";
 }

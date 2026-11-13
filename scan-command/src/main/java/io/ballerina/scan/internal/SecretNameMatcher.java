@@ -19,10 +19,14 @@
 package io.ballerina.scan.internal;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * {@code SecretNameMatcher} decides whether the name of a variable, field, parameter, argument or mapping key
@@ -42,16 +46,43 @@ final class SecretNameMatcher {
     // The plural of an acronym, such as the "URLs" in "authURLs", is one word rather than "UR" and "Ls".
     private static final Pattern PLURAL_ACRONYM = Pattern.compile("([A-Z]{2,})s(?![a-z])");
 
-    // Matched anywhere in the name, so that all-lowercase compounds such as "dbpassword" and "apikey" match.
-    static final List<String> EMBEDDED_KEYWORDS = List.of("password", "passwd", "passphrase", "passcode",
-            "secret", "apikey", "credential", "privatekey", "accesskey", "clientkey", "authorization");
+    /**
+     * A secret keyword.
+     *
+     * @param text       the keyword in lower case
+     * @param isEmbedded whether it matches anywhere, as in "dbpassword", or only as a word or at the end of one, as
+     *                   "token" does, since it starts unrelated words such as "tokenizer"
+     * @param kind       the kind of secret it names; a password is chosen by a person, so any value of it can be real
+     */
+    private record Keyword(String text, boolean isEmbedded, Kind kind) {
+    }
 
-    // Matched as whole words, or at the end of an all-lowercase compound such as "accesstoken", since they are also
-    // the start of unrelated words such as "author" and "tokenizer".
-    static final List<String> WORD_KEYWORDS = List.of("pwd", "auth", "token", "creds", "bearer");
+    private static final List<Keyword> KEYWORDS = List.of(
+            new Keyword("password", true, Kind.PASSWORD),
+            new Keyword("passwd", true, Kind.PASSWORD),
+            new Keyword("passphrase", true, Kind.PASSWORD),
+            new Keyword("passcode", true, Kind.PASSWORD),
+            new Keyword("pwd", false, Kind.PASSWORD),
+            new Keyword("secret", true, Kind.SECRET),
+            new Keyword("apikey", true, Kind.SECRET),
+            new Keyword("credential", true, Kind.SECRET),
+            new Keyword("privatekey", true, Kind.SECRET),
+            new Keyword("accesskey", true, Kind.SECRET),
+            new Keyword("clientkey", true, Kind.SECRET),
+            new Keyword("authorization", true, Kind.SECRET),
+            new Keyword("auth", false, Kind.SECRET),
+            new Keyword("token", false, Kind.SECRET),
+            new Keyword("creds", false, Kind.SECRET),
+            new Keyword("bearer", false, Kind.SECRET));
+
+    static final List<String> EMBEDDED_KEYWORDS = KEYWORDS.stream()
+            .filter(Keyword::isEmbedded).map(Keyword::text).toList();
+
+    static final List<String> WORD_KEYWORDS = KEYWORDS.stream()
+            .filter(keyword -> !keyword.isEmbedded()).map(Keyword::text).toList();
 
     // Words that contain a keyword but name something else, as in "undersecretary".
-    private static final Set<String> NON_SECRET_WORDS = Set.of("secretar");
+    private static final Set<String> NON_SECRET_WORDS = Set.of("secretar", "passwordless");
 
     // A hashed secret, as in "hashedPassword", is no longer the secret itself.
     private static final String HASHED = "hashed";
@@ -67,25 +98,77 @@ final class SecretNameMatcher {
             "placeholder", "field", "param", "scheme", "mode", "provider", "issuer", "audience", "format",
             "encoding", "version", "alias", "ref", "arn", "store", "vault", "scope", "scopes", "location", "prefix",
             "suffix", "template", "handler", "strength", "validator", "status", "valid", "flag", "user", "username",
-            "host", "hostname", "server", "alg", "algorithm", "supported");
+            "host", "hostname", "server", "alg", "algorithm", "supported", "less");
 
     private SecretNameMatcher() {
     }
 
+    /**
+     * The kind of secret a name suggests. A password is chosen by a person, so any value of it can be real. Other
+     * secrets, such as tokens and keys, are generated, so only a value that looks generated can be one.
+     */
+    enum Kind {
+        NONE,
+        SECRET,
+        PASSWORD;
+
+        boolean isSecret() {
+            return this != NONE;
+        }
+
+        // A password is the strictest kind, as any value of it can be real.
+        Kind stricter(Kind other) {
+            return compareTo(other) >= 0 ? this : other;
+        }
+    }
+
     static boolean isSecretName(String name) {
+        return kind(name) != Kind.NONE;
+    }
+
+    static Kind kind(String name) {
         // Escapes in an identifier or key, such as api\-key, are matched by the characters they encode.
         List<String> words = splitIntoWords(SecretValueFilter.literalValue(name));
-        int lastKeywordIndex = lastKeywordWordIndex(words);
-        if (lastKeywordIndex < 0 || words.subList(0, lastKeywordIndex).contains(HASHED)) {
-            return false;
+        List<KeywordMatch> keywords = keywords(words);
+        Optional<KeywordMatch> lastKeyword = keywords.stream().max(Comparator.comparingInt(KeywordMatch::end));
+        if (lastKeyword.isEmpty() || words.subList(0, lastKeyword.get().wordIndex()).contains(HASHED)) {
+            return Kind.NONE;
         }
+        int lastKeywordIndex = lastKeyword.get().wordIndex();
         // The last word before any preposition names what the value is, as in "passwordFilePath" and
         // "privateKeyFileContent".
         int headWordIndex = lastKeywordIndex;
         for (int i = lastKeywordIndex + 1; i < words.size() && !PREPOSITIONS.contains(words.get(i)); i++) {
             headWordIndex = i;
         }
-        return headWordIndex == lastKeywordIndex || !isDescriptor(words.get(headWordIndex));
+        if (headWordIndex != lastKeywordIndex && isDescriptor(words.get(headWordIndex))) {
+            return Kind.NONE;
+        }
+        // A password named in the head of the name makes it one, as in "passwordToken", but not one that qualifies
+        // another word or follows a preposition, as in "passwordResetToken" or "tokenForPasswordReset".
+        int firstPreposition = 1;
+        while (firstPreposition < words.size() && !PREPOSITIONS.contains(words.get(firstPreposition))) {
+            firstPreposition++;
+        }
+        int headEnd = firstPreposition;
+        Set<Integer> keywordWords = keywords.stream()
+                .flatMap(keyword -> IntStream.rangeClosed(keyword.firstWord(), keyword.wordIndex()).boxed())
+                .collect(Collectors.toSet());
+        return keywords.stream().anyMatch(keyword -> keyword.kind() == Kind.PASSWORD
+                && keyword.wordIndex() < headEnd
+                && IntStream.range(keyword.wordIndex() + 1, lastKeywordIndex).allMatch(keywordWords::contains))
+                ? Kind.PASSWORD : Kind.SECRET;
+    }
+
+    /**
+     * A keyword found in a name.
+     *
+     * @param firstWord the index of the word it starts in
+     * @param wordIndex the index of the word it ends in
+     * @param end       where it ends in the name, with the words joined
+     * @param kind      the kind of secret it names
+     */
+    private record KeywordMatch(int firstWord, int wordIndex, int end, Kind kind) {
     }
 
     // A descriptor or its plural, such as "urls", "hashes" or "policies".
@@ -110,26 +193,35 @@ final class SecretNameMatcher {
         return words;
     }
 
-    private static int lastKeywordWordIndex(List<String> words) {
-        int lastIndex = -1;
+    // The keywords found in the name, wherever they end, as "password" in "dbpasswordvalue".
+    private static List<KeywordMatch> keywords(List<String> words) {
+        List<KeywordMatch> matches = new ArrayList<>();
         StringBuilder joinedWords = new StringBuilder();
         int[] wordStarts = new int[words.size() + 1];
         for (int i = 0; i < words.size(); i++) {
             String word = words.get(i);
-            // "oauth" ends with the keyword "auth" but names a protocol, as in "googleoauth".
-            if (!word.endsWith("oauth") && WORD_KEYWORDS.stream()
-                    .anyMatch(keyword -> word.endsWith(keyword) || word.endsWith(keyword + "s"))) {
-                lastIndex = i;
-            }
             wordStarts[i] = joinedWords.length();
             joinedWords.append(word);
+            // "oauth" ends with the keyword "auth" but names a protocol, as in "googleoauth".
+            if (word.endsWith("oauth")) {
+                continue;
+            }
+            for (Keyword keyword : KEYWORDS) {
+                if (!keyword.isEmbedded() && (word.endsWith(keyword.text()) || word.endsWith(keyword.text() + "s"))) {
+                    matches.add(new KeywordMatch(i, i, joinedWords.length(), keyword.kind()));
+                }
+            }
         }
         wordStarts[words.size()] = joinedWords.length();
 
         String joined = joinedWords.toString();
-        for (String keyword : EMBEDDED_KEYWORDS) {
-            for (int start = joined.indexOf(keyword); start >= 0; start = joined.indexOf(keyword, start + 1)) {
-                int end = start + keyword.length();
+        for (Keyword keyword : KEYWORDS) {
+            if (!keyword.isEmbedded()) {
+                continue;
+            }
+            for (int start = joined.indexOf(keyword.text()); start >= 0;
+                 start = joined.indexOf(keyword.text(), start + 1)) {
+                int end = start + keyword.text().length();
                 int firstWord = wordAt(wordStarts, start);
                 int lastWord = wordAt(wordStarts, end - 1);
                 // A keyword spanning words, such as "apiKey" or "apiKeys", must not start or end inside one, as in
@@ -138,11 +230,11 @@ final class SecretNameMatcher {
                 boolean endsWord = nextWordStart == end || (nextWordStart == end + 1 && joined.charAt(end) == 's');
                 boolean spansWholeWords = firstWord == lastWord || (wordStarts[firstWord] == start && endsWord);
                 if (spansWholeWords && NON_SECRET_WORDS.stream().noneMatch(words.get(firstWord)::contains)) {
-                    lastIndex = Math.max(lastIndex, lastWord);
+                    matches.add(new KeywordMatch(firstWord, lastWord, end, keyword.kind()));
                 }
             }
         }
-        return lastIndex;
+        return matches;
     }
 
     private static int wordAt(int[] wordStarts, int offset) {

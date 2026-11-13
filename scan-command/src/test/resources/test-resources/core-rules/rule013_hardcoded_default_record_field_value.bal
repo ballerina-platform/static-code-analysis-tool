@@ -21,5 +21,5 @@ public type Credential record {
 
 public type ClientCredential record {
     string clientId;
-    string clientSecret = "secret";
+    string clientSecret = "UgKPGZnTNc2F";
 };

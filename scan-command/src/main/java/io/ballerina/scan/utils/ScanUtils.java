@@ -260,10 +260,10 @@ public final class ScanUtils {
      * @param issues generated issues
      * @return json string array of generated issues
      * @deprecated without the project, the {@code location.filePath} of an issue is only its file name; use
-     * {@link #convertIssuesToJsonString(List, Project, Map)} instead. Since 0.13.1, the lines and columns of the
+     * {@link #convertIssuesToJsonString(List, Project, Map)} instead. Since 0.14.0, the lines and columns of the
      * {@code location} are one-based, as in the SARIF report, instead of zero-based.
      */
-    @Deprecated(since = "0.13.1")
+    @Deprecated(since = "0.14.0")
     public static String convertIssuesToJsonString(List<Issue> issues) {
         return convertIssuesToJsonString(issues, null, Map.of());
     }
@@ -277,10 +277,10 @@ public final class ScanUtils {
      * @return json string array of generated issues
      * @since 0.13.0
      * @deprecated without the project, the {@code location.filePath} of an issue is only its file name; use
-     * {@link #convertIssuesToJsonString(List, Project, Map)} instead. Since 0.13.1, the lines and columns of the
+     * {@link #convertIssuesToJsonString(List, Project, Map)} instead. Since 0.14.0, the lines and columns of the
      * {@code location} are one-based, as in the SARIF report, instead of zero-based.
      */
-    @Deprecated(since = "0.13.1")
+    @Deprecated(since = "0.14.0")
     public static String convertIssuesToJsonString(List<Issue> issues, Map<Issue, SuppressedIssue> suppressions) {
         return convertIssuesToJsonString(issues, null, suppressions);
     }
@@ -295,7 +295,7 @@ public final class ScanUtils {
      * @param project      the package or workspace the issues were found in, or null to give only the file name
      * @param suppressions the suppressed issues, keyed by the issue they suppress
      * @return json string array of generated issues
-     * @since 0.13.1
+     * @since 0.14.0
      */
     public static String convertIssuesToJsonString(List<Issue> issues, Project project,
                                                    Map<Issue, SuppressedIssue> suppressions) {

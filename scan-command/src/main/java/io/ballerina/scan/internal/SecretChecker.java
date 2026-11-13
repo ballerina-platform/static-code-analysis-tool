@@ -36,6 +36,7 @@ import io.ballerina.compiler.api.symbols.VariableSymbol;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
+import io.ballerina.compiler.syntax.tree.BracedExpressionNode;
 import io.ballerina.compiler.syntax.tree.CaptureBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.ClientResourceAccessActionNode;
 import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
@@ -70,6 +71,7 @@ import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.TemplateExpressionNode;
 import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.TypeCastExpressionNode;
 import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
 import io.ballerina.projects.Document;
@@ -88,6 +90,7 @@ import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.CoreRule.HARD_CODED_SECRET;
 import static io.ballerina.scan.internal.CoreRule.NON_CONFIGURABLE_SECRET;
+import static io.ballerina.scan.internal.SecretNameMatcher.kind;
 import static io.ballerina.scan.internal.SemanticUtils.unwrap;
 
 public class SecretChecker extends NodeVisitor {
@@ -103,7 +106,7 @@ public class SecretChecker extends NodeVisitor {
     private final SemanticModel semanticModel;
     private final SecretValueResolver valueResolver;
     private final Set<String> reportedIssueKeys = new HashSet<>();
-    private final Map<String, Boolean> secretParameterNames = new HashMap<>();
+    private final Map<String, SecretNameMatcher.Kind> secretParameterKinds = new HashMap<>();
 
     SecretChecker(Document document, ScannerContext scannerContext, SemanticModel semanticModel,
                   SecretValueResolver valueResolver) {
@@ -118,26 +121,23 @@ public class SecretChecker extends NodeVisitor {
         this.visit((ModulePartNode) syntaxTree.rootNode());
     }
 
-    private static boolean isSecretName(String name) {
-        return SecretNameMatcher.isSecretName(name);
-    }
-
     @Override
     public void visit(DefaultableParameterNode defaultableParameterNode) {
-        if (isSecretName(defaultableParameterNode.paramName().map(Token::text).orElse(""))
-                && defaultableParameterNode.expression() instanceof ExpressionNode expressionNode) {
-            validateExpression(expressionNode);
+        SecretNameMatcher.Kind kind = kind(defaultableParameterNode.paramName().map(Token::text).orElse(""));
+        if (kind.isSecret() && defaultableParameterNode.expression() instanceof ExpressionNode expressionNode) {
+            validateExpression(expressionNode, kind);
         }
         super.visit(defaultableParameterNode);
     }
 
     @Override
     public void visit(SpecificFieldNode specificFieldNode) {
-        if (isSecretName(fieldNameText(specificFieldNode))) {
+        SecretNameMatcher.Kind kind = kind(fieldNameText(specificFieldNode));
+        if (kind.isSecret()) {
             if (specificFieldNode.valueExpr().isEmpty()) {
-                validateShorthandNotation(specificFieldNode);
+                validateShorthandNotation(specificFieldNode, kind);
             } else {
-                validateExpression(specificFieldNode.valueExpr().get());
+                validateExpression(specificFieldNode.valueExpr().get(), kind);
             }
         }
         super.visit(specificFieldNode);
@@ -153,11 +153,11 @@ public class SecretChecker extends NodeVisitor {
         };
     }
 
-    private void validateShorthandNotation(SpecificFieldNode specificFieldNode) {
+    private void validateShorthandNotation(SpecificFieldNode specificFieldNode, SecretNameMatcher.Kind kind) {
         semanticModel.symbol(specificFieldNode)
                 .filter(symbol -> !(symbol instanceof VariableSymbol variable)
                         || canHoldSecret(variable.typeDescriptor()))
-                .ifPresent(symbol -> report(specificFieldNode, valueResolver.resolveSymbol(symbol)));
+                .ifPresent(symbol -> report(specificFieldNode, valueResolver.resolveSymbol(symbol), kind));
     }
 
     @Override
@@ -225,15 +225,15 @@ public class SecretChecker extends NodeVisitor {
 
     @Override
     public void visit(ModuleVariableDeclarationNode moduleVariableDeclarationNode) {
-        if (isSecretName(variableName(moduleVariableDeclarationNode.typedBindingPattern()))
-                && moduleVariableDeclarationNode.initializer().isPresent()) {
-            validateExpression(moduleVariableDeclarationNode.initializer().get());
+        SecretNameMatcher.Kind kind = kind(variableName(moduleVariableDeclarationNode.typedBindingPattern()));
+        if (kind.isSecret() && moduleVariableDeclarationNode.initializer().isPresent()) {
+            validateExpression(moduleVariableDeclarationNode.initializer().get(), kind);
         }
         super.visit(moduleVariableDeclarationNode);
     }
 
     // The name of a variable declared on its own; a destructuring pattern declares no single secret-named variable.
-    private static String variableName(TypedBindingPatternNode typedBindingPattern) {
+    static String variableName(TypedBindingPatternNode typedBindingPattern) {
         return typedBindingPattern.bindingPattern() instanceof CaptureBindingPatternNode captureBindingPattern
                 ? captureBindingPattern.variableName().text()
                 : "";
@@ -241,62 +241,67 @@ public class SecretChecker extends NodeVisitor {
 
     @Override
     public void visit(VariableDeclarationNode variableDeclarationNode) {
-        if (isSecretName(variableName(variableDeclarationNode.typedBindingPattern()))
-                && variableDeclarationNode.initializer().isPresent()) {
-            validateExpression(variableDeclarationNode.initializer().get());
+        SecretNameMatcher.Kind kind = kind(variableName(variableDeclarationNode.typedBindingPattern()));
+        if (kind.isSecret() && variableDeclarationNode.initializer().isPresent()) {
+            validateExpression(variableDeclarationNode.initializer().get(), kind);
         }
         super.visit(variableDeclarationNode);
     }
 
     @Override
     public void visit(AssignmentStatementNode assignmentStatementNode) {
-        if (isSecretTarget(assignmentStatementNode.varRef())) {
-            validateExpression(assignmentStatementNode.expression());
+        SecretNameMatcher.Kind kind = targetKind(assignmentStatementNode.varRef());
+        if (kind.isSecret()) {
+            validateExpression(assignmentStatementNode.expression(), kind);
         }
         super.visit(assignmentStatementNode);
     }
 
     @Override
     public void visit(CompoundAssignmentStatementNode compoundAssignmentStatementNode) {
-        if (compoundAssignmentStatementNode.binaryOperator().kind() == SyntaxKind.PLUS_TOKEN
-                && isSecretTarget(compoundAssignmentStatementNode.lhsExpression())) {
-            validateExpression(compoundAssignmentStatementNode.rhsExpression());
+        if (compoundAssignmentStatementNode.binaryOperator().kind() == SyntaxKind.PLUS_TOKEN) {
+            SecretNameMatcher.Kind kind = targetKind(compoundAssignmentStatementNode.lhsExpression());
+            if (kind.isSecret()) {
+                validateExpression(compoundAssignmentStatementNode.rhsExpression(), kind);
+            }
         }
         super.visit(compoundAssignmentStatementNode);
     }
 
-    private static boolean isSecretTarget(Node target) {
+    private static SecretNameMatcher.Kind targetKind(Node target) {
         return switch (target) {
-            case SimpleNameReferenceNode variable -> isSecretName(variable.name().text());
-            case FieldAccessExpressionNode fieldAccess -> isSecretName(fieldAccess.fieldName().toSourceCode().trim());
+            case SimpleNameReferenceNode variable -> kind(variable.name().text());
+            case FieldAccessExpressionNode fieldAccess -> kind(fieldAccess.fieldName().toSourceCode().trim());
             case IndexedExpressionNode memberAccess -> SecretValueResolver.memberKey(memberAccess)
-                    .filter(SecretChecker::isSecretName)
-                    .isPresent();
-            default -> false;
+                    .map(SecretNameMatcher::kind)
+                    .orElse(SecretNameMatcher.Kind.NONE);
+            default -> SecretNameMatcher.Kind.NONE;
         };
     }
 
     @Override
     public void visit(NamedArgumentNode namedArgumentNode) {
-        if (isSecretName(namedArgumentNode.argumentName().name().text())) {
-            validateExpression(namedArgumentNode.expression());
+        SecretNameMatcher.Kind kind = kind(namedArgumentNode.argumentName().name().text());
+        if (kind.isSecret()) {
+            validateExpression(namedArgumentNode.expression(), kind);
         }
         super.visit(namedArgumentNode);
     }
 
     @Override
     public void visit(RecordFieldWithDefaultValueNode recordFieldWithDefaultValueNode) {
-        if (isSecretName(recordFieldWithDefaultValueNode.fieldName().text().trim())) {
-            validateExpression(recordFieldWithDefaultValueNode.expression());
+        SecretNameMatcher.Kind kind = kind(recordFieldWithDefaultValueNode.fieldName().text().trim());
+        if (kind.isSecret()) {
+            validateExpression(recordFieldWithDefaultValueNode.expression(), kind);
         }
         super.visit(recordFieldWithDefaultValueNode);
     }
 
     @Override
     public void visit(ObjectFieldNode objectFieldNode) {
-        if (isSecretName(objectFieldNode.fieldName().text().trim())
-                && objectFieldNode.expression().isPresent()) {
-            validateExpression(objectFieldNode.expression().get());
+        SecretNameMatcher.Kind kind = kind(objectFieldNode.fieldName().text().trim());
+        if (kind.isSecret() && objectFieldNode.expression().isPresent()) {
+            validateExpression(objectFieldNode.expression().get(), kind);
         }
         super.visit(objectFieldNode);
     }
@@ -412,34 +417,45 @@ public class SecretChecker extends NodeVisitor {
             Optional<ParameterSymbol> parameter = position < parameters.size()
                     ? Optional.of(parameters.get(position))
                     : restParameter;
-            if (parameter.flatMap(ParameterSymbol::getName).filter(this::isSecretParameterName).isPresent()) {
-                validateExpression(((PositionalArgumentNode) argument).expression());
+            SecretNameMatcher.Kind kind = parameter.flatMap(ParameterSymbol::getName)
+                    .map(this::parameterKind)
+                    .orElse(SecretNameMatcher.Kind.NONE);
+            if (kind.isSecret()) {
+                validateExpression(((PositionalArgumentNode) argument).expression(), kind);
             }
             position++;
         }
     }
 
     // The same parameters are matched at every call to a function, so their names are matched once.
-    private boolean isSecretParameterName(String name) {
-        return secretParameterNames.computeIfAbsent(name, SecretChecker::isSecretName);
+    private SecretNameMatcher.Kind parameterKind(String name) {
+        return secretParameterKinds.computeIfAbsent(name, SecretNameMatcher::kind);
     }
 
-    private void validateExpression(ExpressionNode expressionNode) {
+    private void validateExpression(ExpressionNode expressionNode, SecretNameMatcher.Kind kind) {
+        if (expressionNode instanceof BracedExpressionNode braced) {
+            validateExpression(braced.expression(), kind);
+            return;
+        }
+        if (expressionNode instanceof TypeCastExpressionNode typeCast) {
+            validateExpression(typeCast.expression(), kind);
+            return;
+        }
         // Each branch of a conditional or elvis expression is checked, and reported, where it is written.
         if (expressionNode instanceof ConditionalExpressionNode conditional) {
-            validateExpression(conditional.middleExpression());
-            validateExpression(conditional.endExpression());
+            validateExpression(conditional.middleExpression(), kind);
+            validateExpression(conditional.endExpression(), kind);
             return;
         }
         if (expressionNode instanceof BinaryExpressionNode binary
                 && binary.operator().kind() == SyntaxKind.ELVIS_TOKEN) {
             Stream.of(binary.lhsExpr(), binary.rhsExpr())
                     .filter(ExpressionNode.class::isInstance)
-                    .forEach(operand -> validateExpression((ExpressionNode) operand));
+                    .forEach(operand -> validateExpression((ExpressionNode) operand, kind));
             return;
         }
         if (expressionNode.kind() == SyntaxKind.STRING_LITERAL) {
-            report(expressionNode, valueResolver.resolve(expressionNode));
+            report(expressionNode, valueResolver.resolve(expressionNode), kind);
             return;
         }
         Optional<TypeSymbol> type = semanticModel.typeOf(expressionNode);
@@ -447,26 +463,28 @@ public class SecretChecker extends NodeVisitor {
                 && !type.map(SecretChecker::isByteArray).orElse(false)) {
             ((ListConstructorExpressionNode) expressionNode).expressions().forEach(member -> {
                 if (member instanceof ExpressionNode memberExpression) {
-                    validateExpression(memberExpression);
+                    validateExpression(memberExpression, kind);
                 }
             });
             return;
         }
         if (expressionNode.kind() == SyntaxKind.MAPPING_CONSTRUCTOR) {
             // A map of secrets is checked value by value, while a record's fields are checked by their own names.
-            if (type.map(SecretChecker::isMap).orElse(true)) {
-                ((MappingConstructorExpressionNode) expressionNode).fields().forEach(this::validateMapValue);
+            MappingConstructorExpressionNode mapping = (MappingConstructorExpressionNode) expressionNode;
+            if (valueResolver.isConstantMap(mapping).orElseGet(() -> type.map(SecretChecker::isMap).orElse(true))) {
+                mapping.fields().forEach(field -> validateMapValue(field, kind));
             }
             return;
         }
-        if (!type.map(valueType -> canHoldSecret(slotType(expressionNode, valueType))).orElse(true)) {
+        if (!type.map(valueType -> canHoldSecret(slotType(expressionNode, valueType))).orElse(true)
+                && !valueResolver.isMapConstant(expressionNode)) {
             return;
         }
         // A URL with credentials is reported once, as ballerina:13, when the literal or template is visited.
         if (containsUrlWithCredentials(expressionNode)) {
             return;
         }
-        report(expressionNode, valueResolver.resolve(expressionNode));
+        report(expressionNode, valueResolver.resolve(expressionNode), kind);
     }
 
     // A list constant is typed by the shape of its value, so the type of the slot it is given to tells int[] from
@@ -480,15 +498,21 @@ public class SecretChecker extends NodeVisitor {
                 .orElse(valueType);
     }
 
-    private void validateMapValue(MappingFieldNode field) {
+    // A field of a map of secrets is checked with the stricter of its own kind and the map's, as a token in a map of
+    // passwords can hold any value of a password.
+    private void validateMapValue(MappingFieldNode field, SecretNameMatcher.Kind kind) {
         if (field instanceof SpecificFieldNode specificField) {
-            specificField.valueExpr().ifPresentOrElse(this::validateExpression,
-                    () -> validateShorthandNotation(specificField));
+            SecretNameMatcher.Kind fieldKind = kind(fieldNameText(specificField)).stricter(kind);
+            specificField.valueExpr().ifPresentOrElse(value -> validateExpression(value, fieldKind),
+                    () -> validateShorthandNotation(specificField, fieldKind));
         }
     }
 
-    private void report(Node node, SecretValueResolver.Origin origin) {
-        switch (origin) {
+    private void report(Node node, SecretValueResolver.Value value, SecretNameMatcher.Kind kind) {
+        if (!value.isReported(kind)) {
+            return;
+        }
+        switch (value.origin()) {
             case HARD_CODED -> reportHardCodedSecret(node);
             case FIXED_VARIABLE -> reportNonConfigurableSecret(node);
             default -> { }
@@ -535,7 +559,7 @@ public class SecretChecker extends NodeVisitor {
         return unwrap(typeSymbol) instanceof ArrayTypeSymbol arrayType && isByte(arrayType.memberTypeDescriptor());
     }
 
-    private static boolean isMap(TypeSymbol typeSymbol) {
+    static boolean isMap(TypeSymbol typeSymbol) {
         return unwrap(typeSymbol).typeKind() == TypeDescKind.MAP;
     }
 

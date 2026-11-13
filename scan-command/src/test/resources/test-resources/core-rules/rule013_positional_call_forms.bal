@@ -51,7 +51,7 @@ public function main() returns error? {
 
     Authenticator authenticator = vault;
     authenticator.unlock("admin", "objectTypeSecret1");
-    future<()> unlocking = start authenticator.unlock("admin", "startSecret3");
+    future<()> unlocking = start authenticator.unlock("admin", "Ti4XE4jp56mC");
     check wait unlocking;
     function (string, string) unnamed = connect;
     unnamed("admin", "unnamedPointerValue1");

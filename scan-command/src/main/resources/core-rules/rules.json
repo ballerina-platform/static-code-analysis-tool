@@ -199,7 +199,7 @@
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-13",
     "severity": "HIGH",
     "description": "A secret such as a password, API key, or token is written in source code as a literal or a constant.",
-    "fullDescription": "Writing secrets such as passwords, API keys, or tokens in source code, as a literal, a constant, an expression built only from them, or the default value of a configurable variable, exposes them to anyone with access to the codebase or its version history, and makes rotating a compromised secret require a code change and redeploy.",
+    "fullDescription": "Writing secrets such as passwords, API keys, or tokens in source code, as a literal, a constant, an expression built only from them, or the default value of a configurable variable, exposes them to anyone with access to the codebase or its version history, and makes rotating a compromised secret require a code change and redeploy. A password, passphrase, passcode, `passwd` or `pwd` is reported for any value, since a person chooses it, as is a secret whose name mentions one, such as `passwordToken`, or a value in a map of passwords. Other secrets, such as API keys, tokens, credentials and client secrets, are generated, so they are reported only for a value that looks generated: at least 8 characters, not made of words only, not a run of consecutive characters such as \"12345678\", and with at least 2.5 bits of entropy per character, about six distinct characters in eight. A value such as \"true\", \"Basic \", \"No Proxy\" or \"my-secret-key\" is not reported for them.",
     "tags": [
       "security",
       "secrets",
@@ -227,7 +227,7 @@
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-14",
     "severity": "MEDIUM",
     "description": "A secret is taken from a non-configurable variable that holds a fixed value.",
-    "fullDescription": "A secret taken from a non-configurable variable that holds a fixed value, such as a variable initialized with a literal and never assigned again, forces the same secret to be reused across environments and prevents it from being rotated or overridden without modifying and redeploying the code. Values computed at run time, such as the result of a function call, are not reported.",
+    "fullDescription": "A secret taken from a non-configurable variable that holds a fixed value, such as a variable initialized with a literal and never assigned again, forces the same secret to be reused across environments and prevents it from being rotated or overridden without modifying and redeploying the code. Values computed at run time, such as the result of a function call, are not reported. A password, passphrase, passcode, `passwd` or `pwd` is reported for any value, since a person chooses it, as is a secret whose name mentions one, such as `passwordToken`, or a value in a map of passwords. Other secrets, such as API keys, tokens, credentials and client secrets, are generated, so they are reported only for a value that looks generated: at least 8 characters, not made of words only, not a run of consecutive characters such as \"12345678\", and with at least 2.5 bits of entropy per character, about six distinct characters in eight. A value such as \"true\", \"Basic \", \"No Proxy\" or \"my-secret-key\" is not reported for them.",
     "tags": [
       "security",
       "secrets",
