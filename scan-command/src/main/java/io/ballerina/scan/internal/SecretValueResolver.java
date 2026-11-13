@@ -462,13 +462,18 @@ class SecretValueResolver {
     /**
      * A fixed text.
      *
-     * @param text              the text
+     * @param text              the text of its parts that are not placeholders
      * @param isThroughVariable whether a part is reached through a variable, which makes it a fixed variable
      * @param isPlaceholder     whether every part is a placeholder, as when two templates are joined
      */
     private record FixedText(String text, boolean isThroughVariable, boolean isPlaceholder) {
         static FixedText of(String text) {
-            return new FixedText(text, false, SecretValueFilter.isPlaceholder(text));
+            boolean isPlaceholder = SecretValueFilter.isPlaceholder(text);
+            return new FixedText(isPlaceholder ? "" : text, false, isPlaceholder);
+        }
+
+        FixedText throughVariable() {
+            return new FixedText(text, true, isPlaceholder);
         }
 
         FixedText concat(FixedText other) {
@@ -477,8 +482,8 @@ class SecretValueResolver {
         }
     }
 
-    // The text of a value built only from literals, constants and variables holding one, as in "sk_live_" + KEY,
-    // which is checked as a whole, as its parts can each look like text that is not a secret.
+    // The text of a value built only from literals, constants, and variables or fields holding one, as in
+    // "sk_live_" + KEY, which is checked as a whole, as its parts can each look like text that is not a secret.
     private Optional<FixedText> fixedText(ExpressionNode expression, int depth, Set<Symbol> visited) {
         if (depth > MAX_DEPTH) {
             return Optional.empty();
@@ -488,6 +493,10 @@ class SecretValueResolver {
                     Optional.of(FixedText.of(SecretValueFilter.literalValue(literal.literalToken().text())));
             case BracedExpressionNode braced -> fixedText(braced.expression(), depth, visited);
             case TypeCastExpressionNode cast -> fixedText(cast.expression(), depth, visited);
+            case FieldAccessExpressionNode access -> fieldText(access.expression(),
+                    access.fieldName().toSourceCode().trim(), depth, visited);
+            case IndexedExpressionNode access -> memberKey(access)
+                    .flatMap(key -> fieldText(access.containerExpression(), key, depth, visited));
             case BinaryExpressionNode binary when binary.operator().kind() == SyntaxKind.PLUS_TOKEN
                     && binary.lhsExpr() instanceof ExpressionNode lhs
                     && binary.rhsExpr() instanceof ExpressionNode rhs -> fixedText(lhs, depth, visited)
@@ -512,6 +521,31 @@ class SecretValueResolver {
         };
     }
 
+    // A field of a fixed mapping, unless the field was already reported where it is written or is configurable.
+    private Optional<FixedText> fieldText(ExpressionNode container, String fieldName, int depth, Set<Symbol> visited) {
+        Optional<Symbol> root = semanticModel.symbol(rootExpression(container));
+        if (root.filter(symbol -> symbol.kind() == SymbolKind.VARIABLE)
+                .map(symbol -> isConfigurable((VariableSymbol) symbol)).orElse(false)) {
+            return Optional.empty();
+        }
+        Optional<ExpressionNode> value = findMapping(container, depth, visited, true)
+                .flatMap(mapping -> findField(mapping, fieldName))
+                .flatMap(SpecificFieldNode::valueExpr);
+        if (value.isEmpty()) {
+            return Optional.empty();
+        }
+        String writtenName = SecretNameMatcher.kind(fieldName).isSecret()
+                ? fieldName
+                : mapName((MappingConstructorExpressionNode) value.get().parent().parent()).orElse(fieldName);
+        Kind writtenKind = SecretNameMatcher.kind(writtenName);
+        if (writtenKind.isSecret() && isFixed(resolve(value.get(), writtenKind, depth + 1, visited))) {
+            return Optional.empty();
+        }
+        boolean isConstantRoot = root.filter(symbol -> symbol.kind() == SymbolKind.CONSTANT).isPresent();
+        return fixedText(value.get(), depth + 1, visited)
+                .map(text -> isConstantRoot ? text : text.throughVariable());
+    }
+
     // A configurable can be given another value, and a part already reported where it is written is not joined.
     private Optional<FixedText> variableText(ExpressionNode reference, int depth, Set<Symbol> visited) {
         Optional<VariableSymbol> variable = semanticModel.symbol(reference)
@@ -528,8 +562,7 @@ class SecretValueResolver {
                     && isFixed(resolve(initializer.get(), writtenKind, depth + 1, visited))) {
                 return Optional.empty();
             }
-            return fixedText(initializer.get(), depth + 1, visited)
-                    .map(text -> new FixedText(text.text(), true, text.isPlaceholder()));
+            return fixedText(initializer.get(), depth + 1, visited).map(FixedText::throughVariable);
         } finally {
             visited.remove(variable.get());
         }

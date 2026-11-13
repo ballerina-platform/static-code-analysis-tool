@@ -196,7 +196,11 @@ function joinedPlaceholders() returns string[] {
     string adminPassword = "admin" + "123"; // warning
     string userPassword = "${ENV}-" + "Hunter2!x"; // warning
     string token = "sk_live_" + <string>"51H8xKq"; // warning
-    return [dbPassword, adminPassword, userPassword, token];
+    string authorization = "Bearer " + "${TOKEN}";
+    final record {|string suffix;|} cfg = {suffix: "51H8xKq"};
+    string apiKey = "sk_live_" + cfg.suffix; // warning: ballerina:14
+    string accessToken = string `sk_live_${cfg["suffix"]}`; // warning: ballerina:14
+    return [dbPassword, adminPassword, userPassword, token, authorization, apiKey, accessToken];
 }
 
 // A weak secret-named part is not reported where it is written, so it is joined with the other parts
@@ -224,6 +228,30 @@ function separatedWords() returns string[] {
     string apiKey = "Kq9z/x8F2mPq/Lw7R"; // warning
     string clientCredentials = "admin:admin"; // warning
     return [authHeader, authorization, authPath, apiKey, clientCredentials];
+}
+
+type Suffix record {|
+    string suffix;
+|};
+
+type Credentials record {|
+    string token;
+|};
+
+configurable Suffix configuredSuffix = {suffix: "51H8xKq"};
+
+const Suffix SUFFIX = {suffix: "51H8xKq"};
+
+function suffix() returns Suffix => {suffix: "51H8xKq"};
+
+// A field part is joined with the origin of its mapping, unless it can be replaced or was reported where written
+function fieldParts() returns string[] {
+    string apiKey = "sk_live_" + configuredSuffix.suffix;
+    string accessToken = "sk_live_" + suffix().suffix;
+    final Credentials credentials = {token: "51H8xKqLz9Pm"}; // warning
+    string bearerToken = "sk_" + credentials.token;
+    string clientSecret = "sk_live_" + SUFFIX.suffix; // warning
+    return [apiKey, accessToken, bearerToken, clientSecret];
 }
 
 public function main() {
