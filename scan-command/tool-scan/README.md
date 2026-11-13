@@ -209,7 +209,7 @@ To generate a detailed HTML report of the analysis results, use the `--scan-repo
 bal scan --scan-report
 ```
 
-This produces an HTML report and the scan results in JSON format inside the `target/report` directory (or the directory given via `--target-dir`). The report is only generated for Ballerina projects, not for standalone Ballerina files. It is generated even when the results are also reported to a platform.
+This produces an HTML report and the scan results in JSON format inside the `target/report` directory, or in the `report` directory under the path given with `--target-dir`. The report is only generated for Ballerina projects, not for standalone Ballerina files. It is generated even when the results are also reported to a platform.
 
 The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. Every scanned file is listed, including files without issues, in a folder tree of the package. You can filter, search, and export the list of files.
 
