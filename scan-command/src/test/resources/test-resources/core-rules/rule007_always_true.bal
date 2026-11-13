@@ -1,3 +1,4 @@
+import ballerina/http;
 import ballerina/lang.'int as i;
 
 function testSimpleVariableReference() {
@@ -31,7 +32,7 @@ function testSimpleVariableReference() {
     test2(a["a"] === a["a"]);  // warning
     result = x >= int:MIN_VALUE; // warning
     result = x <= int:MAX_VALUE; // warning
-    result = y <= float:Infinity; // warning
+    result = y <= float:Infinity; // no warning: false when y is NaN
     result = b || true; // warning
     result2 = x | -1;// warning
 
@@ -68,6 +69,29 @@ function testOperators() {
     int x = 1;
     float y = 2.3f;
     boolean result;
+    result = int:MAX_VALUE >= x; // warning
+    result = int:MIN_VALUE <= x; // warning
+    result = x <= i:MAX_VALUE; // warning
+    result = float:Infinity >= y; // no warning: false when y is NaN
+    result = y >= -float:Infinity; // no warning: false when y is NaN
+    int? maybe = ();
+    result = maybe <= int:MAX_VALUE; // no warning: false when maybe is nil
+    result = int:MIN_VALUE <= maybe; // no warning: false when maybe is nil
+}
+
+function testOtherBounds() {
+    int x = 1;
+    float y = 2.3f;
+    boolean result;
+    result = x <= +int:MAX_VALUE; // warning
+    result = +int:MIN_VALUE <= x; // warning
+    result = x >= -int:MAX_VALUE; // no warning: not the smallest int
+    result = x <= int:SIGNED32_MAX_VALUE; // no warning: not the largest int
+    result = y <= float:PI;
+    result = x >= ~int:MAX_VALUE; // no warning: not a sign
+    result = x <= (int:MAX_VALUE); // warning
+    result = x <= http:STATUS_OK; // no warning: not a lang library constant
+    result = x != int:MAX_VALUE; // no warning: not a relational operator
 }
 
 function testRelationaOperatorsWithoutWarnings() {

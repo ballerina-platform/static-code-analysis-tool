@@ -6,7 +6,7 @@
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-1",
     "severity": "LOW",
     "description": "Using `checkpanic` lets an unhandled error panic and crash the program instead of being handled.",
-    "fullDescription": "The `checkpanic` expression causes the program to panic and terminate abruptly when the checked expression evaluates to an error, instead of allowing the error to be handled. Prefer `check` with explicit error handling so callers can recover instead of crashing.",
+    "fullDescription": "The `checkpanic` expression causes the program to panic and terminate abruptly when the checked expression evaluates to an error, instead of allowing the error to be handled. Prefer `check` with explicit error handling so callers can recover instead of crashing. A `checkpanic` caught by an enclosing `trap` is still reported: it turns an error into a panic only to turn it back into an error, so test the value with `is` or use `value:ensureType` instead.",
     "tags": [
       "error-handling"
     ],
@@ -32,7 +32,7 @@
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-2",
     "severity": "LOW",
     "description": "A function parameter is declared but never used within the function body.",
-    "fullDescription": "A function parameter that is declared but never referenced in the function body adds noise, misleads readers about the function's behavior, and may indicate incomplete implementation or a leftover from refactoring.",
+    "fullDescription": "A function parameter that is declared but never referenced in the function body adds noise, misleads readers about the function's behavior, and may indicate incomplete implementation or a leftover from refactoring. A parameter is not reported when the signature is fixed elsewhere: by an external function, by an object type included with `*T`, by the type of a service declaration or object constructor, or by the function type expected where an anonymous function is used, such as the type of the parameter it is passed to or of the variable, list or mapping it is written in.",
     "tags": [
       "unused"
     ],
@@ -49,7 +49,7 @@
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-3",
     "severity": "LOW",
     "description": "A public function is not marked `isolated`, so it cannot be safely called from concurrently executing code.",
-    "fullDescription": "A public function that is not marked `isolated` cannot be safely invoked from concurrently executing isolated code or workers without the compiler being able to prove the absence of data races, limiting how the function can be reused in concurrent contexts.",
+    "fullDescription": "A public function that is not marked `isolated` cannot be safely invoked from concurrently executing isolated code or workers without the compiler being able to prove the absence of data races, limiting how the function can be reused in concurrent contexts. Constructs in test sources are not reported, as they are not part of the public API of the package.",
     "tags": [
       "concurrency"
     ]
@@ -61,7 +61,7 @@
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-4",
     "severity": "LOW",
     "description": "A public method is not marked `isolated`, so it cannot be safely called from concurrently executing code.",
-    "fullDescription": "A public object method that is not marked `isolated` cannot be safely invoked from concurrently executing isolated code or workers without the compiler being able to prove the absence of data races, limiting how the method can be reused in concurrent contexts.",
+    "fullDescription": "A public object method that is not marked `isolated` cannot be safely invoked from concurrently executing isolated code or workers without the compiler being able to prove the absence of data races, limiting how the method can be reused in concurrent contexts. Constructs in test sources are not reported, as they are not part of the public API of the package.",
     "tags": [
       "concurrency"
     ]
@@ -73,7 +73,7 @@
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-5",
     "severity": "LOW",
     "description": "A public class is not marked isolated, so its instances cannot be safely shared across concurrently executing code.",
-    "fullDescription": "A public class that is not marked `isolated` limits how safely its instances can be shared and accessed across concurrently executing isolated code or workers.",
+    "fullDescription": "A public class that is not marked `isolated` limits how safely its instances can be shared and accessed across concurrently executing isolated code or workers. A `readonly` class is not reported, as its instances are immutable and can be shared without a lock. A public `service class` is reported, unlike a `service object` type for `ballerina:6`: it holds the state that the requests of a listener share, and the listener calls its methods concurrently only when it is `isolated`. Constructs in test sources are not reported, as they are not part of the public API of the package.",
     "tags": [
       "concurrency"
     ]
@@ -85,7 +85,7 @@
     "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-6",
     "severity": "LOW",
     "description": "A public object is not marked isolated, so its instances cannot be safely shared across concurrently executing code.",
-    "fullDescription": "A public object constructor/type that is not marked `isolated` limits how safely its instances can be shared and accessed across concurrently executing isolated code or workers.",
+    "fullDescription": "A public object constructor/type that is not marked `isolated` limits how safely its instances can be shared and accessed across concurrently executing isolated code or workers. A public `service object` type is not reported: it is the contract a listener accepts, user code does not share its values, and marking it `isolated` would require every service that implements it to be isolated. Constructs in test sources are not reported, as they are not part of the public API of the package.",
     "tags": [
       "concurrency"
     ]
