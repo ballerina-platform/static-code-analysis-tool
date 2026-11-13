@@ -99,7 +99,9 @@ public class SecretNameMatcherTest {
                 {"passwordChangeToken", SecretNameMatcher.Kind.SECRET},
                 {"passwordGrantClientSecret", SecretNameMatcher.Kind.SECRET},
                 {"passwordApiToken", SecretNameMatcher.Kind.SECRET},
-                {"dbPasswordKey", SecretNameMatcher.Kind.PASSWORD}
+                {"dbPasswordKey", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordPrivateKey", SecretNameMatcher.Kind.PASSWORD},
+                {"passwordAccessKey", SecretNameMatcher.Kind.PASSWORD}
         };
     }
 

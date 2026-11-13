@@ -362,15 +362,19 @@ function mapValues() {
     connectMap(passwords = merged);
 }
 
-// Only a whole template reference is left out of a joined text, so a "$" in a key does not cut it
+// Only a whole template reference is left out of a text, so a "$" in a key does not cut it, and the rest of a key
+// with a template reference is still checked
 function dollarInKey() returns string[] {
     string apiKey = "sk_" + "Zq$RT9XK2LMN"; // warning
     string authToken = "Bearer " + "<token>";
     string bearerToken = "Bearer " + "{{token}}";
-    return [apiKey, authToken, bearerToken];
+    string accessKey = "${ENV}_" + "sk_live_51H8xKqLz9PmA1b2C3"; // warning
+    string accessToken = "${ENV}_sk_live_51H8xKqLz9PmA1b2C3"; // warning
+    string dbPassword = "${ENV}_" + "Hunter2!x";
+    return [apiKey, authToken, bearerToken, accessKey, accessToken, dbPassword];
 }
 
-// A template reference in one part makes a joined text a placeholder, but a part of one character does not
+// A template reference in one part makes a joined password a placeholder, but a part of one character does not
 function templateInPart() returns string[] {
     string password = "user:{{pw}}" + ID_SUFFIX;
     string dbPassword = "p" + "w" + "1"; // warning
@@ -405,6 +409,7 @@ function anglePlaceholders() returns string[] {
 const map<map<string>> NESTED_DB_PASSWORDS = {primary: {db: "Welcome1"}};
 const map<map<string>> NESTED_FIELD_PASSWORDS = {primary: {password: "Welcome1"}}; // warning
 const map<record {|string db;|}> NESTED_RECORDS = {primary: {db: "Welcome1"}};
+const map<map<string>> UNDER_PASSWORDS = {passwords: {db: "Welcome5"}}; // warning
 
 function connectNested(map<map<string>> passwords) {
 }
@@ -417,6 +422,7 @@ function nestedMapConstants() {
     connectNested(passwords = NESTED_DB_PASSWORDS); // warning
     connectNested(passwords = NESTED_FIELD_PASSWORDS);
     connectRecords(passwords = NESTED_RECORDS);
+    connectNested(passwords = UNDER_PASSWORDS);
 }
 
 // A map in braces is reported where it is written, and not again where its field is used

@@ -105,6 +105,14 @@ final class SecretValueFilter {
                 || DUMMY_VALUES.contains(trimmedValue.toLowerCase(Locale.ENGLISH));
     }
 
+    static boolean hasTemplateReference(String value) {
+        return EMBEDDED_TEMPLATE.matcher(value).find();
+    }
+
+    static String withoutTemplateReferences(String value) {
+        return EMBEDDED_TEMPLATE.matcher(value).replaceAll("");
+    }
+
     // The value without its placeholders such as "<token>"; a "${TOKEN}" is kept, as it makes the whole a placeholder.
     static String withoutAnglePlaceholders(String value) {
         return ANGLE_PLACEHOLDER.matcher(value).replaceAll("");

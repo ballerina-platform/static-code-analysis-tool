@@ -470,15 +470,14 @@ public class SecretChecker extends NodeVisitor {
         }
         if (expressionNode.kind() == SyntaxKind.MAPPING_CONSTRUCTOR) {
             // A map of secrets is checked value by value, while a record's fields are checked by their own names.
-            if (type.map(SecretChecker::isMap).orElse(true)) {
-                ((MappingConstructorExpressionNode) expressionNode).fields()
-                        .forEach(field -> validateMapValue(field, kind));
+            MappingConstructorExpressionNode mapping = (MappingConstructorExpressionNode) expressionNode;
+            if (valueResolver.isConstantMap(mapping).orElseGet(() -> type.map(SecretChecker::isMap).orElse(true))) {
+                mapping.fields().forEach(field -> validateMapValue(field, kind));
             }
             return;
         }
         if (!type.map(valueType -> canHoldSecret(slotType(expressionNode, valueType))).orElse(true)
-                && !valueResolver.isMapConstant(expressionNode)
-                && !valueResolver.isImportedMapConstant(expressionNode)) {
+                && !valueResolver.isMapConstant(expressionNode)) {
             return;
         }
         // A URL with credentials is reported once, as ballerina:13, when the literal or template is visited.

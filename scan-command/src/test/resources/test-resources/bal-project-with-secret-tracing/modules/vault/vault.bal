@@ -23,3 +23,9 @@ public const map<string> FIELD_PASSWORDS = {password: "Welcome3"};
 public const map<map<string>> NESTED_PASSWORDS = {primary: {db: "Welcome4"}};
 public const map<int> PORTS = {primary: 5432};
 public const byte[] KEY_BYTES = [97, 56, 102, 53];
+public type Creds record {|
+    string username;
+    string token;
+|};
+
+public const Creds DEFAULT_CREDS = {username: "admin", token: "x"};

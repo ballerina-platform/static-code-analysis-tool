@@ -33,6 +33,7 @@ public function main() {
     connectNested(passwords = vault:NESTED_PASSWORDS);
     connectPorts(passwords = vault:PORTS);
     sign(secretKey = vault:KEY_BYTES);
+    connectMap(passwords = vault:DEFAULT_CREDS);
 }
 
 function sign(byte[] secretKey) {

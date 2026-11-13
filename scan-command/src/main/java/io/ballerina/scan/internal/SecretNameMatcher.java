@@ -151,7 +151,9 @@ final class SecretNameMatcher {
             firstPreposition++;
         }
         int headEnd = firstPreposition;
-        Set<Integer> keywordWords = keywords.stream().map(KeywordMatch::wordIndex).collect(Collectors.toSet());
+        Set<Integer> keywordWords = keywords.stream()
+                .flatMap(keyword -> IntStream.rangeClosed(keyword.firstWord(), keyword.wordIndex()).boxed())
+                .collect(Collectors.toSet());
         return keywords.stream().anyMatch(keyword -> keyword.kind() == Kind.PASSWORD
                 && keyword.wordIndex() < headEnd
                 && IntStream.range(keyword.wordIndex() + 1, lastKeywordIndex).allMatch(keywordWords::contains))
@@ -161,11 +163,12 @@ final class SecretNameMatcher {
     /**
      * A keyword found in a name.
      *
+     * @param firstWord the index of the word it starts in
      * @param wordIndex the index of the word it ends in
      * @param end       where it ends in the name, with the words joined
      * @param kind      the kind of secret it names
      */
-    private record KeywordMatch(int wordIndex, int end, Kind kind) {
+    private record KeywordMatch(int firstWord, int wordIndex, int end, Kind kind) {
     }
 
     // A descriptor or its plural, such as "urls", "hashes" or "policies".
@@ -205,7 +208,7 @@ final class SecretNameMatcher {
             }
             for (Keyword keyword : KEYWORDS) {
                 if (!keyword.isEmbedded() && (word.endsWith(keyword.text()) || word.endsWith(keyword.text() + "s"))) {
-                    matches.add(new KeywordMatch(i, joinedWords.length(), keyword.kind()));
+                    matches.add(new KeywordMatch(i, i, joinedWords.length(), keyword.kind()));
                 }
             }
         }
@@ -227,7 +230,7 @@ final class SecretNameMatcher {
                 boolean endsWord = nextWordStart == end || (nextWordStart == end + 1 && joined.charAt(end) == 's');
                 boolean spansWholeWords = firstWord == lastWord || (wordStarts[firstWord] == start && endsWord);
                 if (spansWholeWords && NON_SECRET_WORDS.stream().noneMatch(words.get(firstWord)::contains)) {
-                    matches.add(new KeywordMatch(lastWord, end, keyword.kind()));
+                    matches.add(new KeywordMatch(firstWord, lastWord, end, keyword.kind()));
                 }
             }
         }
