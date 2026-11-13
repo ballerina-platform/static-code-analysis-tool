@@ -14,7 +14,7 @@
 
 # Overview
 
-A `Scan.toml` file can be created to configure the behavior of the Ballerina static code analysis tool. The configuration file is picked if there’s one in the working directory.
+A `Scan.toml` file can be created to configure the behavior of the Ballerina static code analysis tool. The configuration file is picked if there’s one in the root of the package, or of the workspace (see [Configuration for Workspaces](#configuration-for-workspaces)), whatever the working directory is. A single Ballerina file is scanned without a `Scan.toml` file.
 
 ```text
 📦ballerina_project
@@ -25,12 +25,14 @@ A `Scan.toml` file can be created to configure the behavior of the Ballerina sta
  ┗ 📜Scan.toml
 ```
 
-The path to the configuration file can also be specified in the `Ballerina.toml` file as follows:
+The path to the configuration file, a local path or a URL, can also be specified in the `Ballerina.toml` file as follows:
 
 ```toml
 [scan]
 configPath = "path/to/Scan.toml"
 ```
+
+When the `Ballerina.toml` file has a `[scan]` table, the file at its `configPath` is used instead of a `Scan.toml` file in the root, which is then ignored. A relative `configPath` is resolved against the root, and a `[scan]` table without `configPath` stops the scan with an error.
 
 # Configuration for Platform Plugins
 
@@ -44,7 +46,7 @@ path = "path/to/sonar_platform_plugin.jar"
 
 Both `name` and `path` are required. A platform entry without a `path` is ignored. The `path` can be a local file path, resolved relative to the folder of the `Scan.toml` file, or a URL, in which case the scan tool downloads the plugin JAR. The paths in a remote `Scan.toml` file are resolved relative to the package root.
 
-A declared platform is reported to only when it is named in `--platforms`, for example `bal scan --platforms=sonarqube`. A plain `bal scan` never reports to a platform. The plugin JAR is checked, or downloaded, only when its platform is named, so a `Scan.toml` can declare a platform whose JAR exists only on CI. A path of a named platform that is neither an existing file nor a URL stops the scan with an error.
+A declared platform is reported to only when it is named in `--platforms`, for example `bal scan --platforms=sonarqube`. A plain `bal scan` never reports to a platform. A scan that a platform runs with `--platform-triggered`, such as the SonarQube Ballerina plugin does, reports to every declared platform unless `--platforms` names some. The plugin JAR is checked, or downloaded, only when its platform is named, so a `Scan.toml` can declare a platform whose JAR exists only on CI. A path of a named platform that is neither an existing file nor a URL stops the scan with an error.
 
 ```toml
 [[platform]]
@@ -61,7 +63,7 @@ path = "path/to/sonar_platform_plugin.jar"
 sonarProjectPropertiesPath = "sonar-project.properties"
 ```
 
-An argument whose name ends with `Path`, such as `sonarProjectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file is passed to the plugin as the absolute path of that file. Any other value, such as a URL or a file the plugin creates, is passed to the plugin unchanged.
+An argument whose name ends with `Path`, such as `sonarProjectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file, or to the package root when `Scan.toml` is a remote file given by a URL in `configPath`, is passed to the plugin as the absolute path of that file. Any other value, such as a URL or a file the plugin creates, is passed to the plugin unchanged. Every value is passed as a string; see [Static Code Analysis Platform Plugin](StaticCodeAnalysisPlatformPlugin.md#platform-arguments).
 
 The results are always printed and saved before the platforms run, so a failed upload does not hide them. The named platforms then run one after another, and a platform that fails does not stop the others. If any platform fails, the scan lists every failure and exits with code `1`, and the gate is not checked, since an error wins over the gate. A name in `--platforms` that no `[[platform]]` entry declares also fails the scan. In a workspace, platforms can be set only in the `Scan.toml` of each package; a package that does not declare a named platform is skipped with a warning, and the scan fails only when no package declares it. A single Ballerina file cannot report to platforms, so `--platforms` with a single file is a usage error (exit code `2`).
 
@@ -93,14 +95,14 @@ Define the rules to include in the analysis:
 
 ```toml
 [rule]
-include = ["ballerina:101", "ballerina/io:101"]
+include = ["ballerina:1", "ballerina/io:2"]
 ```
 
 Define the rules to exclude in the analysis:
 
 ```toml
 [rule]
-exclude = ["ballerina:101", "ballerina/io:101"]
+exclude = ["ballerina:1", "ballerina/io:2"]
 ```
 
 Rules can be either included or excluded, not both: a `[rule]` table that sets both stops the scan with an error that gives its location, and so does using `--include-rules` together with `--exclude-rules`.

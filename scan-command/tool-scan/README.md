@@ -63,16 +63,16 @@ bal scan --format=sarif
 bal scan --list-rules
 
 # Run analysis for a specific rule.
-bal scan --include-rules="ballerina:101"
+bal scan --include-rules="ballerina:1"
 
 # Run analysis for a specific set of rules.
-bal scan --include-rules="ballerina:101, ballerina/io:101"
+bal scan --include-rules="ballerina:1, ballerina/io:2"
 
 # Exclude analysis for a specific rule.
-bal scan --exclude-rules="ballerina/io:101"
+bal scan --exclude-rules="ballerina/io:2"
 
 # Exclude analysis for a specific set of rules.
-bal scan --exclude-rules="ballerina:101, ballerina/io:101"
+bal scan --exclude-rules="ballerina:1, ballerina/io:2"
 
 # Run analysis and report to sonarqube.
 bal scan --platforms=sonarqube
@@ -201,7 +201,7 @@ A sample `Scan.toml`:
 ```toml
 # Rules to include or exclude in the analysis (same as --include-rules and --exclude-rules)
 [rule]
-include = ["ballerina:1", "ballerina/io:101"]
+include = ["ballerina:1", "ballerina/io:2"]
 # exclude = ["ballerina:1"]
 
 # Platform plugins that --platforms can report results to
@@ -229,7 +229,7 @@ The rules given with `--include-rules` are added to `include`, and those given w
 
 Each `[[platform]]` entry requires both a `name` and a `path`. The `path` must point to the platform plugin JAR, either as a local file path (resolved relative to the folder of the `Scan.toml` file) or as a URL to download it from. A declared platform is reported to only when it is named in `--platforms`, and `--platforms` can only name platforms declared there. The plugin JAR is checked, or downloaded, only when its platform is named; a path that is then neither an existing file nor a URL stops the scan with an error. The results are always printed and saved first, and the named platforms then run one after another. If any platform fails, the scan lists every failure and exits with code `1`.
 
-See [Scan file configurations](https://github.com/ballerina-platform/static-code-analysis-tool/blob/main/docs/static-code-analysis-tool/ScanFileConfigurations.md) for all available options.
+See [Configure the scan with Scan.toml](https://ballerina.io/learn/scan-tool/#configure-the-scan-with-scantoml) for all available options, including the `Scan.toml` of a workspace.
 
 ## Exit codes and the gate
 
