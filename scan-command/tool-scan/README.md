@@ -25,7 +25,7 @@ All options are optional. Rule filters and platforms can also be configured in a
 | `--target-dir=<path>` | Target directory path for saving analysis reports (only for Ballerina projects). Default is the `target` directory of the package or workspace. A relative path is resolved against the package or workspace root. In a workspace, it is one directory for every package. See [Report locations](#report-locations). |
 | `--scan-report` | Generate an HTML report containing the analysis results (only for Ballerina projects). Disabled by default. |
 | `--format=<json\|sarif>` | Specify the format of the report. Default is `json`. |
-| `--list-rules` | List the rules available to the project, along with their kind and severity. Only works inside a Ballerina project. Lists the core rules and the rules contributed by the project's dependencies (library tools and static code analyzer plugins) only. |
+| `--list-rules` | List the rules available to the workspace, package or source file, along with their kind and severity. Lists the core rules and the rules contributed by the project's dependencies (library tools and static code analyzer plugins) only. |
 | `--include-rules=<rule1, ...>` | Run analysis for a specific set of rules. By default, all available rules are included. A rule that is not available to the project is an error. |
 | `--exclude-rules=<rule1, ...>` | Exclude analysis for a specific set of rules. By default, no rules are excluded. A rule that is not available to the project is an error. |
 | `--platforms=<platformName1, ...>` | Define platform(s) to report results to. More than one platform can be defined. By default, results are not reported to any platform. Not supported for a single Ballerina file. |

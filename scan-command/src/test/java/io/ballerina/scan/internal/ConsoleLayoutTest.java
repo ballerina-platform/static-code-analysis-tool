@@ -155,7 +155,7 @@ public class ConsoleLayoutTest extends BaseTest {
 
                     bal scan: error: unknown rule 'ballerina:99'
                       Run 'bal scan --list-rules' to see the available rules.
-                    Usage: bal scan [OPTIONS] [<package>|<source-file>]
+                    Usage: bal scan [OPTIONS] [<workspace>|<package>|<source-file>]
                     Try 'bal scan --help' for more information.
                     """, output);
         } finally {
@@ -390,10 +390,8 @@ public class ConsoleLayoutTest extends BaseTest {
         String output = scan(testResourcesRoot, singleFile.toAbsolutePath().toString(), "--target-dir=out",
                 "--scan-report");
         Assert.assertEquals(skeleton(output), """
-                bal scan: warning: generating reports is not supported with single bal files, ignoring the flag and \
-                continuing the scans
-                bal scan: warning: generating scan reports is not supported with single bal files, ignoring the flag \
-                and continuing the scans
+                bal scan: warning: reports are not saved for a single bal file, ignoring --target-dir
+                bal scan: warning: the HTML report is not generated for a single bal file, ignoring --scan-report
 
                 Running Scans
 
@@ -419,7 +417,7 @@ public class ConsoleLayoutTest extends BaseTest {
         Assert.assertEquals(output, """
                 bal scan: error: reporting to platforms is not supported with single bal files; scan a package to \
                 use --platforms
-                Usage: bal scan [OPTIONS] [<package>|<source-file>]
+                Usage: bal scan [OPTIONS] [<workspace>|<package>|<source-file>]
                 Try 'bal scan --help' for more information.
                 """);
     }
