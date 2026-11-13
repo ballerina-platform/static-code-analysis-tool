@@ -84,6 +84,7 @@ import io.ballerina.compiler.syntax.tree.RequiredParameterNode;
 import io.ballerina.compiler.syntax.tree.RestBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.RestParameterNode;
 import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
+import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SpecificFieldNode;
 import io.ballerina.compiler.syntax.tree.SpreadMemberNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
@@ -93,6 +94,7 @@ import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.UnaryExpressionNode;
 import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
+import io.ballerina.compiler.syntax.tree.WildcardBindingPatternNode;
 import io.ballerina.projects.Document;
 import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.utils.Constants;
@@ -478,19 +480,17 @@ class StaticCodeAnalyzer extends NodeVisitor {
             case PositionalArgumentNode argument -> parameterType(argument).stream().toList();
             case NamedArgumentNode argument -> parameterType(argument).stream().toList();
             case BracedExpressionNode braced -> contextualTypes(braced);
-            case ListConstructorExpressionNode list when isDestructured(list) ->
-                    boundType(expression).stream().toList();
-            case ListConstructorExpressionNode list -> contextualTypes(list).stream()
-                    .flatMap(StaticCodeAnalyzer::unionMembers)
-                    .flatMap(listType -> memberType(listType, list, expression).stream())
-                    .toList();
-            case SpecificFieldNode field when field.parent() instanceof MappingConstructorExpressionNode mapping
-                    && isDestructured(mapping) -> boundType(expression).stream().toList();
-            case SpecificFieldNode field when field.parent() instanceof MappingConstructorExpressionNode mapping ->
-                    contextualTypes(mapping).stream()
+            case ListConstructorExpressionNode list -> boundType(list, expression).map(List::of)
+                    .orElseGet(() -> contextualTypes(list).stream()
                             .flatMap(StaticCodeAnalyzer::unionMembers)
-                            .flatMap(mappingType -> fieldType(mappingType, field).stream())
-                            .toList();
+                            .flatMap(listType -> memberType(listType, list, expression).stream())
+                            .toList());
+            case SpecificFieldNode field when field.parent() instanceof MappingConstructorExpressionNode mapping ->
+                    boundType(mapping, expression).map(List::of)
+                            .orElseGet(() -> contextualTypes(mapping).stream()
+                                    .flatMap(StaticCodeAnalyzer::unionMembers)
+                                    .flatMap(mappingType -> fieldType(mappingType, field).stream())
+                                    .toList());
             case VariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
             case ModuleVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
             case ForEachStatementNode forEach -> forEachType(forEach)
@@ -504,14 +504,22 @@ class StaticCodeAnalyzer extends NodeVisitor {
         return semanticModel.expectedType(document, expression.lineRange().startLine()).stream().toList();
     }
 
+    // A destructuring or wildcard pattern binds no variable of the declared type, which is then resolved by name
     private List<TypeSymbol> declaredType(TypedBindingPatternNode typedBindingPattern) {
         if (typedBindingPattern.typeDescriptor().kind() == SyntaxKind.VAR_TYPE_DESC) {
             return List.of();
         }
-        return semanticModel.symbol(typedBindingPattern.bindingPattern())
-                .filter(VariableSymbol.class::isInstance)
-                .map(symbol -> ((VariableSymbol) symbol).typeDescriptor())
+        Optional<TypeSymbol> variableType = destructuringPattern(typedBindingPattern).isPresent()
+                ? Optional.empty()
+                : variableType(typedBindingPattern.bindingPattern());
+        return variableType.or(() -> semanticModel.symbol(typedBindingPattern.typeDescriptor())
+                        .filter(TypeSymbol.class::isInstance)
+                        .map(TypeSymbol.class::cast))
                 .stream().toList();
+    }
+
+    private Optional<TypeSymbol> boundType(ExpressionNode constructor, ExpressionNode member) {
+        return isDestructured(constructor) ? boundType(member) : Optional.empty();
     }
 
     /**
@@ -521,7 +529,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private Optional<TypeSymbol> boundType(ExpressionNode member) {
         Optional<Node> pattern = bindingPattern(member);
         if (pattern.isPresent()) {
-            return pattern.flatMap(this::variableType);
+            return pattern.filter(node -> !(node instanceof WildcardBindingPatternNode)).flatMap(this::variableType);
         }
         // A member with no pattern of its own is bound to the rest variable, as in [n, ...rest] or {f, ...rest}
         if (member.parent() instanceof SpecificFieldNode field
@@ -532,26 +540,13 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 || !(bindingPattern(list).orElse(null) instanceof ListBindingPatternNode listPattern)) {
             return Optional.empty();
         }
-        List<Node> members = list.expressions().stream().toList();
-        int memberIndex = members.indexOf(member);
-        OptionalInt position = memberIndex < 0 ? OptionalInt.empty() : length(members.subList(0, memberIndex));
-        Optional<TypeSymbol> restType = restVariableType(Optional.of(listPattern));
-        if (restType.isEmpty() || position.isEmpty()) {
-            return Optional.empty();
-        }
-        int index = position.getAsInt() - (listPattern.bindingPatterns().size() - 1);
-        if (index < 0) {
-            return Optional.empty();
-        }
-        if (restType.get() instanceof ArrayTypeSymbol arrayType) {
-            return Optional.of(arrayType.memberTypeDescriptor());
-        }
-        if (restType.get() instanceof TupleTypeSymbol tupleType) {
-            return index < tupleType.memberTypeDescriptors().size()
-                    ? Optional.of(tupleType.memberTypeDescriptors().get(index))
-                    : tupleType.restTypeDescriptor();
-        }
-        return Optional.empty();
+        int boundBefore = listPattern.bindingPatterns().size() - 1;
+        OptionalInt restPosition = position(list, member).stream().map(index -> index - boundBefore).findFirst();
+        return restVariableType(Optional.of(listPattern)).flatMap(restType -> switch (restType) {
+            case ArrayTypeSymbol arrayType -> Optional.of(arrayType.memberTypeDescriptor());
+            case TupleTypeSymbol tupleType -> tupleMemberType(tupleType, restPosition);
+            default -> Optional.empty();
+        });
     }
 
     private Optional<TypeSymbol> restVariableType(Optional<Node> pattern) {
@@ -603,9 +598,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
             case AssignmentStatementNode assignment when assignment.varRef() instanceof BindingPatternNode pattern ->
                     Optional.of(pattern);
             case ListConstructorExpressionNode list -> {
-                List<Node> members = list.expressions().stream().toList();
-                int index = members.indexOf(expression);
-                OptionalInt position = index < 0 ? OptionalInt.empty() : length(members.subList(0, index));
+                OptionalInt position = position(list, expression);
                 if (position.isEmpty()) {
                     yield Optional.empty();
                 }
@@ -617,16 +610,16 @@ class StaticCodeAnalyzer extends NodeVisitor {
                         .map(patterns -> patterns.get(position.getAsInt()));
             }
             case SpecificFieldNode field when field.parent() instanceof MappingConstructorExpressionNode mapping -> {
-                String name = fieldName(field);
+                String name = SemanticUtils.fieldName(field);
                 yield bindingPattern(mapping)
                         .filter(MappingBindingPatternNode.class::isInstance)
                         .flatMap(pattern -> ((MappingBindingPatternNode) pattern).fieldBindingPatterns().stream()
                                 .flatMap(fieldPattern -> switch (fieldPattern) {
                                     case FieldBindingPatternFullNode full
-                                            when unquote(full.variableName().name().text()).equals(name) ->
+                                            when patternFieldName(full.variableName()).equals(name) ->
                                             Stream.of((Node) full.bindingPattern());
                                     case FieldBindingPatternVarnameNode varName
-                                            when unquote(varName.variableName().name().text()).equals(name) ->
+                                            when patternFieldName(varName.variableName()).equals(name) ->
                                             Stream.of((Node) varName.variableName());
                                     default -> Stream.empty();
                                 })
@@ -634,6 +627,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
             }
             case null, default -> Optional.empty();
         };
+    }
+
+    private static String patternFieldName(SimpleNameReferenceNode fieldName) {
+        return SemanticUtils.identifierName(fieldName.name().text());
     }
 
     private static Optional<Node> destructuringPattern(TypedBindingPatternNode typedBindingPattern) {
@@ -658,9 +655,10 @@ class StaticCodeAnalyzer extends NodeVisitor {
         }
         List<ParameterSymbol> parameters = functionType.get().params().orElse(List.of());
         if (argument instanceof NamedArgumentNode namedArgument) {
-            String name = namedArgument.argumentName().name().text();
+            String name = SemanticUtils.identifierName(namedArgument.argumentName().name().text());
             return parameters.stream()
-                    .filter(parameter -> parameter.getName().filter(name::equals).isPresent())
+                    .filter(parameter -> parameter.getName().map(SemanticUtils::identifierName)
+                            .filter(name::equals).isPresent())
                     .findFirst()
                     .map(ParameterSymbol::typeDescriptor);
         }
@@ -686,9 +684,11 @@ class StaticCodeAnalyzer extends NodeVisitor {
 
     private Optional<FunctionTypeSymbol> calleeType(Node call) {
         if (call instanceof ImplicitNewExpressionNode || call instanceof ExplicitNewExpressionNode) {
-            return semanticModel.typeOf(call)
-                    .map(SemanticUtils::unwrap)
+            // The type of new is a union with error when the init method can return one
+            return semanticModel.typeOf(call).stream()
+                    .flatMap(StaticCodeAnalyzer::unionMembers)
                     .filter(ClassSymbol.class::isInstance)
+                    .findFirst()
                     .flatMap(type -> ((ClassSymbol) type).initMethod())
                     .map(MethodSymbol::typeDescriptor);
         }
@@ -713,36 +713,24 @@ class StaticCodeAnalyzer extends NodeVisitor {
                                             ExpressionNode member) {
         return switch (listType) {
             case ArrayTypeSymbol arrayType -> Optional.of(arrayType.memberTypeDescriptor());
-            case TupleTypeSymbol tupleType -> tupleMemberType(tupleType, list.expressions().stream().toList(), member);
+            case TupleTypeSymbol tupleType -> tupleMemberType(tupleType, position(list, member));
             default -> Optional.empty();
         };
     }
 
-    /**
-     * Returns the tuple member type for a member of a list constructor. After a spread of unknown length, the member
-     * is counted from the end of a tuple of fixed length, or else takes the rest type of the tuple.
-     */
-    private Optional<TypeSymbol> tupleMemberType(TupleTypeSymbol tupleType, List<Node> members, Node member) {
-        int index = members.indexOf(member);
-        if (index < 0) {
-            return Optional.empty();
-        }
+    // A spread of unknown length is only allowed in the rest of a tuple, so a member after one is in it too
+    private static Optional<TypeSymbol> tupleMemberType(TupleTypeSymbol tupleType, OptionalInt position) {
         List<TypeSymbol> memberTypes = tupleType.memberTypeDescriptors();
-        OptionalInt position = length(members.subList(0, index));
-        if (position.isEmpty() && tupleType.restTypeDescriptor().isEmpty()) {
-            OptionalInt fromEnd = length(members.subList(index + 1, members.size()));
-            if (fromEnd.isPresent()) {
-                position = OptionalInt.of(memberTypes.size() - 1 - fromEnd.getAsInt());
-            }
-        }
-        if (position.isEmpty()) {
-            return tupleType.restTypeDescriptor();
-        }
-        int typeIndex = position.getAsInt();
-        if (typeIndex >= 0 && typeIndex < memberTypes.size()) {
-            return Optional.of(memberTypes.get(typeIndex));
-        }
-        return tupleType.restTypeDescriptor();
+        return position.isPresent() && position.getAsInt() >= 0 && position.getAsInt() < memberTypes.size()
+                ? Optional.of(memberTypes.get(position.getAsInt()))
+                : tupleType.restTypeDescriptor();
+    }
+
+    // The position of the member among the values of the list, unless a spread before it has an unknown length
+    private OptionalInt position(ListConstructorExpressionNode list, Node member) {
+        List<Node> members = list.expressions().stream().toList();
+        int index = members.indexOf(member);
+        return index < 0 ? OptionalInt.empty() : length(members.subList(0, index));
     }
 
     // The number of members of a tuple without a rest type or of an array of fixed size, such as int[2].
@@ -776,27 +764,21 @@ class StaticCodeAnalyzer extends NodeVisitor {
     }
 
     private static Optional<TypeSymbol> fieldType(TypeSymbol mappingType, SpecificFieldNode field) {
-        String name = fieldName(field);
+        String name = SemanticUtils.fieldName(field);
         return switch (mappingType) {
             case MapTypeSymbol mapType -> Optional.of(mapType.typeParam());
+            // Field descriptors are keyed by the identifier as written, with its escapes
             case RecordTypeSymbol recordType -> Optional.ofNullable(recordType.fieldDescriptors().get(name))
+                    .or(() -> recordType.fieldDescriptors().entrySet().stream()
+                            .filter(entry -> SemanticUtils.identifierName(entry.getKey()).equals(name))
+                            .findFirst()
+                            .map(Map.Entry::getValue))
                     .map(RecordFieldSymbol::typeDescriptor)
                     .or(recordType::restTypeDescriptor);
             default -> Optional.empty();
         };
     }
 
-    private static String fieldName(SpecificFieldNode field) {
-        return switch (field.fieldName()) {
-            case BasicLiteralNode literal -> literal.literalToken().text().replaceAll("^\"|\"$", "");
-            case Token token -> unquote(token.text());
-            default -> "";
-        };
-    }
-
-    private static String unquote(String identifier) {
-        return identifier.startsWith("'") ? identifier.substring(1) : identifier;
-    }
 
     private static Stream<TypeSymbol> unionMembers(TypeSymbol typeSymbol) {
         TypeSymbol type = SemanticUtils.unwrap(typeSymbol);

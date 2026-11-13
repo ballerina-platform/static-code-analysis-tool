@@ -157,4 +157,18 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(13), documentName, 226, 39, 226, 50, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
+
+    @Test(description = "test anonymous functions typed by calls, patterns, spreads and untyped values")
+    void testContextualTypeEdgeCases() {
+        String documentName = "rule002_contextual_type_edge_cases.bal";
+        List<Issue> issues = analyze(documentName, List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        Assert.assertEquals(issues.size(), 3);
+
+        assertIssue(issues.get(0), documentName, 104, 20, 104, 25, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(1), documentName, 114, 25, 114, 34, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(2), documentName, 116, 31, 116, 40, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+    }
 }
