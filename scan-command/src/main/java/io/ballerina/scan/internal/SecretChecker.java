@@ -36,6 +36,7 @@ import io.ballerina.compiler.api.symbols.VariableSymbol;
 import io.ballerina.compiler.syntax.tree.AssignmentStatementNode;
 import io.ballerina.compiler.syntax.tree.BasicLiteralNode;
 import io.ballerina.compiler.syntax.tree.BinaryExpressionNode;
+import io.ballerina.compiler.syntax.tree.BracedExpressionNode;
 import io.ballerina.compiler.syntax.tree.CaptureBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.ClientResourceAccessActionNode;
 import io.ballerina.compiler.syntax.tree.CompoundAssignmentStatementNode;
@@ -70,6 +71,7 @@ import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.TemplateExpressionNode;
 import io.ballerina.compiler.syntax.tree.Token;
+import io.ballerina.compiler.syntax.tree.TypeCastExpressionNode;
 import io.ballerina.compiler.syntax.tree.TypedBindingPatternNode;
 import io.ballerina.compiler.syntax.tree.VariableDeclarationNode;
 import io.ballerina.projects.Document;
@@ -431,6 +433,14 @@ public class SecretChecker extends NodeVisitor {
     }
 
     private void validateExpression(ExpressionNode expressionNode, SecretNameMatcher.Kind kind) {
+        if (expressionNode instanceof BracedExpressionNode braced) {
+            validateExpression(braced.expression(), kind);
+            return;
+        }
+        if (expressionNode instanceof TypeCastExpressionNode typeCast) {
+            validateExpression(typeCast.expression(), kind);
+            return;
+        }
         // Each branch of a conditional or elvis expression is checked, and reported, where it is written.
         if (expressionNode instanceof ConditionalExpressionNode conditional) {
             validateExpression(conditional.middleExpression(), kind);
@@ -466,8 +476,9 @@ public class SecretChecker extends NodeVisitor {
             }
             return;
         }
-        if (!valueResolver.isMapConstant(expressionNode)
-                && !type.map(valueType -> canHoldSecret(slotType(expressionNode, valueType))).orElse(true)) {
+        if (!type.map(valueType -> canHoldSecret(slotType(expressionNode, valueType))).orElse(true)
+                && !valueResolver.isMapConstant(expressionNode)
+                && !valueResolver.isImportedMapConstant(expressionNode)) {
             return;
         }
         // A URL with credentials is reported once, as ballerina:13, when the literal or template is visited.

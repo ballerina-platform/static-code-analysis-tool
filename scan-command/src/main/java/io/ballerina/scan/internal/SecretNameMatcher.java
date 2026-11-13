@@ -25,6 +25,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * {@code SecretNameMatcher} decides whether the name of a variable, field, parameter, argument or mapping key
@@ -143,15 +145,16 @@ final class SecretNameMatcher {
             return Kind.NONE;
         }
         // A password named in the head of the name makes it one, as in "passwordToken", but not one that qualifies
-        // another word or follows a preposition, as in "passwordPolicyApiKey" or "tokenForPasswordReset".
+        // another word or follows a preposition, as in "passwordResetToken" or "tokenForPasswordReset".
         int firstPreposition = 1;
         while (firstPreposition < words.size() && !PREPOSITIONS.contains(words.get(firstPreposition))) {
             firstPreposition++;
         }
         int headEnd = firstPreposition;
+        Set<Integer> keywordWords = keywords.stream().map(KeywordMatch::wordIndex).collect(Collectors.toSet());
         return keywords.stream().anyMatch(keyword -> keyword.kind() == Kind.PASSWORD
                 && keyword.wordIndex() < headEnd
-                && (keyword.wordIndex() + 1 >= words.size() || !isDescriptor(words.get(keyword.wordIndex() + 1))))
+                && IntStream.range(keyword.wordIndex() + 1, lastKeywordIndex).allMatch(keywordWords::contains))
                 ? Kind.PASSWORD : Kind.SECRET;
     }
 

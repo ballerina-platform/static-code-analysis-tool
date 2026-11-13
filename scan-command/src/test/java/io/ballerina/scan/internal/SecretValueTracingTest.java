@@ -159,7 +159,7 @@ public class SecretValueTracingTest extends StaticCodeAnalyzerTest {
     void testConstantsPlaceholderPartsAndConversions() {
         assertSecretIssues("rule013_tracing_constants_and_parts.bal", List.of(lines(0, END_OF_FILE)),
                 hardCoded(34, 53, 73), hardCoded(44, 23, 45), hardCoded(45, 23, 45), hardCoded(46, 23, 40),
-                hardCoded(49, 23, 43), hardCoded(50, 23, 40), hardCoded(51, 23, 44), hardCoded(52, 23, 54),
+                hardCoded(49, 23, 43), hardCoded(50, 23, 40), hardCoded(51, 31, 44), hardCoded(52, 23, 54),
                 hardCoded(53, 23, 38), hardCoded(54, 23, 42), hardCoded(58, 22, 36),
                 hardCoded(59, 16, 34), fixed(61, 23, 44));
     }
@@ -203,7 +203,9 @@ public class SecretValueTracingTest extends StaticCodeAnalyzerTest {
                     .toList());
         }
         Assert.assertEquals(issuesByDocument, Map.of(
-                "main.bal", List.of(fixed(24, 23, 34), fixed(25, 23, 36), hardCoded(28, 23, 44)),
+                "main.bal", List.of(fixed(24, 23, 34), fixed(25, 23, 36), hardCoded(28, 23, 44),
+                        hardCoded(29, 25, 39), hardCoded(30, 27, 45), hardCoded(32, 30, 52),
+                        hardCoded(34, 21, 36)),
                 "rotation.bal", List.of(fixed(23, 23, 34))));
     }
 

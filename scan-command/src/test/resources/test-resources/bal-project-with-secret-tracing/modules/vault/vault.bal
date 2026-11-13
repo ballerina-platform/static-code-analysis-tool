@@ -17,3 +17,9 @@
 public final string finalValue = "vault-final-secret";
 public string mutableValue = "vault-mutable-secret";
 public const SHARED_CONSTANT = "vault-constant-secret";
+public const string[] API_KEYS = ["a8f5f167f44f4964", "admin"];
+public const map<string> DB_PASSWORDS = {primary: "Welcome1", "replica": "Welcome2"};
+public const map<string> FIELD_PASSWORDS = {password: "Welcome3"};
+public const map<map<string>> NESTED_PASSWORDS = {primary: {db: "Welcome4"}};
+public const map<int> PORTS = {primary: 5432};
+public const byte[] KEY_BYTES = [97, 56, 102, 53];

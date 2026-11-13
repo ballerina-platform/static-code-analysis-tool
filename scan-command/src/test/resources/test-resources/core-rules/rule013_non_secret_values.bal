@@ -106,7 +106,7 @@ function generatedLooking() returns string[] {
 // A value of a map of passwords is reported where it is written, and not again where it is used
 function mapOfPasswords() {
     final map<string> passwords = {db: "hunter2"}; // warning
-    connect(password = passwords.db);
+    connectWith(password = passwords["db"]);
 }
 
 // A prefix or a header name ends with a separator, which does not make it look generated
@@ -381,6 +381,50 @@ function templateInPart() returns string[] {
 function prepositionFirst() returns string {
     string inPassword = "admin"; // warning
     return inPassword;
+}
+
+// A password that qualifies another word does not make the name a password
+function passwordQualifiers() returns string[] {
+    string passwordResetToken = "reset";
+    string passwordChangeToken = "change";
+    string passwordToken = "admin"; // warning
+    return [passwordResetToken, passwordChangeToken, passwordToken];
+}
+
+// A literal is checked without its angle-bracket placeholders
+function anglePlaceholders() returns string[] {
+    string authToken = "Bearer <token>";
+    string apiKey = "sk_live_<your-key>";
+    string authorization = "Basic <base64-credentials>";
+    string dbPassword = "<user>:<password>";
+    string accessToken = "<id>:Xk9qLz2PmRtY"; // warning
+    string userPassword = "admin<1>"; // warning
+    return [authToken, apiKey, authorization, dbPassword, accessToken, userPassword];
+}
+
+const map<map<string>> NESTED_DB_PASSWORDS = {primary: {db: "Welcome1"}};
+const map<map<string>> NESTED_FIELD_PASSWORDS = {primary: {password: "Welcome1"}}; // warning
+const map<record {|string db;|}> NESTED_RECORDS = {primary: {db: "Welcome1"}};
+
+function connectNested(map<map<string>> passwords) {
+}
+
+function connectRecords(map<record {|string db;|}> passwords) {
+}
+
+// The inner maps of a map constant are maps by its declared type
+function nestedMapConstants() {
+    connectNested(passwords = NESTED_DB_PASSWORDS); // warning
+    connectNested(passwords = NESTED_FIELD_PASSWORDS);
+    connectRecords(passwords = NESTED_RECORDS);
+}
+
+// A map in braces is reported where it is written, and not again where its field is used
+function bracedMap() {
+    final map<string> passwords = ({db: "hunter2"}); // warning
+    connectWith(password = passwords["db"]);
+    final map<string> dbPasswords = <map<string>>{db: "hunter3"}; // warning
+    connectWith(password = dbPasswords["db"]);
 }
 
 public function main() {
