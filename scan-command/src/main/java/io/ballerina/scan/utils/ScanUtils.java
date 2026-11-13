@@ -73,11 +73,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -175,8 +175,68 @@ public final class ScanUtils {
     public static final String GATE_COUNT_VALUES = "a whole number of 1 or more";
 
     private static final String RULE_LIST_VALUES = "an array of rule IDs, such as [\"ballerina:1\"]";
+    private static final Comparator<Issue> REPORT_ORDER = Comparator
+            .comparing(ScanUtils::reportFilePath, ScanUtils::comparePaths)
+            .thenComparingInt(issue -> issue.location().lineRange().startLine().line())
+            .thenComparingInt(issue -> issue.location().lineRange().startLine().offset())
+            .thenComparingInt(issue -> issue.location().lineRange().endLine().line())
+            .thenComparingInt(issue -> issue.location().lineRange().endLine().offset())
+            .thenComparing(issue -> ruleProvider(issue.rule().id()))
+            .thenComparingInt(issue -> issue.rule().numericId())
+            .thenComparing(Issue::source);
 
     private ScanUtils() {
+    }
+
+    /**
+     * Returns issues produced by the scan tool in the order the reports list them: by file path, start line, start
+     * column, end line, end column and rule ID, so that a report does not depend on the order the modules were
+     * scanned in. Rule IDs of the same provider are compared by number, so {@code ballerina:2} comes before
+     * {@code ballerina:10}.
+     *
+     * @param issues the issues, as reported by the scan tool
+     * @return a sorted copy of the issues
+     * @since 0.11.2
+     */
+    public static List<Issue> inReportOrder(List<Issue> issues) {
+        List<Issue> sortedIssues = new ArrayList<>(issues);
+        sortedIssues.sort(REPORT_ORDER);
+        return sortedIssues;
+    }
+
+    /**
+     * Compares two file paths folder by folder, starting from their roots, so that the files of a folder stay
+     * together and the order is the same on every OS.
+     */
+    static int comparePaths(String first, String second) {
+        List<String> firstSegments = pathSegments(first);
+        List<String> secondSegments = pathSegments(second);
+        for (int i = 0; i < Math.min(firstSegments.size(), secondSegments.size()); i++) {
+            int comparison = firstSegments.get(i).compareTo(secondSegments.get(i));
+            if (comparison != 0) {
+                return comparison;
+            }
+        }
+        return Integer.compare(firstSegments.size(), secondSegments.size());
+    }
+
+    // The root comes first, as Path iterates only the names, so that files on different drives stay apart
+    private static List<String> pathSegments(String filePath) {
+        Path path = Path.of(filePath).toAbsolutePath().normalize();
+        List<String> segments = new ArrayList<>();
+        segments.add(String.valueOf(path.getRoot()));
+        path.forEach(segment -> segments.add(segment.toString()));
+        return segments;
+    }
+
+    // An issue of another Issue implementation has only the file name of its location
+    private static String reportFilePath(Issue issue) {
+        return issue instanceof IssueImpl issueImpl ? issueImpl.filePath() : issue.location().lineRange().fileName();
+    }
+
+    // Compared apart from the numeric ID, so that ballerina:2 comes before ballerina:10
+    private static String ruleProvider(String ruleId) {
+        return ruleId.substring(0, Math.max(ruleId.lastIndexOf(':'), 0));
     }
 
     /**
@@ -294,11 +354,12 @@ public final class ScanUtils {
                     }
                 })
                 .create();
-        JsonArray issuesAsJson = gson.toJsonTree(issues).getAsJsonArray();
+        List<Issue> sortedIssues = inReportOrder(issues);
+        JsonArray issuesAsJson = gson.toJsonTree(sortedIssues).getAsJsonArray();
         Path root = project == null ? null : project.sourceRoot().toAbsolutePath().normalize();
         Map<String, Optional<String>> fileContentCache = new HashMap<>();
-        for (int i = 0; i < issues.size(); i++) {
-            Issue issue = issues.get(i);
+        for (int i = 0; i < sortedIssues.size(); i++) {
+            Issue issue = sortedIssues.get(i);
             JsonObject issueAsJson = issuesAsJson.get(i).getAsJsonObject();
             if (issue instanceof IssueImpl issueImpl) {
                 JsonObject withLocation = new JsonObject();
@@ -382,6 +443,7 @@ public final class ScanUtils {
      */
     private static String convertIssuesToSarifString(List<Issue> issues, Project project,
                                                      Map<Issue, SuppressedIssue> suppressions) {
+        List<Issue> sortedIssues = inReportOrder(issues);
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
         Path root = project.sourceRoot().toAbsolutePath().normalize();
 
@@ -408,7 +470,7 @@ public final class ScanUtils {
         Set<String> addedRuleIds = new HashSet<>();
 
         // Collect unique rules from issues
-        for (Issue issue : issues) {
+        for (Issue issue : sortedIssues) {
             IssueImpl issueImpl = (IssueImpl) issue;
             String ruleId = issueImpl.rule().id();
 
@@ -444,7 +506,7 @@ public final class ScanUtils {
         JsonArray results = new JsonArray();
         Map<String, Optional<String>> fileContentCache = new HashMap<>();
 
-        for (Issue issue : issues) {
+        for (Issue issue : sortedIssues) {
             IssueImpl issueImpl = (IssueImpl) issue;
             JsonObject result = new JsonObject();
 
@@ -708,7 +770,8 @@ public final class ScanUtils {
         scannedPackages.add(scannedPackage);
         scannedProject.add(SCAN_REPORT_PACKAGES, scannedPackages);
 
-        Map<String, JsonObject> scanReportPathAndFile = new LinkedHashMap<>();
+        // Keyed by path, so that the files are listed in the same order as the issues of the other reports
+        Map<String, JsonObject> scanReportPathAndFile = new TreeMap<>(ScanUtils::comparePaths);
         for (Document document : getAnalyzedDocuments(currentPackage, analyzedSources)) {
             // A build project gives a path even for documents that exist only in memory, which have no file to show
             Optional<Path> documentPath = project.documentPath(document.documentId()).filter(Files::isRegularFile);
@@ -718,7 +781,7 @@ public final class ScanUtils {
             scanReportPathAndFile.put(toReportFileKey(documentPath.get().toString()), createScanReportFile(
                     ReporterImpl.reportFileName(document), documentPath.get(), reportRoot, packageName));
         }
-        for (Issue issue : issues) {
+        for (Issue issue : inReportOrder(issues)) {
             IssueImpl issueImpl = (IssueImpl) issue;
             JsonObject scanReportFile = scanReportPathAndFile.computeIfAbsent(toReportFileKey(issueImpl.filePath()),
                     key -> createScanReportFile(issueImpl.fileName(), Path.of(issueImpl.filePath()), reportRoot,
