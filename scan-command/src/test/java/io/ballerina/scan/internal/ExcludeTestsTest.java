@@ -118,8 +118,8 @@ public class ExcludeTestsTest extends BaseTest {
                 """, () -> {
             String output = scan(testsProject);
             Assert.assertTrue(output.contains("bal scan: error: Scan.toml has 2 errors\n"), output);
-            Assert.assertTrue(output.contains("Scan.toml:2:16: error: invalid value 'yes' for 'excludeTests'; "
-                    + "expected true or false"), output);
+            Assert.assertTrue(output.contains("Scan.toml:2:16: error: 'excludeTests' must be true or false, not the "
+                    + "string \"yes\""), output);
             Assert.assertTrue(output.contains("Scan.toml:3:1: error: unknown key 'excludeTest' in [analysis]; "
                     + "expected excludeTests"), output);
         });
