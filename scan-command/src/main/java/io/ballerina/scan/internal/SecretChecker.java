@@ -257,9 +257,11 @@ public class SecretChecker extends NodeVisitor {
 
     @Override
     public void visit(CompoundAssignmentStatementNode compoundAssignmentStatementNode) {
-        SecretNameMatcher.Kind kind = targetKind(compoundAssignmentStatementNode.lhsExpression());
-        if (compoundAssignmentStatementNode.binaryOperator().kind() == SyntaxKind.PLUS_TOKEN && kind.isSecret()) {
-            validateExpression(compoundAssignmentStatementNode.rhsExpression(), kind);
+        if (compoundAssignmentStatementNode.binaryOperator().kind() == SyntaxKind.PLUS_TOKEN) {
+            SecretNameMatcher.Kind kind = targetKind(compoundAssignmentStatementNode.lhsExpression());
+            if (kind.isSecret()) {
+                validateExpression(compoundAssignmentStatementNode.rhsExpression(), kind);
+            }
         }
         super.visit(compoundAssignmentStatementNode);
     }

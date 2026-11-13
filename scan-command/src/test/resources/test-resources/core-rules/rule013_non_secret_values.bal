@@ -194,7 +194,9 @@ function joinedPlaceholders() returns string[] {
     connect(password = "<user>" + "<password>");
     string dbPassword = "changeme" + "changeme";
     string adminPassword = "admin" + "123"; // warning
-    return [dbPassword, adminPassword];
+    string userPassword = "${ENV}-" + "Hunter2!x"; // warning
+    string token = "sk_live_" + <string>"51H8xKq"; // warning
+    return [dbPassword, adminPassword, userPassword, token];
 }
 
 // A weak secret-named part is not reported where it is written, so it is joined with the other parts

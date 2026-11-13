@@ -300,7 +300,7 @@ public class Rule013Test extends StaticCodeAnalyzerTest {
                 .filter(issue -> issue.rule().id().equals(HARD_CODED_SECRET.rule().id())
                         || issue.rule().id().equals(NON_CONFIGURABLE_SECRET.rule().id()))
                 .toList();
-        Assert.assertEquals(issues.size(), 25);
+        Assert.assertEquals(issues.size(), 27);
         assertIssue(issues.get(0), documentName, new Location(39, 29, 39, 57), HARD_CODED_SECRET.rule());
         assertIssue(issues.get(1), documentName, new Location(44, 24, 44, 31), HARD_CODED_SECRET.rule());
         assertIssue(issues.get(2), documentName, new Location(55, 24, 55, 29), NON_CONFIGURABLE_SECRET.rule());
@@ -322,9 +322,11 @@ public class Rule013Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(18), documentName, new Location(169, 25, 169, 55), NON_CONFIGURABLE_SECRET.rule());
         assertIssue(issues.get(19), documentName, new Location(172, 19, 172, 37), HARD_CODED_SECRET.rule());
         assertIssue(issues.get(20), documentName, new Location(195, 27, 195, 42), HARD_CODED_SECRET.rule());
-        assertIssue(issues.get(21), documentName, new Location(202, 20, 202, 39), NON_CONFIGURABLE_SECRET.rule());
-        assertIssue(issues.get(22), documentName, new Location(211, 45, 211, 67), HARD_CODED_SECRET.rule());
-        assertIssue(issues.get(23), documentName, new Location(221, 20, 221, 39), HARD_CODED_SECRET.rule());
-        assertIssue(issues.get(24), documentName, new Location(222, 31, 222, 44), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(21), documentName, new Location(196, 26, 196, 49), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(22), documentName, new Location(197, 19, 197, 49), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(23), documentName, new Location(204, 20, 204, 39), NON_CONFIGURABLE_SECRET.rule());
+        assertIssue(issues.get(24), documentName, new Location(213, 45, 213, 67), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(25), documentName, new Location(223, 20, 223, 39), HARD_CODED_SECRET.rule());
+        assertIssue(issues.get(26), documentName, new Location(224, 31, 224, 44), HARD_CODED_SECRET.rule());
     }
 }

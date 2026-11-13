@@ -134,7 +134,13 @@ class SecretValueResolver {
 
     // Whether a fixed text cannot be the secret on its own, which depends on the kind of the secret.
     private static boolean isNotSecret(String text, Kind kind) {
-        return SecretValueFilter.isPlaceholder(text) || kind == Kind.SECRET && !SecretValueFilter.looksGenerated(text);
+        return SecretValueFilter.isPlaceholder(text) || isNotGenerated(text, kind);
+    }
+
+    // A joined text is a placeholder only when all its parts are, as a template part such as "${ENV}" does not make
+    // a real password next to it one.
+    private static boolean isNotGenerated(String text, Kind kind) {
+        return kind == Kind.SECRET && !SecretValueFilter.looksGenerated(text);
     }
 
     private Origin resolve(ExpressionNode expression, Kind kind, int depth, Set<Symbol> visited) {
@@ -170,7 +176,7 @@ class SecretValueResolver {
                             depth, visited))
                     .orElse(Origin.UNKNOWN);
             case BINARY_EXPRESSION, STRING_TEMPLATE_EXPRESSION -> fixedText(expression, depth, visited)
-                    .map(text -> text.isPlaceholder() || isNotSecret(text.text(), kind) ? Origin.PLACEHOLDER
+                    .map(text -> text.isPlaceholder() || isNotGenerated(text.text(), kind) ? Origin.PLACEHOLDER
                             : text.isThroughVariable() ? Origin.FIXED_VARIABLE : Origin.HARD_CODED)
                     .orElseGet(() -> expression instanceof TemplateExpressionNode template
                             ? resolveTemplate(template, kind, depth, visited)
@@ -225,10 +231,13 @@ class SecretValueResolver {
                         .map(initializer -> resolve(initializer, kind, depth + 1, visited))
                         .orElse(Origin.UNKNOWN)
                 : Origin.UNKNOWN;
-        if (initializerOrigin == Origin.PLACEHOLDER || isFixed(initializerOrigin)) {
-            return initializerOrigin == Origin.PLACEHOLDER ? Origin.PLACEHOLDER : Origin.HARD_CODED;
+        if (initializerOrigin == Origin.PLACEHOLDER) {
+            return Origin.PLACEHOLDER;
         }
-        return isNotSecret(constant, kind) ? Origin.PLACEHOLDER : Origin.HARD_CODED;
+        if (isFixed(initializerOrigin)) {
+            return Origin.HARD_CODED;
+        }
+        return isNotSecretConstant(constant, kind) ? Origin.PLACEHOLDER : Origin.HARD_CODED;
     }
 
     private static boolean isFixed(Origin origin) {
@@ -265,9 +274,8 @@ class SecretValueResolver {
         if (!isFixed(origin)) {
             return isConfigurableRoot ? Origin.CONFIGURABLE : origin;
         }
-        // A secret-named field, or any field of a map of secrets, is reported where it is written. Any other fixed
-        // field of a constant or of a configurable's default keeps its origin, and is otherwise reached through the
-        // variable that holds it.
+        // A secret-named field, or a field of a map of secrets, is reported where it is written. Another fixed field
+        // keeps its origin in a constant or a configurable's default, and is otherwise a fixed variable.
         String writtenName = SecretNameMatcher.kind(fieldName).isSecret()
                 ? fieldName
                 : mapName((MappingConstructorExpressionNode) field.get().parent()).orElse(fieldName);
@@ -469,11 +477,8 @@ class SecretValueResolver {
         }
     }
 
-    /**
-     * Returns the text of a value built only from string literals, string constants and variables that hold such a
-     * value, by concatenation or in a template, as in {@code "sk_live_" + KEY}. Such a value is checked as a whole,
-     * as its parts can each look like text that is not a secret.
-     */
+    // The text of a value built only from literals, constants and variables holding one, as in "sk_live_" + KEY,
+    // which is checked as a whole, as its parts can each look like text that is not a secret.
     private Optional<FixedText> fixedText(ExpressionNode expression, int depth, Set<Symbol> visited) {
         if (depth > MAX_DEPTH) {
             return Optional.empty();
@@ -482,6 +487,7 @@ class SecretValueResolver {
             case BasicLiteralNode literal when literal.kind() == SyntaxKind.STRING_LITERAL ->
                     Optional.of(FixedText.of(SecretValueFilter.literalValue(literal.literalToken().text())));
             case BracedExpressionNode braced -> fixedText(braced.expression(), depth, visited);
+            case TypeCastExpressionNode cast -> fixedText(cast.expression(), depth, visited);
             case BinaryExpressionNode binary when binary.operator().kind() == SyntaxKind.PLUS_TOKEN
                     && binary.lhsExpr() instanceof ExpressionNode lhs
                     && binary.rhsExpr() instanceof ExpressionNode rhs -> fixedText(lhs, depth, visited)
@@ -677,7 +683,7 @@ class SecretValueResolver {
                 .map(syntaxTree -> ((ModulePartNode) syntaxTree.rootNode()).findNode(location.textRange(), true));
     }
 
-    private static boolean isNotSecret(ConstantSymbol constant, Kind kind) {
+    private static boolean isNotSecretConstant(ConstantSymbol constant, Kind kind) {
         // Only a string constant is text; a byte array or a list constant resolves to its source form
         boolean isText = isString(constant.broaderTypeDescriptor());
         return constant.resolvedValue()
