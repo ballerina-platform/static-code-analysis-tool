@@ -34,7 +34,6 @@ import io.ballerina.compiler.api.symbols.Qualifier;
 import io.ballerina.compiler.api.symbols.RecordFieldSymbol;
 import io.ballerina.compiler.api.symbols.RecordTypeSymbol;
 import io.ballerina.compiler.api.symbols.ServiceDeclarationSymbol;
-import io.ballerina.compiler.api.symbols.Symbol;
 import io.ballerina.compiler.api.symbols.SymbolKind;
 import io.ballerina.compiler.api.symbols.TupleTypeSymbol;
 import io.ballerina.compiler.api.symbols.TypeDefinitionSymbol;
@@ -966,19 +965,12 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private void checkUnusedFunctionParameters(FunctionSignatureNode functionSignatureNode) {
         functionSignatureNode.parameters().forEach(parameter -> {
             if (parameter instanceof IncludedRecordParameterNode includedRecordParameterNode) {
-                includedRecordParameterNode.paramName().ifPresent(name -> {
-                    reportIssueIfNodeIsUnused(name, CoreRule.UNUSED_FUNCTION_PARAMETER);
-                });
-            } else if (isUnusedNode(parameter)) {
+                includedRecordParameterNode.paramName().filter(this::isUnusedParameter)
+                        .ifPresent(name -> reportIssue(name, CoreRule.UNUSED_FUNCTION_PARAMETER));
+            } else if (isUnusedParameter(parameter)) {
                 reportIssue(withoutAnnotations(parameter), CoreRule.UNUSED_FUNCTION_PARAMETER);
             }
         });
-    }
-
-    private void reportIssueIfNodeIsUnused(Node node, CoreRule coreRule) {
-        if (isUnusedNode(node)) {
-            reportIssue(node, coreRule);
-        }
     }
 
     private void reportIssue(Node node, CoreRule coreRule) {
@@ -1027,12 +1019,12 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 TextRange.from(startOffset, endOffset - startOffset));
     }
 
-    private boolean isUnusedNode(Node node) {
-        Optional<Symbol> symbol = semanticModel.symbol(node);
-        // The compiler can give the same reference twice, as for a parameter of an object constructor method
-        return symbol.filter(value -> semanticModel.references(value).stream()
-                .map(location -> location.lineRange().fileName() + ":" + location.textRange().startOffset())
-                .distinct().count() == 1).isPresent();
+    // Valid only for a symbol declared in this document, as a parameter is. The references of a symbol, unlike its
+    // references in a document, miss or repeat the definition of a parameter of an object constructor method.
+    private boolean isUnusedParameter(Node parameter) {
+        return semanticModel.symbol(parameter)
+                .filter(symbol -> semanticModel.references(symbol, document, false).isEmpty())
+                .isPresent();
     }
 
     private Optional<Long> getIntValueFromRangeExprNode(Node rangeExprNode) {

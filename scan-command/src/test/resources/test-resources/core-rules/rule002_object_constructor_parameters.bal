@@ -1,0 +1,66 @@
+// Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+//
+// WSO2 Inc. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+// The compiler gives the references of a parameter of an object constructor method differently when the module has an
+// anonymous function, so this module has none.
+
+type Op object {
+    function m(int p) returns int;
+};
+
+Op typedModuleObject = object {
+    function m(int p) returns int => 1;
+};
+
+var untypedModuleObject = object {
+    function m(int p) returns int => 1; // warning
+};
+
+function untypedObjects() returns int {
+    var untyped = object {
+        function m(int p) returns int { // warning
+            return 1;
+        }
+    };
+    object {} emptyType = object {
+        function m(int p) returns int => 1; // warning
+    };
+    var fetcher = isolated client object {
+        remote isolated function fetch(string path) returns string|error => error("not supported"); // warning
+    };
+    var used = object {
+        function m(int p) returns int => p;
+    };
+    return untyped.m(1) + used.m(1);
+}
+
+function capturedByObject(int captured, int unused) returns int { // warning
+    var o = object {
+        function m(int p) returns int => captured; // warning
+    };
+    return o.m(1);
+}
+
+function typedObject() returns int {
+    Op typed = object {
+        function m(int p) returns int => 1;
+    };
+    return typed.m(1);
+}
+
+function plain(int p) returns int { // warning
+    return 1;
+}

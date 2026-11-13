@@ -171,4 +171,39 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(2), documentName, 116, 31, 116, 40, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
+
+    @Test(description = "test unused parameters of object constructor methods in a module without anonymous functions")
+    void testObjectConstructorParameters() {
+        String documentName = "rule002_object_constructor_parameters.bal";
+        List<Issue> issues = analyze(documentName, List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        Assert.assertEquals(issues.size(), 7);
+
+        assertIssue(issues.get(0), documentName, 28, 15, 28, 20, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(1), documentName, 33, 19, 33, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(2), documentName, 38, 19, 38, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(3), documentName, 41, 39, 41, 50, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(4), documentName, 49, 40, 49, 50, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(5), documentName, 51, 19, 51, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(6), documentName, 63, 15, 63, 20, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+    }
+
+    @Test(description = "test unused parameters of object constructor methods in a package without anonymous functions")
+    void testObjectConstructorParametersInPackage() {
+        String documentName = "main.bal";
+        List<Issue> issues = analyze("rule002_object_constructor_package",
+                List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        Assert.assertEquals(issues.size(), 2);
+
+        assertIssue(issues.get(0), documentName, 17, 20, 17, 25, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(1), documentName, 24, 24, 24, 29, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+    }
 }
