@@ -212,11 +212,16 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         Assert.assertEquals(issues.size(), 0);
     }
 
-    @Test(description = "test unused parameters of object constructor methods in a package without anonymous functions")
+    @Test(description = "test unused parameters of object constructor methods in a package whose anonymous function "
+            + "is in another document")
     void testObjectConstructorParametersInPackage() {
         String documentName = "main.bal";
-        List<Issue> issues = analyze("rule002_object_constructor_package",
-                List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        Document document = loadDocument("rule002_object_constructor_package", documentName);
+        ScannerContextImpl scannerContext = new ScannerContextImpl(List.of(CoreRule.UNUSED_FUNCTION_PARAMETER.rule()));
+        StaticCodeAnalyzer staticCodeAnalyzer = new StaticCodeAnalyzer(document,
+                scannerContext, document.module().getCompilation().getSemanticModel());
+        staticCodeAnalyzer.analyze();
+        List<Issue> issues = scannerContext.getReporter().getIssues();
         Assert.assertEquals(issues.size(), 2);
 
         assertIssue(issues.get(0), documentName, 17, 20, 17, 25, "ballerina:2", 2,
