@@ -68,6 +68,7 @@ import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -108,6 +109,7 @@ public class ScanCmd implements BLauncherCmd {
     private static final String FAIL_ON_COUNT_OPTION = "--fail-on-count";
     private static final String EXCLUDE_TESTS_OPTION = "--exclude-tests";
     private static final String LIST_RULES_HINT = "  Run 'bal scan --list-rules' to see the available rules.";
+    private static final String EXTERNAL_PACKAGES_DIR = "_external";
 
     private final PrintStream outputStream;
     private final PrintStream errorStream;
@@ -204,6 +206,8 @@ public class ScanCmd implements BLauncherCmd {
     private final Set<String> printedWarnings = new HashSet<>();
     // The sources each package is scanned with, keyed by its root, for the workspace HTML report
     private final Map<Path, AnalyzedSources> packageSources = new HashMap<>();
+    // The directory of each workspace package's results under --target-dir, keyed by its root
+    private final Map<Path, Path> packageReportDirs = new HashMap<>();
     // Each platform JAR is downloaded and loaded once for every package, and its loader is closed at the end
     private final Map<String, Path> platformJars = new HashMap<>();
     private final Map<Path, URLClassLoader> platformLoaders = new LinkedHashMap<>();
@@ -521,6 +525,7 @@ public class ScanCmd implements BLauncherCmd {
         failOnUnknownRuleOptions(true);
         // The run fails anyway, so the other packages are not compiled and scanned
         failOnPackageFailures(workspaceProject, failures);
+        resolvePackageReportDirs(workspaceProject, packageScans);
 
         // Each package's analyzers are loaded just before it is scanned and released after it, and its result once it
         // is reported
@@ -1198,9 +1203,49 @@ public class ScanCmd implements BLauncherCmd {
         if (!project.kind().equals(ProjectKind.BUILD_PROJECT)) {
             return Optional.empty();
         }
+        String reportDir = packageTargetDir(project);
         return Optional.of(ReportFormat.SARIF.equals(reportFormat)
-                ? ScanUtils.saveSarifToDirectory(result.issues(), project, targetDir, suppressions)
-                : ScanUtils.saveToDirectory(result.issues(), project, targetDir, suppressions));
+                ? ScanUtils.saveSarifToDirectory(result.issues(), project, reportDir, suppressions)
+                : ScanUtils.saveToDirectory(result.issues(), project, reportDir, suppressions));
+    }
+
+    /**
+     * Returns the directory the results of a package are saved in, or null for its own target directory.
+     */
+    private String packageTargetDir(Project project) {
+        if (targetDir == null || !scanningWorkspace) {
+            return targetDir;
+        }
+        return packageReportDirs.get(packageKey(project)).toString();
+    }
+
+    /**
+     * Chooses the directory of each workspace package's results under --target-dir, which names one directory for the
+     * whole workspace, as it does for {@code bal build}. A package is saved under its path from the workspace root,
+     * and a package outside the root under {@code _external/<org>/<name>}, as a ../ path would leave the directory.
+     * Fails before any package is scanned when two packages would share a directory, so that neither is overwritten.
+     */
+    private void resolvePackageReportDirs(WorkspaceProject workspaceProject, Collection<PackageScan> packageScans) {
+        if (targetDir == null || platformTriggered) {
+            return;
+        }
+        Path workspaceRoot = workspaceProject.sourceRoot().toAbsolutePath().normalize();
+        Path reportRoot = workspaceRoot.resolve(targetDir).normalize();
+        Map<Path, Project> owners = new HashMap<>();
+        for (PackageScan packageScan : packageScans) {
+            Project project = packageScan.project();
+            Path packageRoot = project.sourceRoot().toAbsolutePath().normalize();
+            Path reportDir = reportRoot.resolve(packageRoot.startsWith(workspaceRoot)
+                    ? workspaceRoot.relativize(packageRoot)
+                    : Path.of(EXTERNAL_PACKAGES_DIR, project.currentPackage().packageOrg().value(),
+                    project.currentPackage().packageName().value())).normalize();
+            Project owner = owners.putIfAbsent(reportDir, project);
+            if (owner != null) {
+                throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.REPORT_DIR_CONFLICT,
+                        packageLabel(workspaceProject, owner), packageLabel(workspaceProject, project), reportDir));
+            }
+            packageReportDirs.put(packageKey(project), reportDir);
+        }
     }
 
     /**
