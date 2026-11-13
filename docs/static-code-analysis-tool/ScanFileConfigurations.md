@@ -40,7 +40,7 @@ Scan.toml:5:12: error: unknown rule 'ballerina:999'; it is not a rule of the pac
   Run 'bal scan --list-rules' to see the available rules.
 ```
 
-`bal scan --list-rules` stops only on the errors that change the available rules: a TOML syntax error and an invalid `[[analyzer]]` entry. The editor ignores invalid settings.
+`bal scan --list-rules` stops only on the errors that change the available rules: a TOML syntax error, an invalid `[[analyzer]]` entry, and an analyzer that cannot be resolved. The editor ignores invalid settings.
 
 # Configuration for Platform Plugins
 
@@ -96,7 +96,7 @@ Each entry must be written as an `[[analyzer]]` table, and accepts only these ke
 - `version` - Optional. A version, such as `"1.0.0"`, which is the minimum version of the package to use, as for a dependency in `Ballerina.toml`.
 - `repository` - Optional. Only `"local"` is supported, to use the package from the local repository, and it requires a `version`.
 
-A missing `org` or `name`, a value that is not a valid organization name, package name or version, and an unknown key stop the scan with an error that gives its line and column.
+A missing `org` or `name`, a value that is not a valid organization name, package name or version, and an unknown key stop the scan with an error that gives its line and column. The `name` can also name a module of the analyzer package, such as `"pkg.mod"`. An analyzer that cannot be resolved, such as one whose org or name is misspelled or whose version does not exist, also stops the scan, with the location of its entry, since scanning without it would look clean without its rules.
 
 # Configuration for Static Code Analyzer Rules
 

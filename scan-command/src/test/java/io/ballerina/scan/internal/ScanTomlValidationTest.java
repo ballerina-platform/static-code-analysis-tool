@@ -479,6 +479,77 @@ public class ScanTomlValidationTest extends BaseTest {
         Assert.assertTrue(run.errorReport().startsWith("bal scan: error: Scan.toml has 1 error\n"), run.output());
     }
 
+    @Test(description = "test the resolution diagnostic of an analyzer is matched by its whole org, name and version")
+    void testAnalyzerReasonMatchesWholeNames() {
+        ScanTomlFile.Analyzer analyzer = new ScanTomlFile.Analyzer("ballerina", "io", "1.0.0", "local");
+        Assert.assertTrue(ProjectAnalyzer.namesAnalyzer(
+                "Dependency version (1.0.0) cannot be found in the local repository. org: `ballerina` name: io",
+                analyzer));
+        Assert.assertTrue(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerina/io:1.0.0.", analyzer));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerina/ioutil:1.0.0", analyzer));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerina/io.file:1.0.0", analyzer));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerina/io:1.0.01", analyzer));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer("cannot resolve ballerinax/io:1.0.0", analyzer));
+        Assert.assertTrue(ProjectAnalyzer.namesAnalyzer("cannot resolve module 'ballerina/io as _'",
+                new ScanTomlFile.Analyzer("ballerina", "io", null, null)));
+    }
+
+
+    @DataProvider(name = "unresolved-analyzers")
+    public Object[][] unresolvedAnalyzers() {
+        return new Object[][]{
+                {"""
+                        [[analyzer]]
+                        org = "nosuchorgxyz"
+                        name = "nosuchpkg"
+                        """, "Scan.toml:1:1: error: analyzer 'nosuchorgxyz/nosuchpkg' cannot be resolved"},
+                {"""
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "example_module_static_code_analyzer"
+                        version = "9.9.9"
+                        """, "Scan.toml:1:1: error: analyzer 'exampleOrg/example_module_static_code_analyzer:9.9.9' "
+                        + "cannot be resolved"},
+                {"""
+                        [[analyzer]]
+                        org = "ballerinax"
+                        name = "example_module_static_code_analyzer"
+                        version = "9.9.9"
+                        repository = "local"
+                        """, "Scan.toml:1:1: error: analyzer 'ballerinax/example_module_static_code_analyzer:9.9.9 "
+                        + "from the local repository' cannot be resolved: Dependency version (9.9.9) cannot be found "
+                        + "in the local repository. org: `ballerinax` name: example_module_static_code_analyzer"},
+                // The analyzers that resolve are not reported
+                {"""
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "example_module_static_code_analyzer"
+
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "nosuchpkg"
+                        """, "Scan.toml:5:1: error: analyzer 'exampleOrg/nosuchpkg' cannot be resolved"},
+        };
+    }
+
+
+    @Test(description = "test an [[analyzer]] that cannot be resolved fails the scan and the rule listing",
+            dataProvider = "unresolved-analyzers")
+    void testUnresolvedAnalyzer(String content, String error) throws IOException {
+        Files.writeString(scanToml, content);
+        ScanRun run = scan(project);
+        Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertTrue(run.errorReport().startsWith("bal scan: error: Scan.toml has 1 error\n" + error),
+                run.output());
+        Assert.assertEquals(run.errorReport().lines().count(), 2, run.output());
+        Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+
+        run = scan(project, "--list-rules");
+        Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertTrue(run.errorReport().startsWith("bal scan: error: Scan.toml has 1 error\n" + error),
+                run.output());
+    }
+
     private ScanRun scan(Path target, String... args) throws IOException {
         System.setProperty("user.dir", target.toString());
         try {

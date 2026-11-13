@@ -509,6 +509,8 @@ public class ScanCmd implements BLauncherCmd {
                 packageScan.config().analyzedSources());
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
+        failOnUnresolvedAnalyzers(packageScan.project(), packageScan.scanTomlFile(),
+                projectAnalyzer.getUnresolvedAnalyzers());
         addRules(coreRules);
         externalAnalyzers.values().forEach(this::addRules);
         return new PackageRules(projectAnalyzer, coreRules, externalAnalyzers);
@@ -753,6 +755,29 @@ public class ScanCmd implements BLauncherCmd {
         }
         errors.add(LIST_RULES_HINT);
         return errors;
+    }
+
+    /**
+     * Fails the scan with each [[analyzer]] of the Scan.toml file that could not be resolved, as a Scan.toml error at
+     * its position, since leaving it out would give a clean-looking scan without its rules.
+     */
+    private static void failOnUnresolvedAnalyzers(Project project, ScanTomlFile scanTomlFile,
+                                                  Map<ScanTomlFile.Analyzer, String> unresolvedAnalyzers) {
+        if (unresolvedAnalyzers.isEmpty()) {
+            return;
+        }
+        String displayPath = scanTomlFile.getDisplayPath(project.sourceRoot()).orElse(Constants.SCAN_FILE);
+        List<String> errors = new ArrayList<>();
+        unresolvedAnalyzers.forEach((analyzer, reason) -> {
+            String id = analyzer.org() + "/" + analyzer.name()
+                    + (analyzer.version() == null ? "" : ":" + analyzer.version())
+                    + (analyzer.repository() == null ? "" : " from the " + analyzer.repository() + " repository");
+            errors.add(DiagnosticLog.fileError(displayPath, scanTomlFile.getAnalyzerLocation(analyzer).orElseThrow(),
+                    DiagnosticLog.error(DiagnosticCode.ANALYZER_NOT_RESOLVED, id,
+                            reason.isEmpty() ? "" : ": " + reason)));
+        });
+        throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath,
+                errors.size()), errors);
     }
 
     private static Stream<String> configRuleIds(ScanTomlFile scanTomlFile) {
