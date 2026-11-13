@@ -271,6 +271,14 @@ public class ScanCmd implements BLauncherCmd {
      */
     @Override
     public void execute() {
+        // Standard output holds only the results. Anything else printed to System.out, such as by a compiler plugin
+        // while the package compiles, is sent to standard error. With one stream for both, as in the test runner,
+        // System.out is left to the caller. System.err already goes to standard error.
+        PrintStream systemOut = System.out;
+        boolean redirectSystemOut = errorStream != outputStream;
+        if (redirectSystemOut) {
+            System.setOut(errorStream);
+        }
         try {
             run();
         } catch (RuntimeException ex) {
@@ -280,6 +288,10 @@ public class ScanCmd implements BLauncherCmd {
             // here, as they are often the context for it
             flushWarnings();
             closePlatformLoaders();
+            if (redirectSystemOut) {
+                errorStream.flush();
+                System.setOut(systemOut);
+            }
         }
     }
 
@@ -632,12 +644,13 @@ public class ScanCmd implements BLauncherCmd {
         section(Section.PLATFORMS);
         runs.forEach(run -> errorStream.println("Reporting issues to: " + run.platform().name()));
         section(Section.PLATFORM_OUTPUT);
-        // The plugins print to the system streams, which are routed through the layout while they run
+        // The plugins print to the system streams, which execute already routes to standard error when it is separate.
+        // They are routed here too for a command with one stream, so that the layout still counts their lines.
         PrintStream systemOut = System.out;
         PrintStream systemErr = System.err;
         List<Optional<String>> outcomes;
         try {
-            System.setOut(outputStream);
+            System.setOut(errorStream);
             System.setErr(errorStream);
             outcomes = PlatformRunner.runAll(runs.stream()
                     .map(run -> new PlatformRunner.Task(run.platform().plugin(), run.platform().context(),

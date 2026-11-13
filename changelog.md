@@ -31,6 +31,7 @@ Built against Ballerina 2201.12.0.
 - The published tool package contains up-to-date tool TOML files. ([#122](https://github.com/ballerina-platform/static-code-analysis-tool/pull/122))
 - `bal scan --exclude-tests` no longer fails with `NoClassDefFoundError` on the picocli version bundled with the `bal` launcher.
 - `bal scan .` scans the package in the current directory instead of failing with "'.' is already within a Ballerina package".
+- Output printed to `System.out` by a compiler plugin while the package compiles, or by a platform plugin, is written to standard error, so `bal scan > issues.json` saves valid JSON, also with `--platforms`. Before, it was appended to the results on standard output. A process started by a platform plugin writes to the streams directly, so a plugin must not let it inherit standard output, as the platform plugin guide now states. (backport of [#175](https://github.com/ballerina-platform/static-code-analysis-tool/pull/175))
 
 ## [0.11.0] - 2025-08-06
 
