@@ -16,6 +16,8 @@ DESCRIPTION
 OPTIONS
         --target-dir=<path>
                 Target directory path for saving analysis reports (only for Ballerina projects).
+                Default is the target directory of the package. A relative path is resolved
+                against the package root.
 
         --scan-report
                 Generate an HTML report containing the analysis results (only for Ballerina projects).
