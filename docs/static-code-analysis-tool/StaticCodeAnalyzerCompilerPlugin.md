@@ -133,7 +133,7 @@ public interface ScannerContext {
 }
 ```
 
-When the `getReporter` method of the `ScannerContext` is called by the static code analyzer compiler plugin, it returns the `Reporter` interface that allows reporting static analysis issues. `isExcludeTests()` returns `true` when the test sources are left out of the scan with `--exclude-tests` or `excludeTests = true` in `Scan.toml`. The scan tool drops the issues reported in test sources either way, so an analyzer can use it only to skip analyzing them.
+When the `getReporter` method of the `ScannerContext` is called by the static code analyzer compiler plugin, it returns the `Reporter` interface that allows reporting static analysis issues. `isExcludeTests()` returns `true` when the test sources are left out of the scan with `--exclude-tests` or `excludeTests = true` in the `[analysis]` table of `Scan.toml`. The scan tool drops the issues reported in test sources either way, so an analyzer can use it only to skip analyzing them.
 
 The static code analysis tool creates a new scanner context that contains the in-memory rules for each static code analyzer plugin for reporting issues.
 
@@ -200,26 +200,18 @@ There are three steps to follow to create a static code analyzer compiler plugin
 
 ## Step 1: Add the static code analysis tool dependencies to the project
 
-Each release of the scan tool publishes the `io.ballerina.scan:scan-command` artifact to the GitHub Packages Maven registry of this repository. GitHub Packages requires authentication even for public packages, so use a GitHub user and a personal access token with the `read:packages` scope:
+Add the GitHub Packages registry and choose the versions as described in [Adding the scan tool dependency](README.md#adding-the-scan-tool-dependency), and add the following dependencies, which hold the scan tool API and the Ballerina compiler plugin API used in the steps below:
 
 ```groovy
-repositories {
-    mavenCentral()
-    maven {
-        url = 'https://maven.pkg.github.com/ballerina-platform/static-code-analysis-tool'
-        credentials {
-            username = System.getenv("packageUser")
-            password = System.getenv("packagePAT")
-        }
-    }
-}
-
 dependencies {
-    implementation group: 'io.ballerina.scan', name: 'scan-command', version: '0.11.1'
+    compileOnly group: 'io.ballerina.scan', name: 'scan-command', version: '<scan-tool-version>'
+    compileOnly group: 'org.ballerinalang', name: 'ballerina-lang', version: '<ballerina-version>'
+    compileOnly group: 'org.ballerinalang', name: 'ballerina-parser', version: '<ballerina-version>'
+    compileOnly group: 'org.ballerinalang', name: 'ballerina-tools-api', version: '<ballerina-version>'
 }
 ```
 
-Use the version of the scan tool the plugin is built for, from the [releases](https://github.com/ballerina-platform/static-code-analysis-tool/releases). To build against unreleased changes of the scan tool, run `./gradlew :scan-command:publishToMavenLocal` in a clone of this repository, add `mavenLocal()` to the repositories, and use the `version` in the `gradle.properties` file of the repository, such as `0.11.2-SNAPSHOT`.
+The scan tool classes are provided by `bal scan`, which passes the `ScannerContext` to the plugin, and are not available to other commands such as `bal build`, so do not list `scan-command` as a dependency in the `CompilerPlugin.toml` file of the package. See the note in Step 3.
 
 ## Step 2: Defining the static code analysis rules
 

@@ -55,7 +55,7 @@ and names the platform in the `--platforms` option:
 bal scan --platforms=platformName
 ```
 
-A declared platform is reported to only when it is named in `--platforms`; a plain `bal scan` never reports to a platform. `--platforms` accepts a comma-separated list, such as `--platforms="platformA, platformB"`, and each name in it must be declared in `Scan.toml`. `--platforms` cannot be used with a single Ballerina file. See [Scan File Configurations](ScanFileConfigurations.md#configuration-for-platform-plugins) for how the `path` is resolved.
+A declared platform is reported to only when it is named in `--platforms`; a plain `bal scan` never reports to a platform. The exception is a scan that a platform runs itself with `--platform-triggered`, which reports to every declared platform unless `--platforms` names some; see below. `--platforms` accepts a comma-separated list, such as `--platforms="platformA, platformB"`, and each name in it must be declared in `Scan.toml`. `--platforms` cannot be used with a single Ballerina file. See [Scan File Configurations](ScanFileConfigurations.md#configuration-for-platform-plugins) for how the `path` is resolved.
 
 For each named platform, the scan tool:
 
@@ -64,7 +64,7 @@ For each named platform, the scan tool:
 3. Calls `init` with a `PlatformPluginContext` that holds the platform arguments from `Scan.toml`, and then `onScan` with the issues of the package.
 4. Checks the quality gate, after every platform has run.
 
-The named platforms run one after another. An exception thrown from `init` or `onScan` fails that platform without stopping the others, and once all of them have run, the scan lists every failure and exits with code `1`.
+The named platforms run one after another. A `RuntimeException` or `LinkageError` thrown from `init` or `onScan` fails that platform without stopping the others, and once all of them have run, the scan lists every failure and exits with code `1`.
 
 A platform can also run the scan itself, as the SonarQube Ballerina plugin does during a SonarScanner analysis, with the hidden `--platform-triggered` option. The scan then reports to every platform the package declares, unless `--platforms` names some, does not print the results or save the report of each package, and does not apply the quality gate, since the platform applies its own. `PlatformPluginContext.initiatedByPlatform()` returns `true` in such a scan.
 
@@ -131,7 +131,7 @@ timeoutSeconds = 30
 ```
 
 - Each value is passed as a string. A string is passed as it is, and another value as its string form, such as `"30"` for `timeoutSeconds = 30` or `"true"` for a boolean, so use strings for anything other than numbers and booleans.
-- An argument whose name ends with `Path`, such as `projectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file is passed as the absolute path of that file, so that the plugin does not depend on the working directory. Any other value, such as a URL or a file that the plugin creates, is passed unchanged.
+- An argument whose name ends with `Path`, such as `projectPropertiesPath`, that names an existing file relative to the folder of the `Scan.toml` file, or to the package root when `Scan.toml` is a remote file given by a URL in `configPath`, is passed as the absolute path of that file, so that the plugin does not depend on the working directory. Any other value, such as a URL or a file that the plugin creates, is passed unchanged.
 
 # Steps to create a Static Code Analysis Platform Plugin
 
@@ -144,39 +144,16 @@ There are four steps to create and use a Static Code Analysis Platform Plugin:
 
 ## Step 1: Add the static code analysis tool dependencies to the project
 
-Each release of the scan tool publishes the `io.ballerina.scan:scan-command` artifact to the GitHub Packages Maven registry of this repository. GitHub Packages requires authentication even for public packages, so use a GitHub user and a personal access token with the `read:packages` scope:
+Add the GitHub Packages registry and choose the versions as described in [Adding the scan tool dependency](README.md#adding-the-scan-tool-dependency), and add the following dependencies:
 
 ```groovy
-repositories {
-    mavenCentral()
-    maven {
-        url = 'https://maven.pkg.github.com/ballerina-platform/static-code-analysis-tool'
-        credentials {
-            username = System.getenv("packageUser")
-            password = System.getenv("packagePAT")
-        }
-    }
-}
-
 dependencies {
-    compileOnly group: 'io.ballerina.scan', name: 'scan-command', version: '0.11.1'
-    compileOnly group: 'org.ballerinalang', name: 'ballerina-tools-api', version: '2201.12.0'
+    compileOnly group: 'io.ballerina.scan', name: 'scan-command', version: '<scan-tool-version>'
+    compileOnly group: 'org.ballerinalang', name: 'ballerina-tools-api', version: '<ballerina-version>'
 }
 ```
 
-Use the version of the scan tool the plugin is built for, from the [releases](https://github.com/ballerina-platform/static-code-analysis-tool/releases), and the Ballerina version that scan tool release is built against, which the [changelog](../../changelog.md) states for each release. The scan tool runs on Java 21, so compile the plugin for Java 21 or earlier.
-
-The dependencies are `compileOnly` because the scan tool loads the plugin JAR with a class loader whose parent provides the scan tool and Ballerina classes at run time. Only the plugin JAR is added to that class loader, so any other library the plugin needs and the Ballerina distribution does not provide must be bundled into the plugin JAR.
-
-To build against unreleased changes of the scan tool, publish it to the local Maven repository and add `mavenLocal()` to the repositories of the plugin:
-
-```bash
-git clone https://github.com/ballerina-platform/static-code-analysis-tool.git
-cd static-code-analysis-tool
-./gradlew :scan-command:publishToMavenLocal
-```
-
-The published version is the `version` in the `gradle.properties` file of the repository, such as `0.11.2-SNAPSHOT`.
+The scan tool loads the plugin JAR with a class loader whose parent provides the scan tool and Ballerina classes. Only the plugin JAR is added to that class loader, so any other library the plugin needs and the Ballerina distribution does not provide must be bundled into the plugin JAR.
 
 ## Step 2: Defining the service provider interface file
 
@@ -237,7 +214,7 @@ public class PlatformPlugin implements StaticCodeAnalysisPlatformPlugin {
 }
 ```
 
-Throw an exception from `init` or `onScan` when the issues cannot be reported, such as when a required argument is missing or the upload fails, so that the scan reports the failure and exits with code `1`.
+Throw a `RuntimeException`, such as an `IllegalStateException` or an `UncheckedIOException`, from `init` or `onScan` when the issues cannot be reported, such as when a required argument is missing or the upload fails, so that the scan reports the failure and exits with code `1`.
 
 ## Step 4: Report to the platform
 
