@@ -432,8 +432,11 @@ public class ScanCmd implements BLauncherCmd {
         }
         if (failOnCount != null) {
             gateCount = ScanUtils.parseGateCount(failOnCount).orElseThrow(() -> ScanFailure.usage(
-                    DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, failOnCount, FAIL_ON_COUNT_OPTION,
-                            ScanUtils.GATE_COUNT_VALUES)));
+                    isPositiveWholeNumber(failOnCount)
+                            ? DiagnosticLog.error(DiagnosticCode.NUMBER_TOO_LARGE, failOnCount, FAIL_ON_COUNT_OPTION,
+                            Integer.MAX_VALUE)
+                            : DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, failOnCount,
+                            FAIL_ON_COUNT_OPTION, ScanUtils.GATE_COUNT_VALUES)));
         }
     }
 
@@ -1145,6 +1148,11 @@ public class ScanCmd implements BLauncherCmd {
         if (missing) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.MISSING_OPTION_VALUE, option, expected));
         }
+    }
+
+    // A positive whole number that parseGateCount rejects does not fit in an int
+    private static boolean isPositiveWholeNumber(String value) {
+        return value.trim().matches("\\+?0*[1-9]\\d*");
     }
 
     private List<String> originalArgs() {
