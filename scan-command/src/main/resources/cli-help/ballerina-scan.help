@@ -16,6 +16,8 @@ DESCRIPTION
 OPTIONS
         --target-dir=<path>
                 Target directory path for saving analysis reports (only for Ballerina projects).
+                Default is the target directory of the package. A relative path is resolved
+                against the package root.
 
         --scan-report
                 Generate an HTML report containing the analysis results (only for Ballerina projects).
@@ -97,16 +99,16 @@ EXAMPLES
                 $ bal scan --list-rules
 
         Run analysis for a specific rule.
-                $ bal scan --include-rules="ballerina:101"
+                $ bal scan --include-rules="ballerina:1"
 
         Run analysis for a specific set of rules.
-                $ bal scan --include-rules="ballerina:101, ballerina/io:101"
+                $ bal scan --include-rules="ballerina:1, ballerina/io:2"
 
         Exclude analysis for a specific rule.
-                $ bal scan --exclude-rules="ballerina:101"
+                $ bal scan --exclude-rules="ballerina:1"
 
         Exclude analysis for a specific set of rules.
-                $ bal scan --exclude-rules="ballerina:101, ballerina/io:101"
+                $ bal scan --exclude-rules="ballerina:1, ballerina/io:2"
 
         Run analysis and report to sonarqube
                 $ bal scan --platforms=sonarqube

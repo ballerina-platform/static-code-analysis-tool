@@ -316,10 +316,8 @@ public class ConsoleLayoutTest extends BaseTest {
         String output = scan(testResourcesRoot, singleFile.toAbsolutePath().toString(), "--target-dir=out",
                 "--scan-report");
         Assert.assertEquals(skeleton(output), """
-                bal scan: warning: generating reports is not supported with single bal files, ignoring the flag and \
-                continuing the scans
-                bal scan: warning: generating scan reports is not supported with single bal files, ignoring the flag \
-                and continuing the scans
+                bal scan: warning: reports are not saved for a single bal file, ignoring --target-dir
+                bal scan: warning: the HTML report is not generated for a single bal file, ignoring --scan-report
 
                 Running Scans
 
