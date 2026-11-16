@@ -991,7 +991,8 @@ public class ScanCmd implements BLauncherCmd {
         List<String> withoutPath = quoted(missing.get(true));
         List<String> undeclared = quoted(missing.get(false));
         if (!scanningWorkspace) {
-            failOnMissingPlatforms(undeclared, withoutPath);
+            failOnMissingPlatforms(undeclared, withoutPath,
+                    scanTomlFile.getDisplayPath(project.sourceRoot()).orElse(Constants.SCAN_FILE));
         } else {
             // As with a platform the package does not declare, the package is skipped and the others still report
             WorkspaceProject workspaceProject = project.workspaceProject().orElseThrow();
@@ -1047,22 +1048,23 @@ public class ScanCmd implements BLauncherCmd {
         Map<Boolean, List<String>> missing = platforms.stream().distinct()
                 .filter(name -> !declaredPlatforms.contains(name))
                 .collect(Collectors.partitioningBy(pathlessWorkspacePlatforms::contains));
-        failOnMissingPlatforms(quoted(missing.get(false)), quoted(missing.get(true)));
+        failOnMissingPlatforms(quoted(missing.get(false)), quoted(missing.get(true)), Constants.SCAN_FILE);
     }
 
     /**
      * Fails the scan with every named platform that is not declared and every one declared without a path, in one
      * failure, so that all of them are reported in the same run.
      */
-    private static void failOnMissingPlatforms(List<String> undeclared, List<String> withoutPath) {
+    private static void failOnMissingPlatforms(List<String> undeclared, List<String> withoutPath,
+                                               String scanTomlLabel) {
         List<String> messages = new ArrayList<>();
         if (!undeclared.isEmpty()) {
             messages.add(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, undeclared.size(),
-                    joinWith(undeclared, "and")));
+                    joinWith(undeclared, "and"), scanTomlLabel));
         }
         if (!withoutPath.isEmpty()) {
             messages.add(DiagnosticLog.error(DiagnosticCode.PLATFORM_PATH_MISSING, withoutPath.size(),
-                    joinWith(withoutPath, "and")));
+                    joinWith(withoutPath, "and"), scanTomlLabel));
         }
         if (!messages.isEmpty()) {
             throw ScanFailure.runtime(messages.get(0),

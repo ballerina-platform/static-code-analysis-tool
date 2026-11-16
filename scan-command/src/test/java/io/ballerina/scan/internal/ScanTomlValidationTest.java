@@ -314,6 +314,38 @@ public class ScanTomlValidationTest extends BaseTest {
                 + run.output());
     }
 
+    @Test(description = "test a missing platform is reported against the configuration file set by configPath")
+    void testMissingPlatformInCustomConfigPath() throws IOException {
+        Path ballerinaToml = project.resolve("Ballerina.toml");
+        String originalBallerinaToml = Files.readString(ballerinaToml);
+        Path configDir = project.resolve("config");
+        Path customScanToml = configDir.resolve("scan-settings.toml");
+        try {
+            Files.writeString(ballerinaToml, originalBallerinaToml + """
+
+                    [scan]
+                    configPath = "config/scan-settings.toml"
+                    """);
+            Files.createDirectories(configDir);
+            Files.writeString(customScanToml, """
+                    [[platform]]
+                    name = "examplePlatform"
+                    """);
+            ScanRun run = scan(project, "--platforms=examplePlatform,otherPlatform");
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.output().endsWith("""
+                    bal scan: error: platform 'otherPlatform' is not available; add its plugin to the [[platform]] \
+                    table of config/scan-settings.toml
+                    bal scan: error: platform 'examplePlatform' has no 'path' in the [[platform]] table of \
+                    config/scan-settings.toml; set it to the plugin JAR
+                    """), run.output());
+        } finally {
+            Files.writeString(ballerinaToml, originalBallerinaToml);
+            Files.deleteIfExists(customScanToml);
+            Files.deleteIfExists(configDir);
+        }
+    }
+
     private ScanRun scan(Path target, String... args) throws IOException {
         System.setProperty("user.dir", target.toString());
         try {
