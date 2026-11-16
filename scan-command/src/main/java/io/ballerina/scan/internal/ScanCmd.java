@@ -975,7 +975,7 @@ public class ScanCmd implements BLauncherCmd {
 
     /**
      * Finds the plugins of the platforms named in {@code --platforms} that the package's Scan.toml declares. A
-     * platform is never reported to unless it is named on the command line.
+     * platform is never reported to unless it is named on the command line, or the scan is triggered by a platform.
      */
     private List<SelectedPlatform> selectPlatforms(Project project, ScanTomlFile scanTomlFile) {
         Map<String, ScanTomlFile.Platform> declared = new LinkedHashMap<>();
