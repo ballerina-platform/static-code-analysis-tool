@@ -41,7 +41,7 @@ sequenceDiagram
 
 A Static Code Analysis Platform Plugin is an implementation of the `StaticCodeAnalysisPlatformPlugin` interface that allows the static code analysis tool to pass analysis results to a specific static code analysis platform, such as SonarQube.
 
-To report analysis issues to a platform, the user declares the platform and the path to its plugin JAR in the `[[platform]]` table of the `Scan.toml` file of the package:
+To report analysis issues to a platform, the user declares the platform and the path to its plugin JAR in the `[[platform]]` table of the `Scan.toml` file. The scan tool reads the `Scan.toml` file in the directory `bal scan` runs from, so run it from the package root, or the file that `configPath` in the `[scan]` table of `Ballerina.toml` points to; see [Scan File Configurations](ScanFileConfigurations.md#overview):
 
 ```toml
 [[platform]]
@@ -218,7 +218,7 @@ Throw a `RuntimeException`, such as an `IllegalStateException` or an `UncheckedI
 
 ## Step 4: Report to the platform
 
-- Declare the platform and the path to the plugin JAR in the `Scan.toml` file of the package. A relative path is resolved against the folder of the `Scan.toml` file, and a URL is downloaded into the target directory and reused by later scans.
+- Declare the platform and the path to the plugin JAR in the `Scan.toml` file that `bal scan` reads: the one in the directory it runs from (the package root), or the one `configPath` in the `[scan]` table of `Ballerina.toml` points to. A relative path is resolved against the folder of the `Scan.toml` file, or against the package root when `Scan.toml` is a remote file given by a URL in `configPath`. A URL is downloaded into the target directory as `<platform name>.jar` and reused by later scans, even after the URL changes, until the target directory is cleaned.
 
 ```toml
 [[platform]]
