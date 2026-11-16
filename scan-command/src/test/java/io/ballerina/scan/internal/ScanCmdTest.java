@@ -124,7 +124,9 @@ public class ScanCmdTest extends BaseTest {
         StringBuilder help = new StringBuilder();
         new ScanCmd(printStream).printLongDesc(help);
         List<String> lines = help.toString().lines().toList();
-        String synopsis = lines.get(lines.indexOf("SYNOPSIS") + 1).trim();
+        int synopsisIndex = lines.indexOf("SYNOPSIS");
+        Assert.assertTrue(synopsisIndex >= 0, "SYNOPSIS heading not found in the help");
+        String synopsis = lines.get(synopsisIndex + 1).trim();
         Assert.assertEquals("Usage: " + synopsis, ScanFailure.USAGE_HINT.get(0));
     }
 
