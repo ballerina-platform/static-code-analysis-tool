@@ -180,7 +180,7 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
     }
 
     @Test(description = "test unused parameters of object constructor methods, including constructors that "
-            + "initialize fields, default values and let variables")
+            + "initialize fields, default values and let variables or are cast")
     void testObjectConstructorParameters() {
         String documentName = "rule002_object_constructor_parameters.bal";
         Document document = loadDocument(documentName);
@@ -189,7 +189,7 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
                 scannerContext, document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 13);
+        Assert.assertEquals(issues.size(), 14);
 
         assertIssue(issues.get(0), documentName, 28, 15, 28, 20, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
@@ -216,6 +216,8 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(11), documentName, 109, 23, 109, 28, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
         assertIssue(issues.get(12), documentName, 139, 24, 139, 29, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(13), documentName, 154, 19, 154, 24, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
 
