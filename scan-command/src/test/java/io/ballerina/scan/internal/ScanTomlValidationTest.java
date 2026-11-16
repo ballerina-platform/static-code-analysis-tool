@@ -269,7 +269,9 @@ public class ScanTomlValidationTest extends BaseTest {
         Files.writeString(workspaceScanToml, """
                 platform = []
                 """);
-        ScanRun run = scan(workspace);
+        // The packages of the workspace set gates that its findings fail
+        ScanRun run = scan(workspace, "--fail-on-severity=NONE");
+        Assert.assertEquals(run.exitCode(), 0, run.output());
         Assert.assertFalse(run.output().contains("Scan.toml has"), run.output());
 
         Files.writeString(workspaceScanToml, """
