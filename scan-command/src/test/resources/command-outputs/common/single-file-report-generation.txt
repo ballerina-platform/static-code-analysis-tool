@@ -1,4 +1,4 @@
-bal scan: warning: generating reports is not supported with single bal files, ignoring the flag and continuing the scans
+bal scan: warning: reports are not saved for a single bal file, ignoring --target-dir
 
 Running Scans
 

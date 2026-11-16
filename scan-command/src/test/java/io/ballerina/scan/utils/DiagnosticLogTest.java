@@ -32,7 +32,8 @@ import java.io.IOException;
 public class DiagnosticLogTest extends BaseTest {
     @Test(description = "Test error diagnostic message")
     public void testErrorDiagnostic() throws IOException {
-        String expected = "too many arguments: expected one package or source file, but received 2: main.bal extra";
+        String expected = "too many arguments: expected one workspace, package or source file, but received 2: "
+                + "main.bal extra";
         String result = DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, 2, "main.bal extra");
         Assert.assertEquals(result, expected);
     }
@@ -48,8 +49,7 @@ public class DiagnosticLogTest extends BaseTest {
 
     @Test(description = "Test warning diagnostic message")
     public void testWarningDiagnostic() {
-        String expected = "generating reports is not supported with single bal files, " +
-                "ignoring the flag and continuing the scans";
+        String expected = "reports are not saved for a single bal file, ignoring --target-dir";
         String result = DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED);
         Assert.assertEquals(result, expected);
     }

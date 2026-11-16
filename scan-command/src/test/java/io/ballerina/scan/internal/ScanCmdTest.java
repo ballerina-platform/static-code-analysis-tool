@@ -119,6 +119,17 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
+    @Test(description = "test the usage line printed after a usage error matches the SYNOPSIS of the help")
+    void testUsageHintMatchesHelpSynopsis() {
+        StringBuilder help = new StringBuilder();
+        new ScanCmd(printStream).printLongDesc(help);
+        List<String> lines = help.toString().lines().toList();
+        int synopsisIndex = lines.indexOf("SYNOPSIS");
+        Assert.assertTrue(synopsisIndex >= 0, "SYNOPSIS heading not found in the help");
+        String synopsis = lines.get(synopsisIndex + 1).trim();
+        Assert.assertEquals("Usage: " + synopsis, ScanFailure.USAGE_HINT.get(0));
+    }
+
     @Test(description = "test scan command with Ballerina project")
     void testScanCommandProject() throws IOException {
         System.setProperty("user.dir", validBalProject.toString());
@@ -218,10 +229,9 @@ public class ScanCmdTest extends BaseTest {
         scanCmd.execute();
         System.setProperty("user.dir", userDir);
         String expected = String.join(LINUX_LINE_SEPARATOR,
-                "bal scan: error: too many arguments: expected one package or source file, but received 2: "
+                "bal scan: error: too many arguments: expected one workspace, package or source file, but received 2: "
                         + "main.bal argument2",
-                "Usage: bal scan [OPTIONS] [<package>|<source-file>]",
-                "Try 'bal scan --help' for more information.");
+                UsageHintTestUtils.usageHint());
         Assert.assertEquals(readOutput(true).trim().replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR),
                 expected);
         Assert.assertEquals(scanCmd.exitCode(), 2);
@@ -997,8 +1007,7 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", userDir);
         Assert.assertEquals(readOutput(true).trim(), """
                 bal scan: error: invalid value 'xml' for --format; expected json or sarif
-                Usage: bal scan [OPTIONS] [<package>|<source-file>]
-                Try 'bal scan --help' for more information.""");
+                """ + UsageHintTestUtils.usageHint());
         Assert.assertEquals(scanCmd.exitCode(), 2);
     }
 
