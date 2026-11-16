@@ -498,9 +498,12 @@ class StaticCodeAnalyzer extends NodeVisitor {
             case VariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
             case ModuleVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
             case LetVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
-            case ObjectFieldNode field -> symbolType(field);
-            case RecordFieldWithDefaultValueNode field -> symbolType(field);
-            case DefaultableParameterNode parameter -> symbolType(parameter);
+            case ObjectFieldNode field -> symbolType(field).map(List::of)
+                    .orElseGet(() -> expectedTypes(expression));
+            case RecordFieldWithDefaultValueNode field -> symbolType(field).map(List::of)
+                    .orElseGet(() -> expectedTypes(expression));
+            case DefaultableParameterNode parameter -> symbolType(parameter).map(List::of)
+                    .orElseGet(() -> expectedTypes(expression));
             // A cast with only annotations, as in <@a> value, leaves the expected type to its context
             case TypeCastExpressionNode cast -> cast.typeCastParam().type().isPresent()
                     ? semanticModel.typeOf(cast).stream().toList()
@@ -530,8 +533,8 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 .stream().toList();
     }
 
-    private List<TypeSymbol> symbolType(Node declaration) {
-        return semanticModel.symbol(declaration).flatMap(StaticCodeAnalyzer::typeDescriptor).stream().toList();
+    private Optional<TypeSymbol> symbolType(Node declaration) {
+        return semanticModel.symbol(declaration).flatMap(StaticCodeAnalyzer::typeDescriptor);
     }
 
     private static Optional<TypeSymbol> typeDescriptor(Symbol symbol) {
