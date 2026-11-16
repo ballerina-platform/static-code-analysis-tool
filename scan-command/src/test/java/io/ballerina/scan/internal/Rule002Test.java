@@ -234,7 +234,7 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
                 scannerContext, document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 4);
+        Assert.assertEquals(issues.size(), 5);
 
         assertIssue(issues.get(0), documentName, 42, 37, 42, 42, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
@@ -243,6 +243,8 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(2), documentName, 49, 38, 49, 43, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
         assertIssue(issues.get(3), documentName, 59, 38, 59, 43, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(4), documentName, 74, 34, 74, 39, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
 }

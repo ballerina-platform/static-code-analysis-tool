@@ -69,3 +69,8 @@ function annotatedForEachSource() returns int {
     }
     return total;
 }
+
+// A field of an undefined type has no symbol, and the context gives no expected function type either
+class UndefinedTypeHolder {
+    Undefined f = function(int a, int b) returns int => a; // warning
+}
