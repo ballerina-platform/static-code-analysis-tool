@@ -74,3 +74,9 @@ function annotatedForEachSource() returns int {
 class UndefinedTypeHolder {
     Undefined f = function(int a, int b) returns int => a; // warning
 }
+
+function withLetDestructuring() returns int => let [F, int] [f, n] = [function(int a, int b) returns int => a, 1]
+        in f(n, 2);
+
+function withUntypedLetDestructuring() returns int => let [any, int] [g, n] =
+        [function(int a, int b) returns int => a, 1] in n; // warning
