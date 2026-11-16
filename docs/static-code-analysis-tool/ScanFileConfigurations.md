@@ -88,14 +88,14 @@ Define the rules to include in the analysis:
 
 ```toml
 [rule]
-include = ["ballerina:1", "ballerina/io:2"]
+include = ["ballerina:1", "ballerina/io:1"]
 ```
 
 Define the rules to exclude in the analysis:
 
 ```toml
 [rule]
-exclude = ["ballerina:1", "ballerina/io:2"]
+exclude = ["ballerina:1", "ballerina/io:1"]
 ```
 
 Rules can be either included or excluded, not both: a `[rule]` table that sets both stops the scan with an error that gives its location, and so does using `--include-rules` together with `--exclude-rules`. A value that is not an array of rule IDs, or an unknown key in the `[rule]` table, also stops the scan with an error that gives its location.
