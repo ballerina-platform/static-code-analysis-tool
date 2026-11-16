@@ -198,10 +198,14 @@ public final class ScanUtils {
      *
      * @param values      the items to join
      * @param conjunction the word before the last item
-     * @return the joined items
+     * @return the joined items, or an empty string when there are none
+     * @since 0.11.2
      */
     public static String joinWith(Collection<String> values, String conjunction) {
         List<String> items = List.copyOf(values);
+        if (items.isEmpty()) {
+            return "";
+        }
         if (items.size() == 1) {
             return items.get(0);
         }
