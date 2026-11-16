@@ -127,3 +127,22 @@ function assigned() returns int {
     };
     return op.m(1);
 }
+
+function usedInNestedObject() returns int {
+    var outer = object {
+        function m(int p) returns int {
+            var inner = object {
+                function n() returns int => p;
+            };
+            return inner.n();
+        }
+
+        function unused(int p) returns int { // warning
+            var inner = object {
+                function n(int q) returns int => q;
+            };
+            return inner.n(1);
+        }
+    };
+    return outer.m(1) + outer.unused(1);
+}

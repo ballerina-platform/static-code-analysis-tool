@@ -101,7 +101,7 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
                 scannerContext, document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 6);
+        Assert.assertEquals(issues.size(), 7);
 
         assertIssue(issues.get(0), documentName, 19, 27, 19, 32, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
@@ -114,6 +114,8 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(4), documentName, 56, 21, 56, 26, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
         assertIssue(issues.get(5), documentName, 63, 19, 63, 24, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(6), documentName, 78, 24, 78, 29, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
 
@@ -187,7 +189,7 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
                 scannerContext, document.module().getCompilation().getSemanticModel());
         staticCodeAnalyzer.analyze();
         List<Issue> issues = scannerContext.getReporter().getIssues();
-        Assert.assertEquals(issues.size(), 12);
+        Assert.assertEquals(issues.size(), 13);
 
         assertIssue(issues.get(0), documentName, 28, 15, 28, 20, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
@@ -212,6 +214,8 @@ public class Rule002Test extends StaticCodeAnalyzerTest {
         assertIssue(issues.get(10), documentName, 100, 23, 100, 28, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
         assertIssue(issues.get(11), documentName, 109, 23, 109, 28, "ballerina:2", 2,
+                UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
+        assertIssue(issues.get(12), documentName, 139, 24, 139, 29, "ballerina:2", 2,
                 UNUSED_FUNCTION_PARAMETER, RuleKind.CODE_SMELL);
     }
 
