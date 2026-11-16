@@ -218,7 +218,7 @@ Throw a `RuntimeException`, such as an `IllegalStateException` or an `UncheckedI
 
 ## Step 4: Report to the platform
 
-- Declare the platform and the path to the plugin JAR in the `Scan.toml` file of the package. A relative path is resolved against the folder of the `Scan.toml` file, and a URL is downloaded into the target directory and reused by later scans.
+- Declare the platform and the path to the plugin JAR in the `Scan.toml` file of the package. A relative path is resolved against the folder of the `Scan.toml` file, or against the root of the package or workspace when `Scan.toml` is a remote file given by a URL in `configPath`, and a URL is downloaded into the target directory and reused by later scans.
 
 ```toml
 [[platform]]
