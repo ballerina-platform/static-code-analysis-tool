@@ -230,7 +230,7 @@ The dependencies are `compileOnly`, because the scan tool and the Ballerina dist
 To build against unreleased changes of the scan tool, publish it to the local Maven repository, add `mavenLocal()` to the repositories of the plugin, and use the `version` in the `gradle.properties` file of the repository as `<scan-tool-version>`:
 
 ```bash
-git clone https://github.com/ballerina-platform/static-code-analysis-tool.git
+git clone -b support/dist-2201.12/0.11.x https://github.com/ballerina-platform/static-code-analysis-tool.git
 cd static-code-analysis-tool
 ./gradlew :scan-command:publishToMavenLocal
 ```
