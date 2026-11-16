@@ -146,3 +146,13 @@ function usedInNestedObject() returns int {
     };
     return outer.m(1) + outer.unused(1);
 }
+
+function castObjects() {
+    any castToType = <Op>object {
+        function m(int p) returns int => 1;
+    };
+    any castToEmptyType = <object {}>object {
+        function m(int p) returns int => 1; // warning
+    };
+    _ = [castToType, castToEmptyType];
+}
