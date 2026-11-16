@@ -24,11 +24,6 @@ class Holder {
     };
 }
 
-Op viaModule = object {
-    function m(int p) returns int => 1;
-};
-
 public function main() {
     _ = new Holder();
-    _ = viaModule;
 }
