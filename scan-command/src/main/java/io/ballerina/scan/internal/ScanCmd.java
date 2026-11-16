@@ -74,6 +74,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG;
@@ -81,6 +82,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 import static io.ballerina.scan.utils.ScanUtils.convertIssuesToJsonString;
 import static io.ballerina.scan.utils.ScanUtils.convertIssuesToSarifString;
+import static io.ballerina.scan.utils.ScanUtils.joinWith;
 
 /**
  * Represents the "bal scan" command.
@@ -602,12 +604,10 @@ public class ScanCmd implements BLauncherCmd {
         if (requested.isEmpty()) {
             return List.of();
         }
-        List<String> undeclared = requested.stream().filter(name -> !declared.containsKey(name))
-                .map(name -> "'" + name + "'").toList();
-        if (!undeclared.isEmpty()) {
-            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE,
-                    undeclared.size(), joinWithAnd(undeclared)));
-        }
+        Map<Boolean, List<String>> missing = requested.stream().filter(name -> !declared.containsKey(name))
+                .collect(Collectors.partitioningBy(scanTomlFile.getPlatformsWithoutPath()::contains));
+        String scanTomlLabel = scanTomlFile.getDisplayPath(project.sourceRoot()).orElse(Constants.SCAN_FILE);
+        failOnMissingPlatforms(quoted(missing.get(false)), quoted(missing.get(true)), scanTomlLabel);
         List<ScanTomlFile.Platform> selected = requested.stream().map(declared::get).toList();
 
         // Each JAR is loaded on its own, so that a broken one is blamed on the platform that names it
@@ -631,6 +631,31 @@ public class ScanCmd implements BLauncherCmd {
                     new PlatformPluginContextImpl(platformArgs, platformTriggered)));
         }
         return selectedPlatforms;
+    }
+
+    /**
+     * Fails the scan with every named platform that is not declared and every one declared without a path, in one
+     * failure, so that all of them are reported in the same run.
+     */
+    private static void failOnMissingPlatforms(List<String> undeclared, List<String> withoutPath,
+                                               String scanTomlLabel) {
+        List<String> messages = new ArrayList<>();
+        if (!undeclared.isEmpty()) {
+            messages.add(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, undeclared.size(),
+                    joinWith(undeclared, "and"), scanTomlLabel));
+        }
+        if (!withoutPath.isEmpty()) {
+            messages.add(DiagnosticLog.error(DiagnosticCode.PLATFORM_PATH_MISSING, withoutPath.size(),
+                    joinWith(withoutPath, "and"), scanTomlLabel));
+        }
+        if (!messages.isEmpty()) {
+            throw ScanFailure.runtime(messages.get(0),
+                    messages.subList(1, messages.size()).stream().map(ScanFailure::error).toList());
+        }
+    }
+
+    private static List<String> quoted(List<String> names) {
+        return names.stream().map(name -> "'" + name + "'").toList();
     }
 
     /**
@@ -676,14 +701,13 @@ public class ScanCmd implements BLauncherCmd {
      * Fails the scan when a rule named on the command line is not a rule of the scanned package.
      */
     private void failOnUnknownRuleOptions() {
-        List<String> unknownRules = Stream.concat(includeRules.stream(), excludeRules.stream())
+        List<String> unknownRules = quoted(Stream.concat(includeRules.stream(), excludeRules.stream())
                 .filter(ruleId -> !allRuleIds.contains(ruleId))
                 .distinct()
-                .map(ruleId -> "'" + ruleId + "'")
-                .toList();
+                .toList());
         if (!unknownRules.isEmpty()) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.UNKNOWN_RULE_OPTION,
-                    joinWithAnd(unknownRules), unknownRules.size()), LIST_RULES_HINT);
+                    joinWith(unknownRules, "and"), unknownRules.size()), LIST_RULES_HINT);
         }
     }
 
@@ -828,16 +852,6 @@ public class ScanCmd implements BLauncherCmd {
             return "error: " + diagnostic.message();
         }
         return DiagnosticLog.fileError(lineRange.fileName(), lineRange, diagnostic.message());
-    }
-
-    /**
-     * Joins items as a list in prose, such as "a, b and c".
-     */
-    private static String joinWithAnd(List<String> items) {
-        if (items.size() == 1) {
-            return items.get(0);
-        }
-        return String.join(", ", items.subList(0, items.size() - 1)) + " and " + items.get(items.size() - 1);
     }
 
     private void printSuppressionWarnings(List<SuppressionDiagnostic> diagnostics) {

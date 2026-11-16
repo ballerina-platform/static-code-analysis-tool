@@ -48,6 +48,7 @@ public class ScanTomlFile {
     private final Set<Analyzer> analyzers = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToInclude = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToExclude = new LinkedHashSet<>();
+    private final Set<String> platformsWithoutPath = new LinkedHashSet<>();
     // Each setting the file writes, keyed by its name, with its value as written in TOML
     private final Map<String, String> writtenSettings = new LinkedHashMap<>();
     private boolean suppressionEnabled = true;
@@ -194,6 +195,20 @@ public class ScanTomlFile {
         String id = analyzer.org() + "/" + analyzer.name()
                 + (analyzer.version() == null ? "" : ":" + analyzer.version());
         writtenSettings.put(ANALYZER_SETTING + id, "");
+    }
+
+    void addPlatformWithoutPath(String name) {
+        platformsWithoutPath.add(name);
+    }
+
+    /**
+     * Returns the names of the [[platform]] entries that have no {@code path}, which are not loaded as platforms.
+     *
+     * @return an unmodifiable set of platform names
+     * @since 0.11.2
+     */
+    public Set<String> getPlatformsWithoutPath() {
+        return Collections.unmodifiableSet(platformsWithoutPath);
     }
 
     void setRuleToInclude(RuleToFilter rule) {
