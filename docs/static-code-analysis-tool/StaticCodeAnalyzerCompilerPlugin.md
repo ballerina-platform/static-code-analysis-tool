@@ -128,7 +128,6 @@ package io.ballerina.scan;
 
 public interface ScannerContext {
    Reporter getReporter();
-   Map<String, Object> userData();
    default boolean isExcludeTests() { return false; }
 }
 ```
