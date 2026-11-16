@@ -202,7 +202,7 @@ public interface StaticCodeAnalysisPlatformPlugin {
 }
 ```
 
-For each platform named in `--platforms`, the scan tool uses the `platform` method to find the plugin in the JAR declared for that platform in `Scan.toml`. After completing the scans and saving the results, the tool initializes the plugin by calling its `init` method with a platform plugin context, which holds the platform-specific arguments that the user sets in the `[[platform]]` entry of `Scan.toml`. It then invokes the plugin's `onScan` method to notify identified issues. The plugin can then report issues to the relevant platform in the expected format.
+For each platform named in `--platforms`, the scan tool uses the `platform` method to find the plugin in the JAR declared for that platform in `Scan.toml`. After completing the scans and saving the results, the tool initializes the plugin by calling its `init` method with a platform plugin context, which holds the platform-specific arguments that the user sets in the `[[platform]]` entry of `Scan.toml`. It then invokes the plugin's `onScan` method to notify identified issues. The plugin can then report issues to the relevant platform in the expected format. A scan that a platform runs with `--platform-triggered`, such as the SonarQube Ballerina plugin does, reports to every declared platform unless `--platforms` names some, and does not print the results or save the report of each package.
 
 For more information on reporting analysis results to static analysis platforms, refer to creating a [Static Code Analysis Platform Plugin.](StaticCodeAnalysisPlatformPlugin.md)
 
