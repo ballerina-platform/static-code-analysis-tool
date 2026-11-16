@@ -498,9 +498,9 @@ class StaticCodeAnalyzer extends NodeVisitor {
             case VariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
             case ModuleVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
             case LetVariableDeclarationNode variable -> declaredType(variable.typedBindingPattern());
-            case ObjectFieldNode field -> declarationType(field);
-            case RecordFieldWithDefaultValueNode field -> declarationType(field);
-            case DefaultableParameterNode parameter -> declarationType(parameter);
+            case ObjectFieldNode field -> symbolType(field);
+            case RecordFieldWithDefaultValueNode field -> symbolType(field);
+            case DefaultableParameterNode parameter -> symbolType(parameter);
             // A cast with only annotations, as in <@a> value, leaves the expected type to its context
             case TypeCastExpressionNode cast -> cast.typeCastParam().type().isPresent()
                     ? semanticModel.typeOf(cast).stream().toList()
@@ -530,7 +530,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
                 .stream().toList();
     }
 
-    private List<TypeSymbol> declarationType(Node declaration) {
+    private List<TypeSymbol> symbolType(Node declaration) {
         return semanticModel.symbol(declaration).flatMap(StaticCodeAnalyzer::typeDescriptor).stream().toList();
     }
 
