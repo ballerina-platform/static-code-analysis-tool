@@ -181,7 +181,7 @@ public final class ScanUtils {
     // The top-level tables of a Scan.toml file, each written as it is expected
     private static final Map<String, String> TOP_LEVEL_TABLES = tableForms(List.of(ANALYZER_TABLE, PLATFORM_TABLE),
             List.of(RULES_TABLE, SUPPRESSION_TABLE, GATE_TABLE, ANALYSIS_TABLE));
-    private static final String TABLE_VALUES = joinWithOr(TOP_LEVEL_TABLES.values());
+    private static final String TABLE_VALUES = joinWith(TOP_LEVEL_TABLES.values(), "or");
 
     private ScanUtils() {
     }
@@ -193,9 +193,20 @@ public final class ScanUtils {
         return Collections.unmodifiableMap(forms);
     }
 
-    private static String joinWithOr(Collection<String> values) {
+    /**
+     * Joins items as a list in prose, such as "a, b and c" with the conjunction "and".
+     *
+     * @param values      the items to join
+     * @param conjunction the word before the last item
+     * @return the joined items
+     */
+    public static String joinWith(Collection<String> values, String conjunction) {
         List<String> items = List.copyOf(values);
-        return String.join(", ", items.subList(0, items.size() - 1)) + " or " + items.get(items.size() - 1);
+        if (items.size() == 1) {
+            return items.get(0);
+        }
+        return String.join(", ", items.subList(0, items.size() - 1)) + " " + conjunction + " "
+                + items.get(items.size() - 1);
     }
 
     /**
