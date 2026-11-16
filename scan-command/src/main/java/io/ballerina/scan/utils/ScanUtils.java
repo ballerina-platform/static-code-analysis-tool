@@ -46,6 +46,7 @@ import io.ballerina.toml.semantic.ast.TomlKeyValueNode;
 import io.ballerina.toml.semantic.ast.TomlTableArrayNode;
 import io.ballerina.toml.semantic.ast.TomlValueNode;
 import io.ballerina.toml.semantic.ast.TopLevelNode;
+import io.ballerina.toml.syntax.tree.KeyValueNode;
 import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextRange;
@@ -1342,12 +1343,8 @@ public final class ScanUtils {
                                      List<String> errors) {
         // A name or path of another type would otherwise read as missing
         int errorCount = errors.size();
-        platformTable.get(PLATFORM_NAME).filter(value -> value.kind() != TomlType.STRING)
-                .ifPresent(value -> errors.add(invalidConfigValue(displayPath, value, PLATFORM_NAME,
-                        "a platform name, such as \"sonarqube\"")));
-        platformTable.get(PLATFORM_PATH).filter(value -> value.kind() != TomlType.STRING)
-                .ifPresent(value -> errors.add(invalidConfigValue(displayPath, value, PLATFORM_PATH,
-                        "the path or URL of the plugin JAR")));
+        checkStringEntry(platformTable, PLATFORM_NAME, "a platform name, such as \"sonarqube\"", displayPath, errors);
+        checkStringEntry(platformTable, PLATFORM_PATH, "the path or URL of the plugin JAR", displayPath, errors);
         if (errors.size() > errorCount) {
             return;
         }
@@ -1385,6 +1382,27 @@ public final class ScanUtils {
 
         ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name.get(), jarPath, properties);
         scanTomlFile.setPlatform(platform);
+    }
+
+    /**
+     * Adds an error when a table has the key with a value other than a string. {@link Toml#get} finds only values, so
+     * the entries are read directly to also catch a table, such as {@code path = { jar = "plugin.jar" }}.
+     */
+    private static void checkStringEntry(Toml table, String key, String expected, String displayPath,
+                                         List<String> errors) {
+        TopLevelNode node = table.rootNode().entries().get(key);
+        if (node instanceof TomlKeyValueNode keyValue) {
+            if (keyValue.value().kind() != TomlType.STRING) {
+                errors.add(invalidConfigValue(displayPath, keyValue.value(), key, expected));
+            }
+        } else if (node != null) {
+            LineRange position = node.externalTreeNode() instanceof KeyValueNode keyValue
+                    ? keyValue.value().location().lineRange()
+                    : node.location().lineRange();
+            errors.add(DiagnosticLog.fileError(displayPath, position,
+                    DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_VALUE, String.valueOf(node.toNativeObject()),
+                            key, expected)));
+        }
     }
 
     /**

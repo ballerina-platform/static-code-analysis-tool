@@ -96,6 +96,18 @@ public class ScanTomlValidationTest extends BaseTest {
                         """, List.of("Scan.toml:2:8: error: invalid value '10' for 'name'; expected a platform name, "
                         + "such as \"sonarqube\"")},
                 {"""
+                        [[platform]]
+                        name = "examplePlatform"
+                        path = { jar = "plugin.jar" }
+                        """, List.of("Scan.toml:3:8: error: invalid value '{jar=plugin.jar}' for 'path'; expected the "
+                        + "path or URL of the plugin JAR")},
+                {"""
+                        [[platform]]
+                        name = { id = "examplePlatform" }
+                        path = "plugin.jar"
+                        """, List.of("Scan.toml:2:8: error: invalid value '{id=examplePlatform}' for 'name'; expected "
+                        + "a platform name, such as \"sonarqube\"")},
+                {"""
                         platform = "plugin.jar"
                         """, List.of("Scan.toml:1:1: error: 'platform' must be written as [[platform]] tables, or as "
                         + "platform = []")},
