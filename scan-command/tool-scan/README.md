@@ -14,7 +14,7 @@ bal scan [OPTIONS] [<package>|<source-file>]
 
 ## CLI Options
 
-- Specify target path for saving analysis reports. (Only for ballerina build projects) Default is the `target` directory of the package. A relative path is resolved against the package root, and the results are saved in `<path>/report`.
+- Specify target path for saving analysis reports (only for Ballerina projects). Default is the `target` directory of the package. A relative path is resolved against the package root, and the results are saved in `<path>/report`.
 
 ```text
 --target-dir=<path>
