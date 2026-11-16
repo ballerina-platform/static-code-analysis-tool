@@ -40,9 +40,11 @@ public class DiagnosticLogTest extends BaseTest {
 
     @Test(description = "Test error diagnostic message for one and many missing platforms")
     public void testPlatformNotAvailableDiagnostic() {
-        Assert.assertEquals(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, 1, "'sonarqube'"),
+        Assert.assertEquals(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, 1, "'sonarqube'",
+                        "Scan.toml"),
                 "platform 'sonarqube' is not available; add its plugin to the [[platform]] table of Scan.toml");
-        Assert.assertEquals(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, 2, "'sonarqube' and 'semgrep'"),
+        Assert.assertEquals(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, 2, "'sonarqube' and 'semgrep'",
+                        "Scan.toml"),
                 "platforms 'sonarqube' and 'semgrep' are not available; add their plugins to the [[platform]] table "
                         + "of Scan.toml");
     }

@@ -364,6 +364,14 @@ public class ScanUtilsTest extends BaseTest {
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
+    @Test(description = "test items are joined as a list in prose")
+    void testJoinWith() {
+        Assert.assertEquals(ScanUtils.joinWith(List.of(), "and"), "");
+        Assert.assertEquals(ScanUtils.joinWith(List.of("a"), "and"), "a");
+        Assert.assertEquals(ScanUtils.joinWith(List.of("a", "b"), "and"), "a and b");
+        Assert.assertEquals(ScanUtils.joinWith(List.of("a", "b", "c"), "or"), "a, b or c");
+    }
+
     private void assertAnalyzer(ScanTomlFile.Analyzer analyzer, String org, String name, String version,
                                 String repository) {
         Assert.assertEquals(analyzer.org(), org);

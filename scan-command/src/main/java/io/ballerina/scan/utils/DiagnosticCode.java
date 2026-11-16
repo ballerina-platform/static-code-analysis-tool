@@ -77,6 +77,9 @@ public enum DiagnosticCode {
     FAILED_TO_CREATE_TARGET_DIR("STATIC_ANALYSIS_ERROR_051", "failed.to.create.target.dir"),
     PLATFORMS_NOT_SUPPORTED("STATIC_ANALYSIS_ERROR_052", "platforms.not.supported"),
     UNKNOWN_OPTION("STATIC_ANALYSIS_ERROR_053", "unknown.option"),
+    UNKNOWN_CONFIG_ENTRY("STATIC_ANALYSIS_ERROR_054", "unknown.config.entry"),
+    INVALID_PLATFORM_LIST("STATIC_ANALYSIS_ERROR_055", "invalid.platform.list"),
+    PLATFORM_PATH_MISSING("STATIC_ANALYSIS_ERROR_056", "platform.path.missing"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
@@ -91,7 +94,8 @@ public enum DiagnosticCode {
     EXCLUDE_TESTS_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_013", "exclude.tests.not.supported"),
     WORKSPACE_RULE_NOT_AVAILABLE("STATIC_ANALYSIS_WARNING_014", "workspace.rule.not.available"),
     PLATFORM_NOT_DECLARED("STATIC_ANALYSIS_WARNING_015", "platform.not.declared"),
-    SCAN_FILE_OVERRIDDEN("STATIC_ANALYSIS_WARNING_016", "scan.file.overridden");
+    SCAN_FILE_OVERRIDDEN("STATIC_ANALYSIS_WARNING_016", "scan.file.overridden"),
+    PLATFORM_PATH_MISSING_SKIPPED("STATIC_ANALYSIS_WARNING_017", "platform.path.missing.skipped");
 
     private final String diagnosticId;
     private final String messageKey;

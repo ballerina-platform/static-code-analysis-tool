@@ -74,6 +74,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -82,6 +83,7 @@ import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_RULE_PREFIX;
@@ -96,6 +98,7 @@ import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
 import static io.ballerina.scan.internal.ScanToolConstants.WORKSPACE_CONFIGURATIONS_LOG;
 import static io.ballerina.scan.utils.ScanUtils.convertIssuesToJsonString;
 import static io.ballerina.scan.utils.ScanUtils.convertIssuesToSarifString;
+import static io.ballerina.scan.utils.ScanUtils.joinWith;
 
 /**
  * Represents the "bal scan" command.
@@ -216,6 +219,8 @@ public class ScanCmd implements BLauncherCmd {
     private final ConsoleLayout layout = new ConsoleLayout();
     // Warnings are held until the next section, so that the configuration of every package is loaded as one block
     private final List<String> pendingWarnings = new ArrayList<>();
+    // The platforms named in --platforms that a workspace package declares without a path
+    private final Set<String> pathlessWorkspacePlatforms = new LinkedHashSet<>();
 
     public ScanCmd() {
         this(System.out, System.err);
@@ -953,25 +958,24 @@ public class ScanCmd implements BLauncherCmd {
     private void warnUnavailableWorkspaceRules(Project project, ScanTomlFile workspaceFile, List<Rule> packageRules) {
         Set<String> packageRuleIds = new HashSet<>();
         packageRules.forEach(rule -> packageRuleIds.add(rule.id()));
-        List<String> unavailableRules = Stream.concat(workspaceFile.getRulesToInclude().stream(),
+        List<String> unavailableRules = quoted(Stream.concat(workspaceFile.getRulesToInclude().stream(),
                         workspaceFile.getRulesToExclude().stream())
                 .map(ScanTomlFile.RuleToFilter::id)
                 .filter(ruleId -> !packageRuleIds.contains(ruleId))
                 .distinct()
-                .map(ruleId -> "'" + ruleId + "'")
-                .toList();
+                .toList());
         if (unavailableRules.isEmpty()) {
             return;
         }
         WorkspaceProject workspaceProject = project.workspaceProject().orElseThrow();
-        warn(DiagnosticLog.warning(DiagnosticCode.WORKSPACE_RULE_NOT_AVAILABLE, joinWithAnd(unavailableRules),
+        warn(DiagnosticLog.warning(DiagnosticCode.WORKSPACE_RULE_NOT_AVAILABLE, joinWith(unavailableRules, "and"),
                 workspaceFile.getDisplayPath(workspaceProject.sourceRoot()).orElse(Constants.SCAN_FILE),
                 unavailableRules.size(), packageLabel(workspaceProject, project)));
     }
 
     /**
      * Finds the plugins of the platforms named in {@code --platforms} that the package's Scan.toml declares. A
-     * platform is never reported to unless it is named on the command line.
+     * platform is never reported to unless it is named on the command line, or the scan is triggered by a platform.
      */
     private List<SelectedPlatform> selectPlatforms(Project project, ScanTomlFile scanTomlFile) {
         Map<String, ScanTomlFile.Platform> declared = new LinkedHashMap<>();
@@ -982,16 +986,25 @@ public class ScanCmd implements BLauncherCmd {
         if (requested.isEmpty()) {
             return List.of();
         }
-        List<String> undeclared = requested.stream().filter(name -> !declared.containsKey(name))
-                .map(name -> "'" + name + "'").toList();
-        if (!undeclared.isEmpty()) {
-            if (!scanningWorkspace) {
-                throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE,
-                        undeclared.size(), joinWithAnd(undeclared)));
-            }
+        Map<Boolean, List<String>> missing = requested.stream().filter(name -> !declared.containsKey(name))
+                .collect(Collectors.partitioningBy(scanTomlFile.getPlatformsWithoutPath()::contains));
+        List<String> withoutPath = quoted(missing.get(true));
+        List<String> undeclared = quoted(missing.get(false));
+        if (!scanningWorkspace) {
+            failOnMissingPlatforms(undeclared, withoutPath,
+                    scanTomlFile.getDisplayPath(project.sourceRoot()).orElse(Constants.SCAN_FILE));
+        } else {
+            // As with a platform the package does not declare, the package is skipped and the others still report
             WorkspaceProject workspaceProject = project.workspaceProject().orElseThrow();
-            warn(DiagnosticLog.warning(DiagnosticCode.PLATFORM_NOT_DECLARED,
-                    packageLabel(workspaceProject, project), undeclared.size(), joinWithAnd(undeclared)));
+            pathlessWorkspacePlatforms.addAll(missing.get(true));
+            if (!withoutPath.isEmpty()) {
+                warn(DiagnosticLog.warning(DiagnosticCode.PLATFORM_PATH_MISSING_SKIPPED,
+                        packageLabel(workspaceProject, project), withoutPath.size(), joinWith(withoutPath, "and")));
+            }
+            if (!undeclared.isEmpty()) {
+                warn(DiagnosticLog.warning(DiagnosticCode.PLATFORM_NOT_DECLARED,
+                        packageLabel(workspaceProject, project), undeclared.size(), joinWith(undeclared, "and")));
+            }
         }
         List<ScanTomlFile.Platform> selected = requested.stream().filter(declared::containsKey)
                 .map(declared::get).toList();
@@ -1032,12 +1045,35 @@ public class ScanCmd implements BLauncherCmd {
      * platform, but at least one package must declare it.
      */
     private void failOnUndeclaredWorkspacePlatforms() {
-        List<String> missing = platforms.stream().distinct().filter(name -> !declaredPlatforms.contains(name))
-                .map(name -> "'" + name + "'").toList();
-        if (!missing.isEmpty()) {
-            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, missing.size(),
-                    joinWithAnd(missing)));
+        Map<Boolean, List<String>> missing = platforms.stream().distinct()
+                .filter(name -> !declaredPlatforms.contains(name))
+                .collect(Collectors.partitioningBy(pathlessWorkspacePlatforms::contains));
+        failOnMissingPlatforms(quoted(missing.get(false)), quoted(missing.get(true)), Constants.SCAN_FILE);
+    }
+
+    /**
+     * Fails the scan with every named platform that is not declared and every one declared without a path, in one
+     * failure, so that all of them are reported in the same run.
+     */
+    private static void failOnMissingPlatforms(List<String> undeclared, List<String> withoutPath,
+                                               String scanTomlLabel) {
+        List<String> messages = new ArrayList<>();
+        if (!undeclared.isEmpty()) {
+            messages.add(DiagnosticLog.error(DiagnosticCode.PLATFORM_NOT_AVAILABLE, undeclared.size(),
+                    joinWith(undeclared, "and"), scanTomlLabel));
         }
+        if (!withoutPath.isEmpty()) {
+            messages.add(DiagnosticLog.error(DiagnosticCode.PLATFORM_PATH_MISSING, withoutPath.size(),
+                    joinWith(withoutPath, "and"), scanTomlLabel));
+        }
+        if (!messages.isEmpty()) {
+            throw ScanFailure.runtime(messages.get(0),
+                    messages.subList(1, messages.size()).stream().map(ScanFailure::error).toList());
+        }
+    }
+
+    private static List<String> quoted(List<String> names) {
+        return names.stream().map(name -> "'" + name + "'").toList();
     }
 
     /**
@@ -1094,15 +1130,14 @@ public class ScanCmd implements BLauncherCmd {
         if (listRules) {
             return;
         }
-        List<String> unknownRules = Stream.concat(includeRules.stream(), excludeRules.stream())
+        List<String> unknownRules = quoted(Stream.concat(includeRules.stream(), excludeRules.stream())
                 .filter(ruleId -> !allRuleIds.contains(ruleId))
                 .filter(ruleId -> !coreRulesOnly || ruleId.startsWith(BALLERINA_RULE_PREFIX))
                 .distinct()
-                .map(ruleId -> "'" + ruleId + "'")
-                .toList();
+                .toList());
         if (!unknownRules.isEmpty()) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.UNKNOWN_RULE_OPTION,
-                    joinWithAnd(unknownRules), unknownRules.size()), LIST_RULES_HINT);
+                    joinWith(unknownRules, "and"), unknownRules.size()), LIST_RULES_HINT);
         }
     }
 
@@ -1241,16 +1276,6 @@ public class ScanCmd implements BLauncherCmd {
             return "error: " + diagnostic.message();
         }
         return DiagnosticLog.fileError(lineRange.fileName(), lineRange, diagnostic.message());
-    }
-
-    /**
-     * Joins items as a list in prose, such as "a, b and c".
-     */
-    private static String joinWithAnd(List<String> items) {
-        if (items.size() == 1) {
-            return items.get(0);
-        }
-        return String.join(", ", items.subList(0, items.size() - 1)) + " and " + items.get(items.size() - 1);
     }
 
     private void printSuppressionWarnings(List<SuppressionDiagnostic> diagnostics) {

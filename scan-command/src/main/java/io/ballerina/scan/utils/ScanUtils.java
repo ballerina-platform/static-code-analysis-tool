@@ -54,6 +54,7 @@ import io.ballerina.toml.semantic.ast.TomlKeyValueNode;
 import io.ballerina.toml.semantic.ast.TomlTableArrayNode;
 import io.ballerina.toml.semantic.ast.TomlValueNode;
 import io.ballerina.toml.semantic.ast.TopLevelNode;
+import io.ballerina.toml.syntax.tree.KeyValueNode;
 import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextRange;
@@ -77,6 +78,7 @@ import java.nio.file.Paths;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -190,8 +192,42 @@ public final class ScanUtils {
     public static final String GATE_COUNT_VALUES = "a whole number of 1 or more";
 
     private static final String RULE_LIST_VALUES = "an array of rule IDs, such as [\"ballerina:1\"]";
+    // The top-level tables of a Scan.toml file, each written as it is expected
+    private static final Map<String, String> TOP_LEVEL_TABLES = tableForms(List.of(ANALYZER_TABLE, PLATFORM_TABLE),
+            List.of(RULES_TABLE, SUPPRESSION_TABLE, GATE_TABLE, ANALYSIS_TABLE));
+    private static final String TABLE_VALUES = joinWith(TOP_LEVEL_TABLES.values(), "or");
+    // A workspace Scan.toml cannot set platforms
+    private static final String WORKSPACE_TABLE_VALUES = joinWith(TOP_LEVEL_TABLES.entrySet().stream()
+            .filter(table -> !table.getKey().equals(PLATFORM_TABLE)).map(Map.Entry::getValue).toList(), "or");
 
     private ScanUtils() {
+    }
+
+    private static Map<String, String> tableForms(List<String> tableArrays, List<String> tables) {
+        Map<String, String> forms = new LinkedHashMap<>();
+        tableArrays.forEach(name -> forms.put(name, "[[" + name + "]]"));
+        tables.forEach(name -> forms.put(name, "[" + name + "]"));
+        return Collections.unmodifiableMap(forms);
+    }
+
+    /**
+     * Joins items as a list in prose, such as "a, b and c" with the conjunction "and".
+     *
+     * @param values      the items to join
+     * @param conjunction the word before the last item
+     * @return the joined items, or an empty string when there are none
+     * @since 0.14.0
+     */
+    public static String joinWith(Collection<String> values, String conjunction) {
+        List<String> items = List.copyOf(values);
+        if (items.isEmpty()) {
+            return "";
+        }
+        if (items.size() == 1) {
+            return items.get(0);
+        }
+        return String.join(", ", items.subList(0, items.size() - 1)) + " " + conjunction + " "
+                + items.get(items.size() - 1);
     }
 
     /**
@@ -1457,40 +1493,42 @@ public final class ScanUtils {
         ScanTomlFile scanTomlFile = new ScanTomlFile();
         scanTomlFile.setPath(scanTomlFilePath);
         Map<String, TopLevelNode> entries = scanTomlDocumentContent.rootNode().entries();
-        List<String> errors = new ArrayList<>();
-        List<String> analyzerErrors = new ArrayList<>();
+        List<ConfigError> errors = new ArrayList<>();
+        List<ConfigError> analyzerErrors = new ArrayList<>();
 
         TopLevelNode platformNode = entries.get(PLATFORM_TABLE);
         if (workspace) {
             // Each package reports to its own platform project, so a workspace cannot set one for all of them
-            if (platformNode != null) {
-                errors.add(DiagnosticLog.fileError(displayPath, platformNode.location().lineRange(),
+            if (platformNode != null && !isEmptyArray(platformNode)) {
+                errors.add(new ConfigError(platformNode.location().lineRange(),
                         DiagnosticLog.error(DiagnosticCode.WORKSPACE_PLATFORM_NOT_ALLOWED)));
             }
-        } else {
+        } else if (platformNode instanceof TomlTableArrayNode) {
             for (Toml platformTable : scanTomlDocumentContent.getTables(PLATFORM_TABLE)) {
-                loadPlatform(platformTable, scanTomlFile, baseDir);
+                loadPlatform(platformTable, scanTomlFile, baseDir, errors);
             }
+        } else if (platformNode != null && !isEmptyArray(platformNode)) {
+            errors.add(new ConfigError(platformNode.location().lineRange(),
+                    DiagnosticLog.error(DiagnosticCode.INVALID_PLATFORM_LIST)));
         }
         TopLevelNode analyzerNode = entries.get(ANALYZER_TABLE);
         if (analyzerNode instanceof TomlTableArrayNode) {
             scanTomlDocumentContent.getTables(ANALYZER_TABLE).forEach(loadAnalyzer(scanTomlFile));
-        } else if (analyzerNode != null && !(analyzerNode instanceof TomlKeyValueNode keyValue
-                && keyValue.value() instanceof TomlArrayValueNode array && array.elements().isEmpty())) {
-            String error = DiagnosticLog.fileError(displayPath, analyzerNode.location().lineRange(),
+        } else if (analyzerNode != null && !isEmptyArray(analyzerNode)) {
+            ConfigError error = new ConfigError(analyzerNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_ANALYZER_LIST));
             errors.add(error);
             analyzerErrors.add(error);
         }
         TopLevelNode ruleNode = entries.get(RULES_TABLE);
         if (ruleNode != null && ruleNode.kind() != TomlType.TABLE) {
-            errors.add(DiagnosticLog.fileError(displayPath, ruleNode.location().lineRange(),
+            errors.add(new ConfigError(ruleNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_TABLE, RULES_TABLE)));
         } else {
             scanTomlDocumentContent.getTable(RULES_TABLE).ifPresent(ruleTable -> {
-                loadRuleTable(ruleTable, scanTomlFile, displayPath, errors);
+                loadRuleTable(ruleTable, scanTomlFile, errors);
                 if (!scanTomlFile.getRulesToInclude().isEmpty() && !scanTomlFile.getRulesToExclude().isEmpty()) {
-                    errors.add(DiagnosticLog.fileError(displayPath, ruleNode.location().lineRange(),
+                    errors.add(new ConfigError(ruleNode.location().lineRange(),
                             DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE)));
                 }
             });
@@ -1498,29 +1536,40 @@ public final class ScanUtils {
         // Written in any other form, such as [[suppression]], the settings would not be read at all
         TopLevelNode suppressionNode = entries.get(SUPPRESSION_TABLE);
         if (suppressionNode != null && suppressionNode.kind() != TomlType.TABLE) {
-            errors.add(DiagnosticLog.fileError(displayPath, suppressionNode.location().lineRange(),
+            errors.add(new ConfigError(suppressionNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_TABLE)));
         } else {
             scanTomlDocumentContent.getTable(SUPPRESSION_TABLE)
-                    .ifPresent(table -> loadSuppression(table, scanTomlFile, displayPath, errors));
+                    .ifPresent(table -> loadSuppression(table, scanTomlFile, errors));
         }
 
         TopLevelNode gateNode = entries.get(GATE_TABLE);
         if (gateNode != null && gateNode.kind() != TomlType.TABLE) {
-            errors.add(DiagnosticLog.fileError(displayPath, gateNode.location().lineRange(),
+            errors.add(new ConfigError(gateNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_TABLE, GATE_TABLE)));
         } else {
             scanTomlDocumentContent.getTable(GATE_TABLE)
-                    .ifPresent(gateTable -> loadGate(gateTable, scanTomlFile, displayPath, errors));
+                    .ifPresent(gateTable -> loadGate(gateTable, scanTomlFile, errors));
         }
         TopLevelNode analysisNode = entries.get(ANALYSIS_TABLE);
         if (analysisNode != null && analysisNode.kind() != TomlType.TABLE) {
-            errors.add(DiagnosticLog.fileError(displayPath, analysisNode.location().lineRange(),
+            errors.add(new ConfigError(analysisNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_TABLE, ANALYSIS_TABLE)));
         } else if (analysisNode != null) {
             scanTomlDocumentContent.getTable(ANALYSIS_TABLE)
-                    .ifPresent(analysisTable -> loadAnalysis(analysisTable, scanTomlFile, displayPath, errors));
+                    .ifPresent(analysisTable -> loadAnalysis(analysisTable, scanTomlFile, errors));
         }
+        // A misspelled table, such as [gates], would otherwise turn its settings off without notice
+        entries.forEach((key, node) -> {
+            if (!TOP_LEVEL_TABLES.containsKey(key)) {
+                boolean isKey = node instanceof TomlKeyValueNode || node.externalTreeNode() instanceof KeyValueNode;
+                int entryKind = isKey ? 0 : 1;
+                errors.add(new ConfigError(node.location().lineRange(),
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_ENTRY, entryKind, key,
+                                workspace ? WORKSPACE_TABLE_VALUES : TABLE_VALUES)));
+            }
+        });
+        errors.sort(ConfigError.BY_POSITION);
         switch (validation) {
             case ALL -> failOnConfigErrors(displayPath, errors);
             case RULES -> failOnConfigErrors(displayPath, analyzerErrors);
@@ -1542,9 +1591,9 @@ public final class ScanUtils {
         if (validation == Validation.NONE) {
             return scanTomlDocumentContent;
         }
-        List<String> syntaxErrors = scanTomlDocumentContent.diagnostics().stream()
+        List<ConfigError> syntaxErrors = scanTomlDocumentContent.diagnostics().stream()
                 .filter(diagnostic -> diagnostic.diagnosticInfo().severity() == DiagnosticSeverity.ERROR)
-                .map(diagnostic -> DiagnosticLog.fileError(displayPath, diagnostic.location().lineRange(),
+                .map(diagnostic -> new ConfigError(diagnostic.location().lineRange(),
                         diagnostic.message()))
                 .toList();
         failOnConfigErrors(displayPath, syntaxErrors);
@@ -1552,22 +1601,38 @@ public final class ScanUtils {
     }
 
     /**
+     * An error found in a Scan.toml file, kept with its position so that the errors can be ordered before they are
+     * formatted.
+     *
+     * @param lineRange the position of the error in the file
+     * @param message   the error message
+     */
+    private record ConfigError(LineRange lineRange, String message) {
+
+        static final Comparator<ConfigError> BY_POSITION = Comparator
+                .comparingInt((ConfigError error) -> error.lineRange().startLine().line())
+                .thenComparingInt(error -> error.lineRange().startLine().offset());
+    }
+
+    /**
      * Fails the load with every error found in the file, so that all of them are reported at once.
      */
-    private static void failOnConfigErrors(String displayPath, List<String> errors) {
+    private static void failOnConfigErrors(String displayPath, List<ConfigError> errors) {
         if (!errors.isEmpty()) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath,
-                    errors.size()), errors);
+                    errors.size()), errors.stream()
+                    .map(error -> DiagnosticLog.fileError(displayPath, error.lineRange(), error.message()))
+                    .toList());
         }
     }
 
     /**
      * Loads the [gate] table, adding an error for an unknown key or an invalid value.
      */
-    private static void loadGate(Toml gateTable, ScanTomlFile scanTomlFile, String displayPath, List<String> errors) {
+    private static void loadGate(Toml gateTable, ScanTomlFile scanTomlFile, List<ConfigError> errors) {
         gateTable.rootNode().entries().forEach((key, node) -> {
             if (!key.equals(GATE_FAIL_ON_SEVERITY) && !key.equals(GATE_FAIL_ON_COUNT)) {
-                errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
+                errors.add(new ConfigError(node.location().lineRange(),
                         DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_KEY, key, GATE_TABLE,
                                 GATE_FAIL_ON_SEVERITY + " or " + GATE_FAIL_ON_COUNT)));
             }
@@ -1580,7 +1645,7 @@ public final class ScanUtils {
             if (severity.isPresent()) {
                 scanTomlFile.setFailOnSeverity(severity.get());
             } else {
-                errors.add(invalidConfigValue(displayPath, value, GATE_FAIL_ON_SEVERITY, GateSeverity.VALUES));
+                errors.add(invalidConfigValue(value, GATE_FAIL_ON_SEVERITY, GateSeverity.VALUES));
             }
         });
 
@@ -1589,7 +1654,7 @@ public final class ScanUtils {
                     && count.longValue() >= 1 && count.longValue() <= Integer.MAX_VALUE) {
                 scanTomlFile.setFailOnCount(count.intValue());
             } else {
-                errors.add(invalidConfigValue(displayPath, value, GATE_FAIL_ON_COUNT, GATE_COUNT_VALUES));
+                errors.add(invalidConfigValue(value, GATE_FAIL_ON_COUNT, GATE_COUNT_VALUES));
             }
         });
     }
@@ -1597,11 +1662,10 @@ public final class ScanUtils {
     /**
      * Loads the [analysis] table, adding an error for an unknown key or an invalid value.
      */
-    private static void loadAnalysis(Toml analysisTable, ScanTomlFile scanTomlFile, String displayPath,
-                                     List<String> errors) {
+    private static void loadAnalysis(Toml analysisTable, ScanTomlFile scanTomlFile, List<ConfigError> errors) {
         analysisTable.rootNode().entries().forEach((key, node) -> {
             if (!key.equals(ANALYSIS_EXCLUDE_TESTS)) {
-                errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
+                errors.add(new ConfigError(node.location().lineRange(),
                         DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_KEY, key, ANALYSIS_TABLE,
                                 ANALYSIS_EXCLUDE_TESTS)));
             }
@@ -1610,13 +1674,13 @@ public final class ScanUtils {
             if (value.kind() == TomlType.BOOLEAN) {
                 scanTomlFile.writeExcludeTests((Boolean) value.toNativeValue());
             } else {
-                errors.add(invalidConfigValue(displayPath, value, ANALYSIS_EXCLUDE_TESTS, "true or false"));
+                errors.add(invalidConfigValue(value, ANALYSIS_EXCLUDE_TESTS, "true or false"));
             }
         });
     }
 
-    private static String invalidConfigValue(String displayPath, TomlValueNode value, String key, String expected) {
-        return DiagnosticLog.fileError(displayPath, value.location().lineRange(),
+    private static ConfigError invalidConfigValue(TomlValueNode value, String key, String expected) {
+        return new ConfigError(value.location().lineRange(),
                 DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_VALUE, String.valueOf(value.toNativeValue()), key,
                         expected));
     }
@@ -1625,12 +1689,11 @@ public final class ScanUtils {
      * Loads the [suppression] table, adding an error for an unknown key or a value that is not a boolean, since either
      * would otherwise read as unset and silently turn a requirement off.
      */
-    private static void loadSuppression(Toml suppressionTable, ScanTomlFile scanTomlFile, String displayPath,
-                                        List<String> errors) {
+    private static void loadSuppression(Toml suppressionTable, ScanTomlFile scanTomlFile, List<ConfigError> errors) {
         List<String> keys = List.of(SUPPRESSION_ENABLED, SUPPRESSION_REQUIRE_REASON, SUPPRESSION_REQUIRE_RULE_ID);
         suppressionTable.rootNode().entries().forEach((key, node) -> {
             if (!keys.contains(key)) {
-                errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
+                errors.add(new ConfigError(node.location().lineRange(),
                         DiagnosticLog.error(DiagnosticCode.UNKNOWN_SUPPRESSION_SETTING, key)));
             }
         });
@@ -1643,11 +1706,16 @@ public final class ScanUtils {
                 if (value.kind() == TomlType.BOOLEAN) {
                     setters.get(key).accept((Boolean) value.toNativeValue());
                 } else {
-                    errors.add(DiagnosticLog.fileError(displayPath, value.location().lineRange(),
+                    errors.add(new ConfigError(value.location().lineRange(),
                             DiagnosticLog.error(DiagnosticCode.INVALID_SUPPRESSION_SETTING, key)));
                 }
             });
         }
+    }
+
+    private static boolean isEmptyArray(TopLevelNode node) {
+        return node instanceof TomlKeyValueNode keyValue && keyValue.value() instanceof TomlArrayValueNode array
+                && array.elements().isEmpty();
     }
 
     /**
@@ -1688,7 +1756,15 @@ public final class ScanUtils {
      * @param scanTomlFile the in-memory representation of the Scan.toml file
      * @param baseDir      the directory relative paths are resolved against
      */
-    private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path baseDir) {
+    private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path baseDir,
+                                     List<ConfigError> errors) {
+        // A name or path of another type would otherwise read as missing
+        int errorCount = errors.size();
+        checkStringEntry(platformTable, PLATFORM_NAME, "a platform name, such as \"sonarqube\"", errors);
+        checkStringEntry(platformTable, PLATFORM_PATH, "the path or URL of the plugin JAR", errors);
+        if (errors.size() > errorCount) {
+            return;
+        }
         Map<String, Object> properties = platformTable.toMap();
         Object platformName = properties.remove(PLATFORM_NAME);
         Optional<String> name = (platformName instanceof String) ? Optional.of(platformName.toString())
@@ -1697,7 +1773,11 @@ public final class ScanUtils {
         Optional<String> path = (platformPath instanceof String) ? Optional.of(platformPath.toString())
                 : Optional.empty();
 
-        if (name.isEmpty() || name.get().isEmpty() || path.isEmpty()) {
+        if (name.isEmpty() || name.get().isEmpty()) {
+            return;
+        }
+        if (path.isEmpty()) {
+            scanTomlFile.addPlatformWithoutPath(name.get());
             return;
         }
 
@@ -1719,6 +1799,26 @@ public final class ScanUtils {
 
         ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name.get(), jarPath, properties);
         scanTomlFile.setPlatform(platform);
+    }
+
+    /**
+     * Adds an error when a table has the key with a value other than a string. {@link Toml#get} finds only values, so
+     * the entries are read directly to also catch a table, such as {@code path = { jar = "plugin.jar" }}.
+     */
+    private static void checkStringEntry(Toml table, String key, String expected, List<ConfigError> errors) {
+        TopLevelNode node = table.rootNode().entries().get(key);
+        if (node instanceof TomlKeyValueNode keyValue) {
+            if (keyValue.value().kind() != TomlType.STRING) {
+                errors.add(invalidConfigValue(keyValue.value(), key, expected));
+            }
+        } else if (node != null) {
+            LineRange position = node.externalTreeNode() instanceof KeyValueNode keyValue
+                    ? keyValue.value().location().lineRange()
+                    : node.location().lineRange();
+            errors.add(new ConfigError(position,
+                    DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_VALUE, String.valueOf(node.toNativeObject()),
+                            key, expected)));
+        }
     }
 
     /**
@@ -1746,31 +1846,29 @@ public final class ScanUtils {
      *
      * @param ruleTable    the [rule] table
      * @param scanTomlFile the in-memory representation of the Scan.toml file
-     * @param displayPath  the path of the file as shown to the user
      * @param errors       the errors found in the file
      */
-    private static void loadRuleTable(Toml ruleTable, ScanTomlFile scanTomlFile, String displayPath,
-                                      List<String> errors) {
+    private static void loadRuleTable(Toml ruleTable, ScanTomlFile scanTomlFile, List<ConfigError> errors) {
         ruleTable.rootNode().entries().forEach((key, node) -> {
             if (!key.equals(INCLUDE_KEY) && !key.equals(EXCLUDE_KEY)) {
-                errors.add(DiagnosticLog.fileError(displayPath, node.location().lineRange(),
+                errors.add(new ConfigError(node.location().lineRange(),
                         DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_KEY, key, RULES_TABLE,
                                 INCLUDE_KEY + " or " + EXCLUDE_KEY)));
             }
         });
-        ruleTable.get(INCLUDE_KEY).ifPresent(rules -> loadRules(rules, scanTomlFile, true, displayPath, errors));
-        ruleTable.get(EXCLUDE_KEY).ifPresent(rules -> loadRules(rules, scanTomlFile, false, displayPath, errors));
+        ruleTable.get(INCLUDE_KEY).ifPresent(rules -> loadRules(rules, scanTomlFile, true, errors));
+        ruleTable.get(EXCLUDE_KEY).ifPresent(rules -> loadRules(rules, scanTomlFile, false, errors));
     }
 
     /**
      * Loads the rule IDs of include or exclude, adding an error when the value is not an array of strings.
      */
     private static void loadRules(TomlValueNode rules, ScanTomlFile scanTomlFile, boolean includeRules,
-                                  String displayPath, List<String> errors) {
+                                  List<ConfigError> errors) {
         String key = includeRules ? INCLUDE_KEY : EXCLUDE_KEY;
         if (!(rules instanceof TomlArrayValueNode rulesArray)
                 || !rulesArray.elements().stream().allMatch(rule -> rule.kind() == TomlType.STRING)) {
-            errors.add(invalidConfigValue(displayPath, rules, key, RULE_LIST_VALUES));
+            errors.add(invalidConfigValue(rules, key, RULE_LIST_VALUES));
             return;
         }
         List<String> ruleIds = rulesArray.toNativeValue().stream().map(Object::toString).toList();
