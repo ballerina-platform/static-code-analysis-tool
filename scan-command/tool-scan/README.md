@@ -14,7 +14,7 @@ bal scan [OPTIONS] [<package>|<source-file>]
 
 ## CLI Options
 
-- Specify target path for saving analysis reports. (Only for ballerina build projects)
+- Specify target path for saving analysis reports (only for Ballerina projects). Default is the `target` directory of the package. A relative path is resolved against the package root, and the results are saved in `<path>/report`.
 
 ```text
 --target-dir=<path>
@@ -209,7 +209,7 @@ To generate a detailed HTML report of the analysis results, use the `--scan-repo
 bal scan --scan-report
 ```
 
-This produces an HTML report and the scan results in JSON format inside the `target/report` directory (or the directory given via `--target-dir`). The report is only generated for Ballerina projects, not for standalone Ballerina files. It is generated even when the results are also reported to a platform.
+This produces an HTML report and the scan results in JSON format inside the `target/report` directory, or in the `report` directory under the path given with `--target-dir`. The report is only generated for Ballerina projects, not for standalone Ballerina files. It is generated even when the results are also reported to a platform.
 
 The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. Every scanned file is listed, including files without issues, in a folder tree of the package. You can filter, search, and export the list of files.
 
@@ -234,6 +234,8 @@ The issues found in the file are listed in a table with the line, rule ID, kind 
 | `130` | The scan was interrupted. |
 
 Every failure other than an interrupt is reported on standard error as `bal scan: error: <message>`, followed by the problems that caused it, such as `Scan.toml:2:18: error: <message>`. Warnings printed by the scan tool are reported as `bal scan: warning: <message>` and never change the exit code.
+
+`bal scan` checks the whole `Scan.toml` file and reports every mistake at once with its line and column, exiting with code `1`: an unknown table or key, such as `[gates]`, and a value of the wrong type in `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` or `[analysis]`. The entries of `[[analyzer]]` are not validated.
 
 By default no gate is set, so findings never fail the scan. The gate is set with `--fail-on-severity` and `--fail-on-count`, or with the `[gate]` table of `Scan.toml`, and fails the scan when the number of issues at or above the severity reaches the count:
 

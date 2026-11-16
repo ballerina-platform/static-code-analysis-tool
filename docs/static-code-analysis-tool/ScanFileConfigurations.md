@@ -33,6 +33,16 @@ configPath = "path/to/Scan.toml"
 
 When the `Ballerina.toml` file has a `[scan]` table, the file at its `configPath` is used instead of a `Scan.toml` file in the working directory, which is then ignored. A relative `configPath` is resolved against the package root, and a `[scan]` table without `configPath` stops the scan with an error.
 
+A `Scan.toml` file can have the `[[analyzer]]`, `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` and `[analysis]` tables described below, and nothing else. `bal scan` checks the whole file, whether it is local or downloaded from a URL, and stops with exit code `1` on any mistake, listing every error at once with its line and column: an unknown table or key, such as `[gates]`, `[rules]` or `foo = 1`, which would otherwise turn its settings off without notice; and a value of the wrong type in `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` or `[analysis]`. The entries of `[[analyzer]]` are not validated: an entry with a missing, empty or wrongly typed `org` or `name` is skipped, and an unknown key in it is ignored. For example:
+
+```text
+bal scan: error: Scan.toml has 2 errors
+Scan.toml:1:1: error: unknown table 'gates'; expected [[analyzer]], [[platform]], [rule], [suppression], [gate] or [analysis]
+Scan.toml:5:15: error: invalid value '0' for 'failOnCount'; expected a whole number of 1 or more
+```
+
+`bal scan --list-rules` stops only on a TOML syntax error and on `analyzer` written in a form other than `[[analyzer]]` tables or `analyzer = []`. It does not stop on the other errors, including an unknown table or key: a misspelled analyzer table such as `[[analyzers]]` is ignored, and the rules of its analyzer are not listed. The editor ignores invalid settings.
+
 # Configuration for Platform Plugins
 
 Users can configure platform plugins in a `Scan.toml` file by specifying the plugin JAR path to report analysis results.
@@ -43,7 +53,7 @@ name = "sonarqube"
 path = "path/to/sonar_platform_plugin"
 ```
 
-Both `name` and `path` are required. A platform entry without a `path` is ignored. The `path` can be a local file path, resolved relative to the folder of the `Scan.toml` file, or a URL, in which case the scan tool downloads the plugin JAR. The paths in a remote `Scan.toml` file are resolved relative to the package root.
+Both `name` and `path` are required. A platform entry without a `path` is ignored, and naming it in `--platforms` stops the scan with an error that says its `path` is missing. A `name` or `path` that is not a string is an error. The entries must be written as `[[platform]]` tables. The `path` can be a local file path, resolved relative to the folder of the `Scan.toml` file, or a URL, in which case the scan tool downloads the plugin JAR. The paths in a remote `Scan.toml` file are resolved relative to the package root.
 
 A declared platform is reported to only when it is named in `--platforms`, for example `bal scan --platforms=sonarqube`. A plain `bal scan` never reports to a platform. A scan that a platform runs with `--platform-triggered`, such as the SonarQube Ballerina plugin does, reports to every declared platform unless `--platforms` names some. The plugin JAR is checked, or downloaded, only when its platform is selected, that is, named in `--platforms` or declared for a platform-triggered scan without `--platforms`, so a `Scan.toml` can declare a platform whose JAR exists only on CI as long as the scans that select it run there. A path of a selected platform that is neither an existing file nor a URL stops the scan with an error.
 

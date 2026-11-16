@@ -12,6 +12,14 @@ jobs:
 
     if: github.repository_owner == 'ballerina-platform'
     steps:
+      # Only release lines publish: a tag or topic branch would publish, then open the sync pull request against it
+      - name: Check the release branch
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/heads/support/* ]]; then
+            echo "::error::Release from main or a support/* branch, not $GITHUB_REF"
+            exit 1
+          fi
+
       - name: Checkout Repository
         uses: actions/checkout@v3
 
@@ -55,4 +63,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.BALLERINA_BOT_TOKEN }}
         run: |
           gh release create v$VERSION --title "scan-tool-v$VERSION"
-          gh pr create --base ${GITHUB_REF#refs/heads/} --title "[Automated] Sync ${GITHUB_REF#refs/heads/} after $VERSION release" --body "Sync ${GITHUB_REF#refs/heads/} after $VERSION release"
+          gh pr create --base "$GITHUB_REF_NAME" --title "[Automated] Sync $GITHUB_REF_NAME after $VERSION release" --body "Sync $GITHUB_REF_NAME after $VERSION release"
