@@ -29,7 +29,7 @@ public function getResult() returns json|error {
 ```ballerina
 // Compliant
 public function checkResult() {
-    json|error result = getResult(1, 2);
+    json|error result = getResult();
 
     if result is error {
         // handle error
@@ -46,27 +46,11 @@ public function getResult() returns json|error {
 ```ballerina
 // Compliant
 public function checkResult() returns error? {
-    json result = check getResult(1, 2);
+    json result = check getResult();
 }
 
 public function getResult() returns json|error {
     // ...
-}
-```
-
-- Do not pair `checkpanic` with `trap`. `trap` catches the panic, but `checkpanic` only turns the error into a panic so that `trap` can turn it back into an error. Test the value instead.
-
-```ballerina
-// Noncompliant
-function getAll(cache:Cache cache, string key) returns Response[]? {
-    Response[]|error entry = trap <Response[]> checkpanic cache.get(key);
-    return entry is Response[] ? entry : ();
-}
-
-// Compliant
-function getAll(cache:Cache cache, string key) returns Response[]? {
-    any|error entry = cache.get(key);
-    return entry is Response[] ? entry : ();
 }
 ```
 

@@ -55,6 +55,15 @@ public class StaticCodeAnalyzerTest extends BaseTest {
         return defaultModule.document(defaultModule.documentIds().iterator().next());
     }
 
+    static Document loadDocument(String projectName, String documentName) {
+        Module defaultModule = getModule(projectName);
+        return defaultModule.documentIds().stream()
+                .map(defaultModule::document)
+                .filter(document -> document.name().equals(documentName))
+                .findFirst()
+                .orElseThrow();
+    }
+
     private static Module getModule(String documentName) {
         Path coreRuleBalFiles = Paths.get("src", "test", "resources").resolve("test-resources").resolve("core-rules");
         Project project = ProjectLoader.load(coreRuleBalFiles.resolve(documentName)).project();

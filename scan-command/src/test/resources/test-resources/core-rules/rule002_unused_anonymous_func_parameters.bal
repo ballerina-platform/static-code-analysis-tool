@@ -68,3 +68,18 @@ function doNothing(any a) { // warning
 function (int a , int b) returns int v = (x, y) => x + y;
 
 function (int a , int b) returns int v2 = (x, y) => x;
+
+function usedInNestedFunction() returns int {
+    var outer = object {
+        function m(int p) returns int {
+            var inner = function() returns int => p;
+            return inner();
+        }
+
+        function unused(int p) returns int { // warning
+            var inner = function(int q) returns int => q;
+            return inner(1);
+        }
+    };
+    return outer.m(1) + outer.unused(1);
+}

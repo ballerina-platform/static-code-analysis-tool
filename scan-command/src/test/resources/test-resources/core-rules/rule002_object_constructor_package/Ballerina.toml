@@ -1,0 +1,4 @@
+[package]
+org = "ballerina"
+name = "rule002_object_constructor_package"
+version = "0.1.0"
