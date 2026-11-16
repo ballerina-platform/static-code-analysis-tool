@@ -35,7 +35,7 @@ sequenceDiagram
     activate Platform
     deactivate Platform
     deactivate Static Code Analysis Platform Plugin
-    Ballerina Scan Tool ->> Ballerina Scan Tool: Check the quality gate
+    Ballerina Scan Tool ->> Ballerina Scan Tool: Check the quality gate if every platform succeeded
     deactivate Ballerina Scan Tool
 ```
 
@@ -62,7 +62,7 @@ For each named platform, the scan tool:
 1. Loads the plugin JAR, downloading it first when the `path` is a URL, and finds the plugins it provides with the Java `ServiceLoader`. The plugin whose `platform()` returns the declared `name` is used; if the JAR provides none, the scan fails.
 2. Analyzes the package, and prints and saves the results, so that a failed upload does not hide them.
 3. Calls `init` with a `PlatformPluginContext` that holds the platform arguments from `Scan.toml`, and then `onScan` with the issues of the package.
-4. Checks the quality gate, after every platform has run.
+4. Checks the quality gate, once every platform has run successfully. If a platform fails, the scan fails without checking the gate.
 
 The named platforms run one after another. A `RuntimeException` or `LinkageError` thrown from `init` or `onScan` fails that platform without stopping the others, and once all of them have run, the scan lists every failure and exits with code `1`.
 
