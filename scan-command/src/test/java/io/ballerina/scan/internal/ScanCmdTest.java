@@ -1300,7 +1300,8 @@ public class ScanCmdTest extends BaseTest {
         } finally {
             System.setProperty("user.dir", userDir);
         }
-        return new String[]{out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8)};
+        return new String[]{out.toString(StandardCharsets.UTF_8),
+                err.toString(StandardCharsets.UTF_8).replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR)};
     }
 
     @Test(description = "test scan command default format behavior")
