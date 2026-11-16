@@ -29,7 +29,7 @@ public function getResult() returns json|error {
 ```ballerina
 // Compliant
 public function checkResult() {
-    json|error result = getResult(1, 2);
+    json|error result = getResult();
 
     if result is error {
         // handle error
@@ -46,7 +46,7 @@ public function getResult() returns json|error {
 ```ballerina
 // Compliant
 public function checkResult() returns error? {
-    json result = check getResult(1, 2);
+    json result = check getResult();
 }
 
 public function getResult() returns json|error {
