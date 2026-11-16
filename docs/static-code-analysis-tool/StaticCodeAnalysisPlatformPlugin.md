@@ -35,7 +35,7 @@ sequenceDiagram
     activate Platform
     deactivate Platform
     deactivate Static Code Analysis Platform Plugin
-    Ballerina Scan Tool ->> Ballerina Scan Tool: Check the quality gate
+    Ballerina Scan Tool ->> Ballerina Scan Tool: Check the quality gate if every platform succeeded
     deactivate Ballerina Scan Tool
 ```
 
@@ -62,7 +62,7 @@ For each named platform, the scan tool:
 1. Loads the plugin JAR, downloading it first when the `path` is a URL, and finds the plugins it provides with the Java `ServiceLoader`. The plugin whose `platform()` returns the declared `name` is used; if the JAR provides none, the scan fails.
 2. Analyzes the package, and prints and saves the results, so that a failed upload does not hide them.
 3. Calls `init` with a `PlatformPluginContext` that holds the platform arguments from `Scan.toml`, and then `onScan` with the issues of the package.
-4. Checks the quality gate, after every platform has run.
+4. Checks the quality gate, once every platform has run successfully. If a platform fails, the scan fails with the platform failures and the gate is not applied.
 
 The named platforms run one after another. A `RuntimeException` or `LinkageError` thrown from `init` or `onScan` fails that platform without stopping the others, and once all of them have run, the scan lists every failure and exits with code `1`. In a workspace, each package that declares a platform gets its own plugin instance, whose `init` and `onScan` are called once for that package. All the instances of a JAR's plugins are loaded by one class loader for that JAR, which is created once for the whole scan, so static fields of a plugin class are shared by the packages of a workspace; keep the state of a package in instance fields.
 
