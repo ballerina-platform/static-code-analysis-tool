@@ -51,7 +51,6 @@ import java.util.Set;
  * @since 0.13.0
  */
 public class GateTest extends BaseTest {
-    private static final String USAGE_HINT = String.join("\n", ScanFailure.USAGE_HINT);
     // bal-project-with-gate-issues has 1 HIGH, 2 MEDIUM and 3 LOW issues
     private static final String ALL_ISSUES = "HIGH: 1, MEDIUM: 2, LOW: 3";
     private static final int TOTAL_ISSUES = 6;
@@ -135,7 +134,8 @@ public class GateTest extends BaseTest {
     void testUsageErrors(String[] args, String message) throws IOException {
         ScanRun run = scan(gateIssuesProject, args);
         Assert.assertEquals(run.exitCode(), 2, run.output());
-        Assert.assertEquals(run.output().trim(), "bal scan: error: " + message + "\n" + USAGE_HINT);
+        Assert.assertEquals(run.output().trim(),
+                "bal scan: error: " + message + "\n" + UsageHintTestUtils.usageHint());
     }
 
     @Test(description = "test an unknown rule ID is a usage error that points to the rule list")
@@ -143,7 +143,7 @@ public class GateTest extends BaseTest {
         ScanRun run = scan(gateIssuesProject, "--include-rules=ballerina:99");
         Assert.assertEquals(run.exitCode(), 2, run.output());
         Assert.assertEquals(run.errorReport(), "bal scan: error: unknown rule 'ballerina:99'\n"
-                + "  Run 'bal scan --list-rules' to see the available rules.\n" + USAGE_HINT);
+                + "  Run 'bal scan --list-rules' to see the available rules.\n" + UsageHintTestUtils.usageHint());
         Assert.assertFalse(run.output().contains("Running Scans"), run.output());
 
         run = scan(gateIssuesProject, "--exclude-rules=ballerina:98, ballerina:1, ballerina:99");

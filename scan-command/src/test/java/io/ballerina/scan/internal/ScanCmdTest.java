@@ -229,7 +229,7 @@ public class ScanCmdTest extends BaseTest {
         String expected = String.join(LINUX_LINE_SEPARATOR,
                 "bal scan: error: too many arguments: expected one workspace, package or source file, but received 2: "
                         + "main.bal argument2",
-                String.join(LINUX_LINE_SEPARATOR, ScanFailure.USAGE_HINT));
+                UsageHintTestUtils.usageHint());
         Assert.assertEquals(readOutput(true).trim().replace(WINDOWS_LINE_SEPARATOR, LINUX_LINE_SEPARATOR),
                 expected);
         Assert.assertEquals(scanCmd.exitCode(), 2);
@@ -1005,7 +1005,7 @@ public class ScanCmdTest extends BaseTest {
         System.setProperty("user.dir", userDir);
         Assert.assertEquals(readOutput(true).trim(), """
                 bal scan: error: invalid value 'xml' for --format; expected json or sarif
-                """ + String.join("\n", ScanFailure.USAGE_HINT));
+                """ + UsageHintTestUtils.usageHint());
         Assert.assertEquals(scanCmd.exitCode(), 2);
     }
 
