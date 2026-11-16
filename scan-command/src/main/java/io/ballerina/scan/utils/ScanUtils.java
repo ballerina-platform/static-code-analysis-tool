@@ -1162,7 +1162,8 @@ public final class ScanUtils {
         // A misspelled table, such as [gates], would otherwise turn its settings off without notice
         entries.forEach((key, node) -> {
             if (!TOP_LEVEL_TABLES.containsKey(key)) {
-                int entryKind = node instanceof TomlKeyValueNode ? 0 : 1;
+                boolean isKey = node instanceof TomlKeyValueNode || node.externalTreeNode() instanceof KeyValueNode;
+                int entryKind = isKey ? 0 : 1;
                 errors.add(new ConfigError(node.location().lineRange(),
                         DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_ENTRY, entryKind, key, TABLE_VALUES)));
             }

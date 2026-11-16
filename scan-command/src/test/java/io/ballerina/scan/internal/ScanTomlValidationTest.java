@@ -73,6 +73,9 @@ public class ScanTomlValidationTest extends BaseTest {
                         foo = 1
                         """, List.of("Scan.toml:1:1: error: unknown key 'foo'; expected " + TABLES)},
                 {"""
+                        foo = { a = 1 }
+                        """, List.of("Scan.toml:1:1: error: unknown key 'foo'; expected " + TABLES)},
+                {"""
                         analyzer = [1]
                         """, List.of("Scan.toml:1:1: error: 'analyzer' must be written as [[analyzer]] tables, or as "
                         + "analyzer = []")},
