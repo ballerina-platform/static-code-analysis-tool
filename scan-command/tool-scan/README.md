@@ -22,7 +22,7 @@ All options are optional. Rule filters and platforms can also be configured in a
 
 | Option | Description |
 |--------|-------------|
-| `--target-dir=<path>` | Target directory path for saving analysis reports (only for Ballerina projects). Default is the `target` directory of the package, or in a workspace, of each package and of the workspace. A relative path is resolved against the package root: in a workspace, each package saves its results in `<path>/report` under its own root, and the combined results are saved in `<path>/report` under the workspace root. |
+| `--target-dir=<path>` | Target directory path for saving analysis reports (only for Ballerina projects). Default is the `target` directory of the package, or in a workspace, of each package and of the workspace. A relative path is resolved against the package root, and the results are saved in `<path>/report`. In a workspace, each package saves its results in `<path>/report` under its own root, and the combined results are saved in `<path>/report` under the workspace root. |
 | `--scan-report` | Generate an HTML report containing the analysis results (only for Ballerina projects). Disabled by default. |
 | `--format=<json\|sarif>` | Specify the format of the report. Default is `json`. |
 | `--list-rules` | List the rules available to the workspace, package or source file, along with their kind and severity. Lists only the core rules and the rules contributed by the dependencies (library tools and static code analyzer plugins), and for a package or workspace, by the analyzers declared in `Scan.toml`. |

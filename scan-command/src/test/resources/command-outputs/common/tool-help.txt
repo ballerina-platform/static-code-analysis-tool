@@ -20,9 +20,9 @@ OPTIONS
                 Target directory path for saving analysis reports (only for Ballerina projects).
                 Default is the target directory of the package, or in a workspace, of each
                 package and of the workspace. A relative path is resolved against the package
-                root: in a workspace, each package saves its results in <path>/report under its
-                own root, and the combined results are saved in <path>/report under the
-                workspace root.
+                root, and the results are saved in <path>/report. In a workspace, each package
+                saves its results in <path>/report under its own root, and the combined results
+                are saved in <path>/report under the workspace root.
 
         --scan-report
                 Generate an HTML report containing the analysis results (only for Ballerina projects).
