@@ -10,9 +10,16 @@ jobs:
     name: Publish release
     runs-on: ubuntu-latest
 
-    # A release from a tag would publish and then fail to open the sync pull request, as its base must be a branch
-    if: github.repository_owner == 'ballerina-platform' && startsWith(github.ref, 'refs/heads/')
+    if: github.repository_owner == 'ballerina-platform'
     steps:
+      # Only release lines publish: a tag or topic branch would publish, then open the sync pull request against it
+      - name: Check the release branch
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/heads/support/* ]]; then
+            echo "::error::Release from main or a support/* branch, not $GITHUB_REF"
+            exit 1
+          fi
+
       - name: Checkout Repository
         uses: actions/checkout@v3
 
