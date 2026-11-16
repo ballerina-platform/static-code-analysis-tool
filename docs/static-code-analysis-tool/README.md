@@ -104,7 +104,7 @@ bal scan --include-rules="ballerina:1"
 8. Run analysis for a specific set of rules.
 
 ```bash
-bal scan --include-rules="ballerina:1, ballerina/io:2"
+bal scan --include-rules="ballerina:1, ballerina:2"
 ```
 
 9. Exclude analysis for a specific rule.
@@ -116,7 +116,7 @@ bal scan --exclude-rules="ballerina:1"
 10. Exclude analysis for a specific set of rules.
 
 ```bash
-bal scan --exclude-rules="ballerina:1, ballerina/io:2"
+bal scan --exclude-rules="ballerina:1, ballerina:2"
 ```
 
 11. Run analysis and report to a static analysis platform (e.g., SonarQube).

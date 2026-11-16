@@ -66,13 +66,13 @@ bal scan --list-rules
 bal scan --include-rules="ballerina:1"
 
 # Run analysis for a specific set of rules.
-bal scan --include-rules="ballerina:1, ballerina/io:2"
+bal scan --include-rules="ballerina:1, ballerina:2"
 
 # Exclude analysis for a specific rule.
-bal scan --exclude-rules="ballerina/io:2"
+bal scan --exclude-rules="ballerina:2"
 
 # Exclude analysis for a specific set of rules.
-bal scan --exclude-rules="ballerina:1, ballerina/io:2"
+bal scan --exclude-rules="ballerina:1, ballerina:2"
 
 # Run analysis and report to sonarqube.
 bal scan --platforms=sonarqube
