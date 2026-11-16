@@ -49,7 +49,7 @@ sequenceDiagram
     deactivate Ballerina Scan Tool
 ```
 
-The Ballerina static code analysis tool performs analysis on single `BAL` files, Ballerina packages, and identifies potential code smells, bugs, and vulnerabilities without executing them.
+The Ballerina static code analysis tool performs analysis on single `BAL` files and Ballerina packages, and identifies potential code smells, bugs, and vulnerabilities without executing them.
 
 The tool performs the analysis against a core set of rules based on the core language. If compiler plugins that perform additional static analysis are available, the tool will engage them. It then prints and saves the analysis results, and reports them to the static analysis platforms named in `--platforms` via platform plugins.
 
