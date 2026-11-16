@@ -619,6 +619,7 @@ class StaticCodeAnalyzer extends NodeVisitor {
     private Optional<Node> bindingPattern(ExpressionNode expression) {
         return switch (expression.parent()) {
             case BracedExpressionNode braced -> bindingPattern(braced);
+            case TypeCastExpressionNode cast when cast.typeCastParam().type().isEmpty() -> bindingPattern(cast);
             case VariableDeclarationNode variable -> destructuringPattern(variable.typedBindingPattern());
             case ModuleVariableDeclarationNode variable -> destructuringPattern(variable.typedBindingPattern());
             case LetVariableDeclarationNode variable -> destructuringPattern(variable.typedBindingPattern());

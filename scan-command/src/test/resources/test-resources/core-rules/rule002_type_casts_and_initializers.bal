@@ -80,3 +80,10 @@ function withLetDestructuring() returns int => let [F, int] [f, n] = [function(i
 
 function withUntypedLetDestructuring() returns int => let [any, int] [g, n] =
         [function(int a, int b) returns int => a, 1] in n; // warning
+
+function annotatedDestructuring() returns int {
+    [F, int] [f, n] = <@Tag>[function(int a, int b) returns int => a, 1];
+    [any, int] [h, k] = <@Tag>[function(int a, int b) returns int => a, 1]; // warning
+    _ = h;
+    return f(n, 2) + k + (let [F, int] [g, m] = <@Tag>[function(int a, int b) returns int => a, 1] in g(m, 2));
+}
