@@ -39,7 +39,7 @@ Scan.toml:1:1: error: unknown table 'gates'; expected [[analyzer]], [[platform]]
 Scan.toml:5:15: error: invalid value '0' for 'failOnCount'; expected a whole number of 1 or more
 ```
 
-`bal scan --list-rules` stops only on the errors that change the available rules, such as a TOML syntax error, and not on an unknown table. The editor ignores invalid settings.
+`bal scan --list-rules` stops only on a TOML syntax error and on `analyzer` written in a form other than `[[analyzer]]` tables or `analyzer = []`. It does not stop on the other errors, including an unknown table or key: a misspelled analyzer table such as `[[analyzers]]` is ignored, and the rules of its analyzer are not listed. The editor ignores invalid settings.
 
 # Configuration for Platform Plugins
 
