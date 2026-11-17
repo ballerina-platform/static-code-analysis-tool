@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.14.0] - 2026-11-17
 
+Built against Ballerina 2201.13.2.
+
 ### Changed
 
 - **Breaking:** The `location` of each issue in `scan_results.json` and in the JSON printed to standard output gives one-based lines and columns, as the SARIF report and the compiler's diagnostics do, and the path of the file relative to the package root, or to the workspace root in the output and combined report of a workspace scan, instead of only its file name. The `scan_results.json` of each workspace package gives paths relative to the root of that package. Consumers that added one to the lines or columns, or matched files by name, must be updated. `ScanUtils.convertIssuesToJsonString(List, Project, Map)` is added, and the overloads without the project are deprecated, as they can give only the file name; they also give one-based lines and columns now, as does the JSON printed by the deprecated `ScanUtils.printToConsole(List, PrintStream)` and `printToConsole(List, PrintStream, boolean, Project)`, so a platform plugin or other code that calls them must be updated too. The `Issue` objects that platform plugins receive are unchanged, and `Issue.location()` stays zero-based. ([#172](https://github.com/ballerina-platform/static-code-analysis-tool/issues/172), [#152](https://github.com/ballerina-platform/static-code-analysis-tool/issues/152), [#174](https://github.com/ballerina-platform/static-code-analysis-tool/pull/174))
@@ -135,7 +137,7 @@ Built against Ballerina 2201.10.2.
 - Loading analyzers from compiler plugins and reporting to static code analysis platforms with `--platforms`.
 
 [Unreleased]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.14.0...HEAD
-[0.14.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.12.0...v0.14.0
+[0.14.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.10.0...v0.11.0
