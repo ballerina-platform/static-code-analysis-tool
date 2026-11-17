@@ -4,7 +4,7 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. This branch maintains the 0.11.x line for Ballerina 2201.12 (Update 12). Releases for newer distributions are made from `main`.
 
-## [Unreleased]
+## [0.11.2] - 2026-11-17
 
 Built against Ballerina 2201.12.0.
 
@@ -109,7 +109,8 @@ Built against Ballerina 2201.10.2.
 - Rule selection with `--include-rules`, `--exclude-rules` and `--list-rules`, and configuration through `Scan.toml`, including remote configurations.
 - Loading analyzers from compiler plugins and reporting to static code analysis platforms with `--platforms`.
 
-[Unreleased]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.11.1...support/dist-2201.12/0.11.x
+[Unreleased]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.11.2...support/dist-2201.12/0.11.x
+[0.11.2]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ballerina-platform/static-code-analysis-tool/compare/v0.9.0...v0.10.0
