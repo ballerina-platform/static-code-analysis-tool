@@ -4,6 +4,13 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. This branch maintains the 0.11.x line for Ballerina 2201.12 (Update 12). Releases for newer distributions are made from `main`.
 
+## [Unreleased]
+
+### Fixed
+
+- An `[[analyzer]]` in `Scan.toml` that cannot be resolved, such as one with a misspelled `org` or `name` or a `version` that does not exist, fails the scan and `--list-rules` with a Scan.toml error at its position, with the resolution message when there is one, instead of being skipped while the scan looked clean. (backport of [#230](https://github.com/ballerina-platform/static-code-analysis-tool/pull/230); [#191](https://github.com/ballerina-platform/static-code-analysis-tool/issues/191))
+- An `[[analyzer]]` entry with an unknown key, a missing, empty or invalid `org` or `name`, a `version` that is not a version, such as `"latest"`, a `repository` other than `"local"`, or `repository = "local"` without a `version` is a Scan.toml error at its position, instead of the entry or the value being left out without notice. A pre-release `version`, such as `"1.0.0-alpha"`, is accepted. (backport of [#230](https://github.com/ballerina-platform/static-code-analysis-tool/pull/230); [#191](https://github.com/ballerina-platform/static-code-analysis-tool/issues/191), [#190](https://github.com/ballerina-platform/static-code-analysis-tool/issues/190))
+
 ## [0.11.2] - 2026-11-17
 
 Built against Ballerina 2201.12.0.

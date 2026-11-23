@@ -31,8 +31,10 @@ import io.ballerina.projects.ModuleId;
 import io.ballerina.projects.Package;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectKind;
+import io.ballerina.projects.SemanticVersion;
 import io.ballerina.projects.TomlDocument;
 import io.ballerina.projects.internal.model.Target;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
@@ -82,7 +84,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
+import java.util.function.Predicate;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -95,7 +97,6 @@ import static io.ballerina.scan.utils.Constants.ANALYZER_ORG;
 import static io.ballerina.scan.utils.Constants.ANALYZER_REPOSITORY;
 import static io.ballerina.scan.utils.Constants.ANALYZER_TABLE;
 import static io.ballerina.scan.utils.Constants.ANALYZER_VERSION;
-import static io.ballerina.scan.utils.Constants.CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN;
 import static io.ballerina.scan.utils.Constants.EXCLUDE_KEY;
 import static io.ballerina.scan.utils.Constants.GATE_FAIL_ON_COUNT;
 import static io.ballerina.scan.utils.Constants.GATE_FAIL_ON_SEVERITY;
@@ -177,6 +178,10 @@ public final class ScanUtils {
      */
     public static final String GATE_COUNT_VALUES = "a whole number of 1 or more";
 
+    private static final String ANALYZER_KEY_VALUES = "org, name, version or repository";
+    private static final String ANALYZER_ORG_VALUES = "an organization name, such as \"ballerina\"";
+    private static final String ANALYZER_NAME_VALUES = "a package name, such as \"example_analyzer\"";
+    private static final String ANALYZER_VERSION_VALUES = "a version, such as \"1.0.0\"";
     private static final String RULE_LIST_VALUES = "an array of rule IDs, such as [\"ballerina:1\"]";
     // The top-level tables of a Scan.toml file, each written as it is expected
     private static final Map<String, String> TOP_LEVEL_TABLES = tableForms(List.of(ANALYZER_TABLE, PLATFORM_TABLE),
@@ -1117,7 +1122,10 @@ public final class ScanUtils {
         }
         TopLevelNode analyzerNode = entries.get(ANALYZER_TABLE);
         if (analyzerNode instanceof TomlTableArrayNode) {
-            scanTomlDocumentContent.getTables(ANALYZER_TABLE).forEach(loadAnalyzer(scanTomlFile));
+            for (Toml analyzerTable : scanTomlDocumentContent.getTables(ANALYZER_TABLE)) {
+                loadAnalyzer(analyzerTable, scanTomlFile, analyzerErrors);
+            }
+            errors.addAll(analyzerErrors);
         } else if (analyzerNode != null && !isEmptyArray(analyzerNode)) {
             ConfigError error = new ConfigError(analyzerNode.location().lineRange(),
                     DiagnosticLog.error(DiagnosticCode.INVALID_ANALYZER_LIST));
@@ -1173,6 +1181,7 @@ public final class ScanUtils {
             }
         });
         errors.sort(ConfigError.BY_POSITION);
+        analyzerErrors.sort(ConfigError.BY_POSITION);
         switch (validation) {
             case ALL -> failOnConfigErrors(displayPath, errors);
             case RULES -> failOnConfigErrors(displayPath, analyzerErrors);
@@ -1322,34 +1331,84 @@ public final class ScanUtils {
     }
 
     /**
-     * Loads an analyzer to the {@link ScanTomlFile} representation of the Scan.toml
-     * file.
+     * Loads an analyzer to the {@link ScanTomlFile} representation of the Scan.toml file, adding an error for an
+     * unknown key or a missing or invalid value, since the analyzer would otherwise be left out without notice.
      *
-     * @param scanTomlFile the in-memory representation of the Scan.toml file
+     * @param analyzerTable the [[analyzer]] table
+     * @param scanTomlFile  the in-memory representation of the Scan.toml file
+     * @param errors        the errors found in the file
      */
-    private static Consumer<Toml> loadAnalyzer(ScanTomlFile scanTomlFile) {
-        return analyzerTable -> {
-            Map<String, Object> properties = analyzerTable.toMap();
-            Object analyzerOrg = properties.remove(ANALYZER_ORG);
-            String org = (analyzerOrg instanceof String) ? analyzerOrg.toString() : null;
-            Object analyzerName = properties.remove(ANALYZER_NAME);
-            String name = (analyzerName instanceof String) ? analyzerName.toString() : null;
-            Pattern versionPattern = Pattern.compile(CUSTOM_RULES_COMPILER_PLUGIN_VERSION_PATTERN);
-            Object analyzerVersion = properties.remove(ANALYZER_VERSION);
-            String version = (analyzerVersion instanceof String) && versionPattern.matcher(analyzerVersion.toString())
-                    .matches() ? analyzerVersion.toString() : null;
-            Object analyzerRepository = properties.remove(ANALYZER_REPOSITORY);
-            String repository = (analyzerRepository instanceof String) ? analyzerRepository.toString() : null;
-
-            if (org == null || org.isEmpty() || name == null || name.isEmpty()) {
-                return;
+    private static void loadAnalyzer(Toml analyzerTable, ScanTomlFile scanTomlFile, List<ConfigError> errors) {
+        List<String> keys = List.of(ANALYZER_ORG, ANALYZER_NAME, ANALYZER_VERSION, ANALYZER_REPOSITORY);
+        analyzerTable.rootNode().entries().forEach((key, node) -> {
+            if (!keys.contains(key)) {
+                errors.add(new ConfigError(node.location().lineRange(),
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_KEY, key, "[" + ANALYZER_TABLE + "]",
+                                ANALYZER_KEY_VALUES)));
             }
-            boolean isLocalRepository = repository != null && repository.equals(LOCAL_REPOSITORY_NAME) &&
-                    version != null && !version.isEmpty();
-            String repo = isLocalRepository ? repository : null;
-            ScanTomlFile.Analyzer analyzer = new ScanTomlFile.Analyzer(org, name, version, repo);
-            scanTomlFile.setAnalyzer(analyzer);
-        };
+        });
+        LineRange tableRange = analyzerTable.rootNode().location().lineRange();
+        // Checked with the compiler's own rules, which also keeps a value from adding text to the generated import
+        Optional<String> org = analyzerName(analyzerTable, ANALYZER_ORG, ProjectUtils::validateOrgName,
+                ANALYZER_ORG_VALUES, tableRange, errors);
+        Optional<String> name = analyzerName(analyzerTable, ANALYZER_NAME, ProjectUtils::validatePackageName,
+                ANALYZER_NAME_VALUES, tableRange, errors);
+        Optional<String> version = analyzerTable.get(ANALYZER_VERSION).flatMap(value -> {
+            if (value.kind() == TomlType.STRING && isVersion(value.toNativeValue().toString())) {
+                return Optional.of(value.toNativeValue().toString());
+            }
+            errors.add(invalidConfigValue(value, ANALYZER_VERSION, ANALYZER_VERSION_VALUES));
+            return Optional.empty();
+        });
+        Optional<String> repository = analyzerTable.get(ANALYZER_REPOSITORY).flatMap(value -> {
+            if (value.kind() == TomlType.STRING && LOCAL_REPOSITORY_NAME.equals(value.toNativeValue())) {
+                return Optional.of(LOCAL_REPOSITORY_NAME);
+            }
+            errors.add(invalidConfigValue(value, ANALYZER_REPOSITORY, "\"" + LOCAL_REPOSITORY_NAME + "\""));
+            return Optional.empty();
+        });
+        // A package is found in the local repository only by its exact version, as in a Ballerina.toml dependency
+        if (repository.isPresent() && analyzerTable.get(ANALYZER_VERSION).isEmpty()) {
+            errors.add(new ConfigError(tableRange, DiagnosticLog.error(DiagnosticCode.MISSING_CONFIG_KEY,
+                    ANALYZER_VERSION, "[[" + ANALYZER_TABLE + "]] with " + ANALYZER_REPOSITORY + " = \""
+                            + LOCAL_REPOSITORY_NAME + "\"")));
+        }
+        if (org.isEmpty() || name.isEmpty()) {
+            return;
+        }
+        String repo = version.isPresent() ? repository.orElse(null) : null;
+        scanTomlFile.setAnalyzer(new ScanTomlFile.Analyzer(org.get(), name.get(), version.orElse(null), repo),
+                tableRange);
+    }
+
+    /**
+     * Returns the org or name of an [[analyzer]] table, adding an error when it is missing or not a valid name.
+     */
+    private static Optional<String> analyzerName(Toml analyzerTable, String key, Predicate<String> isValid,
+                                                 String expected, LineRange tableRange, List<ConfigError> errors) {
+        Optional<TomlValueNode> value = analyzerTable.get(key);
+        if (value.isEmpty()) {
+            errors.add(new ConfigError(tableRange, DiagnosticLog.error(DiagnosticCode.MISSING_CONFIG_KEY, key,
+                    "[[" + ANALYZER_TABLE + "]]")));
+            return Optional.empty();
+        }
+        if (value.get().kind() == TomlType.STRING) {
+            String text = value.get().toNativeValue().toString();
+            if (!text.isEmpty() && isValid.test(text)) {
+                return Optional.of(text);
+            }
+        }
+        errors.add(invalidConfigValue(value.get(), key, expected));
+        return Optional.empty();
+    }
+
+    private static boolean isVersion(String version) {
+        try {
+            SemanticVersion.from(version);
+            return true;
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     /**

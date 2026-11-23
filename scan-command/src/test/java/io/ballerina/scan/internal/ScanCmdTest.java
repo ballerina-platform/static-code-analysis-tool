@@ -342,12 +342,20 @@ public class ScanCmdTest extends BaseTest {
     void testScanCommandWithListRulesFlag() throws IOException {
         Path ballerinaProject = testResources.resolve("test-resources")
                 .resolve("bal-project-with-config-file");
-        System.setProperty("user.dir", ballerinaProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--list-rules"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-        System.setProperty("user.dir", userDir);
+        Path scanToml = ballerinaProject.resolve("Scan.toml");
+        String original = Files.readString(scanToml);
+        // The file also has invalid [[analyzer]] entries for the lenient loading tests, which fail --list-rules
+        Files.writeString(scanToml, original.substring(0, original.indexOf("# Invalid use cases")));
+        try {
+            System.setProperty("user.dir", ballerinaProject.toString());
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            String[] args = {"--list-rules"};
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+        } finally {
+            System.setProperty("user.dir", userDir);
+            Files.writeString(scanToml, original);
+        }
         String expected = getExpectedOutput("list-rules-output.txt");
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
