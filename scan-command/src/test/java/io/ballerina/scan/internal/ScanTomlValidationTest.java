@@ -110,6 +110,19 @@ public class ScanTomlValidationTest extends BaseTest {
                         path = "plugin.jar"
                         """, List.of("Scan.toml:2:8: error: invalid value '{id=examplePlatform}' for 'name'; expected "
                         + "a platform name, such as \"sonarqube\"")},
+                // --platforms cannot select a platform without a name, so it would be left out without notice
+                {"""
+                        [[platform]]
+                        nmae = "sonarqube"
+                        path = "plugin.jar"
+                        """, List.of("Scan.toml:1:1: error: [[platform]] entry without a 'name'; add the name that "
+                        + "--platforms selects it by")},
+                {"""
+                        [[platform]]
+                        name = ""
+                        path = "plugin.jar"
+                        """, List.of("Scan.toml:2:8: error: invalid value '' for 'name'; expected a platform name, "
+                        + "such as \"sonarqube\"")},
                 {"""
                         platform = "plugin.jar"
                         """, List.of("Scan.toml:1:1: error: 'platform' must be written as [[platform]] tables, or as "
@@ -285,6 +298,32 @@ public class ScanTomlValidationTest extends BaseTest {
         run = scan(project);
         Assert.assertEquals(run.exitCode(), 0, "a platform without a path is ignored until it is named: "
                 + run.output());
+    }
+
+    @Test(description = "test a platform without a name is reported, not as a platform that is not declared")
+    void testPlatformWithoutName() throws IOException {
+        Files.writeString(scanToml, """
+                [[platform]]
+                nmae = "sonarqube"
+                path = "plugin.jar"
+                """);
+        ScanRun run = scan(project, "--platforms=sonarqube");
+        Assert.assertEquals(run.exitCode(), 1, run.output());
+        Assert.assertEquals(run.errorReport(), """
+                bal scan: error: Scan.toml has 1 error
+                Scan.toml:1:1: error: [[platform]] entry without a 'name'; add the name that --platforms selects it \
+                by""");
+
+        // The editor loads the file leniently and leaves the platform out
+        Project loaded = ProjectLoader.loadProject(project);
+        System.setProperty("user.dir", project.toString());
+        try {
+            Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(loaded, printStream);
+            Assert.assertTrue(scanTomlFile.isPresent());
+            Assert.assertTrue(scanTomlFile.get().getPlatforms().isEmpty());
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
     }
 
     @Test(description = "test a missing platform is reported against the configuration file set by configPath")
