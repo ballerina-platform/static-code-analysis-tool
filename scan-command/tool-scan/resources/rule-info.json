@@ -3,10 +3,6 @@
     "title": "\"checkpanic\" should not be used",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "error-handling",
       "cwe",
@@ -15,10 +11,8 @@
       "owasp-2025-a10"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:1",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "COMPLETE",
     "impacts": [
       {
@@ -61,45 +55,21 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - \"checkpanic\" should not be used",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-1"
-        },
-        {
-          "title": "CWE-248",
-          "url": "https://cwe.mitre.org/data/definitions/248.html"
-        },
-        {
-          "title": "CWE-636",
-          "url": "https://cwe.mitre.org/data/definitions/636.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A10 Mishandling of Exceptional Conditions",
-          "url": "https://owasp.org/Top10/2025/A10_2025-Mishandling_of_Exceptional_Conditions/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Unused function parameters should be removed",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "unused",
       "cwe",
       "cwe-561"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:2",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "CLEAR",
     "impacts": [
       {
@@ -133,35 +103,19 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Unused function parameters should be removed",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-2"
-        },
-        {
-          "title": "CWE-561",
-          "url": "https://cwe.mitre.org/data/definitions/561.html"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Public functions should be \"isolated\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "concurrency"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:3",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "CONVENTIONAL",
     "impacts": [
       {
@@ -190,31 +144,19 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Public functions should be \"isolated\"",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-3"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Public methods should be \"isolated\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "concurrency"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:4",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "CONVENTIONAL",
     "impacts": [
       {
@@ -243,31 +185,19 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Public methods should be \"isolated\"",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-4"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Public classes should be \"isolated\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "concurrency"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:5",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "CONVENTIONAL",
     "impacts": [
       {
@@ -296,31 +226,19 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Public classes should be \"isolated\"",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-5"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Public objects should be \"isolated\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "concurrency"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:6",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "CONVENTIONAL",
     "impacts": [
       {
@@ -349,33 +267,21 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Public objects should be \"isolated\"",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-6"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Conditions should not always evaluate to \"true\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "trivial",
       "cwe",
       "cwe-571"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:7",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "LOGICAL",
     "impacts": [
       {
@@ -409,37 +315,21 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Conditions should not always evaluate to \"true\"",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-7"
-        },
-        {
-          "title": "CWE-571",
-          "url": "https://cwe.mitre.org/data/definitions/571.html"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Conditions should not always evaluate to \"false\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "trivial",
       "cwe",
       "cwe-570"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:8",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "LOGICAL",
     "impacts": [
       {
@@ -473,37 +363,21 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Conditions should not always evaluate to \"false\"",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-8"
-        },
-        {
-          "title": "CWE-570",
-          "url": "https://cwe.mitre.org/data/definitions/570.html"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Operations should not always evaluate to the same value",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "trivial",
       "cwe",
       "cwe-1164"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:9",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "LOGICAL",
     "impacts": [
       {
@@ -537,37 +411,21 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Operations should not always evaluate to the same value",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-9"
-        },
-        {
-          "title": "CWE-1164",
-          "url": "https://cwe.mitre.org/data/definitions/1164.html"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Variables should not be assigned to themselves",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "trivial",
       "cwe",
       "cwe-1164"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:10",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "LOGICAL",
     "impacts": [
       {
@@ -601,37 +459,21 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Variables should not be assigned to themselves",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-10"
-        },
-        {
-          "title": "CWE-1164",
-          "url": "https://cwe.mitre.org/data/definitions/1164.html"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Unused private class fields should be removed",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "unused",
       "cwe",
       "cwe-561"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:11",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "CLEAR",
     "impacts": [
       {
@@ -665,37 +507,21 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Unused private class fields should be removed",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-11"
-        },
-        {
-          "title": "CWE-561",
-          "url": "https://cwe.mitre.org/data/definitions/561.html"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Range expressions should move in the intended direction",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "pitfall",
       "cwe",
       "cwe-561"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:12",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "LOGICAL",
     "impacts": [
       {
@@ -729,27 +555,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Range expressions should move in the intended direction",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-12"
-        },
-        {
-          "title": "CWE-561",
-          "url": "https://cwe.mitre.org/data/definitions/561.html"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Secrets should not be hard-coded",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "secrets",
       "credentials",
@@ -759,10 +571,8 @@
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:13",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -800,35 +610,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Secrets should not be hard-coded",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-13"
-        },
-        {
-          "title": "CWE-798",
-          "url": "https://cwe.mitre.org/data/definitions/798.html"
-        },
-        {
-          "title": "CWE-259",
-          "url": "https://cwe.mitre.org/data/definitions/259.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A07 Authentication Failures",
-          "url": "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Secrets should be read from configurable variables",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "secrets",
       "configurable",
@@ -837,10 +625,8 @@
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:14",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -877,31 +663,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Secrets should be read from configurable variables",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-14"
-        },
-        {
-          "title": "CWE-798",
-          "url": "https://cwe.mitre.org/data/definitions/798.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A07 Authentication Failures",
-          "url": "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Encryption should use secure cipher modes and padding schemes",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "crypto",
       "cipher",
@@ -911,10 +679,8 @@
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/crypto:1",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -976,35 +742,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Encryption should use secure cipher modes and padding schemes",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-crypto-1"
-        },
-        {
-          "title": "CWE-327",
-          "url": "https://cwe.mitre.org/data/definitions/327.html"
-        },
-        {
-          "title": "CWE-780",
-          "url": "https://cwe.mitre.org/data/definitions/780.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A04 Cryptographic Failures",
-          "url": "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Passwords should be hashed with slow hashing algorithms",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "1h"
-    },
     "tags": [
       "crypto",
       "hashing",
@@ -1014,10 +758,8 @@
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/crypto:2",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -1072,35 +814,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Passwords should be hashed with slow hashing algorithms",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-crypto-2"
-        },
-        {
-          "title": "CWE-916",
-          "url": "https://cwe.mitre.org/data/definitions/916.html"
-        },
-        {
-          "title": "CWE-327",
-          "url": "https://cwe.mitre.org/data/definitions/327.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A04 Cryptographic Failures",
-          "url": "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Initialization vectors should not be hard-coded",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "crypto",
       "cipher",
@@ -1109,10 +829,8 @@
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/crypto:3",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -1166,31 +884,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Initialization vectors should not be hard-coded",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-crypto-3"
-        },
-        {
-          "title": "CWE-323",
-          "url": "https://cwe.mitre.org/data/definitions/323.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A04 Cryptographic Failures",
-          "url": "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Publicly writable directories should not be used for file operations",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "file",
       "cwe",
@@ -1199,10 +899,8 @@
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/file:1",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -1240,35 +938,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Publicly writable directories should not be used for file operations",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-file-1"
-        },
-        {
-          "title": "CWE-377",
-          "url": "https://cwe.mitre.org/data/definitions/377.html"
-        },
-        {
-          "title": "CWE-379",
-          "url": "https://cwe.mitre.org/data/definitions/379.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A01 Broken Access Control",
-          "url": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "File function calls should not be vulnerable to path injection attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "1h"
-    },
     "tags": [
       "file",
       "injection",
@@ -1277,10 +953,8 @@
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/file:2",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "COMPLETE",
     "impacts": [
       {
@@ -1317,31 +991,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - File function calls should not be vulnerable to path injection attacks",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-file-2"
-        },
-        {
-          "title": "CWE-22",
-          "url": "https://cwe.mitre.org/data/definitions/22.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A01 Broken Access Control",
-          "url": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "HTTP resources should not use the \"default\" accessor",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "http",
       "csrf",
@@ -1351,10 +1007,8 @@
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/http:1",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -1392,35 +1046,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - HTTP resources should not use the \"default\" accessor",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-http-1"
-        },
-        {
-          "title": "CWE-352",
-          "url": "https://cwe.mitre.org/data/definitions/352.html"
-        },
-        {
-          "title": "CWE-749",
-          "url": "https://cwe.mitre.org/data/definitions/749.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A01 Broken Access Control",
-          "url": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Cross-Origin Resource Sharing policies should not be permissive",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "http",
       "cors",
@@ -1429,10 +1061,8 @@
       "owasp-2025-a02"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/http:2",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -1469,31 +1099,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Cross-Origin Resource Sharing policies should not be permissive",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-http-2"
-        },
-        {
-          "title": "CWE-942",
-          "url": "https://cwe.mitre.org/data/definitions/942.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A02 Security Misconfiguration",
-          "url": "https://owasp.org/Top10/2025/A02_2025-Security_Misconfiguration/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Server-side requests should not be vulnerable to traversing attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "1h"
-    },
     "tags": [
       "http",
       "ssrf",
@@ -1502,10 +1114,8 @@
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/http:3",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "COMPLETE",
     "impacts": [
       {
@@ -1541,31 +1151,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Server-side requests should not be vulnerable to traversing attacks",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-http-3"
-        },
-        {
-          "title": "CWE-918",
-          "url": "https://cwe.mitre.org/data/definitions/918.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A01 Broken Access Control",
-          "url": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "HTTP request redirections should not be open to forging attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "1h"
-    },
     "tags": [
       "http",
       "redirect",
@@ -1574,10 +1166,8 @@
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/http:4",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "COMPLETE",
     "impacts": [
       {
@@ -1613,31 +1203,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - HTTP request redirections should not be open to forging attacks",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-http-4"
-        },
-        {
-          "title": "CWE-601",
-          "url": "https://cwe.mitre.org/data/definitions/601.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A01 Broken Access Control",
-          "url": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "I/O function calls should not be vulnerable to path injection attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "1h"
-    },
     "tags": [
       "io",
       "injection",
@@ -1646,10 +1218,8 @@
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/io:1",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "COMPLETE",
     "impacts": [
       {
@@ -1686,31 +1256,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - I/O function calls should not be vulnerable to path injection attacks",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-io-1"
-        },
-        {
-          "title": "CWE-22",
-          "url": "https://cwe.mitre.org/data/definitions/22.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A01 Broken Access Control",
-          "url": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Configurable variables should not be printed to the console",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "io",
       "logging",
@@ -1720,10 +1272,8 @@
       "owasp-2025-a09"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/io:2",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -1762,35 +1312,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Configurable variables should not be printed to the console",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-io-2"
-        },
-        {
-          "title": "CWE-532",
-          "url": "https://cwe.mitre.org/data/definitions/532.html"
-        },
-        {
-          "title": "CWE-200",
-          "url": "https://cwe.mitre.org/data/definitions/200.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A09 Security Logging and Alerting Failures",
-          "url": "https://owasp.org/Top10/2025/A09_2025-Security_Logging_and_Alerting_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Sensitive configurable variables should not be logged",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "log",
       "leak",
@@ -1799,10 +1327,8 @@
       "owasp-2025-a09"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/log:1",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -1839,31 +1365,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Sensitive configurable variables should not be logged",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-log-1"
-        },
-        {
-          "title": "CWE-532",
-          "url": "https://cwe.mitre.org/data/definitions/532.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A09 Security Logging and Alerting Failures",
-          "url": "https://owasp.org/Top10/2025/A09_2025-Security_Logging_and_Alerting_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Log files should not be written to world-writable directories",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "log",
       "file-system",
@@ -1872,10 +1380,8 @@
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/log:2",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -1912,31 +1418,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Log files should not be written to world-writable directories",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-log-2"
-        },
-        {
-          "title": "CWE-379",
-          "url": "https://cwe.mitre.org/data/definitions/379.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A01 Broken Access Control",
-          "url": "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "OS commands should not be vulnerable to argument injection attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "1h"
-    },
     "tags": [
       "os",
       "injection",
@@ -1946,10 +1434,8 @@
       "owasp-2025-a05"
     ],
     "defaultSeverity": "Blocker",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/os:1",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "COMPLETE",
     "impacts": [
       {
@@ -1987,35 +1473,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - OS commands should not be vulnerable to argument injection attacks",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-os-1"
-        },
-        {
-          "title": "CWE-78",
-          "url": "https://cwe.mitre.org/data/definitions/78.html"
-        },
-        {
-          "title": "CWE-88",
-          "url": "https://cwe.mitre.org/data/definitions/88.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A05 Injection",
-          "url": "https://owasp.org/Top10/2025/A05_2025-Injection/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Environment variables should not be set from user input",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "1h"
-    },
     "tags": [
       "os",
       "injection",
@@ -2026,10 +1490,8 @@
       "owasp-2025-a06"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/os:2",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "COMPLETE",
     "impacts": [
       {
@@ -2068,39 +1530,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Environment variables should not be set from user input",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-os-2"
-        },
-        {
-          "title": "CWE-454",
-          "url": "https://cwe.mitre.org/data/definitions/454.html"
-        },
-        {
-          "title": "CWE-15",
-          "url": "https://cwe.mitre.org/data/definitions/15.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A02 Security Misconfiguration",
-          "url": "https://owasp.org/Top10/2025/A02_2025-Security_Misconfiguration/"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A06 Insecure Design",
-          "url": "https://owasp.org/Top10/2025/A06_2025-Insecure_Design/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Commands should not be executed through a shell interpreter",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "os",
       "injection",
@@ -2109,10 +1545,8 @@
       "owasp-2025-a05"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/os:3",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2149,31 +1583,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Commands should not be executed through a shell interpreter",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-os-3"
-        },
-        {
-          "title": "CWE-78",
-          "url": "https://cwe.mitre.org/data/definitions/78.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A05 Injection",
-          "url": "https://owasp.org/Top10/2025/A05_2025-Injection/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Commands should not be resolved through the \"PATH\" environment variable",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "os",
       "untrusted-search-path",
@@ -2182,10 +1598,8 @@
       "owasp-2025-a05"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/os:4",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2222,31 +1636,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Commands should not be resolved through the \"PATH\" environment variable",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-os-4"
-        },
-        {
-          "title": "CWE-426",
-          "url": "https://cwe.mitre.org/data/definitions/426.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A05 Injection",
-          "url": "https://owasp.org/Top10/2025/A05_2025-Injection/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "JSON Web Tokens should be signed and verified with strong algorithms",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "jwt",
       "crypto",
@@ -2256,10 +1652,8 @@
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:1",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2297,35 +1691,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - JSON Web Tokens should be signed and verified with strong algorithms",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-1"
-        },
-        {
-          "title": "CWE-327",
-          "url": "https://cwe.mitre.org/data/definitions/327.html"
-        },
-        {
-          "title": "CWE-347",
-          "url": "https://cwe.mitre.org/data/definitions/347.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A04 Cryptographic Failures",
-          "url": "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "JSON Web Tokens should be validated with a signature configuration",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "jwt",
       "authentication",
@@ -2334,10 +1706,8 @@
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:2",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2374,31 +1744,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - JSON Web Tokens should be validated with a signature configuration",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-2"
-        },
-        {
-          "title": "CWE-347",
-          "url": "https://cwe.mitre.org/data/definitions/347.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A07 Authentication Failures",
-          "url": "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "JSON Web Token validation should check the issuer and the audience",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "jwt",
       "authentication",
@@ -2407,10 +1759,8 @@
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:3",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2447,31 +1797,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - JSON Web Token validation should check the issuer and the audience",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-3"
-        },
-        {
-          "title": "CWE-287",
-          "url": "https://cwe.mitre.org/data/definitions/287.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A07 Authentication Failures",
-          "url": "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "JSON Web Tokens should not be issued with a long expiry time",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "jwt",
       "session-management",
@@ -2480,10 +1812,8 @@
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:4",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2520,31 +1850,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - JSON Web Tokens should not be issued with a long expiry time",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-4"
-        },
-        {
-          "title": "CWE-613",
-          "url": "https://cwe.mitre.org/data/definitions/613.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A07 Authentication Failures",
-          "url": "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "JSON Web Tokens should not be validated with a large clock skew",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "jwt",
       "session-management",
@@ -2553,10 +1865,8 @@
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:5",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2593,31 +1903,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - JSON Web Tokens should not be validated with a large clock skew",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-5"
-        },
-        {
-          "title": "CWE-613",
-          "url": "https://cwe.mitre.org/data/definitions/613.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A07 Authentication Failures",
-          "url": "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "TLS validation should not be disabled on JWKS endpoint clients",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "jwt",
       "tls",
@@ -2627,10 +1919,8 @@
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:6",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2668,35 +1958,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - TLS validation should not be disabled on JWKS endpoint clients",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-6"
-        },
-        {
-          "title": "CWE-295",
-          "url": "https://cwe.mitre.org/data/definitions/295.html"
-        },
-        {
-          "title": "CWE-296",
-          "url": "https://cwe.mitre.org/data/definitions/296.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A04 Cryptographic Failures",
-          "url": "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "JSON Web Tokens should not be decoded without being verified",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "20min"
-    },
     "tags": [
       "jwt",
       "authentication",
@@ -2706,10 +1974,8 @@
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:7",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2747,35 +2013,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - JSON Web Tokens should not be decoded without being verified",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-7"
-        },
-        {
-          "title": "CWE-347",
-          "url": "https://cwe.mitre.org/data/definitions/347.html"
-        },
-        {
-          "title": "CWE-345",
-          "url": "https://cwe.mitre.org/data/definitions/345.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A07 Authentication Failures",
-          "url": "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Server hostnames should be verified during SSL/TLS connections",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "email",
       "tls",
@@ -2785,10 +2029,8 @@
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/email:1",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2826,35 +2068,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Server hostnames should be verified during SSL/TLS connections",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-email-1"
-        },
-        {
-          "title": "CWE-297",
-          "url": "https://cwe.mitre.org/data/definitions/297.html"
-        },
-        {
-          "title": "CWE-295",
-          "url": "https://cwe.mitre.org/data/definitions/295.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A07 Authentication Failures",
-          "url": "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Mail server connections should use TLS",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "email",
       "tls",
@@ -2863,10 +2083,8 @@
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/email:2",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2903,31 +2121,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Mail server connections should use TLS",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-email-2"
-        },
-        {
-          "title": "CWE-319",
-          "url": "https://cwe.mitre.org/data/definitions/319.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A04 Cryptographic Failures",
-          "url": "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Mail clients should not fall back to cleartext when TLS is unavailable",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "email",
       "tls",
@@ -2937,10 +2137,8 @@
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/email:3",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -2978,35 +2176,13 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Mail clients should not fall back to cleartext when TLS is unavailable",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-email-3"
-        },
-        {
-          "title": "CWE-757",
-          "url": "https://cwe.mitre.org/data/definitions/757.html"
-        },
-        {
-          "title": "CWE-319",
-          "url": "https://cwe.mitre.org/data/definitions/319.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A04 Cryptographic Failures",
-          "url": "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"
-        }
-      ]
+      }
     }
   },
   {
     "title": "Weak TLS protocol versions should not be used",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant/Issue",
-      "constantCost": "10min"
-    },
     "tags": [
       "email",
       "tls",
@@ -3016,10 +2192,8 @@
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/email:4",
     "scope": "All",
-    "quickfix": "unknown",
     "cleanCodeAttribute": "TRUSTWORTHY",
     "impacts": [
       {
@@ -3057,25 +2231,7 @@
             ]
           }
         ]
-      },
-      "moreInfo": [
-        {
-          "title": "Ballerina scan rules - Weak TLS protocol versions should not be used",
-          "url": "https://ballerina.io/learn/scan-rules/#ballerina-email-4"
-        },
-        {
-          "title": "CWE-327",
-          "url": "https://cwe.mitre.org/data/definitions/327.html"
-        },
-        {
-          "title": "CWE-326",
-          "url": "https://cwe.mitre.org/data/definitions/326.html"
-        },
-        {
-          "title": "OWASP Top 10:2025 - A04 Cryptographic Failures",
-          "url": "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"
-        }
-      ]
+      }
     }
   }
 ]
