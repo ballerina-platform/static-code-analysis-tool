@@ -1,830 +1,2237 @@
 [
   {
-    "title": "Avoid checkpanic",
+    "title": "\"checkpanic\" should not be used",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "error-handling",
+      "cwe",
       "cwe-248",
       "cwe-636",
       "owasp-2025-a10"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:1",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "COMPLETE",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        248,
+        636
+      ],
+      "owaspTop10_2025": [
+        "A10"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-1",
+    "description": {
+      "whyIsThisAnIssue": "When `checkpanic` is used, the program terminates abruptly with a `panic` unless it’s handled explicitly along the call\nstack.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "public function checkResult() {\n    json result = checkpanic getResult(); // Noncompliant\n    \n    // ...\n}\n\npublic function getResult() returns json|error {\n    // ...\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Check and handle the error explicitly.",
+                "language": "ballerina",
+                "code": "public function checkResult() {\n    json|error result = getResult();\n\n    if result is error {\n        // handle error\n    }\n\n    // ...\n}\n\npublic function getResult() returns json|error {\n    // ...\n}\n"
+              },
+              {
+                "description": "Make use of the `check` keyword, which immediately returns the error or transfers control to an `on-fail` block, in\ncontrast to `checkpanic` and panicking if an expression or action evaluates to an error.",
+                "language": "ballerina",
+                "code": "public function checkResult() returns error? {\n    json result = check getResult();\n}\n\npublic function getResult() returns json|error {\n    // ...\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Unused function parameter",
+    "title": "Unused function parameters should be removed",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "unused",
+      "cwe",
       "cwe-561"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:2",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "CLEAR",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        561
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-2",
+    "description": {
+      "whyIsThisAnIssue": "Unused function parameters cause unnecessary code complexity and can lead to confusion for developers maintaining the\ncode. They may also indicate potential errors in function design or changes in requirements that were not properly\nimplemented.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/io;\n\nfunction name(int a, int b) { // Noncompliant: \"b\" is never used\n   io:println(a);\n}\n\npublic function main() {\n   name(1, 2);\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Remove unused function parameters to improve code clarity and maintainability. If the parameter is intended for future\nuse or completeness, consider documenting it or refactoring the function to use it.",
+                "language": "ballerina",
+                "code": "import ballerina/io;\n\nfunction name(int a) {\n   io:println(a);\n}\n\npublic function main() {\n   name(1);\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Non isolated public function",
+    "title": "Public functions should be \"isolated\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "concurrency"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:3",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-3",
+    "description": {
+      "whyIsThisAnIssue": "A non-isolated function will not be called concurrently. Only isolated functions are called concurrently given that they\nare guaranteed to be safe if the arguments are also safe. To allow being called concurrently, a public function should\nbe marked as isolated.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "public function helperFunction() { // Noncompliant\n   // isolated code\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Mark public functions as isolated to ensure the function can be called concurrently.",
+                "language": "ballerina",
+                "code": "public isolated function helperFunction() {\n   // isolated code\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Non isolated public method",
+    "title": "Public methods should be \"isolated\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "concurrency"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:4",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-4",
+    "description": {
+      "whyIsThisAnIssue": "Class methods can be isolated. An isolated method is the same as an isolated function with self treated as a parameter.\nA non-isolated method will not be called concurrently. Only isolated methods are called concurrently given that they are\nguaranteed to be safe if the arguments are also safe. To allow being called concurrently, a public method should be\nmarked as isolated.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "class EvenNumber {\n    int i = 1;\n\n    public function generate() returns int { // Noncompliant\n        return self.i * 2;\n    }\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Mark public methods as isolated to ensure the method can be called concurrently.",
+                "language": "ballerina",
+                "code": "class EvenNumber {\n    int i = 1;\n\n    public isolated function generate() returns int {\n        lock {\n            return self.i * 2;\n        }\n    }\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Non isolated public class",
+    "title": "Public classes should be \"isolated\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "concurrency"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:5",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-5",
+    "description": {
+      "whyIsThisAnIssue": "A class defined as isolated is similar to a module with isolated module-level variables. A non-isolated class will not\nbe accessed concurrently. Only isolated classes are accessed concurrently. To allow being accessed concurrently, a\npublic class should be marked as isolated.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "public class EvenNumber { // Noncompliant\n    int i = 1;\n\n    public isolated function generate() returns int {\n        lock {\n            return self.i * 2;\n        }\n    }\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Mark public classes as isolated to ensure the class can be used in a concurrent environment.",
+                "language": "ballerina",
+                "code": "public isolated class EvenNumber {\n    int i = 1;\n\n    public isolated function generate() returns int {\n        lock {\n            return self.i * 2;\n        }\n    }\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Non isolated public object",
+    "title": "Public objects should be \"isolated\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "concurrency"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:6",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-6",
+    "description": {
+      "whyIsThisAnIssue": "A non-isolated object will not be accessed concurrently. Only isolated objects are accessed concurrently. To allow being\naccessed concurrently, a public object should be marked as isolated.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "public type Hashable object { // Noncompliant\n    function hash() returns int;\n};\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Mark public objects as isolated to ensure the object can be used in a concurrent environment.",
+                "language": "ballerina",
+                "code": "public type Hashable isolated object {\n    function hash() returns int;\n};\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "This operation always evaluates to true",
+    "title": "Conditions should not always evaluate to \"true\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "trivial",
+      "cwe",
       "cwe-571"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:7",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "LOGICAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        571
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-7",
+    "description": {
+      "whyIsThisAnIssue": "Conditions that are always true don't do any meaningful computation. They increase code complexity, reduce the code\nreadability and potentially hide logical errors.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "public function main() {\n   int a = 1;\n   boolean b = a <= int:MAX_VALUE; // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Compare against a value that can change the result, or remove the condition.",
+                "language": "ballerina",
+                "code": "public function main() {\n   int a = 1;\n   boolean b = a <= 10;\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "This operation always evaluates to false",
+    "title": "Conditions should not always evaluate to \"false\"",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "trivial",
+      "cwe",
       "cwe-570"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:8",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "LOGICAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        570
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-8",
+    "description": {
+      "whyIsThisAnIssue": "Conditions that are always false indicate unreachable code or logic that will never execute. This can clutter the\ncodebase, make it harder to understand, and potentially hide bugs or unintentional logic errors.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "public function main() {\n   int a = 1;\n   boolean b = a <= int:MIN_VALUE; // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Compare against a value that can change the result, or remove the condition.",
+                "language": "ballerina",
+                "code": "public function main() {\n   int a = 1;\n   boolean b = a < 0;\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "This operation always evaluates to the same value",
+    "title": "Operations should not always evaluate to the same value",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "trivial",
+      "cwe",
       "cwe-1164"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:9",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "LOGICAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        1164
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-9",
+    "description": {
+      "whyIsThisAnIssue": "Conditions which always evaluate to the same value don't do any meaningful computation. They increase code complexity,\nreduce the code readability, and potentially hide logical errors.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "public function main() {\n   int x = 10;\n   int a = x % 1; // Noncompliant: always evaluates to zero\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Use an operand that makes the result depend on the input.",
+                "language": "ballerina",
+                "code": "public function main() {\n   int x = 10;\n   int a = x % 3;\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "This variable is assigned to itself",
+    "title": "Variables should not be assigned to themselves",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "trivial",
+      "cwe",
       "cwe-1164"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:10",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "LOGICAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        1164
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-10",
+    "description": {
+      "whyIsThisAnIssue": "Self-assignments, where a variable is assigned to itself (x = x), are redundant and do not alter the state of the\nvariable. They can indicate incomplete or erroneous logic and make the code harder to read and maintain.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "public function main() {\n   int x = 5;\n   x = x; // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Assign the intended value, or remove the assignment.",
+                "language": "ballerina",
+                "code": "public function main() {\n   int x = 5;\n   int y = 10;\n   x = y;\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Unused class private fields",
+    "title": "Unused private class fields should be removed",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "unused",
+      "cwe",
       "cwe-561"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:11",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "CLEAR",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        561
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-11",
+    "description": {
+      "whyIsThisAnIssue": "Unused or unread private fields/methods in a class can indicate incomplete or erroneous logic, lead to unnecessary\nmemory usage, and make the code harder to maintain and understand.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "class A {\n  private int[] a = [];\n  private int[] b = []; // Noncompliant: \"b\" is never used\n\n  function foo() {\n    self.a = [2];\n  }\n}\n\npublic function main() {\n  A a = new A();\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Remove the unused private fields/methods. If the field/method is intended for future use or completeness, consider\ndocumenting, refactoring the class to use it, or introducing it when ready to implement the rest.",
+                "language": "ballerina",
+                "code": "class A {\n  private int[] a = [];\n\n  function foo() {\n      self.a = [2];\n  }\n}\n\npublic function main() {\n  A a = new A();\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Invalid range expression",
+    "title": "Range expressions should move in the intended direction",
     "type": "CODE_SMELL",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "pitfall",
+      "cwe",
       "cwe-561"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:12",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "LOGICAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        561
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-12",
+    "description": {
+      "whyIsThisAnIssue": "The update clause of a range expression should ensure the counter moves in the correct direction. Incorrect range\nexpression directions can lead to unexpected behavior, making the code harder to understand and debug.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/io;\n\npublic function main() {\n   foreach int i in 9...0 { // Noncompliant\n       io:println(i);\n   }\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Ensure the range expression counter moves in the correct direction according to the desired iteration. Use the correct\nrange or adjust the range expression logic to achieve the intended behavior.",
+                "language": "ballerina",
+                "code": "import ballerina/io;\n\npublic function main() {\n   foreach int i in 0...9 {\n       io:println(i);\n   }\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Hard-coded secrets are security-sensitive",
+    "title": "Secrets should not be hard-coded",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "secrets",
       "credentials",
+      "cwe",
       "cwe-798",
       "cwe-259",
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:13",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        798,
+        259
+      ],
+      "owaspTop10_2025": [
+        "A07"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-13",
+    "description": {
+      "whyIsThisAnIssue": "Embedding secrets such as passwords, API keys, or tokens directly as literal values in source code exposes them to\nanyone with access to the codebase or its version history. Rotating a compromised secret then requires a code change\nand a redeploy.\n\nThe rule looks for string literals and constants assigned to names that suggest a secret, such as `password`, `passwd`,\n`pwd`, `passphrase`, `secret`, `auth`, `apiKey`, and `token` (including their snake-case and kebab-case forms). It checks\nvariables, constants, default parameter values, record and object fields, map fields, and named arguments. It also\nreports URLs that embed credentials, such as `http://user:password@example.com`.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "const string API_KEY = \"a1b2c3d4\"; // Noncompliant\n\npublic function main() {\n    string password = \"mySecurePassword123\"; // Noncompliant\n    string serviceUrl = \"https://admin:admin123@api.example.com\"; // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Read secrets from configurable variables so their values are supplied at deployment rather than stored in the source.",
+                "language": "ballerina",
+                "code": "configurable string password = ?;\nconfigurable string serviceUrl = ?;\n\npublic function main() {\n    connect(serviceUrl, password);\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Non configurable secrets are security-sensitive",
+    "title": "Secrets should be read from configurable variables",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "secrets",
       "configurable",
+      "cwe",
       "cwe-798",
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina:14",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        798
+      ],
+      "owaspTop10_2025": [
+        "A07"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-14",
+    "description": {
+      "whyIsThisAnIssue": "A secret that is assigned a fixed value rather than being exposed as a configurable value forces the same secret to be\nreused across environments. It also prevents the secret from being rotated or overridden without modifying and\nredeploying the code.\n\nThe rule reports a secret-named variable, field, or argument whose value comes from a non-configurable variable or from\na computed expression, rather than from a configurable variable.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "string defaultValue = \"password\";\n\npublic type Credential record {\n    string username;\n    string password;\n};\n\npublic function main() {\n    string password = defaultValue; // Noncompliant\n    Credential credential = {username: \"admin\", password: defaultValue}; // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Declare the secret as a configurable variable and reference it wherever the secret is needed.",
+                "language": "ballerina",
+                "code": "configurable string password = ?;\n\npublic type Credential record {\n    string username;\n    string password;\n};\n\npublic function main() {\n    Credential credential = {username: \"admin\", password};\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid using insecure cipher modes or padding schemes",
+    "title": "Encryption should use secure cipher modes and padding schemes",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "crypto",
       "cipher",
+      "cwe",
       "cwe-327",
       "cwe-780",
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/crypto:1",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        327,
+        780
+      ],
+      "owaspTop10_2025": [
+        "A04"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-crypto-1",
+    "description": {
+      "whyIsThisAnIssue": "Encryption algorithms are essential for protecting sensitive information and ensuring secure communications. When implementing encryption, it's critical to select not only strong algorithms but also secure modes of operation and padding schemes. Using weak or outdated encryption modes can compromise the security of otherwise strong algorithms.",
+      "howToFix": {
+        "examples": [
+          {
+            "title": "AES Encryption",
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\n\nbyte[] cipherText = check crypto:encryptAesEcb(data, key); // Noncompliant\n",
+                "explanation": "For AES, the weakest mode is ECB (Electronic Codebook). Repeated blocks of data are encrypted to the same value, making them easy to identify and reducing the difficulty of recovering the original cleartext."
+              },
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\n\nbyte[] cipherText = check crypto:encryptAesCbc(data, key, initialVector); // Noncompliant\n",
+                "explanation": "Unauthenticated modes such as CBC (Cipher Block Chaining) may be used but are prone to attacks that manipulate the ciphertext (like padding oracle attacks). They must be used with caution and additional integrity checks."
+              }
+            ],
+            "compliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\n\nbyte[] cipherText = check crypto:encryptAesGcm(data, key, initialVector);\n",
+                "explanation": "AES-GCM (Galois/Counter Mode) provides authenticated encryption, ensuring both confidentiality and integrity of the encrypted data."
+              }
+            ]
+          },
+          {
+            "title": "RSA Encryption",
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\n\n// Default padding is PKCS1\nbyte[] cipherText = check crypto:encryptRsaEcb(data, publicKey); // Noncompliant\n\ncipherText = check crypto:encryptRsaEcb(data, publicKey, crypto:PKCS1); // Noncompliant\n",
+                "explanation": "For `RSA`, avoid using `PKCS1v1.5` padding as it is vulnerable to various attacks. Instead, use `OAEP` (Optimal Asymmetric Encryption Padding) which provides better security."
+              }
+            ],
+            "compliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\n\nbyte[] cipherText = check crypto:encryptRsaEcb(data, publicKey, crypto:OAEPwithMD5andMGF1);\n",
+                "explanation": "The `OAEP` paddings such as `OAEPwithMD5andMGF1`, `OAEPWithSHA1AndMGF1`, `OAEPWithSHA256AndMGF1`, `OAEPwithSHA384andMGF1`, and `OAEPwithSHA512andMGF1` should be used for RSA encryption to enhance security."
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid using fast hashing algorithms",
+    "title": "Passwords should be hashed with slow hashing algorithms",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "crypto",
       "hashing",
+      "cwe",
       "cwe-916",
       "cwe-327",
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/crypto:2",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        916,
+        327
+      ],
+      "owaspTop10_2025": [
+        "A04"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-crypto-2",
+    "description": {
+      "whyIsThisAnIssue": "Storing passwords in plaintext or using fast hashing algorithms creates significant security vulnerabilities. If an attacker gains access to your database, plaintext passwords are immediately compromised. Similarly, passwords hashed with fast algorithms (like `MD5`, `SHA-1`, or `SHA-256` without sufficient iterations) can be rapidly cracked using modern hardware.\n\nFollowing are the OWASP (Open Web Application Security Project) recommended parameters:\n\nFor `BCrypt`:\n\n- Use a work factor of 10 or more\n- Only use `BCrypt` for password storage in legacy systems where `Argon2` and `scrypt` are not available\n- Be aware of `BCrypt`'s 72-byte password length limit\n\nFor `Argon2`:\n\n- Use the `Argon2id` variant (which Ballerina implements)\n- Minimum configuration of 19 MiB (19,456 KB) of memory\n- An iteration count of at least 2\n- At least 1 degree of parallelism (this is enforced by Ballerina)",
+      "howToFix": {
+        "examples": [
+          {
+            "title": "BCrypt Hashing",
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\nimport ballerina/io;\n\npublic function main() returns error? {\n    string password = \"mySecurePassword123\";\n    string hashedPassword = check crypto:hashBcrypt(password, 4); // Noncompliant: work factor is too low\n    io:println(\"Hashed Password: \", hashedPassword);\n}\n",
+                "explanation": "Using `BCrypt` with a work factor below 10 is insufficient and vulnerable to brute-force attacks."
+              }
+            ],
+            "compliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\nimport ballerina/io;\n\npublic function hashPassword() returns error? {\n    string password = \"mySecurePassword123\";\n    // Using sufficient work factor (14 or higher for better security)\n    string hashedPassword = check crypto:hashBcrypt(password, 14);\n    io:println(\"Hashed Password: \", hashedPassword);\n}\n"
+              }
+            ]
+          },
+          {
+            "title": "Argon2 Hashing",
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\nimport ballerina/io;\n\npublic function main() returns error? {\n    string password = \"mySecurePassword123\";\n    string hashedPassword = check crypto:hashArgon2(password, memory = 4096); // Noncompliant: memory configuration is too low\n    io:println(\"Hashed Password: \", hashedPassword);\n}\n",
+                "explanation": "Using `Argon2` with insufficient memory (less than 19,456 KB) makes it vulnerable to attacks."
+              }
+            ],
+            "compliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\nimport ballerina/io;\n\npublic function hashPassword() returns error? {\n    string password = \"mySecurePassword123\";\n    // Using recommended parameters: sufficient memory, iterations, and parallelism\n    string hashedPassword = check crypto:hashArgon2(password, iterations = 3, memory = 65536, parallelism = 4);\n    io:println(\"Hashed Password: \", hashedPassword);\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid reusing counter mode initialization vectors",
+    "title": "Initialization vectors should not be hard-coded",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "crypto",
       "cipher",
+      "cwe",
       "cwe-323",
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/crypto:3",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        323
+      ],
+      "owaspTop10_2025": [
+        "A04"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-crypto-3",
+    "description": {
+      "whyIsThisAnIssue": "An `AES-CBC` or `AES-GCM` encryption operation uses a hard-coded initialization vector.\n\nA hard-coded initialization vector is likely to be reused across encryptions with the same key. In GCM, reusing an initialization vector repeats the keystream, which can let an attacker recover plaintext by combining ciphertexts and can expose the authentication key. In CBC, a fixed initialization vector makes identical plaintext prefixes produce identical ciphertext. Generate a fresh, random initialization vector for every encryption.",
+      "howToFix": {
+        "examples": [
+          {
+            "title": "AES-GCM Encryption",
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\n\npublic function encryptData(string data) returns byte[]|error {\n    byte[16] initialVector = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]; // Noncompliant\n    byte[16] key = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];\n    byte[] dataBytes = data.toBytes();\n    return crypto:encryptAesGcm(dataBytes, key, initialVector);\n}\n",
+                "explanation": "In this non-compliant example, the initialization vector is hardcoded, meaning every encryption operation uses the same IV. This completely undermines the security of AES-GCM encryption, regardless of key strength."
+              }
+            ],
+            "compliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\nimport ballerina/random;\n\npublic function encryptData(string data) returns [byte[], byte[16]]|error {\n    byte[16] initialVector = [];\n    foreach int i in 0...15 {\n        initialVector[i] = <byte>(check random:createIntInRange(0, 255));\n    }\n    byte[16] key = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];\n    byte[] dataBytes = data.toBytes();\n    byte[] encryptedData = check crypto:encryptAesGcm(dataBytes, key, initialVector);\n    return [encryptedData, initialVector];\n}\n",
+                "explanation": "This compliant approach generates a cryptographically secure random initialization vector for each encryption operation and returns it along with the encrypted data. The IV must be stored alongside the encrypted data (but doesn't need to be kept secret) to allow for decryption later."
+              }
+            ]
+          },
+          {
+            "title": "AES-CBC Encryption",
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\n\npublic function encryptMessage(string message) returns byte[]|error {\n    byte[12] nonce = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]; // Noncompliant: static nonce\n    byte[16] key = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];\n    byte[] messageBytes = message.toBytes();\n    return crypto:encryptAesCbc(messageBytes, key, nonce);\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/crypto;\nimport ballerina/random;\n\npublic function encryptMessage(string message) returns [byte[], byte[12]]|error {\n    // Generate unique nonce for each encryption\n    byte[12] nonce = [];\n    foreach int i in 0...11 {\n        nonce[i] = <byte>(check random:createIntInRange(0, 255));\n    }\n    byte[16] key = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];\n    byte[] messageBytes = message.toBytes();\n    byte[] encryptedData = check crypto:encryptAesCbc(messageBytes, key, nonce);\n    return [encryptedData, nonce];\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid using publicly writable directories for file operations without proper access controls",
+    "title": "Publicly writable directories should not be used for file operations",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "file",
+      "cwe",
       "cwe-377",
       "cwe-379",
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/file:1",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        377,
+        379
+      ],
+      "owaspTop10_2025": [
+        "A01"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-file-1",
+    "description": {
+      "whyIsThisAnIssue": "Operating systems often have global directories with write access granted to any user. These directories serve as\ntemporary storage locations like /tmp in Linux-based systems. However, when an application manipulates files within\nthese directories, it becomes vulnerable to race conditions on filenames. A malicious user may attempt to create a file\nwith a predictable name before the application does. If successful, such an attack could lead to unauthorized access,\nmodification, corruption, or deletion of other files. This risk escalates further if the application operates with\nelevated permissions.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/file;\nimport ballerina/os;\n\nstring tempFolderPath = os:getEnv(\"TMP\");\ncheck file:create(tempFolderPath + \"/\" + \"myfile.txt\"); // Noncompliant\ncheck file:getAbsolutePath(tempFolderPath + \"/\" + \"myfile.txt\"); // Noncompliant\ncheck file:createTemp(\"suffix\", \"prefix\"); // Noncompliant\ncheck file:createTempDir((), \"prefix\"); // Noncompliant\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Use dedicated sub-folders.",
+                "language": "ballerina",
+                "code": "import ballerina/file;\n\ncheck file:create(\"./myDirectory/myfile.txt\");\ncheck file:getAbsolutePath(\"./myDirectory/myfile.txt\");\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "I/O function calls should not be vulnerable to path injection attacks",
+    "title": "File function calls should not be vulnerable to path injection attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "file",
       "injection",
+      "cwe",
       "cwe-22",
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/file:2",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "COMPLETE",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        22
+      ],
+      "owaspTop10_2025": [
+        "A01"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-file-2",
+    "description": {
+      "whyIsThisAnIssue": "Path injections occur when an application constructs a file path using untrusted data without first validating the path.\n\nA malicious user can inject specially crafted values, like \"../\", to alter the intended path. This manipulation may lead\nthe path to resolve to a location within the filesystem where the user typically wouldn't have access.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/file;\nimport ballerina/http;\n\nlistener http:Listener endpoint = new (8080);\nstring targetDirectory = \"./path/to/target/directory/\";\n\nservice / on endpoint {\n    resource function get deleteFile(string fileName) returns string|error {\n        check file:remove(targetDirectory + fileName); // Noncompliant\n        // ...\n    }\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Conduct validation of canonical paths.",
+                "language": "ballerina",
+                "code": "import ballerina/file;\nimport ballerina/http;\n\nlistener http:Listener endpoint = new (8080);\nstring targetDirectory = \"./path/to/target/directory/\";\n\nservice / on endpoint {\n    resource function get deleteFile(string fileName) returns string|error {\n        // Retrieve the normalized absolute path of the user provided file\n        string absoluteUserFilePath = check file:getAbsolutePath(\n            targetDirectory +\n            fileName);\n        string normalizedAbsoluteUserFilePath = check file:normalizePath(\n            absoluteUserFilePath,\n            file:CLEAN);\n\n        // Check whether the user provided file exists\n        boolean fileExists = check file:test(\n            normalizedAbsoluteUserFilePath,\n            file:EXISTS);\n        if !fileExists {\n            return \"File does not exist!\";\n        }\n\n        // Retrieve the normalized absolute path of parent directory of the user provided file\n        string canonicalDestinationPath = check file:parentPath(\n            normalizedAbsoluteUserFilePath);\n        string normalizedCanonicalDestinationPath = check file:normalizePath(\n            canonicalDestinationPath,\n            file:CLEAN);\n\n        // Retrieve the normalized absolute path of the target directory\n        string absoluteTargetFilePath = check file:getAbsolutePath(\n            targetDirectory);\n        string normalizedTargetDirectoryPath = check file:normalizePath(\n            absoluteTargetFilePath,\n            file:CLEAN);\n\n        // Perform comparison of user provided file path and target directory path\n        boolean dirMatch = normalizedTargetDirectoryPath.equalsIgnoreCaseAscii(\n            normalizedCanonicalDestinationPath);\n        if !dirMatch {\n            return \"Entry is not in the target directory!\";\n        }\n\n        check file:remove(normalizedAbsoluteUserFilePath);\n    }\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid allowing default resource accessor",
+    "title": "HTTP resources should not use the \"default\" accessor",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "http",
       "csrf",
+      "cwe",
       "cwe-352",
       "cwe-749",
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/http:1",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        352,
+        749
+      ],
+      "owaspTop10_2025": [
+        "A01"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-http-1",
+    "description": {
+      "whyIsThisAnIssue": "An HTTP resource is safe when used for read-only operations like GET, HEAD, or OPTIONS. An unsafe HTTP resource is used\nto alter the state of an application, such as modifying the user’s profile on a web application.\n\nUnsafe HTTP resources include POST, PUT, and DELETE.\n\nEnabling both safe and insecure HTTP resources to execute a particular operation on a web application may compromise its\nsecurity; for instance, CSRF protections are typically designed to safeguard operations executed by insecure HTTP\nresources.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/http;\n\nlistener http:Listener endpoint = new (8080);\n\nservice / on endpoint {\n    resource function default deleteRequest(http:Request clientRequest, string username) returns string { // Noncompliant: all HTTP methods are allowed\n        // state of the application will be changed here\n    }\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "For every resource in an application, it’s crucial to explicitly define the type of the HTTP resource, ensuring that\nsafe resources are exclusively used for read-only operations.",
+                "language": "ballerina",
+                "code": "import ballerina/http;\n\nservice / on endpoint {\n    resource function delete deleteRequest(http:Request clientRequest, string username) returns string {\n        // state of the application will be changed here\n    }\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid permissive Cross-Origin Resource Sharing",
+    "title": "Cross-Origin Resource Sharing policies should not be permissive",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "http",
       "cors",
+      "cwe",
       "cwe-942",
       "owasp-2025-a02"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/http:2",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        942
+      ],
+      "owaspTop10_2025": [
+        "A02"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-http-2",
+    "description": {
+      "whyIsThisAnIssue": "Browsers enforce the same-origin policy by default, as a security measure, preventing JavaScript frontends from making\ncross-origin HTTP requests to resources with different origins (domains, protocols, or ports). However, the target\nresource can include additional HTTP headers in its response, known as CORS headers, which serve as directives for the\nbrowser and modify the access control policy, effectively relaxing the same-origin policy.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/http;\n\nlistener http:Listener endpoint = new (8080);\n\nservice / on endpoint {\n    @http:ResourceConfig {\n        cors: {\n            allowOrigins: [\"*\"] // Noncompliant\n        }\n    }\n\n    resource function get example() returns http:Response|error? {\n        // Return response\n    }\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "The resource configuration should be configured exclusively for trusted origins and specific resources.",
+                "language": "ballerina",
+                "code": "import ballerina/http;\n\nlistener http:Listener endpoint = new (8080);\n\nservice / on endpoint {\n    @http:ResourceConfig {\n        cors: {\n            allowOrigins: [\"trusted.example.com\"] // Compliant\n        }\n    }\n\n    resource function get example() returns http:Response|error? {\n        // Return response\n    }\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
     "title": "Server-side requests should not be vulnerable to traversing attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "http",
       "ssrf",
+      "cwe",
       "cwe-918",
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/http:3",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "COMPLETE",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        918
+      ],
+      "owaspTop10_2025": [
+        "A01"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-http-3",
+    "description": {
+      "whyIsThisAnIssue": "Server-Side Request Forgery (SSRF) is a vulnerability that allows attackers to induce the server-side application to make requests to an unintended location. When applications accept user input that influences server-side HTTP requests without proper validation or sanitization, attackers can manipulate these requests.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/http;\n\nservice /api/v1 on new http:Listener(8080) {\n    resource function get users(string id) returns http:Response|error {\n        http:Client userClient = check new (\"http://example.com\");\n        // User input is used directly in the URL\n        return userClient->/users/[id]; // Noncompliant\n    }\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/http;\n\nservice /api/v1 on new http:Listener(8080) {\n    resource function get users(string id) returns http:Response|error {\n        // Validate the user input\n        string validatedId = check getValidatedId(id);\n        http:Client userClient = check new (\"http://example.com\");\n        return userClient->/users/[validatedId];\n    }\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
     "title": "HTTP request redirections should not be open to forging attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "http",
       "redirect",
+      "cwe",
       "cwe-601",
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/http:4",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "COMPLETE",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        601
+      ],
+      "owaspTop10_2025": [
+        "A01"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-http-4",
+    "description": {
+      "whyIsThisAnIssue": "Open redirects occur when an application accepts user-controlled input that specifies a URL to which the user will be redirected. When these redirects are implemented without proper validation, attackers can craft redirection URLs to malicious sites.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/http;\n\nservice /api/v1 on new http:Listener(8080) {\n    resource function get redirect(string location) returns http:TemporaryRedirect {\n        return {\n            headers: {\n                // User input is used directly in the Location header\n                \"Location\": location // Noncompliant\n            }\n        };\n    }\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/http;\n\nservice /api/v1 on new http:Listener(8080) {\n    resource function get redirect(string location) returns http:TemporaryRedirect|error {\n        // Validate the user input\n        string validatedLocation = check getValidatedLocation(location);\n        return {\n            headers: {\n                \"Location\": validatedLocation\n            }\n        };\n    }\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
     "title": "I/O function calls should not be vulnerable to path injection attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "io",
       "injection",
+      "cwe",
       "cwe-22",
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/io:1",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "COMPLETE",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        22
+      ],
+      "owaspTop10_2025": [
+        "A01"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-io-1",
+    "description": {
+      "whyIsThisAnIssue": "Path injections occur when an application constructs a file path using untrusted data without first validating the path.\n\nA malicious user can inject specially crafted values, like \"../\", to alter the intended path. This manipulation may lead\nthe path to resolve to a location within the filesystem where the user typically wouldn't have access.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/http;\nimport ballerina/io;\n\nservice /fileService on new http:Listener(8080) {\n   resource function get file(string fileName) returns string|error {\n       // User input is directly concatenated into the file path\n       string filePath = \"./resources/\" + fileName;\n\n       // Reading file without validating the path\n       string content = check io:fileReadString(filePath); // Noncompliant\n       return content;\n   }\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Validate and normalize the path to ensure the accessed file remains within the intended target directory.",
+                "language": "ballerina",
+                "code": "import ballerina/file;\nimport ballerina/http;\nimport ballerina/io;\n\nservice /fileService on new http:Listener(8080) {\n    resource function get file(string fileName) returns string|error {\n        string targetDirectory = \"./resources/\";\n\n        // Retrieve the normalized absolute path of the user-provided file\n        string absoluteUserFilePath = check file:getAbsolutePath(targetDirectory + fileName);\n        string normalizedAbsoluteUserFilePath = check file:normalizePath(absoluteUserFilePath, file:CLEAN);\n\n        // Retrieve the normalized absolute path of the target directory\n        string absoluteTargetFilePath = check file:getAbsolutePath(targetDirectory);\n        string normalizedTargetDirectoryPath = check file:normalizePath(absoluteTargetFilePath, file:CLEAN);\n\n        // Perform comparison of user provided file path and target directory path\n        boolean dirMatch = normalizedTargetDirectoryPath.equalsIgnoreCaseAscii(\n        check file:parentPath(normalizedAbsoluteUserFilePath));\n        if !dirMatch {\n            return \"Access to files outside the target directory is not allowed!\";\n        }\n\n        string content = check io:fileReadString(normalizedAbsoluteUserFilePath);\n        return content;\n    }\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
     "title": "Configurable variables should not be printed to the console",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "io",
       "logging",
+      "cwe",
       "cwe-532",
       "cwe-200",
       "owasp-2025-a09"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/io:2",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        532,
+        200
+      ],
+      "owaspTop10_2025": [
+        "A09"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-io-2",
+    "description": {
+      "whyIsThisAnIssue": "Configurable variables carry the values supplied at deployment, which is where credentials, tokens, and connection\nsecrets live. Standard output is collected by the container runtime and forwarded to whatever log aggregator the\nplatform uses, so printing one moves the value out of the deployment configuration and into a durable store that a far\nwider set of people can read.\n\nThe rule does not attempt to decide which configurables hold secrets. Every deployment-supplied value is treated as\nsensitive, which is the same position `ballerina/log:1` takes for log statements.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/io;\n\nconfigurable string dbPassword = ?;\n\npublic function connect() {\n    io:println(dbPassword); // Noncompliant\n    io:println(string `Connecting with ${dbPassword}`); // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Print a value that identifies the configuration rather than the configuration itself, or omit the statement.",
+                "language": "ballerina",
+                "code": "import ballerina/io;\n\nconfigurable string dbPassword = ?;\n\npublic function connect() {\n    io:println(\"Connecting to the configured database\");\n}\n",
+                "explanation": "Every configurable is treated as sensitive, including one that holds no secret, so a compliant message names none of\nthem."
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Potentially-sensitive configurable variables are logged",
+    "title": "Sensitive configurable variables should not be logged",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "log",
       "leak",
+      "cwe",
       "cwe-532",
       "owasp-2025-a09"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/log:1",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        532
+      ],
+      "owaspTop10_2025": [
+        "A09"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-log-1",
+    "description": {
+      "whyIsThisAnIssue": "In Ballerina, configurable variables typically contain sensitive data that should not be exposed externally and are\nusually kept secret. This includes credentials to access external systems, such as databases. To protect users' privacy,\ninformation is forbidden or strongly discouraged from being logged, such as user passwords or credit card numbers, which\nshould obviously not be stored or at least not in clear text.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/log;\n\nconfigurable string password = ?;\nconfigurable string user = ?;\n\npublic function main() {\n   log:printInfo(password); // Noncompliant\n   log:printError(string `Error: ${password}`); // Noncompliant\n   log:printWarn(`Error: ${password}`); // Noncompliant\n   log:printError(\"Error \" + password); // Noncompliant\n   log:printWarn(\"Warning\", password = password); // Noncompliant\n   log:printError(\"Error\", password = password, user = user); // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Avoid using configurable variables inside the logging statement.",
+                "language": "ballerina",
+                "code": "import ballerina/log;\n\nint id = 12345;\n\npublic function main() {\n   log:printInfo(“task executed successfully.”, id = id);\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid writing log files to world-writable directories",
+    "title": "Log files should not be written to world-writable directories",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "log",
       "file-system",
+      "cwe",
       "cwe-379",
       "owasp-2025-a01"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/log:2",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        379
+      ],
+      "owaspTop10_2025": [
+        "A01"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-log-2",
+    "description": {
+      "whyIsThisAnIssue": "Logs routinely capture request details, identifiers, and error context, so the log file itself is a sensitive artefact.\nA world-writable directory such as `/tmp` lets any local account create the file before the service does. The service\nthen appends to a file it does not own, and the permissions on that file were chosen by whoever created it, so the log\ncan be readable to others or replaced with a file of their choosing.\n\nThe rule reads both ways of naming a log file: the deprecated `setOutputFile`, and the `path` of a file destination on a\nlogger configuration. A path is reported only when it is anchored at a world-writable directory, including one reached\nthrough `os:getEnv(\"TMPDIR\")` and its variants.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/log;\n\npublic function configureLogging() returns error? {\n    check log:setOutputFile(\"/tmp/application.log\"); // Noncompliant\n\n    log:Logger _ = check log:fromConfig({\n        destinations: [{'type: log:FILE, path: \"/var/tmp/service.log\"}] // Noncompliant\n    });\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Write logs under a directory the service owns, with permissions that exclude other accounts.",
+                "language": "ballerina",
+                "code": "import ballerina/log;\n\npublic function configureLogging() returns error? {\n    log:Logger _ = check log:fromConfig({\n        destinations: [{'type: log:FILE, path: \"./logs/service.log\"}]\n    });\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid constructing system command arguments from user input without proper sanitization",
+    "title": "OS commands should not be vulnerable to argument injection attacks",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "os",
       "injection",
+      "cwe",
       "cwe-78",
       "cwe-88",
       "owasp-2025-a05"
     ],
     "defaultSeverity": "Blocker",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/os:1",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "COMPLETE",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "BLOCKER"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        78,
+        88
+      ],
+      "owaspTop10_2025": [
+        "A05"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-os-1",
+    "description": {
+      "whyIsThisAnIssue": "Arguments of system commands are processed by the executed program. The arguments are usually used to configure and\ninfluence the behavior of the programs. Control over a single argument might be enough for an attacker to trigger\ndangerous features like executing arbitrary commands or writing files into specific directories.\n\nArguments like -delete or -exec for the find command can alter the expected behavior and result in vulnerabilities.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/os;\n\nstring terminalPath = ...;\nstring input = request.getQueryParamValue(\"input\").toString();\nstring[] cmd = [..., input];\n\nos:Process result = check os:exec({ // Noncompliant\n    value: terminalPath,\n    arguments: cmd\n});\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Use an allow-list to restrict the arguments to trusted values.",
+                "language": "ballerina",
+                "code": "import ballerina/os;\n\nstring terminalPath = ...;\nstring input = request.getQueryParamValue(\"input\").toString();\nstring[] cmd = [..., input];\nstring[] allowed = [\"main\", \"main.bal\", \"bal\"];\n\nif allowed.some(keyword => keyword.equalsIgnoreCaseAscii(input)) {\n    os:Process result = check os:exec({\n        value: terminalPath,\n        arguments: cmd\n    });\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid constructing environment variables from user input without proper sanitization",
+    "title": "Environment variables should not be set from user input",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "os",
       "injection",
+      "cwe",
       "cwe-454",
       "cwe-15",
       "owasp-2025-a02",
       "owasp-2025-a06"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/os:2",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "COMPLETE",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        454,
+        15
+      ],
+      "owaspTop10_2025": [
+        "A02",
+        "A06"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-os-2",
+    "description": {
+      "whyIsThisAnIssue": "Environment variables are inherited by every child process. Setting one from a value that arrives from outside the\nprogram therefore reaches well beyond the code that set it, and several variables change how a program resolves\nlibraries or executables rather than merely what data it works on. A caller who controls an environment variable can\ninfluence programs the service starts later, including which executable or library they load.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/os;\n\npublic function configure(string userInput) returns os:Error? {\n    check os:setEnv(\"APP_MODE\", userInput); // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Set environment variables from values the program controls. Where a caller must influence one, validate the value\nagainst the set the program expects.",
+                "language": "ballerina",
+                "code": "import ballerina/os;\n\npublic function configure(string userInput) returns os:Error? {\n    if ![\"production\", \"staging\"].some(mode => mode == userInput) {\n        return error(\"unknown mode\");\n    }\n    check os:setEnv(\"APP_MODE\", userInput);\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid executing commands through a shell interpreter",
+    "title": "Commands should not be executed through a shell interpreter",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "os",
       "injection",
+      "cwe",
       "cwe-78",
       "owasp-2025-a05"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/os:3",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        78
+      ],
+      "owaspTop10_2025": [
+        "A05"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-os-3",
+    "description": {
+      "whyIsThisAnIssue": "`os:exec` takes the executable and its arguments separately, and that separation is what keeps an argument from being\nread as syntax. Invoking a shell with a command string throws it away: the argument becomes a script, and every\nmetacharacter in it, such as `;`, `|`, or `$()`, is interpreted again. Any value reaching the command string can run\narbitrary commands with the privileges of the service.\n\nThe rule reports a shell only when it is handed a command string, through `-c`, `/c`, or the PowerShell equivalents. A\nshell invoked to run a script by path is not reported, but the script path and its contents still have to be as trusted\nas the program itself.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/os;\n\npublic function countFiles() returns os:Process|error {\n    return check os:exec({value: \"/bin/sh\", arguments: [\"-c\", \"ls /var/data | wc -l\"]}); // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Run the executable directly and pass its arguments as separate list elements.",
+                "language": "ballerina",
+                "code": "import ballerina/os;\n\npublic function countFiles() returns os:Process|error {\n    return check os:exec({value: \"/bin/ls\", arguments: [\"/var/data\"]});\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid executing commands resolved through the PATH environment variable",
+    "title": "Commands should not be resolved through the \"PATH\" environment variable",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "os",
       "untrusted-search-path",
+      "cwe",
       "cwe-426",
       "owasp-2025-a05"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/os:4",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        426
+      ],
+      "owaspTop10_2025": [
+        "A05"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-os-4",
+    "description": {
+      "whyIsThisAnIssue": "A bare executable name is resolved through `PATH` at run time, so which program actually runs depends on the environment\nthe service happens to start in. Anyone able to place a file earlier in `PATH`, or to set `PATH` itself, chooses the\nprogram that executes, with the service's own privileges. `os:setEnv` allows exactly that from within the same program.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/os;\n\npublic function status() returns os:Process|error {\n    return check os:exec({value: \"git\", arguments: [\"status\"]}); // Noncompliant\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Name the executable by an absolute path, or by a path relative to a directory the service controls.",
+                "language": "ballerina",
+                "code": "import ballerina/os;\n\npublic function status() returns os:Process|error {\n    return check os:exec({value: \"/usr/bin/git\", arguments: [\"status\"]});\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid using weak cipher algorithms when signing and verifying JWTs",
+    "title": "JSON Web Tokens should be signed and verified with strong algorithms",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "jwt",
       "crypto",
+      "cwe",
       "cwe-327",
       "cwe-347",
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:1",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        327,
+        347
+      ],
+      "owaspTop10_2025": [
+        "A04"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-1",
+    "description": {
+      "whyIsThisAnIssue": "JSON Web Tokens (JWTs) are a compact, URL-safe means of representing claims between two parties. They're commonly used\nfor authentication and authorization in web applications. The security of JWT-based authentication depends critically on\nthe signature mechanism used to verify token authenticity.\n\nWhen JWTs are issued without a signature or with weak algorithms, attackers can forge tokens to impersonate legitimate\nusers, modify token claims, bypass authentication entirely, and gain unauthorized access to protected resources.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:IssuerConfig issuerConfig = {\n    issuer: \"ballerina\",\n    expTime: 3600,\n    signatureConfig: {\n        algorithm: jwt:NONE // Noncompliant\n    }\n};\n\nstring token = check jwt:issue(issuerConfig);\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Use a strong signing algorithm like RS256, which uses RSA encryption with an SHA-256 hash function.",
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:IssuerConfig issuerConfig = {\n    issuer: \"ballerina\",\n    expTime: 3600,\n    signatureConfig: {\n        algorithm: jwt:RS256,\n        config: {\n            keyFile: \"private.key\"\n        }\n    }\n};\n\nstring token = check jwt:issue(issuerConfig);\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid validating JSON Web Tokens without a signature configuration",
+    "title": "JSON Web Tokens should be validated with a signature configuration",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "jwt",
       "authentication",
+      "cwe",
       "cwe-347",
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:2",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        347
+      ],
+      "owaspTop10_2025": [
+        "A07"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-2",
+    "description": {
+      "whyIsThisAnIssue": "`signatureConfig` is optional, and leaving it out removes the signature check rather than defaulting to one.\n`jwt:validate` still parses the token and returns its claims, so the calling code reads them as though they had been\nverified. A token anyone assembled and self-signed is then accepted on the same terms as one the identity provider\nissued.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:Payload payload = check jwt:validate(token, { // Noncompliant: no signature configuration\n    issuer: \"example-issuer\",\n    audience: \"ballerina\"\n});\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Configure the signature check with the trusted certificate, a JWKS endpoint, or a trust store.",
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:Payload payload = check jwt:validate(token, {\n    issuer: \"example-issuer\",\n    audience: \"ballerina\",\n    signatureConfig: {\n        certFile: \"/path/to/public.crt\"\n    }\n});\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid validating JSON Web Tokens without checking the issuer and the audience",
+    "title": "JSON Web Token validation should check the issuer and the audience",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "jwt",
       "authentication",
+      "cwe",
       "cwe-287",
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:3",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        287
+      ],
+      "owaspTop10_2025": [
+        "A07"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-3",
+    "description": {
+      "whyIsThisAnIssue": "A signature proves only that the token was minted by a key the service trusts. Without `issuer` and `audience`, a token\nthat the same key issued for a different service, or for a different tenant, satisfies the validator as well. A token\nobtained legitimately for a low-value service can then be replayed against a high-value one.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:Payload payload = check jwt:validate(token, { // Noncompliant: issuer and audience are not checked\n    signatureConfig: {\n        certFile: \"/path/to/public.crt\"\n    }\n});\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Pin both the expected issuer and the audience the service is registered as.",
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:Payload payload = check jwt:validate(token, {\n    issuer: \"example-issuer\",\n    audience: \"ballerina\",\n    signatureConfig: {\n        certFile: \"/path/to/public.crt\"\n    }\n});\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid issuing JSON Web Tokens with a long expiry time",
+    "title": "JSON Web Tokens should not be issued with a long expiry time",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "jwt",
       "session-management",
+      "cwe",
       "cwe-613",
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:4",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        613
+      ],
+      "owaspTop10_2025": [
+        "A07"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-4",
+    "description": {
+      "whyIsThisAnIssue": "A JWT is accepted on its own contents; there is no revocation step in the validation path. Where no revocation list or\nsigning-key rotation is in place, the expiry is the only thing that ends a stolen token's usefulness. `expTime` defaults\nto 300 seconds, and the rule reports a lifetime beyond one day.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\nstring token = check jwt:issue({\n    issuer: \"example-issuer\",\n    audience: \"ballerina\",\n    expTime: 604800, // Noncompliant\n    signatureConfig: {\n        algorithm: jwt:RS256,\n        config: {keyFile: \"/path/to/private.key\"}\n    }\n});\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Issue short-lived tokens and let clients obtain a new one when it expires.",
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\nstring token = check jwt:issue({\n    issuer: \"example-issuer\",\n    audience: \"ballerina\",\n    expTime: 300,\n    signatureConfig: {\n        algorithm: jwt:RS256,\n        config: {keyFile: \"/path/to/private.key\"}\n    }\n});\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid validating JSON Web Tokens with a large clock skew",
+    "title": "JSON Web Tokens should not be validated with a large clock skew",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "jwt",
       "session-management",
+      "cwe",
       "cwe-613",
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:5",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        613
+      ],
+      "owaspTop10_2025": [
+        "A07"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-5",
+    "description": {
+      "whyIsThisAnIssue": "`clockSkew` is allowed on both ends of every expiry check, so it silently lengthens the validity window of every token,\nincluding ones that have already expired. It defaults to zero, and a few minutes covers any realistic clock drift\nbetween hosts. The rule reports a skew beyond five minutes.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:Payload payload = check jwt:validate(token, {\n    issuer: \"example-issuer\",\n    audience: \"ballerina\",\n    clockSkew: 3600, // Noncompliant\n    signatureConfig: {certFile: \"/path/to/public.crt\"}\n});\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Keep the skew to what clock drift actually requires, and synchronise clocks rather than widening the window.",
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:Payload payload = check jwt:validate(token, {\n    issuer: \"example-issuer\",\n    audience: \"ballerina\",\n    clockSkew: 60,\n    signatureConfig: {certFile: \"/path/to/public.crt\"}\n});\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid disabling TLS validation on the JWKS endpoint client",
+    "title": "TLS validation should not be disabled on JWKS endpoint clients",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "jwt",
       "tls",
+      "cwe",
       "cwe-295",
       "cwe-296",
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:6",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        295,
+        296
+      ],
+      "owaspTop10_2025": [
+        "A04"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-6",
+    "description": {
+      "whyIsThisAnIssue": "A JWKS configuration carries its own client for reaching the keys endpoint, separate from any other client the service\nuses. Setting `disable` to `true` on its secure socket means keys are accepted from any host able to answer for the JWKS\nURL. An attacker who can answer for that URL supplies their own signing key, and every signature check downstream then\npasses against it.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:Payload payload = check jwt:validate(token, {\n    issuer: \"example-issuer\",\n    audience: \"ballerina\",\n    signatureConfig: {\n        jwksConfig: {\n            url: \"https://idp.example.com/jwks\",\n            clientConfig: {\n                secureSocket: {disable: true} // Noncompliant\n            }\n        }\n    }\n});\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Leave TLS validation enabled and supply the certificate the keys endpoint presents.",
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:Payload payload = check jwt:validate(token, {\n    issuer: \"example-issuer\",\n    audience: \"ballerina\",\n    signatureConfig: {\n        jwksConfig: {\n            url: \"https://idp.example.com/jwks\",\n            clientConfig: {\n                secureSocket: {cert: \"/path/to/public.crt\"}\n            }\n        }\n    }\n});\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid decoding JSON Web Tokens without verifying them",
+    "title": "JSON Web Tokens should not be decoded without being verified",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "jwt",
       "authentication",
+      "cwe",
       "cwe-347",
       "cwe-345",
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Minor",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/jwt:7",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "LOW"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        347,
+        345
+      ],
+      "owaspTop10_2025": [
+        "A07"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-jwt-7",
+    "description": {
+      "whyIsThisAnIssue": "`jwt:decode` splits a token and returns its header and payload. It checks no signature, no issuer, no audience, and no\nexpiry. The claims it returns are whatever the sender wrote, so a decision made from them is a decision made on\nattacker-supplied data. `jwt:validate` is the function that establishes trust.\n\nReading the header before validating, to select a key by `kid`, is a legitimate use. The rule reports the call for\nreview rather than asserting a defect, so a deliberate decode is expected to be reviewed and suppressed.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\n[jwt:Header, jwt:Payload] [_, payload] = check jwt:decode(token); // Noncompliant\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Validate the token and read the claims from the validated payload.",
+                "language": "ballerina",
+                "code": "import ballerina/jwt;\n\njwt:Payload payload = check jwt:validate(token, {\n    issuer: \"example-issuer\",\n    audience: \"ballerina\",\n    signatureConfig: {certFile: \"/path/to/public.crt\"}\n});\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid unverified server hostnames during SSL/TLS connections",
+    "title": "Server hostnames should be verified during SSL/TLS connections",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "email",
       "tls",
+      "cwe",
       "cwe-297",
       "cwe-295",
       "owasp-2025-a07"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/email:1",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        297,
+        295
+      ],
+      "owaspTop10_2025": [
+        "A07"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-email-1",
+    "description": {
+      "whyIsThisAnIssue": "Using outdated or weak SSL/TLS protocols puts application communications at serious risk. These obsolete protocols\ncontain known vulnerabilities that attackers can exploit to intercept, decrypt, or manipulate data transmitted between\nclients and servers.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/email;\n\npublic function main() returns error? {\n    email:PopClient _ = check new (\"pop.example.com\", \"user@example.com\", \"pass123\", clientConfig = {\n        port: 465,\n        secureSocket: {\n            cert: \"path/to/certfile.crt\",\n            protocol: {\n                name: email:TLS,\n                versions: [\"TLSv1.2\", \"TLSv1.1\"]\n            },\n            ciphers: [\"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA\"],\n            verifyHostName: false // Noncompliant\n        }\n    });\n}\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Enable hostname verification to ensure the server's certificate matches the hostname.",
+                "language": "ballerina",
+                "code": "import ballerina/email;\n\npublic function main() returns error? {\n    email:PopClient _ = check new (\"pop.example.com\", \"user@example.com\", \"pass123\", clientConfig = {\n        port: 465,\n        secureSocket: {\n            cert: \"path/to/certfile.crt\",\n            protocol: {\n                name: email:TLS,\n                versions: [\"TLSv1.2\"]\n            },\n            ciphers: [\"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA\"],\n            verifyHostName: true\n        }\n    });\n}\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid connecting to mail servers without TLS",
+    "title": "Mail server connections should use TLS",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "email",
       "tls",
+      "cwe",
       "cwe-319",
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Critical",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/email:2",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "HIGH"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        319
+      ],
+      "owaspTop10_2025": [
+        "A04"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-email-2",
+    "description": {
+      "whyIsThisAnIssue": "The `security` field decides whether the connection is protected at all. `START_TLS_NEVER` disables the upgrade\nentirely, so the session, including the mailbox credentials sent during authentication, crosses the network in the\nclear. Anyone on the network path can read the credentials and every message the client sends or retrieves, and can\nmodify them in transit.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/email;\n\nemail:SmtpClient smtpClient = check new (\"smtp.example.com\", \"sender@example.com\", \"password\", clientConfig = {\n    port: 25,\n    security: email:START_TLS_NEVER // Noncompliant\n});\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Use `SSL` for an implicitly encrypted connection, or `START_TLS_ALWAYS` where the protocol requires the upgrade form.",
+                "language": "ballerina",
+                "code": "import ballerina/email;\n\nemail:SmtpClient smtpClient = check new (\"smtp.example.com\", \"sender@example.com\", \"password\", clientConfig = {\n    port: 587,\n    security: email:START_TLS_ALWAYS\n});\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid falling back to cleartext when TLS is unavailable",
+    "title": "Mail clients should not fall back to cleartext when TLS is unavailable",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "email",
       "tls",
+      "cwe",
       "cwe-757",
       "cwe-319",
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/email:3",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        757,
+        319
+      ],
+      "owaspTop10_2025": [
+        "A04"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-email-3",
+    "description": {
+      "whyIsThisAnIssue": "`START_TLS_AUTO` upgrades the connection when the server advertises STARTTLS and continues in plaintext when it does\nnot. Whether the credentials are encrypted is therefore decided by the server's greeting, which an attacker positioned\non the network path can rewrite. Stripping the advertisement is enough to have the client send everything in the clear,\nand nothing in the client indicates that anything went wrong.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/email;\n\nemail:ImapClient imapClient = check new (\"imap.example.com\", \"reader@example.com\", \"password\", clientConfig = {\n    port: 143,\n    security: email:START_TLS_AUTO // Noncompliant\n});\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Use `START_TLS_ALWAYS`, which fails the connection instead of downgrading it, or `SSL` for an implicitly encrypted\nconnection.",
+                "language": "ballerina",
+                "code": "import ballerina/email;\n\nemail:ImapClient imapClient = check new (\"imap.example.com\", \"reader@example.com\", \"password\", clientConfig = {\n    port: 143,\n    security: email:START_TLS_ALWAYS\n});\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   },
   {
-    "title": "Avoid using weak TLS protocol versions",
+    "title": "Weak TLS protocol versions should not be used",
     "type": "VULNERABILITY",
     "status": "ready",
-    "remediation": {
-      "func": "Constant\/Issue",
-      "constantCost": "5min"
-    },
     "tags": [
       "email",
       "tls",
+      "cwe",
       "cwe-327",
       "cwe-326",
       "owasp-2025-a04"
     ],
     "defaultSeverity": "Major",
-    "ruleSpecification": "N/A",
     "sqKey": "ballerina/email:4",
     "scope": "All",
-    "quickfix": "unknown"
+    "cleanCodeAttribute": "TRUSTWORTHY",
+    "impacts": [
+      {
+        "softwareQuality": "SECURITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "securityStandards": {
+      "cwe": [
+        327,
+        326
+      ],
+      "owaspTop10_2025": [
+        "A04"
+      ]
+    },
+    "helpUri": "https://ballerina.io/learn/scan-rules/#ballerina-email-4",
+    "description": {
+      "whyIsThisAnIssue": "TLS 1.0 and TLS 1.1 depend on MD5 and SHA-1 in the handshake and support no AEAD cipher suites, and RFC 8996 deprecates\nboth for those reasons. The SSL family is broken outright. Naming any of them in `protocol.versions` pins the connection\nto a version a current server should refuse, and lets an attacker able to influence the negotiation attack the\nencryption itself.",
+      "howToFix": {
+        "examples": [
+          {
+            "noncompliant": [
+              {
+                "language": "ballerina",
+                "code": "import ballerina/email;\n\nemail:SmtpClient smtpClient = check new (\"smtp.example.com\", \"sender@example.com\", \"password\", clientConfig = {\n    secureSocket: {\n        cert: \"/path/to/public.crt\",\n        protocol: {\n            name: email:TLS,\n            versions: [\"TLSv1.2\", \"TLSv1.1\"] // Noncompliant\n        }\n    }\n});\n"
+              }
+            ],
+            "compliant": [
+              {
+                "description": "Name only TLS 1.2 and TLS 1.3, or leave `protocol` unset and take the runtime's defaults.",
+                "language": "ballerina",
+                "code": "import ballerina/email;\n\nemail:SmtpClient smtpClient = check new (\"smtp.example.com\", \"sender@example.com\", \"password\", clientConfig = {\n    secureSocket: {\n        cert: \"/path/to/public.crt\",\n        protocol: {\n            name: email:TLS,\n            versions: [\"TLSv1.2\", \"TLSv1.3\"]\n        }\n    }\n});\n"
+              }
+            ]
+          }
+        ]
+      }
+    }
   }
 ]
