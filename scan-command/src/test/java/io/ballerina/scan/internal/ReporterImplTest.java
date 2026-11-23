@@ -29,6 +29,7 @@ import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Source;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
+import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.diagnostics.Location;
 import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextRange;
@@ -41,6 +42,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Static code analysis issue reporter tests.
@@ -102,6 +104,57 @@ public class ReporterImplTest {
         Assert.assertEquals(issue.location(), issueLocation);
         Assert.assertEquals(issue.rule(), rule);
         Assert.assertEquals(issue.source(), Source.EXTERNAL);
+    }
+
+    @Test(description = "test reporting an issue with a rule that the scan tool did not create, which the public "
+            + "Reporter API accepts")
+    void testReporterWithRuleImplementedElsewhere() {
+        Rule rule = new Rule() {
+            @Override
+            public String id() {
+                return "exampleOrg/exampleName:7";
+            }
+
+            @Override
+            public int numericId() {
+                return 7;
+            }
+
+            @Override
+            public String description() {
+                return "rule implemented by an analyzer";
+            }
+
+            @Override
+            public RuleKind kind() {
+                return RuleKind.BUG;
+            }
+        };
+        ReporterImpl reporter = new ReporterImpl(List.of());
+        Path validBalProject = Paths.get("src", "test", "resources", "test-resources",
+                "valid-single-file-project", "main.bal");
+        Project project = ProjectLoader.load(validBalProject).project();
+        Module defaultModule = project.currentPackage().getDefaultModule();
+        Document document = defaultModule.document(defaultModule.documentIds().iterator().next());
+        Location location = document.syntaxTree().rootNode().location();
+
+        reporter.reportIssue(document, location, rule);
+        Issue issue = reporter.getIssues().get(0);
+        Assert.assertEquals(issue.rule().id(), "exampleOrg/exampleName:7");
+        Assert.assertEquals(issue.rule().kind(), RuleKind.BUG);
+        Assert.assertEquals(issue.rule().name(), "rule implemented by an analyzer");
+        Assert.assertEquals(issue.source(), Source.EXTERNAL);
+        // The reports write the rule in the same shape as the scan tool's own rules
+        String json = ScanUtils.convertIssuesToJsonString(List.of(issue), project, Map.of());
+        Assert.assertTrue(json.contains("""
+                    "rule": {
+                      "id": "exampleOrg/exampleName:7",
+                      "numericId": 7,
+                      "name": "rule implemented by an analyzer",
+                """), json);
+        Assert.assertTrue(json.contains("\"ruleKind\": \"BUG\""), json);
+        Assert.assertTrue(ScanUtils.convertIssuesToSarifString(List.of(issue), project)
+                .contains("\"ruleId\": \"exampleOrg/exampleName:7\""));
     }
 
     @Test(description = "test creating a reporter and reporting an issue with non-existent numeric rule identifier")

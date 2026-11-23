@@ -4,6 +4,13 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. Releases for older distributions are maintained on the `support/*` branches, which keep their own changelog.
 
+## [Unreleased]
+
+### Fixed
+
+- `Reporter.reportIssue(Document, Location, Rule)` accepts a `Rule` that an analyzer implements itself, instead of failing with a `ClassCastException`. The issue's rule is written to the JSON, SARIF and HTML reports in the same shape as the scan tool's own rules. ([#64](https://github.com/ballerina-platform/static-code-analysis-tool/issues/64))
+- The scan reads the issues an analyzer reports without casting the `ScannerContext`'s `Reporter` to the tool's own implementation, so a `ProjectAnalyzer` whose `getScannerContext` gives any `Reporter` works, and that reporter still receives every report. ([#64](https://github.com/ballerina-platform/static-code-analysis-tool/issues/64))
+
 ## [0.14.0] - 2026-11-17
 
 Built against Ballerina 2201.13.2.

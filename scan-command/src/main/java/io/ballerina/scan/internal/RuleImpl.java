@@ -137,6 +137,23 @@ public class RuleImpl implements Rule {
     }
 
     /**
+     * Returns a rule as the scan tool's own implementation, copying one that an analyzer implemented itself through
+     * the {@link Rule} getters, so that every report writes it the same way.
+     *
+     * @param rule the rule
+     * @return the rule, or a copy of it
+     */
+    static RuleImpl of(Rule rule) {
+        if (rule instanceof RuleImpl ruleImpl) {
+            return ruleImpl;
+        }
+        return builder().id(rule.id()).numericId(rule.numericId()).name(rule.name())
+                .description(rule.description()).details(rule.details()).helpUri(rule.helpUri())
+                .ruleKind(rule.kind()).severity(rule.severity()).tags(rule.tags()).standards(rule.standards())
+                .build();
+    }
+
+    /**
      * {@code Builder} stages the rich, authored metadata of a rule (numeric id, name, description,
      * severity, tags, standards, helpUri, etc.) before its fully qualified {@code id} is
      * known. That is only computed by {@link RuleFactory} once it knows whether the rule being

@@ -48,7 +48,7 @@ public class IssueImpl implements Issue {
         this.location = new BLangDiagnosticLocation(lineRange.fileName(), lineRange.startLine().line(),
                 lineRange.endLine().line(), lineRange.startLine().offset(), lineRange.endLine().offset(),
                 textRange.startOffset(), textRange.length());
-        this.rule = (RuleImpl) rule;
+        this.rule = RuleImpl.of(rule);
         this.source = source;
         this.fileName = fileName;
         this.filePath = filePath;
