@@ -34,7 +34,7 @@ configPath = "path/to/Scan.toml"
 
 When the `Ballerina.toml` file has a `[scan]` table, the file at its `configPath` is used instead of a `Scan.toml` file in the root, which is then ignored. A relative `configPath` is resolved against the root, and a `[scan]` table without `configPath` stops the scan with an error.
 
-A `Scan.toml` file can have the `[[analyzer]]`, `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` and `[analysis]` tables described below, and nothing else. `bal scan` checks the whole file, whether it is local or downloaded from a URL, and stops with exit code `1` on any mistake, listing every error at once with its line and column: an unknown table or key, such as `[gates]`, `[rules]` or `foo = 1`, which would otherwise turn its settings off without notice; and a value of the wrong type in `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` or `[analysis]`. The entries of `[[analyzer]]` are not validated: an entry with a missing, empty or wrongly typed `org` or `name` is skipped, and an unknown key in it is ignored. For example:
+A `Scan.toml` file can have the `[[analyzer]]`, `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` and `[analysis]` tables described below, and nothing else. `bal scan` checks the whole file, whether it is local or downloaded from a URL, and stops with exit code `1` on any mistake, listing every error at once with its line and column: an unknown table or key, such as `[gates]`, `[rules]` or `foo = 1`, which would otherwise turn its settings off without notice; a value of the wrong type in `[[platform]]`, `[rule]`, `[suppression]`, `[gate]` or `[analysis]`; and an `[[analyzer]]` entry that cannot be used, as described in [Configuration for Static Code Analyzer Plugins](#configuration-for-static-code-analyzer-plugins). For example:
 
 ```text
 bal scan: error: Scan.toml has 2 errors
@@ -42,7 +42,7 @@ Scan.toml:1:1: error: unknown table 'gates'; expected [[analyzer]], [[platform]]
 Scan.toml:5:15: error: invalid value '0' for 'failOnCount'; expected a whole number of 1 or more
 ```
 
-`bal scan --list-rules` stops only on a TOML syntax error and on `analyzer` written in a form other than `[[analyzer]]` tables or `analyzer = []`. It does not stop on the other errors, including an unknown table or key: a misspelled analyzer table such as `[[analyzers]]` is ignored, and the rules of its analyzer are not listed. The editor ignores invalid settings.
+`bal scan --list-rules` stops only on a TOML syntax error and on the `[[analyzer]]` errors, since its analyzers decide the rules it lists. It does not stop on the other errors, including an unknown table or key: a misspelled analyzer table such as `[[analyzers]]` is ignored, and the rules of its analyzer are not listed. The editor ignores invalid settings.
 
 # Configuration for Platform Plugins
 
@@ -93,9 +93,18 @@ For locally available static code analyzer plugins, the following configuration 
 [[analyzer]]
 org = "org2"
 name = "name2"
-version = "version"
+version = "1.0.0"
 repository = "local"
 ```
+
+Each `[[analyzer]]` entry takes only `org`, `name`, `version` and `repository`. `org` and `name` are required and must be valid organization and package names; `name` can also name a module of the package, such as `name1.mod`. `version`, when given, must be a version such as `1.0.0`, and without it the latest version in Ballerina Central is used. `repository` can only be `"local"`, which requires a `version`, as a package is found in the local repository only by its exact version. An entry that breaks any of these is an error with its position, and so is an analyzer that cannot be resolved, such as one with a misspelled `org` or `name` or a `version` that does not exist, since leaving it out would give a clean-looking scan without its rules:
+
+```
+bal scan: error: Scan.toml has 1 error
+Scan.toml:1:1: error: analyzer 'org2/name2:9.9.9 from the local repository' cannot be resolved: Dependency version (9.9.9) cannot be found in the local repository. org: `org2` name: name2
+```
+
+A workspace `Scan.toml` can name a package of the workspace as an analyzer; that package does not import itself. An analyzer of the workspace `Scan.toml` that cannot be resolved stops the scan once, instead of failing every package.
 
 # Configuration for Static Code Analyzer Rules
 
