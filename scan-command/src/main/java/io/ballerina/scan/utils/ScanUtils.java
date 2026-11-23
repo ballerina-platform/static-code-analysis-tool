@@ -1191,14 +1191,19 @@ public final class ScanUtils {
         } catch (IOException ex) {
             throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.READING_CONFIG_FILE, ex.getMessage()));
         }
+        List<TomlKeys.Duplicate> duplicates = TomlKeys.normalize(scanTomlDocumentContent);
         if (validation == Validation.NONE) {
             return scanTomlDocumentContent;
         }
-        List<ConfigError> syntaxErrors = scanTomlDocumentContent.diagnostics().stream()
+        List<ConfigError> syntaxErrors = new ArrayList<>();
+        scanTomlDocumentContent.diagnostics().stream()
                 .filter(diagnostic -> diagnostic.diagnosticInfo().severity() == DiagnosticSeverity.ERROR)
-                .map(diagnostic -> new ConfigError(diagnostic.location().lineRange(),
-                        diagnostic.message()))
-                .toList();
+                .forEach(diagnostic -> syntaxErrors.add(new ConfigError(diagnostic.location().lineRange(),
+                        diagnostic.message())));
+        duplicates.forEach(duplicate -> syntaxErrors.add(new ConfigError(duplicate.lineRange(),
+                DiagnosticLog.error(DiagnosticCode.DUPLICATE_CONFIG_ENTRY, duplicate.table() ? 1 : 0,
+                        duplicate.key()))));
+        syntaxErrors.sort(ConfigError.BY_POSITION);
         failOnConfigErrors(displayPath, syntaxErrors);
         return scanTomlDocumentContent;
     }

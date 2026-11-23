@@ -4,6 +4,12 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. This branch maintains the 0.11.x line for Ballerina 2201.12 (Update 12). Releases for newer distributions are made from `main`.
 
+## [Unreleased]
+
+### Fixed
+
+- A quoted key or table name in `Scan.toml`, such as `"sonar.host.url" = "..."` or `["rule"]`, is read as the same bare name, as TOML defines. Before, the quotes were kept, so a quoted `[[platform]]` argument reached the plugin's `platformArgs()` with its quotes, a quoted argument ending in `Path` was not resolved against the folder of `Scan.toml`, and a quoted table name was reported as an unknown table. A name written both quoted and bare, such as `[rule]` and `["rule"]`, is reported as a duplicate, while `[["platform"]]` and `[[platform]]` entries form one list. (backport of [#225](https://github.com/ballerina-platform/static-code-analysis-tool/pull/225); [#221](https://github.com/ballerina-platform/static-code-analysis-tool/issues/221))
+
 ## [0.11.2] - 2026-11-17
 
 Built against Ballerina 2201.12.0.
