@@ -35,7 +35,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Tests for the validation of the tables and keys of a Scan.toml file.
@@ -121,7 +124,65 @@ public class ScanTomlValidationTest extends BaseTest {
                         platform = ["plugin.jar"]
                         """, List.of("Scan.toml:1:1: error: 'platform' must be written as [[platform]] tables, or as "
                         + "platform = []")},
+                // TOML treats a quoted name and the same bare name as one, so writing both defines it twice
+                {"""
+                        [rule]
+                        exclude = ["ballerina:1"]
+
+                        ["rule"]
+                        include = ["ballerina:2"]
+                        """, List.of("Scan.toml:4:1: error: duplicate table 'rule'; a quoted name and the same bare "
+                        + "name are one table")},
+                {"""
+                        [[platform]]
+                        name = "examplePlatform"
+                        'name' = "otherPlatform"
+                        path = "plugin.jar"
+                        """, List.of("Scan.toml:3:1: error: duplicate key 'name'; a quoted name and the same bare "
+                        + "name are one key")},
         };
+    }
+
+    @Test(description = "test a quoted key or table name in Scan.toml is read as the same bare name")
+    void testQuotedKeys() throws IOException {
+        Path propertiesDir = project.resolve("conf");
+        Path properties = propertiesDir.resolve("a.properties");
+        try {
+            Files.createDirectories(propertiesDir);
+            Files.writeString(properties, "");
+            Files.writeString(scanToml, """
+                    ["rule"]
+                    'exclude' = ["ballerina:1"]
+
+                    [["platform"]]
+                    "name" = "examplePlatform"
+                    path = "plugin.jar"
+                    "sonar.host.url" = "http://localhost:9000"
+                    plain = "x"
+                    "quotedPath" = "conf/a.properties"
+
+                    [[platform]]
+                    name = "otherPlatform"
+                    path = "other.jar"
+
+                    ['gate']
+                    "failOnSeverity" = "HIGH"
+                    """);
+            Project loaded = ProjectLoader.load(project).project();
+            ScanTomlFile scanTomlFile = ScanUtils.readScanTomlConfigurations(loaded, printStream);
+
+            Assert.assertEquals(scanTomlFile.getRulesToExclude(), Set.of(new ScanTomlFile.RuleToFilter("ballerina:1")));
+            Assert.assertEquals(scanTomlFile.getFailOnSeverity(), Optional.of(GateSeverity.HIGH));
+            Map<String, Map<String, Object>> arguments = scanTomlFile.getPlatforms().stream()
+                    .collect(Collectors.toMap(ScanTomlFile.Platform::name, ScanTomlFile.Platform::arguments));
+            Assert.assertEquals(arguments, Map.of(
+                    "examplePlatform", Map.of("sonar.host.url", "http://localhost:9000", "plain", "x",
+                            "quotedPath", properties.toAbsolutePath().normalize().toString()),
+                    "otherPlatform", Map.of()));
+        } finally {
+            Files.deleteIfExists(properties);
+            Files.deleteIfExists(propertiesDir);
+        }
     }
 
     @Test(description = "test an unknown table or key and a table written in the wrong form are Scan.toml errors",
