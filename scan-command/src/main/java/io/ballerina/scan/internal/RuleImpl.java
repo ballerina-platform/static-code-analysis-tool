@@ -40,6 +40,20 @@ public class RuleImpl implements Rule {
         this.ruleKind = ruleKind;
     }
 
+    /**
+     * Returns a rule as the scan tool's own implementation, copying one that an analyzer implemented itself through
+     * the {@link Rule} getters, so that every report writes it the same way.
+     *
+     * @param rule the rule
+     * @return the rule, or a copy of it
+     */
+    static RuleImpl of(Rule rule) {
+        if (rule instanceof RuleImpl ruleImpl) {
+            return ruleImpl;
+        }
+        return new RuleImpl(rule.id(), rule.numericId(), rule.description(), rule.kind());
+    }
+
     @Override
     public String id() {
         return id;

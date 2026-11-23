@@ -350,9 +350,11 @@ public class ProjectAnalyzer {
     }
 
     List<Issue> runExternalAnalyzers(Map<String, List<Rule>> externalAnalyzers) {
-        List<ScannerContext> scannerContextList = new ArrayList<>(externalAnalyzers.size());
+        List<RecordingScannerContext> scannerContextList = new ArrayList<>(externalAnalyzers.size());
         for (Map.Entry<String, List<Rule>> externalAnalyzer : externalAnalyzers.entrySet()) {
-            ScannerContext scannerContext = getScannerContext(externalAnalyzer.getValue());
+            // The context of getScannerContext can have any Reporter, so the issues are recorded around it
+            RecordingScannerContext scannerContext = new RecordingScannerContext(
+                    getScannerContext(externalAnalyzer.getValue()), externalAnalyzer.getValue());
             scannerContextList.add(scannerContext);
 
             // Save the scanner context to plugin cache for the compiler plugin to use during package compilation
@@ -365,9 +367,8 @@ public class ProjectAnalyzer {
 
         project.currentPackage().getCompilation();
         List<Issue> externalIssues = new ArrayList<>(scannerContextList.size());
-        for (ScannerContext scannerContext : scannerContextList) {
-            ReporterImpl reporter = (ReporterImpl) scannerContext.getReporter();
-            for (Issue issue : reporter.getIssues()) {
+        for (RecordingScannerContext scannerContext : scannerContextList) {
+            for (Issue issue : scannerContext.issues()) {
                 if (!issue.location().lineRange().fileName().equals(pluginImportsDocumentName) && isAnalyzed(issue)) {
                     externalIssues.add(issue);
                 }
