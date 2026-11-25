@@ -114,7 +114,6 @@ public class ScanCmd implements BLauncherCmd {
     private static final String FAIL_ON_COUNT_OPTION = "--fail-on-count";
     private static final String EXCLUDE_TESTS_OPTION = "--exclude-tests";
     private static final String REPORT_OPTION = "--report";
-    private static final String OUTPUT_FORMAT_OPTION = "--output-format";
     private static final String LIST_RULES_HINT = "  Run 'bal scan --list-rules' to see the available rules.";
     private static final String EXTERNAL_PACKAGES_DIR = "_external";
 
@@ -154,15 +153,11 @@ public class ScanCmd implements BLauncherCmd {
             description = "Specify the comma separated list of reports to save (json/sarif/html). Default is json")
     private List<String> reportOptions = new ArrayList<>();
 
-    @CommandLine.Option(names = OUTPUT_FORMAT_OPTION,
-            description = "Specify the format of the issues printed to standard output (json/sarif). Default is json")
-    private String outputFormat;
-
     // Deprecated for --report=html, and hidden from the help
     @CommandLine.Option(names = "--scan-report", hidden = true, description = "Enable HTML scan report generation")
     private boolean scanReport;
 
-    // Deprecated for --report and --output-format, and hidden from the help
+    // Deprecated for --report, and hidden from the help
     @CommandLine.Option(names = "--format", hidden = true,
             description = "Specify the format of the report (json/sarif). Default is json")
     private String format;
@@ -217,7 +212,7 @@ public class ScanCmd implements BLauncherCmd {
     private final List<Issue> workspaceConsoleIssues = new ArrayList<>();
     private boolean printWorkspaceIssues;
     private boolean scanningWorkspace;
-    // The format of the issues printed to standard output
+    // The format of the issues printed to standard output: JSON, or SARIF only with the deprecated --format=sarif
     private ReportFormat reportFormat = ReportFormat.JSON;
     // The reports saved in the report directory, in the order they are listed
     private final Set<Report> reports = new TreeSet<>();
@@ -515,14 +510,14 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * Selects the reports to save and the format of standard output. The deprecated --format and --scan-report are
-     * mapped to --report and --output-format, with a warning that names the replacement.
+     * Selects the reports to save. The deprecated --format and --scan-report are mapped to --report, with a warning
+     * that names the replacement; --format=sarif still prints SARIF to standard output until it is removed.
      */
     private void resolveReports() {
         if (format != null) {
-            if (!reportOptions.isEmpty() || outputFormat != null) {
-                throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.DEPRECATED_OPTION_CONFLICT,
-                        "--format", REPORT_OPTION + " or " + OUTPUT_FORMAT_OPTION));
+            if (!reportOptions.isEmpty()) {
+                throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.DEPRECATED_OPTION_CONFLICT, "--format",
+                        REPORT_OPTION));
             }
             ReportFormat legacyFormat;
             try {
@@ -534,19 +529,11 @@ public class ScanCmd implements BLauncherCmd {
             reportFormat = sarif ? ReportFormat.SARIF : ReportFormat.JSON;
             reports.add(sarif ? Report.SARIF : Report.JSON);
             warnOnce(DiagnosticLog.warning(DiagnosticCode.DEPRECATED_OPTION, "--format=" + format,
-                    sarif ? REPORT_OPTION + "=sarif " + OUTPUT_FORMAT_OPTION + "=sarif" : REPORT_OPTION + "=json"));
+                    REPORT_OPTION + "=" + (sarif ? "sarif" : "json")));
         }
         for (String value : reportOptions) {
             reports.add(Report.parse(value).orElseThrow(() -> ScanFailure.usage(DiagnosticLog.error(
                     DiagnosticCode.INVALID_OPTION_VALUE, value, REPORT_OPTION, Report.VALUES))));
-        }
-        if (outputFormat != null) {
-            reportFormat = switch (outputFormat.toLowerCase(Locale.ROOT)) {
-                case "json" -> ReportFormat.JSON;
-                case "sarif" -> ReportFormat.SARIF;
-                default -> throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE,
-                        outputFormat, OUTPUT_FORMAT_OPTION, "json or sarif"));
-            };
         }
         if (reports.isEmpty()) {
             reports.add(Report.JSON);

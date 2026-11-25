@@ -27,10 +27,8 @@ OPTIONS
         --report=<json|sarif|html>[,...]
                 Reports to save in <target-dir>/report: scan_results.json, scan_results.sarif or
                 index.html, the HTML report. Can be given more than once. Default is json.
-                Replaces the deprecated --format and --scan-report.
-
-        --output-format=<json|sarif>
-                Format of the issues printed to standard output. Default is json.
+                The issues printed to standard output are always JSON. Replaces the
+                deprecated --format and --scan-report.
 
         --list-rules
                 List the rules available to the workspace, package or source file, along with
@@ -101,8 +99,8 @@ EXAMPLES
         Run analysis and save the results in SARIF format, for example for code scanning.
                 $ bal scan --report=sarif
 
-        Run analysis and print the issues in SARIF format.
-                $ bal scan --output-format=sarif
+        Run analysis and save the results in SARIF format and the HTML report in one run.
+                $ bal scan --report=sarif,html
 
         View the rules available to the current package.
                 $ bal scan --list-rules

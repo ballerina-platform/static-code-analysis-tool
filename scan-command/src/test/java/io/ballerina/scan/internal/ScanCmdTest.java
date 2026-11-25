@@ -1059,17 +1059,20 @@ public class ScanCmdTest extends BaseTest {
         }
     }
 
-    @Test(description = "test --report=html saves only the HTML report, and --output-format=sarif prints SARIF")
-    void testHtmlReportAndOutputFormat() throws IOException {
+    @Test(description = "test --report=html saves only the HTML report, and --report=sarif still prints JSON")
+    void testHtmlAndSarifReports() throws IOException {
         Path out = Files.createTempDirectory("reports").toRealPath();
         try {
-            String output = scanValidProject(0, "--report=html", "--output-format=sarif", "--target-dir=" + out);
+            String output = scanValidProject(0, "--report=html", "--target-dir=" + out);
             Path report = out.resolve("report");
             Assert.assertTrue(Files.isRegularFile(report.resolve("index.html")), output);
             Assert.assertFalse(Files.exists(report.resolve("scan_results.json")), output);
             Assert.assertFalse(Files.exists(report.resolve("scan_results.sarif")), output);
             Assert.assertFalse(output.contains("View scan results at:"), output);
-            Assert.assertTrue(output.contains("\"version\": \"2.1.0\""), "standard output is SARIF: " + output);
+
+            output = scanValidProject(0, "--report=sarif", "--target-dir=" + out);
+            Assert.assertTrue(Files.isRegularFile(report.resolve("scan_results.sarif")), output);
+            Assert.assertFalse(output.contains("\"version\": \"2.1.0\""), "standard output is JSON: " + output);
         } finally {
             ProjectUtils.deleteDirectory(out);
         }
@@ -1085,9 +1088,10 @@ public class ScanCmdTest extends BaseTest {
             Assert.assertTrue(Files.isRegularFile(report.resolve("scan_results.sarif")), output);
             Assert.assertTrue(Files.isRegularFile(report.resolve("index.html")), output);
             Assert.assertFalse(Files.exists(report.resolve("scan_results.json")), output);
-            Assert.assertTrue(output.contains("\"version\": \"2.1.0\""), "standard output is SARIF: " + output);
+            Assert.assertTrue(output.contains("\"version\": \"2.1.0\""), "--format=sarif still prints SARIF: "
+                    + output);
             Assert.assertTrue(output.contains("bal scan: warning: --format=SARIF is deprecated and will be removed; "
-                    + "use --report=sarif --output-format=sarif instead\n"), output);
+                    + "use --report=sarif instead\n"), output);
             Assert.assertTrue(output.contains("bal scan: warning: --scan-report is deprecated and will be removed; "
                     + "use --report=sarif,html instead\n"), output);
 
@@ -1110,11 +1114,9 @@ public class ScanCmdTest extends BaseTest {
         return new Object[][]{
                 {new String[]{"--report=xml"}, "invalid value 'xml' for --report; expected json, sarif or html"},
                 {new String[]{"--report=json,"}, "invalid value '' for --report; expected json, sarif or html"},
-                {new String[]{"--output-format=html"},
-                        "invalid value 'html' for --output-format; expected json or sarif"},
                 {new String[]{"--format=xml"}, "invalid value 'xml' for --format; expected json or sarif"},
                 {new String[]{"--format=sarif", "--report=sarif"}, "--format is deprecated and cannot be combined "
-                        + "with --report or --output-format; use --report or --output-format alone"},
+                        + "with --report; use --report alone"},
         };
     }
 

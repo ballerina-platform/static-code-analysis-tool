@@ -23,8 +23,7 @@ All options are optional. Rule filters and platforms can also be configured in a
 | Option | Description |
 |--------|-------------|
 | `--target-dir=<path>` | Target directory path for saving analysis reports. Default is the `target` directory of the package or workspace, or the current directory for a single Ballerina file. A relative path is resolved against the current directory. In a workspace, it is one directory for every package. See [Report locations](#report-locations). |
-| `--report=<json\|sarif\|html>[,...]` | Reports to save in the `report` folder of the target directory: `scan_results.json`, `scan_results.sarif` or `index.html`, the HTML report. Can be given more than once, and the values are combined. Default is `json`. See [Report locations](#report-locations). |
-| `--output-format=<json\|sarif>` | Format of the issues printed to standard output. Default is `json`. |
+| `--report=<json\|sarif\|html>[,...]` | Reports to save in the `report` folder of the target directory: `scan_results.json`, `scan_results.sarif` or `index.html`, the HTML report. Can be given more than once, and the values are combined. Default is `json`. The issues printed to standard output are always JSON. See [Report locations](#report-locations). |
 | `--list-rules` | List the rules available to the workspace, package or source file, along with their kind and severity. Lists only the core rules and the rules contributed by the dependencies (library tools and static code analyzer plugins), and for a package or workspace, by the analyzers declared in `Scan.toml`. |
 | `--include-rules=<rule1, ...>` | Run analysis for a specific set of rules. By default, all available rules are included. A rule that is not available to the project is an error. |
 | `--exclude-rules=<rule1, ...>` | Exclude analysis for a specific set of rules. By default, no rules are excluded. A rule that is not available to the project is an error. |
@@ -60,9 +59,6 @@ bal scan --report=sarif
 
 # Run analysis and save the results in SARIF format and the HTML report in one run.
 bal scan --report=sarif,html
-
-# Run analysis and print the issues in SARIF format.
-bal scan --output-format=sarif
 
 # View the rules available to the current package.
 bal scan --list-rules
@@ -164,7 +160,7 @@ Running `bal scan` reports each finding as a JSON issue with its location and fu
 
 The `location` gives one-based lines and columns, as the compiler's diagnostics and the SARIF report do, and the path of the file relative to the package root, such as `modules/db/db.bal`, or to the workspace root in the output and combined report of a workspace scan. The `scan_results.json` of each workspace package gives paths relative to the root of that package, and a single Ballerina file gives its file name. The top-level `filePath` is the path of the file as the scan loaded it.
 
-Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON, or SARIF with `--output-format=sarif`. Progress messages, warnings, the issue summary, such as `3 issue(s)`, report paths, and the blank lines between sections are written to standard error.
+Only the issues are written to standard output, so `bal scan > issues.json` saves valid JSON. For SARIF, save it with `--report=sarif` and read `target/report/scan_results.sarif`. Progress messages, warnings, the issue summary, such as `3 issue(s)`, report paths, and the blank lines between sections are written to standard error.
 
 The console output is printed as sections, in this order, with one blank line between them: configuration, warnings, progress, issues, issue summary, report locations, platform output and the gate result. A section that prints nothing is left out, and warnings raised during the scan, such as unmatched suppressions, are printed before the section that follows them.
 
@@ -180,7 +176,7 @@ bal scan --report=json,html
 
 This produces an HTML report and the scan results in JSON format inside the `target/report` directory, or in the `report` directory under the path given with `--target-dir`. It is generated even when the results are also reported to a platform.
 
-`--report` selects the files saved in the `report` folder, and `--output-format` selects what is printed to standard output, so the two are independent: `bal scan --report=sarif,html` saves `scan_results.sarif` and `index.html` and prints JSON. Without `--report`, only `scan_results.json` is saved. `--format` and `--scan-report` are deprecated and will be removed: `--format=sarif` is `--report=sarif --output-format=sarif`, `--format=json` is `--report=json`, and `--scan-report` adds `html` to the reports. Each prints a warning that names its replacement, and `--format` cannot be combined with `--report` or `--output-format`.
+`--report` selects only the files saved in the `report` folder; the issues printed to standard output are always JSON. For example, `bal scan --report=sarif,html` saves `scan_results.sarif` and `index.html`. Without `--report`, only `scan_results.json` is saved. `--format` and `--scan-report` are deprecated and will be removed: `--format=sarif` is `--report=sarif`, `--format=json` is `--report=json`, and `--scan-report` adds `html` to the reports. Each prints a warning that names its replacement, and `--format` cannot be combined with `--report`. Until it is removed, `--format=sarif` also prints SARIF to standard output, as before.
 
 ### Report locations
 

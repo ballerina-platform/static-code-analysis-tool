@@ -81,14 +81,13 @@ bal scan --target-dir="results"
 bal scan --report=json,html
 ```
 
-5. Run analysis and save the results in SARIF format, or print them in SARIF format.
+5. Run analysis and save the results in SARIF format and the HTML report in one run.
 
 ```bash
-bal scan --report=sarif
-bal scan --output-format=sarif
+bal scan --report=sarif,html
 ```
 
-> Note: `--report` accepts `json`, `sarif` and `html`, and defaults to `json`. `--output-format` accepts `json` and `sarif`, and defaults to `json`. The deprecated `--format` and `--scan-report` still work, with a warning.
+> Note: `--report` accepts `json`, `sarif` and `html`, and defaults to `json`. The issues printed to standard output are always JSON. The deprecated `--format` and `--scan-report` still work, with a warning.
 
 6. View all available rules.
 
