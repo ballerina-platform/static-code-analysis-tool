@@ -40,7 +40,9 @@ class RecordingScannerContext implements ScannerContext {
 
     RecordingScannerContext(ScannerContext context, List<Rule> rules) {
         this.context = context;
-        this.reporter = new RecordingReporter(rules, context.getReporter());
+        // Nothing reads the issues of the scan tool's own context, so its reporter is not given them a second time
+        Reporter delegate = context.getClass() == ScannerContextImpl.class ? null : context.getReporter();
+        this.reporter = new RecordingReporter(rules, delegate);
     }
 
     @Override
@@ -66,8 +68,8 @@ class RecordingScannerContext implements ScannerContext {
     }
 
     /**
-     * Records an issue as the scan tool's reporter does, including the check of a numeric rule ID, before passing the
-     * report on, so that the wrapped reporter sees only reports the scan accepts.
+     * Checks a report as the scan tool's reporter does before passing it on, so that the wrapped reporter sees only
+     * reports the scan accepts, and records the issue only once the wrapped reporter has accepted it too.
      */
     private static final class RecordingReporter extends ReporterImpl {
         private final Reporter delegate;
@@ -79,14 +81,20 @@ class RecordingScannerContext implements ScannerContext {
 
         @Override
         public void reportIssue(Document reportedDocument, Location location, int ruleId) {
-            super.reportIssue(reportedDocument, location, ruleId);
-            delegate.reportIssue(reportedDocument, location, ruleId);
+            Issue issue = createIssue(reportedDocument, location, ruleId);
+            if (delegate != null) {
+                delegate.reportIssue(reportedDocument, location, ruleId);
+            }
+            getIssues().add(issue);
         }
 
         @Override
         public void reportIssue(Document reportedDocument, Location location, Rule rule) {
-            super.reportIssue(reportedDocument, location, rule);
-            delegate.reportIssue(reportedDocument, location, rule);
+            Issue issue = createIssue(reportedDocument, location, rule);
+            if (delegate != null) {
+                delegate.reportIssue(reportedDocument, location, rule);
+            }
+            getIssues().add(issue);
         }
     }
 }
