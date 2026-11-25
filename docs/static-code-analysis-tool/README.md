@@ -75,19 +75,20 @@ bal scan main.bal
 bal scan --target-dir="results"
 ```
 
-4. Run analysis and generate a HTML analysis report.
+4. Run analysis and save the JSON results and the HTML analysis report.
 
 ```bash
-bal scan --scan-report
+bal scan --report=json,html
 ```
 
-5. Run analysis and specify the output format (json or sarif).
+5. Run analysis and save the results in SARIF format, or print them in SARIF format.
 
 ```bash
-bal scan --format=sarif
+bal scan --report=sarif
+bal scan --output-format=sarif
 ```
 
-> Note: The default format is json, which is also accepted as `ballerina`.
+> Note: `--report` accepts `json`, `sarif` and `html`, and defaults to `json`. `--output-format` accepts `json` and `sarif`, and defaults to `json`. The deprecated `--format` and `--scan-report` still work, with a warning.
 
 6. View all available rules.
 

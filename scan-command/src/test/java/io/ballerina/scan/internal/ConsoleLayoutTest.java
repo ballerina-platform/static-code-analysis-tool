@@ -327,7 +327,7 @@ public class ConsoleLayoutTest extends BaseTest {
                 """);
         try {
             String output = scan(gateIssuesProject, "--exclude-rules=ballerina:1", "--fail-on-severity=HIGH",
-                    "--scan-report");
+                    "--report=json,html");
             Assert.assertEquals(skeleton(output), """
                     Loading scan tool configurations from <PATH>
 
@@ -354,7 +354,7 @@ public class ConsoleLayoutTest extends BaseTest {
 
     @Test(description = "test the layout of a workspace scan")
     void testWorkspaceLayout() throws IOException {
-        String output = scan(testResourcesRoot.resolve("workspace-with-gates"), "--scan-report");
+        String output = scan(testResourcesRoot.resolve("workspace-with-gates"), "--report=json,html");
         Assert.assertEquals(skeleton(output), """
                 Resolving workspace dependencies
 
