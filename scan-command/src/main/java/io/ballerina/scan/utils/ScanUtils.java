@@ -1645,13 +1645,20 @@ public final class ScanUtils {
             if (severity.isPresent()) {
                 scanTomlFile.setFailOnSeverity(severity.get());
             } else {
-                errors.add(invalidConfigValue(value, GATE_FAIL_ON_SEVERITY, GateSeverity.VALUES));
+                errors.add(new ConfigError(value.location().lineRange(),
+                        DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_VALUE,
+                                String.valueOf(value.toNativeValue()), GATE_FAIL_ON_SEVERITY, GateSeverity.VALUES)));
             }
         });
 
         gateTable.get(GATE_FAIL_ON_COUNT).ifPresent(value -> {
             if (value.kind() == TomlType.INTEGER && value.toNativeValue() instanceof Number count
-                    && count.longValue() >= 1 && count.longValue() <= Integer.MAX_VALUE) {
+                    && count.longValue() > Integer.MAX_VALUE) {
+                errors.add(new ConfigError(value.location().lineRange(),
+                        DiagnosticLog.error(DiagnosticCode.NUMBER_TOO_LARGE, String.valueOf(count),
+                                "'" + GATE_FAIL_ON_COUNT + "'", Integer.MAX_VALUE)));
+            } else if (value.kind() == TomlType.INTEGER && value.toNativeValue() instanceof Number count
+                    && count.longValue() >= 1) {
                 scanTomlFile.setFailOnCount(count.intValue());
             } else {
                 errors.add(invalidConfigValue(value, GATE_FAIL_ON_COUNT, GATE_COUNT_VALUES));
@@ -1679,10 +1686,15 @@ public final class ScanUtils {
         });
     }
 
+    /**
+     * Returns the error for an invalid value of a key that does not take a string. A quoted value, such as
+     * {@code failOnCount = "5"}, is named as a string, since it reads like a valid value.
+     */
     private static ConfigError invalidConfigValue(TomlValueNode value, String key, String expected) {
+        DiagnosticCode code = value.kind() == TomlType.STRING
+                ? DiagnosticCode.INVALID_CONFIG_STRING_VALUE : DiagnosticCode.INVALID_CONFIG_VALUE;
         return new ConfigError(value.location().lineRange(),
-                DiagnosticLog.error(DiagnosticCode.INVALID_CONFIG_VALUE, String.valueOf(value.toNativeValue()), key,
-                        expected));
+                DiagnosticLog.error(code, String.valueOf(value.toNativeValue()), key, expected));
     }
 
     /**
