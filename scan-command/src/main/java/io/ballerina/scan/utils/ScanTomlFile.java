@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.utils;
 
+import io.ballerina.tools.text.LineRange;
+
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
@@ -46,6 +48,7 @@ public class ScanTomlFile {
 
     private final Set<Platform> platforms = new LinkedHashSet<>();
     private final Set<Analyzer> analyzers = new LinkedHashSet<>();
+    private final Map<Analyzer, LineRange> analyzerLocations = new LinkedHashMap<>();
     private final Set<RuleToFilter> rulesToInclude = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToExclude = new LinkedHashSet<>();
     private final Set<String> platformsWithoutPath = new LinkedHashSet<>();
@@ -197,6 +200,14 @@ public class ScanTomlFile {
         writtenSettings.put(ANALYZER_SETTING + id, "");
     }
 
+    /**
+     * Adds an analyzer with where it is written in the file, so that an error about it can point at it.
+     */
+    void setAnalyzer(Analyzer analyzer, LineRange location) {
+        setAnalyzer(analyzer);
+        analyzerLocations.putIfAbsent(analyzer, location);
+    }
+
     void addPlatformWithoutPath(String name) {
         platformsWithoutPath.add(name);
     }
@@ -284,6 +295,17 @@ public class ScanTomlFile {
      */
     public Set<Analyzer> getAnalyzers() {
         return Collections.unmodifiableSet(analyzers);
+    }
+
+    /**
+     * Returns where an analyzer is written in the file.
+     *
+     * @param analyzer the analyzer
+     * @return the location of its [[analyzer]] table, or empty when the file does not declare it
+     * @since 0.14.1
+     */
+    public Optional<LineRange> getAnalyzerLocation(Analyzer analyzer) {
+        return Optional.ofNullable(analyzerLocations.get(analyzer));
     }
 
     /**

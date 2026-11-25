@@ -203,6 +203,8 @@ public class ScanCmd implements BLauncherCmd {
     private Integer gateCount;
     // The defaults of the packages of a workspace, read once for all of them; null when the workspace has none
     private ScanTomlFile workspaceDefaults;
+    // Whether loading a package found an error of the workspace Scan.toml, which stops the run at that package
+    private boolean workspaceFileFailed;
     private boolean workspaceDefaultsRead;
     private final Set<String> printedWarnings = new HashSet<>();
     // The sources each package is scanned with, keyed by its root, for the workspace HTML report
@@ -542,6 +544,7 @@ public class ScanCmd implements BLauncherCmd {
                 }
             } catch (RuntimeException ex) {
                 failures.put(buildProject, ScanFailure.from(ex));
+                stopOnWorkspaceFileFailure(workspaceProject, failures);
             }
         }
         // A package that failed to load has no rules, so the analyzer rule IDs are complete only without failures
@@ -609,6 +612,7 @@ public class ScanCmd implements BLauncherCmd {
                 loadRules(packageScan);
             } catch (RuntimeException ex) {
                 failures.put((BuildProject) packageScan.project(), ScanFailure.from(ex));
+                stopOnWorkspaceFileFailure(workspaceProject, failures);
             }
         }
         if (!allRules.isEmpty()) {
@@ -616,6 +620,17 @@ public class ScanCmd implements BLauncherCmd {
             ScanUtils.printRulesToConsole(allRules, outputStream);
         }
         failOnPackageFailures(workspaceProject, failures);
+    }
+
+    /**
+     * Stops at an error of the workspace Scan.toml, which the remaining packages would repeat, reporting it for the
+     * package it was found in along with the failures of the packages before it.
+     */
+    private void stopOnWorkspaceFileFailure(WorkspaceProject workspaceProject,
+                                            Map<BuildProject, ScanFailure> failures) {
+        if (workspaceFileFailed) {
+            failOnPackageFailures(workspaceProject, failures);
+        }
     }
 
     /**
@@ -801,14 +816,42 @@ public class ScanCmd implements BLauncherCmd {
                 packageScan.config().analyzedSources());
         List<Rule> coreRules = CoreRule.rules();
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
+        boolean usesWorkspaceFile = scanningWorkspace && workspaceDefaults != null && scanTomlFile == workspaceDefaults;
+        failOnUnresolvedAnalyzers(project, scanTomlFile, projectAnalyzer.getUnresolvedAnalyzers(), usesWorkspaceFile);
         addRules(coreRules);
         externalAnalyzers.values().forEach(this::addRules);
 
-        boolean usesWorkspaceFile = scanningWorkspace && workspaceDefaults != null && scanTomlFile == workspaceDefaults;
         if (!listRules && usesWorkspaceFile) {
             warnUnavailableWorkspaceRules(project, scanTomlFile, ProjectAnalyzer.rules(coreRules, externalAnalyzers));
         }
         return new PackageRules(projectAnalyzer, coreRules, externalAnalyzers);
+    }
+
+    /**
+     * Fails with each [[analyzer]] of the Scan.toml file that could not be resolved, as a Scan.toml error at its
+     * position, since leaving it out would give a clean-looking scan without its rules. An analyzer of the workspace
+     * Scan.toml stops the run at the package it failed for, so that it is reported once instead of for every package.
+     */
+    private void failOnUnresolvedAnalyzers(Project project, ScanTomlFile scanTomlFile,
+                                           Map<ScanTomlFile.Analyzer, String> unresolvedAnalyzers,
+                                           boolean usesWorkspaceFile) {
+        if (unresolvedAnalyzers.isEmpty()) {
+            return;
+        }
+        Path root = scanningWorkspace ? project.workspaceProject().orElseThrow().sourceRoot() : project.sourceRoot();
+        String displayPath = scanTomlFile.getDisplayPath(root).orElse(Constants.SCAN_FILE);
+        List<String> errors = new ArrayList<>();
+        unresolvedAnalyzers.forEach((analyzer, reason) -> {
+            String id = analyzer.org() + "/" + analyzer.name()
+                    + (analyzer.version() == null ? "" : ":" + analyzer.version())
+                    + (analyzer.repository() == null ? "" : " from the " + analyzer.repository() + " repository");
+            errors.add(DiagnosticLog.fileError(displayPath, scanTomlFile.getAnalyzerLocation(analyzer).orElseThrow(),
+                    DiagnosticLog.error(DiagnosticCode.ANALYZER_NOT_RESOLVED, id, reason.isEmpty() ? "" : ": "
+                            + reason)));
+        });
+        workspaceFileFailed = usesWorkspaceFile;
+        throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath,
+                errors.size()), errors);
     }
 
     /**

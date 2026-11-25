@@ -246,4 +246,19 @@ public class ProjectAnalyzerTest extends BaseTest {
         Assert.assertEquals(compilationErrors.size(), 1);
         Assert.assertEquals(compilationErrors.get(0).location().lineRange().fileName(), "main.bal");
     }
+
+    @Test(description = "test a resolution diagnostic names an analyzer only by its whole version, and a module "
+            + "analyzer by its package")
+    void testResolutionDiagnosticNamesAnalyzer() {
+        String message = "Dependency version (1.0.0-alpha) cannot be found in the local repository. org: `myorg` "
+                + "name: mypkg";
+        Assert.assertTrue(ProjectAnalyzer.namesAnalyzer(message,
+                new ScanTomlFile.Analyzer("myorg", "mypkg", "1.0.0-alpha", "local")));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer(message,
+                new ScanTomlFile.Analyzer("myorg", "mypkg", "1.0.0", "local")));
+        Assert.assertTrue(ProjectAnalyzer.namesAnalyzer(message,
+                new ScanTomlFile.Analyzer("myorg", "mypkg.rules", "1.0.0-alpha", "local")));
+        Assert.assertFalse(ProjectAnalyzer.namesAnalyzer(message,
+                new ScanTomlFile.Analyzer("myorg", "mypk", "1.0.0-alpha", "local")));
+    }
 }
