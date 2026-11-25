@@ -214,7 +214,7 @@ public class ScanCmd implements BLauncherCmd {
     private boolean scanningWorkspace;
     // The format of the issues printed to standard output: JSON, or SARIF only with the deprecated --format=sarif
     private ReportFormat reportFormat = ReportFormat.JSON;
-    // The reports saved in the report directory, in the order they are listed
+    // The reports saved in the report directory, kept in the order of Report whatever the order --report gives
     private final Set<Report> reports = new TreeSet<>();
     private GateSeverity gateSeverity;
     private Integer gateCount;
@@ -1670,7 +1670,7 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * A report saved in the report directory, in the order they are listed.
+     * A report saved in the report directory. The reports are saved and listed in the order of the constants.
      */
     private enum Report {
         JSON("json"),
