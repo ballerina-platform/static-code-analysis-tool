@@ -241,7 +241,7 @@ See [Configure the scan with Scan.toml](https://ballerina.io/learn/scan-tool/#co
 |------|---------|
 | `0` | The scan completed, and no gate is set or the gate was not tripped. |
 | `1` | The gate was tripped, or the scan could not be completed, for example because of an invalid `Scan.toml`, a package that cannot be loaded, such as one whose `Ballerina.toml` has an error, a compilation error, an empty package (an empty workspace member is skipped with a warning), a plugin failure, an invalid suppression or a report that cannot be written. |
-| `2` | Invalid command-line input, such as an invalid option value, an unknown option, an option written without its value, such as `--format` alone, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, `--platforms` with a single Ballerina file, or an unknown rule ID. |
+| `2` | Invalid command-line input, such as an invalid option value, an unknown option (write a path that starts with a dash after `--`, as in `bal scan -- -mypkg`), an option written without its value, such as `--format` alone, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, `--platforms` with a single Ballerina file, or an unknown rule ID. |
 | `3` | The path is not a Ballerina package, workspace or standalone file, or is a `.bal` file inside a package. |
 | `130` | The scan was interrupted. |
 

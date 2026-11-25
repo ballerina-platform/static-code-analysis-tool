@@ -150,7 +150,15 @@ public class LauncherPicocliTest extends BaseTest {
                 {new String[]{"--help", "--bogus"}, "unknown option '--bogus'"},
                 {new String[]{"--format", "--help"}, "missing value for --format; expected json or sarif"},
                 {new String[]{file, "--bogus", "-y"}, "unknown options '--bogus' and '-y'"},
-                {new String[]{"--format", "--bogus"}, "invalid value '--bogus' for --format; expected json or sarif"},
+                {new String[]{"-y", "--bogus", file}, "unknown options '-y' and '--bogus'"},
+                {new String[]{"--bogus", file, "--bogus"}, "unknown option '--bogus'"},
+                // picocli gives an unknown long option written after an option that takes a value to it as the value
+                {new String[]{"--format", "--bogus"}, "unknown option '--bogus'"},
+                {new String[]{"--target-dir", "--bogus", file}, "unknown option '--bogus'"},
+                {new String[]{"--include-rules", "--bogus=1", file}, "unknown option '--bogus=1'"},
+                {new String[]{"--exclude-tests", "--bogus", file}, "unknown option '--bogus'"},
+                {new String[]{"--fail-on-count", "--format"},
+                        "missing value for --fail-on-count; expected a whole number of 1 or more"},
                 {new String[]{"--format"}, "missing value for --format; expected json or sarif"},
                 {new String[]{"--format", "--scan-report", file}, "missing value for --format; expected json or sarif"},
                 {new String[]{file, "--target-dir"}, "missing value for --target-dir; expected a directory path"},
@@ -221,6 +229,7 @@ public class LauncherPicocliTest extends BaseTest {
                 {new String[]{"--", "-x"}, "-x"},
                 {new String[]{"--target-dir", "-foo", "--", "-foo"}, "-foo"},
                 {new String[]{"-"}, "-"},
+                {new String[]{"--exclude-tests", "-"}, "-"},
         };
     }
 

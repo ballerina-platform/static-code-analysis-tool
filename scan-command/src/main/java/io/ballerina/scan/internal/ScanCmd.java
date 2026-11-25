@@ -69,6 +69,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -497,8 +498,8 @@ public class ScanCmd implements BLauncherCmd {
     private void failOnInvalidArguments() {
         if (excludeTestsOption != null && !isBoolean(excludeTestsOption) && isExcludeTestsWrittenAlone()) {
             // picocli takes an unknown option after --exclude-tests as its value, so it is reported here instead
-            if (excludeTestsOption.startsWith("-")) {
-                unmatchedArgs.add(0, excludeTestsOption);
+            if (excludeTestsOption.length() > 1 && excludeTestsOption.startsWith("-")) {
+                unmatchedArgs.add(excludeTestsOption);
             } else {
                 targets.add(excludeTestsValuePosition(), excludeTestsOption);
             }
@@ -509,9 +510,10 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * Fails on the options the command does not have. picocli gives an unknown option that starts with a single dash,
-     * such as {@code -x}, as a target, so a target that looks like an option is one unless it was written after
-     * {@code --}. The targets after {@code --} are the last ones, so they are matched from the end.
+     * Fails on the options the command does not have, in the order they were written. picocli gives an unknown option
+     * that starts with a single dash, such as {@code -x}, as a target, so a target that looks like an option is one
+     * unless it was written after {@code --}. The targets after {@code --} are the last ones, so they are matched from
+     * the end.
      */
     private void failOnUnknownOptions() {
         List<String> args = originalArgs();
@@ -524,29 +526,65 @@ public class ScanCmd implements BLauncherCmd {
                 unknownOptions.add(target);
             }
         }
+        unknownOptions.addAll(unknownOptionsTakenAsValues(args, endOfOptions < 0 ? args.size() : endOfOptions));
         if (!unknownOptions.isEmpty()) {
+            List<String> inOrder = unknownOptions.stream().distinct()
+                    .sorted(Comparator.comparingInt(option -> writtenAt(args, option)))
+                    .toList();
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.UNKNOWN_OPTION,
-                    joinWith(quoted(unknownOptions), "and"), unknownOptions.size()));
+                    joinWith(quoted(inOrder), "and"), inOrder.size()));
         }
+    }
+
+    /**
+     * Returns the unknown long options written right after an option that takes a value, which picocli gives to that
+     * option as its value, such as {@code --bogus} in {@code --target-dir --bogus}. A value that starts with a single
+     * dash, such as {@code -1}, stays a value, and one written with {@code =} is always a value.
+     */
+    private List<String> unknownOptionsTakenAsValues(List<String> args, int endOfOptions) {
+        List<String> unknownOptions = new ArrayList<>();
+        for (int i = 0; i < endOfOptions - 1; i++) {
+            CommandLine.Model.OptionSpec option = spec.findOption(args.get(i));
+            String next = args.get(i + 1);
+            if (option != null && option.arity().max() > 0 && !EXCLUDE_TESTS_OPTION.equals(args.get(i))
+                    && next.startsWith("--") && spec.findOption(next.split("=", 2)[0]) == null) {
+                unknownOptions.add(next);
+            }
+        }
+        return unknownOptions;
+    }
+
+    private static int writtenAt(List<String> args, String argument) {
+        int index = args.indexOf(argument);
+        return index < 0 ? Integer.MAX_VALUE : index;
     }
 
     /**
      * Fails on the first option written without its value.
      */
     private void failOnMissingValues() {
-        failOnMissingValue(MISSING_VALUE.equals(targetDir), "--target-dir", "a directory path");
-        failOnMissingValue(MISSING_VALUE.equals(format), "--format", "json or sarif");
-        failOnMissingValue(includeRules.contains(MISSING_VALUE), "--include-rules", RULE_IDS);
-        failOnMissingValue(excludeRules.contains(MISSING_VALUE), "--exclude-rules", RULE_IDS);
-        failOnMissingValue(platforms.contains(MISSING_VALUE), "--platforms",
+        Map<String, String> missing = new LinkedHashMap<>();
+        addIfMissing(missing, MISSING_VALUE.equals(targetDir), "--target-dir", "a directory path");
+        addIfMissing(missing, MISSING_VALUE.equals(format), "--format", "json or sarif");
+        addIfMissing(missing, includeRules.contains(MISSING_VALUE), "--include-rules", RULE_IDS);
+        addIfMissing(missing, excludeRules.contains(MISSING_VALUE), "--exclude-rules", RULE_IDS);
+        addIfMissing(missing, platforms.contains(MISSING_VALUE), "--platforms",
                 "a comma-separated list of platform names");
-        failOnMissingValue(MISSING_VALUE.equals(failOnSeverity), FAIL_ON_SEVERITY_OPTION, GateSeverity.VALUES);
-        failOnMissingValue(MISSING_VALUE.equals(failOnCount), FAIL_ON_COUNT_OPTION, ScanUtils.GATE_COUNT_VALUES);
+        addIfMissing(missing, MISSING_VALUE.equals(failOnSeverity), FAIL_ON_SEVERITY_OPTION, GateSeverity.VALUES);
+        addIfMissing(missing, MISSING_VALUE.equals(failOnCount), FAIL_ON_COUNT_OPTION, ScanUtils.GATE_COUNT_VALUES);
+        List<String> args = originalArgs();
+        missing.entrySet().stream()
+                .min(Comparator.comparingInt(entry -> writtenAt(args, entry.getKey())))
+                .ifPresent(entry -> {
+                    throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.MISSING_OPTION_VALUE, entry.getKey(),
+                            entry.getValue()));
+                });
     }
 
-    private static void failOnMissingValue(boolean missing, String option, String expected) {
-        if (missing) {
-            throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.MISSING_OPTION_VALUE, option, expected));
+    private static void addIfMissing(Map<String, String> missing, boolean isMissing, String option,
+                                     String expected) {
+        if (isMissing) {
+            missing.put(option, expected);
         }
     }
 
