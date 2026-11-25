@@ -74,10 +74,12 @@ import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.ballerina.scan.internal.ScanToolConstants.BALLERINA_RULE_PREFIX;
 import static io.ballerina.scan.internal.ScanToolConstants.RESOLVING_PACKAGE_SCAN_RULES_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.RUNNING_SCANS_LOG;
 import static io.ballerina.scan.internal.ScanToolConstants.SCAN_COMMAND;
@@ -455,6 +457,7 @@ public class ScanCmd implements BLauncherCmd {
         }
         PackageRules rules = loadRules(packageScan);
         failOnUnknownRuleOptions();
+        failOnUnknownTomlRules(packageScan, rules);
 
         printRunningScans();
         PackageResult result = scanPackage(packageScan, rules);
@@ -486,6 +489,10 @@ public class ScanCmd implements BLauncherCmd {
     private PackageScan preparePackage(Project project) {
         section(Section.LOADING);
         ScanTomlFile scanTomlFile = ScanUtils.readScanTomlConfigurations(project, errorStream, listRules);
+        // A package's own file is checked in full once its analyzers are loaded, still before it is analyzed
+        if (!listRules && !isOwnScanToml(project, scanTomlFile)) {
+            failOnUnknownCoreRules(scanTomlFile, project.sourceRoot());
+        }
         PackageConfig config = resolveConfig(project, scanTomlFile);
 
         if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && !listRules) {
@@ -508,10 +515,69 @@ public class ScanCmd implements BLauncherCmd {
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
         addRules(coreRules);
         externalAnalyzers.values().forEach(this::addRules);
-        if (!listRules) {
-            failOnUnknownTomlRules(packageScan.scanTomlFile(), packageScan.project().sourceRoot());
-        }
         return new PackageRules(projectAnalyzer, coreRules, externalAnalyzers);
+    }
+
+    /**
+     * Checks the rule IDs of the [rule] table of the Scan.toml file a package uses against the rules of the package.
+     * Its own Scan.toml must name only rules it has. A file shared with other packages, such as a remote one or a
+     * configPath outside the package, may name an analyzer that only some of them use, so a rule the package lacks is
+     * a warning.
+     */
+    private void failOnUnknownTomlRules(PackageScan packageScan, PackageRules rules) {
+        ScanTomlFile scanTomlFile = packageScan.scanTomlFile();
+        Project project = packageScan.project();
+        Set<String> packageRuleIds = ruleIds(ProjectAnalyzer.rules(rules.coreRules(), rules.externalAnalyzers()));
+        if (isOwnScanToml(project, scanTomlFile)) {
+            failOnUnknownTomlRules(scanTomlFile, project.sourceRoot(), ruleId -> !packageRuleIds.contains(ruleId), 0);
+        } else {
+            warnUnavailableRules(project, scanTomlFile, packageRuleIds);
+        }
+    }
+
+    // A Scan.toml in the folder of the package, or of a single file, rather than one it shares with other packages
+    private static boolean isOwnScanToml(Project project, ScanTomlFile scanTomlFile) {
+        Path root = project.sourceRoot().toAbsolutePath().normalize();
+        Path packageRoot = project.kind() == ProjectKind.SINGLE_FILE_PROJECT ? root.getParent() : root;
+        return packageRoot != null && scanTomlFile.getPath()
+                .map(path -> path.toAbsolutePath().normalize().startsWith(packageRoot))
+                .orElse(false);
+    }
+
+    /**
+     * Fails on a rule ID of the [rule] table of a shared Scan.toml file that is not a core rule, as every package has
+     * the same core rules. Done before the package is compiled, so that a typo does not wait for the scan.
+     */
+    private static void failOnUnknownCoreRules(ScanTomlFile scanTomlFile, Path root) {
+        Set<String> coreRuleIds = ruleIds(CoreRule.rules());
+        failOnUnknownTomlRules(scanTomlFile, root,
+                ruleId -> ruleId.startsWith(BALLERINA_RULE_PREFIX) && !coreRuleIds.contains(ruleId), 2);
+    }
+
+    /**
+     * Warns about the rules of the [rule] table of a shared Scan.toml file that a package does not provide, since they
+     * may come from an analyzer that only some of the packages use.
+     */
+    private void warnUnavailableRules(Project project, ScanTomlFile scanTomlFile, Set<String> packageRuleIds) {
+        List<String> unavailableRules = quoted(Stream.concat(scanTomlFile.getRulesToInclude().stream(),
+                        scanTomlFile.getRulesToExclude().stream())
+                .map(ScanTomlFile.RuleToFilter::id)
+                .filter(ruleId -> !packageRuleIds.contains(ruleId))
+                .distinct()
+                .toList());
+        if (unavailableRules.isEmpty()) {
+            return;
+        }
+        warn(DiagnosticLog.warning(DiagnosticCode.WORKSPACE_RULE_NOT_AVAILABLE, joinWith(unavailableRules, "and"),
+                scanTomlFile.getDisplayPath(project.sourceRoot()).orElse(Constants.SCAN_FILE),
+                unavailableRules.size(), project.currentPackage().packageOrg().value() + "/"
+                        + project.currentPackage().packageName().value()));
+    }
+
+    private static Set<String> ruleIds(List<Rule> rules) {
+        Set<String> ruleIds = new HashSet<>();
+        rules.forEach(rule -> ruleIds.add(rule.id()));
+        return ruleIds;
     }
 
     /**
@@ -702,21 +768,22 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * Fails the scan with an error at each rule ID of the [rule] table of the package's Scan.toml file that is not a
-     * rule of the package, as an unknown rule on the command line is.
+     * Fails the scan with an error at each rule ID of the [rule] table of a Scan.toml file that is unknown, as an
+     * unknown rule on the command line is. The scope says what does not provide it: 0 the package, 2 the scan tool.
      */
-    private void failOnUnknownTomlRules(ScanTomlFile scanTomlFile, Path root) {
+    private static void failOnUnknownTomlRules(ScanTomlFile scanTomlFile, Path root, Predicate<String> isUnknown,
+                                               int scope) {
         String displayPath = scanTomlFile.getDisplayPath(root).orElse(Constants.SCAN_FILE);
         List<String> errors = new ArrayList<>(Stream.concat(scanTomlFile.getRulesToInclude().stream(),
                         scanTomlFile.getRulesToExclude().stream())
                 .map(ScanTomlFile.RuleToFilter::id)
-                .filter(ruleId -> !allRuleIds.contains(ruleId))
+                .filter(isUnknown)
                 .distinct()
                 .map(ruleId -> Map.entry(ruleId, scanTomlFile.getRuleLocation(ruleId).orElseThrow()))
                 .sorted(Comparator.comparing((Map.Entry<String, LineRange> rule) -> rule.getValue().startLine().line())
                         .thenComparing(rule -> rule.getValue().startLine().offset()))
                 .map(rule -> DiagnosticLog.fileError(displayPath, rule.getValue(),
-                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_RULE, rule.getKey())))
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_RULE, rule.getKey(), scope)))
                 .toList());
         if (errors.isEmpty()) {
             return;

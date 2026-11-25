@@ -343,6 +343,59 @@ public class GateTest extends BaseTest {
         }
     }
 
+    @Test(description = "test an unknown rule option is reported before an unknown rule of Scan.toml")
+    void testUnknownRuleOptionWinsOverScanToml() throws IOException {
+        Path scanToml = gateConfigProject.resolve("Scan.toml");
+        String original = Files.readString(scanToml, StandardCharsets.UTF_8);
+        try {
+            Files.writeString(scanToml, original + """
+
+                    [rule]
+                    exclude = ["ballerina:999"]
+                    """);
+            ScanRun run = scan(gateConfigProject, "--exclude-rules=ballerina:998");
+            Assert.assertEquals(run.exitCode(), 2, run.output());
+            Assert.assertTrue(run.errorReport().startsWith("bal scan: error: unknown rule 'ballerina:998'"),
+                    run.output());
+        } finally {
+            Files.writeString(scanToml, original);
+        }
+    }
+
+    @Test(description = "test a Scan.toml shared through configPath only warns about an analyzer rule the package "
+            + "lacks, while an unknown core rule fails before the scan")
+    void testUnknownRuleInSharedScanToml() throws IOException {
+        Path ballerinaToml = gateConfigProject.resolve("Ballerina.toml");
+        String original = Files.readString(ballerinaToml, StandardCharsets.UTF_8);
+        Path shared = Files.createTempFile("shared-scan", ".toml");
+        try {
+            Files.writeString(ballerinaToml, original + "\n[scan]\nconfigPath = \""
+                    + shared.toString().replace("\\", "/") + "\"\n");
+            Files.writeString(shared, """
+                    [rule]
+                    exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
+                    """);
+            ScanRun run = scan(gateConfigProject);
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertTrue(run.output().contains("'exampleOrg/example_module_static_code_analyzer:1' in [rule] "
+                    + "of "), run.output());
+            Assert.assertTrue(run.output().contains(" is not a rule of ballerina/"), run.output());
+
+            Files.writeString(shared, """
+                    [rule]
+                    exclude = ["ballerina:999"]
+                    """);
+            run = scan(gateConfigProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.errorReport().contains("error: unknown rule 'ballerina:999'; it is not a rule of "
+                    + "the scan tool"), run.output());
+            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+        } finally {
+            Files.writeString(ballerinaToml, original);
+            Files.deleteIfExists(shared);
+        }
+    }
+
     @Test(description = "test a rule option that leaves both include and exclude set is a usage error")
     void testRuleOptionConflictsWithScanToml() throws IOException {
         Path scanToml = gateConfigProject.resolve("Scan.toml");

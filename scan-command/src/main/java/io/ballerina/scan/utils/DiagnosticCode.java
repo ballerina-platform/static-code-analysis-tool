@@ -87,7 +87,8 @@ public enum DiagnosticCode {
     IGNORED_SUPPRESSION("STATIC_ANALYSIS_WARNING_009", "ignored.suppression"),
     SETTING_OVERRIDDEN("STATIC_ANALYSIS_WARNING_010", "setting.overridden"),
     GATE_COUNT_IGNORED("STATIC_ANALYSIS_WARNING_012", "gate.count.ignored"),
-    EXCLUDE_TESTS_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_013", "exclude.tests.not.supported");
+    EXCLUDE_TESTS_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_013", "exclude.tests.not.supported"),
+    WORKSPACE_RULE_NOT_AVAILABLE("STATIC_ANALYSIS_WARNING_014", "workspace.rule.not.available");
 
     private final String diagnosticId;
     private final String messageKey;
