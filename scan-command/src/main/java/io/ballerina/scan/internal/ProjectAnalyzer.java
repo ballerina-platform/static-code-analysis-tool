@@ -30,11 +30,13 @@ import io.ballerina.projects.DocumentConfig;
 import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
 import io.ballerina.projects.ModuleId;
+import io.ballerina.projects.Package;
 import io.ballerina.projects.PackageDependencyScope;
 import io.ballerina.projects.PackageManifest;
 import io.ballerina.projects.PackageResolution;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ResolvedPackageDependency;
+import io.ballerina.projects.SemanticVersion;
 import io.ballerina.projects.internal.model.CompilerPluginDescriptor;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
@@ -58,14 +60,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.ballerina.projects.util.ProjectConstants.IMPORT_PREFIX;
@@ -93,6 +99,7 @@ public class ProjectAnalyzer {
     private final Gson gson = new Gson();
     private String pluginImportsDocumentName;
     private Set<String> excludedFilePaths;
+    private final Map<ScanTomlFile.Analyzer, String> unresolvedAnalyzers = new LinkedHashMap<>();
 
     /**
      * Creates an analyzer that scans the sources selected by {@code [analysis] excludeTests} in the Scan.toml file.
@@ -192,8 +199,12 @@ public class ProjectAnalyzer {
         StringBuilder newImports = new StringBuilder();
         StringBuilder tomlDependencies = new StringBuilder();
         Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
+        // Importing this package would be a cycle
+        List<Package> cyclicPackages = packagesDependingOnThis();
         for (ScanTomlFile.Analyzer analyzer : analyzers) {
-            extractAnalyzerImportsAndDependencies(analyzer, newImports, tomlDependencies);
+            if (cyclicPackages.stream().noneMatch(pkg -> provides(pkg, analyzer))) {
+                extractAnalyzerImportsAndDependencies(analyzer, newImports, tomlDependencies);
+            }
         }
 
         Module defaultModule = project.currentPackage().getDefaultModule();
@@ -211,8 +222,11 @@ public class ProjectAnalyzer {
                 .compilationOptions());
         ResolvedPackageDependency rootPkgNode = new ResolvedPackageDependency(project.currentPackage(),
                 PackageDependencyScope.DEFAULT);
+        Collection<ResolvedPackageDependency> directDependencies = packageResolution.dependencyGraph()
+                .getDirectDependencies(rootPkgNode);
+        findUnresolvedAnalyzers(analyzers, directDependencies, cyclicPackages, packageResolution);
         Map<String, List<Rule>> externalAnalyzers = new HashMap<>();
-        packageResolution.dependencyGraph().getDirectDependencies(rootPkgNode).stream()
+        directDependencies.stream()
                 .map(ResolvedPackageDependency::packageInstance).forEach(pkgDependency -> {
                     PackageManifest pkgManifest = pkgDependency.manifest();
                     String org = pkgManifest.org().value();
@@ -230,6 +244,100 @@ public class ProjectAnalyzer {
                     externalAnalyzers.put(pluginDesc.plugin().getClassName(), externalRules);
                 });
         return externalAnalyzers;
+    }
+
+    /**
+     * Records each analyzer of the Scan.toml file that cannot be used, with the reason, or the resolution diagnostic
+     * that names it, if any.
+     */
+    private void findUnresolvedAnalyzers(Set<ScanTomlFile.Analyzer> analyzers,
+                                         Collection<ResolvedPackageDependency> directDependencies,
+                                         List<Package> cyclicPackages, PackageResolution packageResolution) {
+        unresolvedAnalyzers.clear();
+        for (ScanTomlFile.Analyzer analyzer : analyzers) {
+            if (cyclicPackages.stream().anyMatch(pkg -> provides(pkg, analyzer))) {
+                // A Scan.toml shared by several packages can name one of them
+                if (!isSharedScanToml()) {
+                    unresolvedAnalyzers.put(analyzer, "it is the package being scanned");
+                }
+                continue;
+            }
+            Optional<Package> dependency = directDependencies.stream()
+                    .map(ResolvedPackageDependency::packageInstance)
+                    .filter(pkg -> provides(pkg, analyzer))
+                    .findFirst();
+            // A version that does not exist only gets a warning, and resolution keeps an older locked version
+            if (dependency.isPresent() && (analyzer.version() == null || !dependency.get().packageVersion().value()
+                    .lessThan(SemanticVersion.from(analyzer.version())))) {
+                continue;
+            }
+            String reason = packageResolution.diagnosticResult().diagnostics().stream()
+                    .map(Diagnostic::message)
+                    .filter(message -> namesAnalyzer(message, analyzer))
+                    .findFirst()
+                    .or(() -> dependency.map(pkg -> "version " + pkg.packageVersion() + " was resolved instead"))
+                    .orElse("");
+            unresolvedAnalyzers.put(analyzer, reason);
+        }
+    }
+
+    // Only this package, as a package cannot be scanned with a workspace on this line
+    private List<Package> packagesDependingOnThis() {
+        return List.of(project.currentPackage());
+    }
+
+    // A remote file, or one outside the package, such as a shared configPath
+    private boolean isSharedScanToml() {
+        return scanTomlFile.getPath()
+                .map(path -> !path.toAbsolutePath().normalize().startsWith(project.sourceRoot().toAbsolutePath()
+                        .normalize()))
+                .orElse(true);
+    }
+
+    // The name of an analyzer is that of its package, or of a module of it, such as "pkg.mod"
+    private static boolean provides(Package pkg, ScanTomlFile.Analyzer analyzer) {
+        if (!analyzer.org().equals(pkg.packageOrg().value())) {
+            return false;
+        }
+        for (Module module : pkg.modules()) {
+            if (module.moduleName().toString().equals(analyzer.name())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a resolution diagnostic names an analyzer by its whole org, name and version. For a module, such as
+     * "pkg.mod", the diagnostic may name only its package.
+     */
+    static boolean namesAnalyzer(String message, ScanTomlFile.Analyzer analyzer) {
+        if (!containsToken(message, analyzer.org())
+                || (analyzer.version() != null && !containsToken(message, analyzer.version()))) {
+            return false;
+        }
+        String name = analyzer.name();
+        while (!containsToken(message, name)) {
+            int lastDot = name.lastIndexOf('.');
+            if (lastDot < 0) {
+                return false;
+            }
+            name = name.substring(0, lastDot);
+        }
+        return true;
+    }
+
+    // Whether a value appears as a whole token, so that "io" does not match other words and "1.0.0" not "1.0.0-alpha"
+    private static boolean containsToken(String message, String value) {
+        return Pattern.compile("(?<![\\w.])" + Pattern.quote(value) + "(?![\\w+-]|\\.\\w)").matcher(message).find();
+    }
+
+    /**
+     * Returns the analyzers of the Scan.toml file that {@link #getExternalAnalyzers} could not resolve, each with the
+     * resolution diagnostic that names it, or an empty string when there is none.
+     */
+    Map<ScanTomlFile.Analyzer, String> getUnresolvedAnalyzers() {
+        return Collections.unmodifiableMap(unresolvedAnalyzers);
     }
 
     private void extractAnalyzerImportsAndDependencies(ScanTomlFile.Analyzer analyzer, StringBuilder imports,

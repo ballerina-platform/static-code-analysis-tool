@@ -24,11 +24,11 @@ include = [
 ]
 exclude = ["ballerina:1"]
 
-# Invalid use cases which are filtered by scan tool
+# Invalid entries, which fail a scan and --list-rules, for the lenient loading of the editor
 [[analyzer]]
 org = "org3"
 name = "name3"
-version = "version" # version will be ignored
+version = "version"
 
 [[analyzer]]
 org = ""
