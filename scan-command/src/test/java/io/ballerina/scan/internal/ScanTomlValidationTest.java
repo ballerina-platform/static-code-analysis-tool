@@ -20,6 +20,7 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.utils.GateSeverity;
 import io.ballerina.scan.utils.ScanTomlFile;
@@ -319,6 +320,23 @@ public class ScanTomlValidationTest extends BaseTest {
                         """, "Scan.toml:1:1: error: analyzer 'ballerinax/example_module_static_code_analyzer:9.9.9 "
                         + "from the local repository' cannot be resolved: Dependency version (9.9.9) cannot be found "
                         + "in the local repository. org: `ballerinax` name: example_module_static_code_analyzer"},
+                // A package whose name starts with that of a resolved package is not one of its modules
+                {"""
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "example_module_static_code_analyzer"
+
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "example_module_static_code_analyzer.typo"
+                        """, "Scan.toml:5:1: error: analyzer 'exampleOrg/example_module_static_code_analyzer.typo' "
+                        + "cannot be resolved"},
+                {"""
+                        [[analyzer]]
+                        org = "ballerina"
+                        name = "bal_project_with_scan_toml_errors"
+                        """, "Scan.toml:1:1: error: analyzer 'ballerina/bal_project_with_scan_toml_errors' cannot be "
+                        + "resolved: it is the package being scanned"},
         };
     }
 
@@ -334,6 +352,79 @@ public class ScanTomlValidationTest extends BaseTest {
         run = scan(project, "--list-rules");
         Assert.assertEquals(run.exitCode(), 1, run.output());
         Assert.assertEquals(run.errorReport(), "bal scan: error: Scan.toml has 1 error\n" + error);
+    }
+
+    @Test(description = "test an analyzer version that does not exist fails although an older version is locked")
+    void testMissingAnalyzerVersionWithLockedVersion() throws IOException {
+        Path lockedProject = Files.createTempDirectory("project-with-locked-analyzer").resolve("locked_analyzer");
+        try {
+            writePackage(lockedProject, "locked_analyzer", """
+                    import exampleOrg/example_module_static_code_analyzer as _;
+
+                    public function main() {
+                    }
+                    """, lockedPackage("locked_analyzer", """
+                    dependencies = [
+                    \t{org = "exampleOrg", name = "example_module_static_code_analyzer"}
+                    ]
+                    """) + """
+
+                    [[package]]
+                    org = "exampleOrg"
+                    name = "example_module_static_code_analyzer"
+                    version = "0.1.0"
+                    modules = [
+                    \t{org = "exampleOrg", packageName = "example_module_static_code_analyzer", \
+                    moduleName = "example_module_static_code_analyzer"}
+                    ]
+                    """);
+            Files.writeString(lockedProject.resolve("Scan.toml"), """
+                    [[analyzer]]
+                    org = "exampleOrg"
+                    name = "example_module_static_code_analyzer"
+                    version = "9.9.9"
+                    repository = "local"
+                    """);
+            ScanRun run = scan(lockedProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertEquals(run.errorReport(), """
+                    bal scan: error: Scan.toml has 1 error
+                    Scan.toml:1:1: error: analyzer 'exampleOrg/example_module_static_code_analyzer:9.9.9 from the \
+                    local repository' cannot be resolved: Dependency version (9.9.9) cannot be found in the local \
+                    repository. org: `exampleOrg` name: example_module_static_code_analyzer""");
+        } finally {
+            ProjectUtils.deleteDirectory(lockedProject.getParent());
+        }
+    }
+
+    private static void writePackage(Path root, String name, String source, String lockedPackages)
+            throws IOException {
+        Files.createDirectories(root);
+        Files.writeString(root.resolve("Ballerina.toml"), """
+                [package]
+                org = "ballerina"
+                name = "<name>"
+                version = "0.1.0"
+                """.replace("<name>", name));
+        Files.writeString(root.resolve("Dependencies.toml"), """
+                [ballerina]
+                dependencies-toml-version = "2"
+                distribution-version = "2201.12.0"
+                """ + lockedPackages);
+        Files.writeString(root.resolve("main.bal"), source);
+    }
+
+    private static String lockedPackage(String name, String dependencies) {
+        return """
+
+                [[package]]
+                org = "ballerina"
+                name = "<name>"
+                version = "0.1.0"
+                <dependencies>modules = [
+                \t{org = "ballerina", packageName = "<name>", moduleName = "<name>"}
+                ]
+                """.replace("<name>", name).replace("<dependencies>", dependencies);
     }
 
     @Test(description = "test a platform named in --platforms whose [[platform]] has no path is reported as such")

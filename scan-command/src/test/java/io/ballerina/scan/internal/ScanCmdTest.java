@@ -340,13 +340,17 @@ public class ScanCmdTest extends BaseTest {
 
     @Test(description = "test scan command with list rules flag")
     void testScanCommandWithListRulesFlag() throws IOException {
-        Path ballerinaProject = testResources.resolve("test-resources")
-                .resolve("bal-project-with-config-file");
-        Path scanToml = ballerinaProject.resolve("Scan.toml");
-        String original = Files.readString(scanToml);
-        // The file also has invalid [[analyzer]] entries for the lenient loading tests, which fail --list-rules
-        Files.writeString(scanToml, original.substring(0, original.indexOf("# Invalid use cases")));
+        Path fixture = testResources.resolve("test-resources").resolve("bal-project-with-config-file");
+        Path ballerinaProject = Files.createTempDirectory("list-rules").resolve("bal-project-with-config-file");
         try {
+            Files.createDirectories(ballerinaProject);
+            for (String file : List.of("Ballerina.toml", "Dependencies.toml", "main.bal")) {
+                Files.copy(fixture.resolve(file), ballerinaProject.resolve(file));
+            }
+            // The fixture also has invalid [[analyzer]] entries for the lenient loading tests, which fail --list-rules
+            String scanToml = Files.readString(fixture.resolve("Scan.toml"));
+            Files.writeString(ballerinaProject.resolve("Scan.toml"),
+                    scanToml.substring(0, scanToml.indexOf("# Invalid entries")));
             System.setProperty("user.dir", ballerinaProject.toString());
             ScanCmd scanCmd = new ScanCmd(printStream);
             String[] args = {"--list-rules"};
@@ -354,9 +358,11 @@ public class ScanCmdTest extends BaseTest {
             scanCmd.execute();
         } finally {
             System.setProperty("user.dir", userDir);
-            Files.writeString(scanToml, original);
+            ProjectUtils.deleteDirectory(ballerinaProject.getParent());
         }
-        String expected = getExpectedOutput("list-rules-output.txt");
+        String expected = getExpectedOutput("list-rules-output.txt").replace(
+                Path.of("src", "test", "resources", "test-resources", "bal-project-with-config-file").toString(),
+                ballerinaProject.toString());
         Assert.assertEquals(readOutput(true).trim(), expected);
     }
 
