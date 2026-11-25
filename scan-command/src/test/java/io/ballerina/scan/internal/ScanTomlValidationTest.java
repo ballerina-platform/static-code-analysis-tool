@@ -185,6 +185,31 @@ public class ScanTomlValidationTest extends BaseTest {
         }
     }
 
+    @Test(description = "test a sub-table of a quoted [[platform]] array written with a bare name is read")
+    void testBareSubTableOfQuotedTableArray() throws IOException {
+        Files.writeString(scanToml, """
+                [["platform"]]
+                name = "p"
+                path = "plugin.jar"
+
+                [platform.settings]
+                mode = "x"
+                """);
+        Project loaded = ProjectLoader.loadProject(project);
+        // This line reads the Scan.toml file of a package from the current directory
+        String userDir = System.getProperty("user.dir");
+        ScanTomlFile scanTomlFile;
+        try {
+            System.setProperty("user.dir", project.toString());
+            scanTomlFile = ScanUtils.readScanTomlConfigurations(loaded, printStream);
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
+
+        Assert.assertEquals(scanTomlFile.getPlatforms().iterator().next().arguments(),
+                Map.of("settings", Map.of("mode", "x")));
+    }
+
     @Test(description = "test a sub-table after a quoted [[platform]] header belongs to that platform")
     void testSubTableOfQuotedTableArray() throws IOException {
         Files.writeString(scanToml, """

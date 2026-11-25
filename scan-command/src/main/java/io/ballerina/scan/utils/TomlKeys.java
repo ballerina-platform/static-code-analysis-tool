@@ -99,6 +99,15 @@ final class TomlKeys {
             first.children().addAll(second.children());
             first.children().sort(BY_POSITION);
             reassignSubTables(first.children(), duplicates);
+        } else if (tableArrayAndGeneratedTable(existing, node)) {
+            // A sub-table written with the bare name of a quoted table array, such as [platform.settings] after
+            // [["platform"]], gives the parser a generated bare table of its own
+            TomlTableArrayNode tableArray = (TomlTableArrayNode) (existing instanceof TomlTableArrayNode ? existing
+                    : node);
+            TomlTableNode generated = (TomlTableNode) (tableArray == existing ? node : existing);
+            entries.put(key, tableArray);
+            generated.entries().forEach((childKey, child) ->
+                    put(ownerOf(tableArray.children(), child).entries(), childKey, child, duplicates));
         } else if (existing instanceof TomlTableNode first && node instanceof TomlTableNode second
                 && (first.generated() || second.generated())) {
             // A table created implicitly by a dotted name, such as [scan.x], may be defined again explicitly
@@ -120,18 +129,31 @@ final class TomlKeys {
         for (TomlTableNode element : List.copyOf(elements)) {
             for (Map.Entry<String, TopLevelNode> entry : List.copyOf(element.entries().entrySet())) {
                 TopLevelNode node = entry.getValue();
-                TomlTableNode owner = element;
-                for (TomlTableNode candidate : elements) {
-                    if (BY_POSITION.compare(candidate, node) < 0) {
-                        owner = candidate;
-                    }
-                }
+                TomlTableNode owner = ownerOf(elements, node);
                 if (owner != element) {
                     element.entries().remove(entry.getKey());
                     put(owner.entries(), entry.getKey(), node, duplicates);
                 }
             }
         }
+    }
+
+    private static boolean tableArrayAndGeneratedTable(TopLevelNode first, TopLevelNode second) {
+        return first instanceof TomlTableArrayNode array && !array.children().isEmpty()
+                && second instanceof TomlTableNode table && table.generated()
+                || second instanceof TomlTableArrayNode otherArray && !otherArray.children().isEmpty()
+                && first instanceof TomlTableNode other && other.generated();
+    }
+
+    // The element of a table array written last before a node, or the first element when the node comes before all
+    private static TomlTableNode ownerOf(List<TomlTableNode> elements, TopLevelNode node) {
+        TomlTableNode owner = elements.get(0);
+        for (TomlTableNode candidate : elements) {
+            if (BY_POSITION.compare(candidate, node) < 0) {
+                owner = candidate;
+            }
+        }
+        return owner;
     }
 
     // A bare key cannot contain a quote, so matching quotes at both ends always come from a quoted key
