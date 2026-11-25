@@ -19,6 +19,7 @@
 package io.ballerina.scan.utils;
 
 import io.ballerina.toml.api.Toml;
+import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * {@code ScanTomlWriter} provides utilities for creating and modifying Scan.toml files,
@@ -36,6 +38,8 @@ import java.util.Map;
  * @since 0.11.1
  */
 public final class ScanTomlWriter {
+
+    private static final Pattern BARE_KEY = Pattern.compile("[A-Za-z0-9_-]+");
 
     private ScanTomlWriter() {
     }
@@ -97,6 +101,12 @@ public final class ScanTomlWriter {
             String content = Files.readString(scanTomlPath, StandardCharsets.UTF_8).trim();
             if (!content.isEmpty()) {
                 Toml toml = Toml.read(scanTomlPath);
+                boolean hasSyntaxErrors = toml.diagnostics().stream()
+                        .anyMatch(diagnostic -> diagnostic.diagnosticInfo().severity() == DiagnosticSeverity.ERROR);
+                // Rewriting would drop what the parser could not read and the later of two duplicate definitions
+                if (!TomlKeys.normalize(toml).isEmpty() || hasSyntaxErrors) {
+                    throw new IOException("the file has errors; run 'bal scan' to list them");
+                }
                 tomlMap = deepMutableCopy(toml.toMap());
             }
         }
@@ -187,7 +197,7 @@ public final class ScanTomlWriter {
             } else if (v instanceof Map) {
                 writeTable(sb, k, v);
             } else {
-                sb.append(k).append(" = ");
+                sb.append(formatKey(k)).append(" = ");
                 writeValue(sb, v);
                 sb.append("\n\n");
             }
@@ -203,9 +213,9 @@ public final class ScanTomlWriter {
         if (tableObj instanceof Map) {
             Map<String, Object> map = (Map<String, Object>) tableObj;
             if (!map.isEmpty()) {
-                sb.append("[").append(key).append("]\n");
+                sb.append("[").append(formatKey(key)).append("]\n");
                 for (Map.Entry<String, Object> entry : map.entrySet()) {
-                    sb.append(entry.getKey()).append(" = ");
+                    sb.append(formatKey(entry.getKey())).append(" = ");
                     writeValue(sb, entry.getValue());
                     sb.append("\n");
                 }
@@ -221,10 +231,10 @@ public final class ScanTomlWriter {
             List<?> list = (List<?>) arrayObj;
             for (Object item : list) {
                 if (item instanceof Map) {
-                    sb.append("[[").append(key).append("]]\n");
+                    sb.append("[[").append(formatKey(key)).append("]]\n");
                     Map<String, Object> map = (Map<String, Object>) item;
                     for (Map.Entry<String, Object> entry : map.entrySet()) {
-                        sb.append(entry.getKey()).append(" = ");
+                        sb.append(formatKey(entry.getKey())).append(" = ");
                         writeValue(sb, entry.getValue());
                         sb.append("\n");
                     }
@@ -258,7 +268,7 @@ public final class ScanTomlWriter {
         sb.append("{ ");
         int index = 0;
         for (Map.Entry<?, ?> entry : map.entrySet()) {
-            sb.append(String.valueOf(entry.getKey())).append(" = ");
+            sb.append(formatKey(String.valueOf(entry.getKey()))).append(" = ");
             writeValue(sb, entry.getValue());
             if (index < map.size() - 1) {
                 sb.append(", ");
@@ -266,6 +276,11 @@ public final class ScanTomlWriter {
             index++;
         }
         sb.append(" }");
+    }
+
+    // A key that is not a valid bare key, such as sonar.host.url, would otherwise be read back as a different key
+    private static String formatKey(String key) {
+        return BARE_KEY.matcher(key).matches() ? key : "\"" + escapeTomlString(key) + "\"";
     }
 
     private static String escapeTomlString(String value) {
