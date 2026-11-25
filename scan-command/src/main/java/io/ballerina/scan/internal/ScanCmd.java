@@ -125,8 +125,8 @@ public class ScanCmd implements BLauncherCmd {
 
     @CommandLine.Option(names = "--target-dir", description = "Target directory path")
     private String targetDir;
-    // A --target-dir on the command line is resolved against the current directory, and one given to the API
-    // constructor against the project root, as before
+    // A --target-dir on the command line is resolved against the current directory. One given to the API constructor
+    // is resolved against the root of a package, and against the folder of a single file
     private boolean targetDirFromCommandLine = true;
 
     @CommandLine.Option(names = "--scan-report", description = "Enable HTML scan report generation")
@@ -793,6 +793,11 @@ public class ScanCmd implements BLauncherCmd {
         if (project.kind() != ProjectKind.BUILD_PROJECT && project.kind() != ProjectKind.SINGLE_FILE_PROJECT) {
             return Optional.empty();
         }
+        // Through the API, such as an analyzer's test runner, a single file is saved only to a given directory, so
+        // that a test suite does not write report/ into its working directory
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && targetDir == null && !targetDirFromCommandLine) {
+            return Optional.empty();
+        }
         String reportDir = reportDir(project);
         return Optional.of(ReportFormat.SARIF.equals(reportFormat)
                 ? ScanUtils.saveSarifToDirectory(result.issues(), project, reportDir, suppressions)
@@ -804,10 +809,16 @@ public class ScanCmd implements BLauncherCmd {
      * of the package.
      */
     private String reportDir(Project project) {
-        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && targetDir == null) {
-            // A single file has only a temporary target directory, so it is saved where the scan runs, as bal build
-            // saves the executable of a single file
-            return Paths.get(System.getProperty(ProjectConstants.USER_DIR)).toAbsolutePath().normalize().toString();
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT) {
+            if (targetDir == null) {
+                // A single file has only a temporary target directory, so it is saved where the scan runs, as bal
+                // build saves the executable of a single file
+                return Paths.get(System.getProperty(ProjectConstants.USER_DIR)).toAbsolutePath().normalize()
+                        .toString();
+            }
+            // The root of a single file project is the file, so a relative directory from the API is resolved against
+            // the folder of the file
+            return project.sourceRoot().toAbsolutePath().normalize().resolveSibling(targetDir).normalize().toString();
         }
         return targetDir;
     }

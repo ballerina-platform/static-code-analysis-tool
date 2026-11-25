@@ -420,6 +420,38 @@ public class ScanCmdTest extends BaseTest {
         }
     }
 
+    @Test(description = "test a single file scanned through the API is saved only to a given target directory, "
+            + "resolved against the folder of the file")
+    void testSingleFileReportsThroughApi() throws IOException {
+        Path workDir = Files.createTempDirectory("single-file-api-reports").toRealPath();
+        Path singleFile = Files.createDirectories(workDir.resolve("src")).resolve("main.bal");
+        Files.writeString(singleFile, """
+                public function main() {
+                    int value = checkpanic int:fromString("1");
+                }
+                """);
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", workDir.toString());
+        try {
+            scanSingleFileThroughApi(singleFile, null);
+            Assert.assertFalse(Files.exists(workDir.resolve("report")), readOutput(true));
+
+            scanSingleFileThroughApi(singleFile, "out");
+            Assert.assertTrue(Files.isRegularFile(singleFile.resolveSibling("out").resolve("report")
+                    .resolve("scan_results.json")), readOutput(true));
+        } finally {
+            System.setProperty("user.dir", userDir);
+            ProjectUtils.deleteDirectory(workDir);
+        }
+    }
+
+    private void scanSingleFileThroughApi(Path singleFile, String targetDir) throws IOException {
+        ScanCmd scanCmd = new ScanCmd(singleFile, printStream, false, false, targetDir, false, null, false,
+                List.of(), List.of(), List.of());
+        scanCmd.execute();
+        Assert.assertEquals(scanCmd.exitCode(), 0, readOutput(true));
+    }
+
     private String scanSingleFile(Path singleFile, String... options) throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream, printStream);
         List<String> args = new ArrayList<>(List.of(singleFile.toString()));
