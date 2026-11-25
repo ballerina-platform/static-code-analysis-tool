@@ -229,7 +229,7 @@ The issues found in the file are listed in a table with the line, rule ID, kind 
 |------|---------|
 | `0` | The scan completed, and no gate is set or the gate was not tripped. |
 | `1` | The gate was tripped, or the scan could not be completed, for example because of an invalid `Scan.toml`, a package that cannot be loaded, such as one whose `Ballerina.toml` has an error, a compilation error, an empty package, a platform or plugin failure, an invalid suppression or a report that cannot be written. |
-| `2` | Invalid command-line input, such as an invalid option value, too many arguments, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, an unknown option, an option written without its value, such as `--format` alone, `--platforms` with a single Ballerina file, or an unknown rule ID. |
+| `2` | Invalid command-line input, such as an invalid option value, an unknown option (write a path that starts with a dash after `--`, as in `bal scan -- -mypkg`), too many arguments, both `--include-rules` and `--exclude-rules`, a rule option that conflicts with the `[rule]` table of `Scan.toml`, an unknown option, an option written without its value, such as `--format` alone, `--platforms` with a single Ballerina file, or an unknown rule ID. |
 | `3` | The path is not a Ballerina package or standalone file, or is a `.bal` file inside a package. |
 | `130` | The scan was interrupted. |
 
