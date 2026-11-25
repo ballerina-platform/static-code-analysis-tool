@@ -14,12 +14,12 @@ bal scan [OPTIONS] [<package>|<source-file>]
 
 ## CLI Options
 
-- Specify target path for saving analysis reports (only for Ballerina projects). Default is the `target` directory of the package. A relative path is resolved against the package root, and the results are saved in `<path>/report`.
+- Specify target path for saving analysis reports. The results are saved in `<path>/report`. Default is the `target` directory of the package, or the current directory for a single Ballerina file. A relative path is resolved against the current directory.
 
 ```text
 --target-dir=<path>
 ```
--  Generate an HTML report containing the analysis results. (Only for ballerina build projects)
+- Generate an HTML report containing the analysis results.
 
 ```text
 --scan-report
@@ -99,13 +99,13 @@ bal scan [OPTIONS] [<package>|<source-file>]
 bal scan
 ```
 
-- Run analysis against a standalone Ballerina file and print results to the console. The file path of the Ballerina file can be relative or absolute.
+- Run analysis against a standalone Ballerina file, print results to the console and save them in the report directory of the current directory. The file path of the Ballerina file can be relative or absolute.
 
 ```bash
 bal scan main.bal
 ```
 
-- Run analysis and save analysis results in a specified directory.
+- Run analysis and save analysis results in a specified directory, relative to the current directory.
 
 ```bash
 bal scan --target-dir="results"
@@ -209,7 +209,9 @@ To generate a detailed HTML report of the analysis results, use the `--scan-repo
 bal scan --scan-report
 ```
 
-This produces an HTML report and the scan results in JSON format inside the `target/report` directory, or in the `report` directory under the path given with `--target-dir`. The report is only generated for Ballerina projects, not for standalone Ballerina files. It is generated even when the results are also reported to a platform.
+This produces an HTML report and the scan results in JSON format inside the `target/report` directory, or in the `report` directory under the path given with `--target-dir`. It is generated even when the results are also reported to a platform.
+
+A relative `--target-dir` is resolved against the current directory, so `bal scan ../orders --target-dir=out` saves to `out/report` in the current directory. A single Ballerina file has no `target` directory, so its results and HTML report are saved in the `report` folder of the current directory, as `bal build` saves the executable of a single file in the current directory, or in `<dir>/report` with `--target-dir=<dir>`. For example, `bal scan src/main.bal --scan-report` saves `report/scan_results.json` and `report/index.html` in the current directory.
 
 The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. Every scanned file is listed, including files without issues, in a folder tree of the package. You can filter, search, and export the list of files.
 

@@ -726,13 +726,18 @@ public final class ScanUtils {
         JsonObject scannedProject = new JsonObject();
         Package currentPackage = project.currentPackage();
         String packageName = currentPackage.packageName().toString();
-        scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, packageName);
+        // The source root of a single file is the file, and its package is anonymous
+        boolean singleFile = project.kind() == ProjectKind.SINGLE_FILE_PROJECT;
+        scannedProject.addProperty(SCAN_REPORT_PROJECT_NAME, singleFile
+                ? Optional.ofNullable(project.sourceRoot().getFileName()).map(Path::toString).orElse(packageName)
+                : packageName);
         scannedProject.addProperty(SCAN_REPORT_PROJECT_KIND, project.kind().name());
         if (project.kind() == ProjectKind.BUILD_PROJECT) {
             scannedProject.addProperty(SCAN_REPORT_PROJECT_VERSION, currentPackage.packageVersion().toString());
         }
 
-        Path reportRoot = project.sourceRoot().toAbsolutePath().normalize();
+        Path sourceRoot = project.sourceRoot().toAbsolutePath().normalize();
+        Path reportRoot = singleFile ? Optional.ofNullable(sourceRoot.getParent()).orElse(sourceRoot) : sourceRoot;
         JsonObject scannedPackage = new JsonObject();
         scannedPackage.addProperty(SCAN_REPORT_PACKAGE_ORG, currentPackage.packageOrg().toString());
         scannedPackage.addProperty(SCAN_REPORT_PACKAGE_NAME, packageName);

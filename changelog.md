@@ -4,6 +4,13 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. This branch maintains the 0.11.x line for Ballerina 2201.12 (Update 12). Releases for newer distributions are made from `main`.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** A relative `--target-dir` is resolved against the current directory, like other command-line paths, instead of against the package root. `bal scan ../orders --target-dir=out` saves to `out/report` in the current directory instead of `../orders/out/report`. (backport of [#240](https://github.com/ballerina-platform/static-code-analysis-tool/pull/240); [#137](https://github.com/ballerina-platform/static-code-analysis-tool/issues/137))
+- A single Ballerina file saves its results, and the HTML report with `--scan-report`, in the `report` folder of the current directory, as `bal build` saves the executable of a single file there, or in `<dir>/report` with `--target-dir=<dir>`. Before, nothing was saved, and `--target-dir` and `--scan-report` were ignored with a warning. The HTML report of a single file is named after the file. (backport of [#240](https://github.com/ballerina-platform/static-code-analysis-tool/pull/240); [#137](https://github.com/ballerina-platform/static-code-analysis-tool/issues/137))
+
 ## [0.11.2] - 2026-11-17
 
 Built against Ballerina 2201.12.0.

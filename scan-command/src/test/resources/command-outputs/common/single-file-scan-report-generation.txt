@@ -1,7 +1,0 @@
-bal scan: warning: the HTML report is not generated for a single bal file, ignoring --scan-report
-
-Running Scans
-
-[]
-
-0 issue(s)

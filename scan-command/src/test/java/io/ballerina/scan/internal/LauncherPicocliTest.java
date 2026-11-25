@@ -126,7 +126,14 @@ public class LauncherPicocliTest extends BaseTest {
             dataProvider = "exclude-tests-arguments")
     void testExcludeTests(String[] args, int exitCode, String expectedOutput, String unexpectedOutput)
             throws IOException, ReflectiveOperationException {
-        int actualExitCode = runAsLauncher(testResourcesRoot, args);
+        // A single file is saved in the current directory, so the scan runs in a temporary one
+        Path workDir = Files.createTempDirectory("single-file-scan");
+        int actualExitCode;
+        try {
+            actualExitCode = runAsLauncher(workDir, args);
+        } finally {
+            ProjectUtils.deleteDirectory(workDir);
+        }
         String output = readOutput(true);
         Assert.assertEquals(actualExitCode, exitCode, output);
         Assert.assertTrue(output.contains(expectedOutput), output);
