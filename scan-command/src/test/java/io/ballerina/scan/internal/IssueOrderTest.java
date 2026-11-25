@@ -52,7 +52,7 @@ import java.util.Random;
  * Tests that the reports list issues in the same order whatever order they were found in, as the modules and
  * packages of a project are not always scanned in the same order.
  *
- * @since 0.14.0
+ * @since 0.14.1
  */
 public class IssueOrderTest extends BaseTest {
     private static final int SHUFFLES = 20;

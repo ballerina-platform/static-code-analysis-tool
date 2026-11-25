@@ -200,9 +200,8 @@ public final class ScanUtils {
     // A workspace Scan.toml cannot set platforms
     private static final String WORKSPACE_TABLE_VALUES = joinWith(TOP_LEVEL_TABLES.entrySet().stream()
             .filter(table -> !table.getKey().equals(PLATFORM_TABLE)).map(Map.Entry::getValue).toList(), "or");
-    private static final Comparator<Issue> REPORT_ORDER = Comparator
-            .comparing((Issue issue) -> ((IssueImpl) issue).filePath(), ScanUtils::comparePaths)
-            .thenComparingInt(issue -> issue.location().lineRange().startLine().line())
+    private static final Comparator<Issue> LOCATION_AND_RULE_ORDER = Comparator
+            .comparingInt((Issue issue) -> issue.location().lineRange().startLine().line())
             .thenComparingInt(issue -> issue.location().lineRange().startLine().offset())
             .thenComparingInt(issue -> issue.location().lineRange().endLine().line())
             .thenComparingInt(issue -> issue.location().lineRange().endLine().offset())
@@ -340,7 +339,7 @@ public final class ScanUtils {
      * @param issues       generated issues, including suppressed ones
      * @param project      the package or workspace the issues were found in, or null to give only the file name
      * @param suppressions the suppressed issues, keyed by the issue they suppress
-     * @return json string array of generated issues
+     * @return json string array of generated issues, in the order of {@link #inReportOrder}
      * @since 0.14.0
      */
     public static String convertIssuesToJsonString(List<Issue> issues, Project project,
@@ -444,7 +443,7 @@ public final class ScanUtils {
      * @param issues       generated issues, including suppressed ones
      * @param project      Ballerina project
      * @param suppressions the suppressed issues, keyed by the issue they suppress
-     * @return SARIF string representation of generated issues
+     * @return SARIF string representation of generated issues, in the order of {@link #inReportOrder}
      * @since 0.13.0
      */
     public static String convertIssuesToSarifString(List<Issue> issues, Project project,
@@ -571,8 +570,13 @@ public final class ScanUtils {
      * @since 0.14.1
      */
     public static List<Issue> inReportOrder(List<Issue> issues) {
+        // Each file's path is split once, instead of on every comparison
+        Map<String, List<String>> segments = new HashMap<>();
         List<Issue> sortedIssues = new ArrayList<>(issues);
-        sortedIssues.sort(REPORT_ORDER);
+        sortedIssues.sort(Comparator
+                .comparing((Issue issue) -> segments.computeIfAbsent(((IssueImpl) issue).filePath(),
+                        ScanUtils::pathSegments), ScanUtils::compareSegments)
+                .thenComparing(LOCATION_AND_RULE_ORDER));
         return sortedIssues;
     }
 
@@ -581,8 +585,10 @@ public final class ScanUtils {
      * together and the order is the same on every OS.
      */
     static int comparePaths(String first, String second) {
-        List<String> firstSegments = pathSegments(first);
-        List<String> secondSegments = pathSegments(second);
+        return compareSegments(pathSegments(first), pathSegments(second));
+    }
+
+    private static int compareSegments(List<String> firstSegments, List<String> secondSegments) {
         for (int i = 0; i < Math.min(firstSegments.size(), secondSegments.size()); i++) {
             int comparison = firstSegments.get(i).compareTo(secondSegments.get(i));
             if (comparison != 0) {
@@ -592,9 +598,11 @@ public final class ScanUtils {
         return Integer.compare(firstSegments.size(), secondSegments.size());
     }
 
-    // The root comes first, as Path iterates only the names, so that files on different drives stay apart
+    // The root comes first, as Path iterates only the names, so that files on different drives stay apart. A file
+    // with no path on disk has only its name, which is not resolved, so that the order does not depend on the
+    // working directory
     private static List<String> pathSegments(String filePath) {
-        Path path = Path.of(filePath).toAbsolutePath().normalize();
+        Path path = Path.of(filePath).normalize();
         List<String> segments = new ArrayList<>();
         segments.add(String.valueOf(path.getRoot()));
         path.forEach(segment -> segments.add(segment.toString()));

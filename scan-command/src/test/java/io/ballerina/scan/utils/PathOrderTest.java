@@ -28,7 +28,7 @@ import java.nio.file.Path;
 /**
  * Tests the order of the file paths the reports list issues and files in.
  *
- * @since 0.14.0
+ * @since 0.14.1
  */
 public class PathOrderTest {
     private final Path root = Path.of("").toAbsolutePath();
@@ -41,6 +41,13 @@ public class PathOrderTest {
                 root.resolve("a").resolve("b.bal").toString()) < 0);
         Assert.assertEquals(ScanUtils.comparePaths(root.resolve("a.bal").toString(),
                 root.resolve("x").resolve("..").resolve("a.bal").toString()), 0);
+    }
+
+    @Test(description = "test a file with no path on disk is ordered after the files on disk, not as a file of the "
+            + "working directory")
+    void testPathWithoutFolder() {
+        Assert.assertTrue(ScanUtils.comparePaths("gen.bal", root.resolve("zzz").resolve("a.bal").toString()) > 0);
+        Assert.assertTrue(ScanUtils.comparePaths("a.bal", "gen.bal") < 0);
     }
 
     @Test(description = "test paths on different Windows drives or shares are never equal")
