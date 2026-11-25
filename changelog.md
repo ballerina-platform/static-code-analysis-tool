@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- A `[[platform]]` entry in `Scan.toml` without a `name`, for example because the key is misspelled as `nmae`, or with an empty `name`, is reported with its position along with the other errors of the file, instead of being left out without notice. Before, `bal scan` ignored the entry, and `--platforms` said that the platform was not available and should be added to `[[platform]]`, which it already was. ([#217](https://github.com/ballerina-platform/static-code-analysis-tool/issues/217))
+- A `[[platform]]` entry in `Scan.toml` without a `name`, for example because the key is misspelled as `nmae`, or with an empty or blank `name`, such as `name = " "`, is reported with its position along with the other errors of the file, instead of being left out without notice. Before, `bal scan` ignored the entry, and `--platforms` said that the platform was not available and should be added to `[[platform]]`, which it already was. ([#217](https://github.com/ballerina-platform/static-code-analysis-tool/issues/217))
 
 ## [0.14.0] - 2026-11-17
 

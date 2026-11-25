@@ -1759,7 +1759,7 @@ public final class ScanUtils {
      */
     private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path baseDir,
                                      List<ConfigError> errors) {
-        // A name or path of another type would otherwise read as missing
+        // Past these checks, the name is a non-blank string and the path is a string or missing
         int errorCount = errors.size();
         checkStringEntry(platformTable, PLATFORM_NAME, PLATFORM_NAME_VALUES, errors);
         checkStringEntry(platformTable, PLATFORM_PATH, "the path or URL of the plugin JAR", errors);
@@ -1768,18 +1768,13 @@ public final class ScanUtils {
             return;
         }
         Map<String, Object> properties = platformTable.toMap();
-        Object platformName = properties.remove(PLATFORM_NAME);
-        Optional<String> name = (platformName instanceof String) ? Optional.of(platformName.toString())
-                : Optional.empty();
+        String name = (String) properties.remove(PLATFORM_NAME);
         Object platformPath = properties.remove(PLATFORM_PATH);
         Optional<String> path = (platformPath instanceof String) ? Optional.of(platformPath.toString())
                 : Optional.empty();
 
-        if (name.isEmpty() || name.get().isBlank()) {
-            return;
-        }
         if (path.isEmpty()) {
-            scanTomlFile.addPlatformWithoutPath(name.get());
+            scanTomlFile.addPlatformWithoutPath(name);
             return;
         }
 
@@ -1799,7 +1794,7 @@ public final class ScanUtils {
             }
         }
 
-        ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name.get(), jarPath, properties);
+        ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name, jarPath, properties);
         scanTomlFile.setPlatform(platform);
     }
 
