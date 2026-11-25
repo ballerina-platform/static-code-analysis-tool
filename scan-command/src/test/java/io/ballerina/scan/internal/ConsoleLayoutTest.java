@@ -166,10 +166,18 @@ public class ConsoleLayoutTest extends BaseTest {
         Path workspace = testResourcesRoot.resolve("workspace-with-gates");
         Path packageScanToml = workspace.resolve("pkg-a").resolve("Scan.toml");
         Path workspaceScanToml = workspace.resolve("Scan.toml");
+        Path otherScanToml = workspace.resolve("pkg-b").resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        String otherOriginal = Files.readString(otherScanToml, StandardCharsets.UTF_8);
         try {
-            // pkg-a uses the workspace file, which names a rule pkg-a lacks; pkg-b's own file leaves it out
+            // pkg-a uses the workspace file, which names a rule of pkg-b's analyzer; pkg-b's own file leaves it out
             Files.delete(packageScanToml);
+            Files.writeString(otherScanToml, otherOriginal + """
+
+                    [[analyzer]]
+                    org = "exampleOrg"
+                    name = "example_module_static_code_analyzer"
+                    """);
             Files.writeString(workspaceScanToml, """
                     [rule]
                     exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
@@ -202,6 +210,7 @@ public class ConsoleLayoutTest extends BaseTest {
         } finally {
             Files.deleteIfExists(workspaceScanToml);
             Files.writeString(packageScanToml, original);
+            Files.writeString(otherScanToml, otherOriginal);
         }
     }
 

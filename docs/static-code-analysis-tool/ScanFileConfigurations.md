@@ -117,6 +117,8 @@ exclude = ["ballerina:1", "ballerina/io:2"]
 
 Rules can be either included or excluded, not both: a `[rule]` table that sets both stops the scan with an error that gives its location, and so does using `--include-rules` together with `--exclude-rules`.
 
+Each rule ID must be a rule of the package: a core rule, or a rule of an analyzer the package uses. An ID that is not, such as a mistyped one, stops the scan with an error that gives its location, exit code `1`, as an unknown ID in `--include-rules` or `--exclude-rules` does with exit code `2`. Run `bal scan --list-rules` to see the rules of the package.
+
 Each command-line option adds its rules to its own setting for that run: `--include-rules` adds to `include`, and `--exclude-rules` adds to `exclude`. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes both `ballerina:1` and `ballerina:2`. Since rules cannot be included and excluded at the same time, an option that conflicts with the other setting in `Scan.toml` stops the scan as a usage error (exit code `2`): with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` is an error.
 
 # Configuration for Suppressions
@@ -202,6 +204,6 @@ The command-line options then apply to the file each package uses:
 | `[suppression]` | `--ignore-suppressions`, `--require-suppression-reason`, `--require-suppression-rule-id` | Each one tightens its own setting, and cannot undo `Scan.toml` |
 | `[analysis]` | `--exclude-tests[=<true\|false>]` | Overrides `excludeTests` either way |
 
-The gate applies to each package on its own, with the issues of that package only. Each package that fails its gate is listed in the error, and the scan exits with code `1`. When a rule a package inherits from the workspace `[rule]` table is not provided to the package, for example because only some packages use the analyzer that defines it, the package is named in a warning. An unknown table in the workspace `Scan.toml` is an error as it is in a package `Scan.toml`.
+The gate applies to each package on its own, with the issues of that package only. Each package that fails its gate is listed in the error, and the scan exits with code `1`. When a rule a package inherits from the workspace `[rule]` table is not provided to the package, for example because only some packages use the analyzer that defines it, the package is named in a warning. A rule of the workspace `[rule]` table that no package of the workspace provides stops the scan with an error that gives its location. An unknown table in the workspace `Scan.toml` is an error as it is in a package `Scan.toml`.
 
 A workspace `Scan.toml` cannot set `[[platform]]`, since each package reports to a project of its own on the platform. The scan stops with an error that gives the location of the table. Each package that reports to a platform sets the platform in its own `Scan.toml`.
