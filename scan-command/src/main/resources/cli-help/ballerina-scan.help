@@ -17,15 +17,15 @@ DESCRIPTION
 
 OPTIONS
         --target-dir=<path>
-                Target directory path for saving analysis reports (only for Ballerina projects).
-                Default is the target directory of the package, or in a workspace, of each
-                package and of the workspace. A relative path is resolved against the package
-                root, and the results are saved in <path>/report. In a workspace, each package
-                saves its results in <path>/report under its own root, and the combined results
-                are saved in <path>/report under the workspace root.
+                Target directory path for saving analysis reports. The results are saved in
+                <path>/report. Default is the target directory of the package or workspace, or the
+                current directory for a single Ballerina file. A relative path is resolved against
+                the current directory. In a workspace, it is one directory for every package: the
+                combined results are saved in <path>/report and the results of each package in
+                <path>/<package path>/report.
 
         --scan-report
-                Generate an HTML report containing the analysis results (only for Ballerina projects).
+                Generate an HTML report containing the analysis results.
 
         --format=<json|sarif>
                 Specify the format of the report. Default is json.
@@ -85,8 +85,9 @@ EXAMPLES
         console, and save results in JSON file format in the target directory.
                 $ bal scan
 
-        Run analysis against a standalone Ballerina file and print results to the console. The
-        file path of the Ballerina file can be relative or absolute.
+        Run analysis against a standalone Ballerina file, print results to the console and save
+        them in the report directory of the current directory. The file path of the Ballerina
+        file can be relative or absolute.
                 $ bal scan main.bal
 
         Run analysis and save analysis results in a specified directory.

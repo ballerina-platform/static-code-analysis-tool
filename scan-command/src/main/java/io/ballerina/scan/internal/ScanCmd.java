@@ -141,6 +141,9 @@ public class ScanCmd implements BLauncherCmd {
 
     @CommandLine.Option(names = "--target-dir", description = "Target directory path")
     private String targetDir;
+    // A --target-dir on the command line is resolved against the current directory, and one given to the API
+    // constructor against the project root, as before
+    private boolean targetDirFromCommandLine = true;
 
     @CommandLine.Option(names = "--scan-report", description = "Enable HTML scan report generation")
     private boolean scanReport;
@@ -272,6 +275,7 @@ public class ScanCmd implements BLauncherCmd {
         this.helpFlag = helpFlag;
         this.platformTriggered = platformTriggered;
         this.targetDir = targetDir;
+        this.targetDirFromCommandLine = false;
         this.scanReport = scanReport;
         this.reportFormat = format == null ? ReportFormat.BALLERINA : format;
         this.format = this.reportFormat.getFormat();
@@ -458,6 +462,15 @@ public class ScanCmd implements BLauncherCmd {
         }
         if (!platforms.isEmpty() && isStandaloneBalFile()) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.PLATFORMS_NOT_SUPPORTED));
+        }
+        if (targetDir != null && targetDirFromCommandLine) {
+            try {
+                targetDir = Paths.get(System.getProperty(ProjectConstants.USER_DIR)).resolve(targetDir)
+                        .toAbsolutePath().normalize().toString();
+            } catch (InvalidPathException ex) {
+                throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, targetDir,
+                        "--target-dir", "a directory path"));
+            }
         }
         if (excludeTestsOption != null) {
             if (!excludeTestsOption.equalsIgnoreCase("true") && !excludeTestsOption.equalsIgnoreCase("false")) {
@@ -757,7 +770,7 @@ public class ScanCmd implements BLauncherCmd {
         printSummary(result.activeIssues().size(), result.suppressions().size());
         resultsPath.ifPresent(this::printResultsLocation);
         if (resultsPath.isPresent() && scanReport) {
-            printScanReportLocation(ScanUtils.generateScanReport(result.issues(), project, targetDir,
+            printScanReportLocation(ScanUtils.generateScanReport(result.issues(), project, packageTargetDir(project),
                     result.suppressions(), this::analyzedSources));
         }
         // The results are saved before the platforms run, and a failed platform wins over the gate
@@ -1233,7 +1246,7 @@ public class ScanCmd implements BLauncherCmd {
         } else {
             printIssues(result.activeIssues(), project);
         }
-        if (!project.kind().equals(ProjectKind.BUILD_PROJECT)) {
+        if (project.kind() != ProjectKind.BUILD_PROJECT && project.kind() != ProjectKind.SINGLE_FILE_PROJECT) {
             return Optional.empty();
         }
         String reportDir = packageTargetDir(project);
@@ -1243,9 +1256,15 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * Returns the directory the results of a package are saved in, or null for its own target directory.
+     * Returns the directory the results of a package or a single file are saved in, or null for the target directory
+     * of the package.
      */
     private String packageTargetDir(Project project) {
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && targetDir == null) {
+            // A single file has only a temporary target directory, so it is saved where the scan runs, as bal build
+            // saves the executable of a single file
+            return Paths.get(System.getProperty(ProjectConstants.USER_DIR)).toAbsolutePath().normalize().toString();
+        }
         if (targetDir == null || !scanningWorkspace) {
             return targetDir;
         }
@@ -1341,14 +1360,6 @@ public class ScanCmd implements BLauncherCmd {
      * Warns about each option that has no effect on a single Ballerina file.
      */
     private void printUnsupportedSingleFileFlagWarnings() {
-        if (targetDir != null) {
-            warn(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
-        }
-
-        if (scanReport) {
-            warn(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
-        }
-
         if (Boolean.TRUE.equals(excludeTests)) {
             warn(DiagnosticLog.warning(DiagnosticCode.EXCLUDE_TESTS_NOT_SUPPORTED));
         }

@@ -850,7 +850,8 @@ public final class ScanUtils {
                                           Function<Package, AnalyzedSources> analyzedSources) {
         JsonObject scannedProject = new JsonObject();
         String name;
-        if (project.kind() == ProjectKind.WORKSPACE_PROJECT) {
+        // The source root of a single file is the file, and its package is anonymous
+        if (project.kind() == ProjectKind.WORKSPACE_PROJECT || project.kind() == ProjectKind.SINGLE_FILE_PROJECT) {
             name = Optional.of(project.sourceRoot().getFileName()).get().toString();
         } else {
             name = project.currentPackage().packageName().toString();
@@ -862,7 +863,9 @@ public final class ScanUtils {
                     project.currentPackage().packageVersion().toString());
         }
 
-        Path reportRoot = project.sourceRoot().toAbsolutePath().normalize();
+        Path reportRoot = project.kind() == ProjectKind.SINGLE_FILE_PROJECT
+                ? project.sourceRoot().toAbsolutePath().normalize().getParent()
+                : project.sourceRoot().toAbsolutePath().normalize();
         JsonArray scannedPackages = new JsonArray();
         Map<String, JsonObject> scanReportPathAndFile = new LinkedHashMap<>();
         for (Package analyzedPackage : getAnalyzedPackages(project)) {

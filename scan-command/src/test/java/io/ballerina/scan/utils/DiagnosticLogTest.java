@@ -51,8 +51,8 @@ public class DiagnosticLogTest extends BaseTest {
 
     @Test(description = "Test warning diagnostic message")
     public void testWarningDiagnostic() {
-        String expected = "reports are not saved for a single bal file, ignoring --target-dir";
-        String result = DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED);
+        String expected = "a single bal file has no tests to exclude, ignoring --exclude-tests";
+        String result = DiagnosticLog.warning(DiagnosticCode.EXCLUDE_TESTS_NOT_SUPPORTED);
         Assert.assertEquals(result, expected);
     }
 }

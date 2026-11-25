@@ -186,12 +186,20 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with single file project with single file as argument")
     void testScanCommandSingleFileProject() throws IOException {
         Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {validBalProject.resolve("main.bal").toString()};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-        String expected = "Running Scans";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        // A single file is saved in the current directory, so the scan runs in a temporary one
+        Path workDir = Files.createTempDirectory("single-file-scan");
+        System.setProperty("user.dir", workDir.toString());
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            String[] args = {validBalProject.resolve("main.bal").toString()};
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+            String expected = "Running Scans";
+            Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        } finally {
+            System.setProperty("user.dir", userDir);
+            ProjectUtils.deleteDirectory(workDir);
+        }
     }
 
     @Test(description = "test scan command with single file project with project directory as argument")
@@ -552,28 +560,75 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(scanCmd.exitCode(), 3);
     }
 
-    @Test(description = "test scan command with target directory flag on single file project")
-    void testScanCommandWithTargetDirFlagOnSingleFileProject() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
-        Path singleFileProject = testResources.resolve("test-resources")
-                .resolve("valid-single-file-project").resolve("main.bal");
-        String[] args = {singleFileProject.toString(), "--target-dir=results"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-        String expected = getExpectedOutput("single-file-report-generation.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+    @Test(description = "test a relative --target-dir is resolved against the current directory")
+    void testRelativeTargetDirFromCurrentDirectory() throws IOException {
+        Path workDir = Files.createTempDirectory("target-dir").toRealPath();
+        System.setProperty("user.dir", workDir.toString());
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+            new CommandLine(scanCmd).parseArgs(validBalProject.toAbsolutePath().toString(), "--target-dir=out");
+            scanCmd.execute();
+            String output = readOutput(true);
+            Assert.assertEquals(scanCmd.exitCode(), 0, output);
+            Assert.assertTrue(Files.isRegularFile(workDir.resolve("out").resolve("report")
+                    .resolve("scan_results.json")), output);
+            Assert.assertFalse(Files.exists(validBalProject.resolve("out")), "not saved in the package: " + output);
+        } finally {
+            System.setProperty("user.dir", userDir);
+            ProjectUtils.deleteDirectory(workDir);
+        }
     }
 
-    @Test(description = "test scan command with scan report flag on single file project")
-    void testScanCommandWithScanReportFlagOnSingleFileProject() throws IOException {
+    @Test(description = "test a single file is saved in the report directory of the current directory or --target-dir")
+    void testSingleFileReports() throws IOException {
+        Path workDir = Files.createTempDirectory("single-file-reports").toRealPath();
+        Path singleFile = Files.createDirectories(workDir.resolve("src")).resolve("main.bal");
+        Files.writeString(singleFile, """
+                public function main() {
+                    int value = checkpanic int:fromString("1");
+                }
+                """);
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", workDir.toString());
+        try {
+            String output = scanSingleFile(singleFile, "--scan-report");
+            Path report = workDir.resolve("report");
+            Assert.assertTrue(Files.isRegularFile(report.resolve("scan_results.json")), output);
+            Assert.assertTrue(output.contains("View scan results at:\n\t" + report.resolve("scan_results.json")
+                    .toUri()), output);
+            Assert.assertTrue(output.contains("View scan report at:\n\t" + report.resolve("index.html").toUri()),
+                    output);
+            JsonArray results = JsonParser.parseString(Files.readString(report.resolve("scan_results.json")))
+                    .getAsJsonArray();
+            Assert.assertEquals(results.size(), 1, output);
+            JsonObject location = results.get(0).getAsJsonObject().getAsJsonObject("location");
+            Assert.assertEquals(location.get("filePath").getAsString(), "main.bal", output);
+            Assert.assertEquals(location.get("startLine").getAsInt(), 2, output);
+            JsonObject scanData = readScanReportData(report.resolve("index.html"));
+            Assert.assertEquals(scanData.get("projectName").getAsString(), "main.bal", output);
+            JsonObject scannedFile = scanData.getAsJsonArray("scannedFiles").get(0).getAsJsonObject();
+            Assert.assertEquals(scannedFile.get("relativePath").getAsString(), "main.bal", output);
+            Assert.assertEquals(scannedFile.getAsJsonArray("issues").size(), 1, output);
+
+            output = scanSingleFile(singleFile, "--target-dir=out", "--format=sarif");
+            Assert.assertTrue(Files.isRegularFile(workDir.resolve("out").resolve("report")
+                    .resolve("scan_results.sarif")), output);
+            Assert.assertFalse(Files.exists(singleFile.resolveSibling("out")), output);
+        } finally {
+            System.setProperty("user.dir", userDir);
+            ProjectUtils.deleteDirectory(workDir);
+        }
+    }
+
+    private String scanSingleFile(Path singleFile, String... options) throws IOException {
         ScanCmd scanCmd = new ScanCmd(printStream, printStream);
-        Path singleFileProject = testResources.resolve("test-resources")
-                .resolve("valid-single-file-project").resolve("main.bal");
-        String[] args = {singleFileProject.toString(), "--scan-report"};
-        new CommandLine(scanCmd).parseArgs(args);
+        List<String> args = new ArrayList<>(List.of(singleFile.toString()));
+        args.addAll(List.of(options));
+        new CommandLine(scanCmd).parseArgs(args.toArray(String[]::new));
         scanCmd.execute();
-        String expected = getExpectedOutput("single-file-scan-report-generation.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        String output = readOutput(true);
+        Assert.assertEquals(scanCmd.exitCode(), 0, output);
+        return output;
     }
 
     @Test(description = "test method for sorting static code analysis rules in specified order",
