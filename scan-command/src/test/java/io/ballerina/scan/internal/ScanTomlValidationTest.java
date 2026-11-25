@@ -185,6 +185,41 @@ public class ScanTomlValidationTest extends BaseTest {
         }
     }
 
+    @Test(description = "test a sub-table after a quoted [[platform]] header belongs to that platform")
+    void testSubTableOfQuotedTableArray() throws IOException {
+        Files.writeString(scanToml, """
+                [[platform]]
+                name = "first"
+                path = "first.jar"
+
+                [["platform"]]
+                name = "second"
+                path = "second.jar"
+
+                [platform.settings]
+                mode = "second"
+
+                [platform.args.child]
+                value = 1
+                """);
+        Project loaded = ProjectLoader.loadProject(project);
+        // This line reads the Scan.toml file of a package from the current directory
+        String userDir = System.getProperty("user.dir");
+        ScanTomlFile scanTomlFile;
+        try {
+            System.setProperty("user.dir", project.toString());
+            scanTomlFile = ScanUtils.readScanTomlConfigurations(loaded, printStream);
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
+
+        Map<String, Map<String, Object>> arguments = scanTomlFile.getPlatforms().stream()
+                .collect(Collectors.toMap(ScanTomlFile.Platform::name, ScanTomlFile.Platform::arguments));
+        Assert.assertEquals(arguments, Map.of(
+                "first", Map.of(),
+                "second", Map.of("settings", Map.of("mode", "second"), "args", Map.of("child", Map.of("value", 1L)))));
+    }
+
     @Test(description = "test an unknown table or key and a table written in the wrong form are Scan.toml errors",
             dataProvider = "invalid-scan-tomls")
     void testInvalidScanToml(String content, List<String> errors) throws IOException {

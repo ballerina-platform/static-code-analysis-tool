@@ -98,6 +98,7 @@ final class TomlKeys {
         } else if (existing instanceof TomlTableArrayNode first && node instanceof TomlTableArrayNode second) {
             first.children().addAll(second.children());
             first.children().sort(BY_POSITION);
+            reassignSubTables(first.children(), duplicates);
         } else if (existing instanceof TomlTableNode first && node instanceof TomlTableNode second
                 && (first.generated() || second.generated())) {
             // A table created implicitly by a dotted name, such as [scan.x], may be defined again explicitly
@@ -107,6 +108,29 @@ final class TomlKeys {
             entries.put(key, later == node ? existing : node);
             boolean isKey = later instanceof TomlKeyValueNode || later.externalTreeNode() instanceof KeyValueNode;
             duplicates.add(new Duplicate(key, !isKey, later.location().lineRange()));
+        }
+    }
+
+    /**
+     * Moves each sub-table, such as {@code [platform.settings]}, to the element written last before it. The parser
+     * attaches it to the last element of the array with the same spelling, which is wrong once quoted and bare
+     * arrays are merged.
+     */
+    private static void reassignSubTables(List<TomlTableNode> elements, List<Duplicate> duplicates) {
+        for (TomlTableNode element : List.copyOf(elements)) {
+            for (Map.Entry<String, TopLevelNode> entry : List.copyOf(element.entries().entrySet())) {
+                TopLevelNode node = entry.getValue();
+                TomlTableNode owner = element;
+                for (TomlTableNode candidate : elements) {
+                    if (BY_POSITION.compare(candidate, node) < 0) {
+                        owner = candidate;
+                    }
+                }
+                if (owner != element) {
+                    element.entries().remove(entry.getKey());
+                    put(owner.entries(), entry.getKey(), node, duplicates);
+                }
+            }
         }
     }
 
