@@ -198,7 +198,8 @@ public class ScanTomlValidationTest extends BaseTest {
         Project loaded = ProjectLoader.load(project).project();
         ScanTomlFile scanTomlFile = ScanUtils.readScanTomlConfigurations(loaded, printStream);
 
-        Assert.assertEquals(scanTomlFile.getPlatforms().get(0).arguments(), Map.of("settings", Map.of("mode", "x")));
+        Assert.assertEquals(scanTomlFile.getPlatforms().iterator().next().arguments(),
+                Map.of("settings", Map.of("mode", "x")));
     }
 
     @Test(description = "test a sub-table after a quoted [[platform]] header belongs to that platform")
