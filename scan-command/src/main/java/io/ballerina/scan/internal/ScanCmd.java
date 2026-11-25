@@ -77,6 +77,7 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -141,8 +142,8 @@ public class ScanCmd implements BLauncherCmd {
 
     @CommandLine.Option(names = "--target-dir", description = "Target directory path")
     private String targetDir;
-    // A --target-dir on the command line is resolved against the current directory, and one given to the API
-    // constructor against the project root, as before
+    // A --target-dir on the command line is resolved against the current directory. One given to the API constructor
+    // is resolved against the root of a package or workspace, and against the folder of a single file
     private boolean targetDirFromCommandLine = true;
 
     @CommandLine.Option(names = "--scan-report", description = "Enable HTML scan report generation")
@@ -1249,6 +1250,11 @@ public class ScanCmd implements BLauncherCmd {
         if (project.kind() != ProjectKind.BUILD_PROJECT && project.kind() != ProjectKind.SINGLE_FILE_PROJECT) {
             return Optional.empty();
         }
+        // Through the API, such as an analyzer's test runner, a single file is saved only to a given directory, so
+        // that a test suite does not write report/ into its working directory
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && targetDir == null && !targetDirFromCommandLine) {
+            return Optional.empty();
+        }
         String reportDir = packageTargetDir(project);
         return Optional.of(ReportFormat.SARIF.equals(reportFormat)
                 ? ScanUtils.saveSarifToDirectory(result.issues(), project, reportDir, suppressions)
@@ -1260,10 +1266,16 @@ public class ScanCmd implements BLauncherCmd {
      * of the package.
      */
     private String packageTargetDir(Project project) {
-        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && targetDir == null) {
-            // A single file has only a temporary target directory, so it is saved where the scan runs, as bal build
-            // saves the executable of a single file
-            return Paths.get(System.getProperty(ProjectConstants.USER_DIR)).toAbsolutePath().normalize().toString();
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT) {
+            if (targetDir == null) {
+                // A single file has only a temporary target directory, so it is saved where the scan runs, as bal
+                // build saves the executable of a single file
+                return Paths.get(System.getProperty(ProjectConstants.USER_DIR)).toAbsolutePath().normalize()
+                        .toString();
+            }
+            // The root of a single file project is the file, so a relative directory from the API is resolved against
+            // the folder of the file
+            return project.sourceRoot().toAbsolutePath().normalize().resolveSibling(targetDir).normalize().toString();
         }
         if (targetDir == null || !scanningWorkspace) {
             return targetDir;
@@ -1283,7 +1295,8 @@ public class ScanCmd implements BLauncherCmd {
         }
         Path workspaceRoot = workspaceProject.sourceRoot().toAbsolutePath().normalize();
         Path reportRoot = workspaceRoot.resolve(targetDir).normalize();
-        Map<Path, Project> owners = new HashMap<>();
+        // Keyed without case, as packages whose paths differ only in case share a folder on macOS and Windows
+        Map<String, Project> owners = new HashMap<>();
         for (PackageScan packageScan : packageScans) {
             Project project = packageScan.project();
             Path packageRoot = project.sourceRoot().toAbsolutePath().normalize();
@@ -1291,7 +1304,7 @@ public class ScanCmd implements BLauncherCmd {
                     ? workspaceRoot.relativize(packageRoot)
                     : Path.of(EXTERNAL_PACKAGES_DIR, project.currentPackage().packageOrg().value(),
                     project.currentPackage().packageName().value())).normalize();
-            Project owner = owners.putIfAbsent(reportDir, project);
+            Project owner = owners.putIfAbsent(reportDir.toString().toLowerCase(Locale.ROOT), project);
             if (owner != null) {
                 throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.REPORT_DIR_CONFLICT,
                         packageLabel(workspaceProject, owner), packageLabel(workspaceProject, project), reportDir));

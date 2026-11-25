@@ -47,7 +47,7 @@ import java.util.stream.Stream;
  * {@code bal build} uses, with the results of each package under its path from the workspace root and the combined
  * results at the top.
  *
- * @since 0.14.0
+ * @since 0.14.1
  */
 public class WorkspaceTargetDirTest extends BaseTest {
     private static final String SOURCE = """
@@ -191,6 +191,22 @@ public class WorkspaceTargetDirTest extends BaseTest {
         Assert.assertFalse(Files.exists(out), "nothing is saved");
 
         Assert.assertEquals(scan(otherWorkspace), 0, "the packages are scanned without --target-dir");
+    }
+
+    @Test(description = "test two packages whose report directories differ only in case conflict, as they are one "
+            + "folder on macOS and Windows")
+    void testReportDirConflictInCase() throws IOException {
+        Path otherWorkspace = tempRoot.resolve("ws-case-conflict");
+        createPackage(otherWorkspace.resolve("_external").resolve("Test").resolve("lib"), "lib_copy");
+        createPackage(tempRoot.resolve("case").resolve("lib"), "lib");
+        createWorkspace(otherWorkspace, "_external/Test/lib", "../case/lib");
+        Path out = tempRoot.resolve("case-out");
+
+        int exitCode = scan(otherWorkspace, "--target-dir=" + out);
+        String output = readOutput(true);
+        Assert.assertEquals(exitCode, 1, output);
+        Assert.assertTrue(output.contains(" would save their results to the same directory "), output);
+        Assert.assertFalse(Files.exists(out), "nothing is saved");
     }
 
     private void scan(String... args) {
