@@ -92,7 +92,7 @@ repository = "local"
 
 # Configuration for Static Code Analyzer Rules
 
-Users can specify the rules to filter out specific issues during an analysis by defining them in a `Scan.toml` file.
+Users can specify the rules to filter out specific issues during an analysis by defining them in a `Scan.toml` file. The examples below name `ballerina/io:2`, a rule of an analyzer, which the package must use for the ID to be valid.
 
 Define the rules to include in the analysis:
 
@@ -109,6 +109,8 @@ exclude = ["ballerina:1", "ballerina/io:1"]
 ```
 
 Rules can be either included or excluded, not both: a `[rule]` table that sets both stops the scan with an error that gives its location, and so does using `--include-rules` together with `--exclude-rules`. A value that is not an array of rule IDs, or an unknown key in the `[rule]` table, also stops the scan with an error that gives its location.
+
+Each rule ID in a package's own `Scan.toml` must be a rule of the package: a core rule, or a rule of an analyzer the package uses. An ID that is not, such as a mistyped one, stops the scan with an error that gives its location, exit code `1`, as an unknown ID in `--include-rules` or `--exclude-rules` does with exit code `2`, which is reported first. A `Scan.toml` shared by several packages, such as a remote one or a `configPath` outside the package, may name a rule of an analyzer that only some of them use, so such a rule is a warning for a package that lacks it. A core rule ID, such as `ballerina:999`, that is not a rule of the scan tool is an error in any `Scan.toml`, reported before the package is scanned. Run `bal scan --list-rules` to see the rules of the package.
 
 Each command-line option adds its rules to its own setting for that run: `--include-rules` adds to `include`, and `--exclude-rules` adds to `exclude`. For example, with `exclude = ["ballerina:1"]` in `Scan.toml`, `--exclude-rules=ballerina:2` excludes both `ballerina:1` and `ballerina:2`. Since rules cannot be included and excluded at the same time, an option that conflicts with the other setting in `Scan.toml` stops the scan as a usage error (exit code `2`): with `exclude = ["ballerina:1"]` in `Scan.toml`, `--include-rules=ballerina:2` is an error. A rule named on the command line that the package does not have is also a usage error.
 

@@ -18,6 +18,8 @@
 
 package io.ballerina.scan.utils;
 
+import io.ballerina.tools.text.LineRange;
+
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
@@ -48,6 +50,7 @@ public class ScanTomlFile {
     private final Set<Analyzer> analyzers = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToInclude = new LinkedHashSet<>();
     private final Set<RuleToFilter> rulesToExclude = new LinkedHashSet<>();
+    private final Map<String, LineRange> ruleLocations = new LinkedHashMap<>();
     private final Set<String> platformsWithoutPath = new LinkedHashSet<>();
     // Each setting the file writes, keyed by its name, with its value as written in TOML
     private final Map<String, String> writtenSettings = new LinkedHashMap<>();
@@ -217,6 +220,21 @@ public class ScanTomlFile {
 
     void setRuleToExclude(RuleToFilter rule) {
         rulesToExclude.add(rule);
+    }
+
+    void setRuleLocation(String ruleId, LineRange location) {
+        ruleLocations.putIfAbsent(ruleId, location);
+    }
+
+    /**
+     * Returns where a rule ID of the [rule] table is first written in the file.
+     *
+     * @param ruleId the rule ID
+     * @return the location of the rule ID, or empty if the file does not write it
+     * @since 0.11.3
+     */
+    public Optional<LineRange> getRuleLocation(String ruleId) {
+        return Optional.ofNullable(ruleLocations.get(ruleId));
     }
 
     void setSuppressionEnabled(boolean enabled) {
