@@ -80,6 +80,7 @@ public enum DiagnosticCode {
     UNKNOWN_CONFIG_ENTRY("STATIC_ANALYSIS_ERROR_054", "unknown.config.entry"),
     INVALID_PLATFORM_LIST("STATIC_ANALYSIS_ERROR_055", "invalid.platform.list"),
     PLATFORM_PATH_MISSING("STATIC_ANALYSIS_ERROR_056", "platform.path.missing"),
+    PLATFORM_NAME_MISSING("STATIC_ANALYSIS_ERROR_058", "platform.name.missing"),
     REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
     SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
