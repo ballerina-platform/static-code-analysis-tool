@@ -62,6 +62,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -507,6 +508,9 @@ public class ScanCmd implements BLauncherCmd {
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
         addRules(coreRules);
         externalAnalyzers.values().forEach(this::addRules);
+        if (!listRules) {
+            failOnUnknownTomlRules(packageScan.scanTomlFile(), packageScan.project().sourceRoot());
+        }
         return new PackageRules(projectAnalyzer, coreRules, externalAnalyzers);
     }
 
@@ -695,6 +699,32 @@ public class ScanCmd implements BLauncherCmd {
         if (!errors.isEmpty()) {
             throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.PLATFORMS_FAILED, errors.size()), errors);
         }
+    }
+
+    /**
+     * Fails the scan with an error at each rule ID of the [rule] table of the package's Scan.toml file that is not a
+     * rule of the package, as an unknown rule on the command line is.
+     */
+    private void failOnUnknownTomlRules(ScanTomlFile scanTomlFile, Path root) {
+        String displayPath = scanTomlFile.getDisplayPath(root).orElse(Constants.SCAN_FILE);
+        List<String> errors = new ArrayList<>(Stream.concat(scanTomlFile.getRulesToInclude().stream(),
+                        scanTomlFile.getRulesToExclude().stream())
+                .map(ScanTomlFile.RuleToFilter::id)
+                .filter(ruleId -> !allRuleIds.contains(ruleId))
+                .distinct()
+                .map(ruleId -> Map.entry(ruleId, scanTomlFile.getRuleLocation(ruleId).orElseThrow()))
+                .sorted(Comparator.comparing((Map.Entry<String, LineRange> rule) -> rule.getValue().startLine().line())
+                        .thenComparing(rule -> rule.getValue().startLine().offset()))
+                .map(rule -> DiagnosticLog.fileError(displayPath, rule.getValue(),
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_RULE, rule.getKey())))
+                .toList());
+        if (errors.isEmpty()) {
+            return;
+        }
+        int errorCount = errors.size();
+        errors.add(LIST_RULES_HINT);
+        throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath,
+                errorCount), errors);
     }
 
     /**

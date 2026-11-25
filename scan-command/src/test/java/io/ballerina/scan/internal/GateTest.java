@@ -153,6 +153,33 @@ public class GateTest extends BaseTest {
                 "bal scan: error: unknown rules 'ballerina:98' and 'ballerina:99'\n"), run.output());
     }
 
+    @Test(description = "test a [rule] ID of Scan.toml that the package lacks fails the scan at its location")
+    void testUnknownRuleInScanToml() throws IOException {
+        Path scanToml = gateConfigProject.resolve("Scan.toml");
+        String original = Files.readString(scanToml, StandardCharsets.UTF_8);
+        try {
+            Files.writeString(scanToml, original + """
+
+                    [rule]
+                    exclude = ["ballerina:999", "ballerina:1", "exampleOrg/example_module_static_code_analyzer:1"]
+                    """);
+            ScanRun run = scan(gateConfigProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertEquals(run.errorReport(), """
+                    bal scan: error: Scan.toml has 2 errors
+                    Scan.toml:5:12: error: unknown rule 'ballerina:999'; the package does not provide it
+                    Scan.toml:5:44: error: unknown rule 'exampleOrg/example_module_static_code_analyzer:1'; the \
+                    package does not provide it
+                      Run 'bal scan --list-rules' to see the available rules.""", run.output());
+            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+
+            run = scan(gateConfigProject, "--list-rules");
+            Assert.assertEquals(run.exitCode(), 0, "the rules are still listed: " + run.output());
+        } finally {
+            Files.writeString(scanToml, original);
+        }
+    }
+
     @Test(description = "test the gate set in Scan.toml")
     void testGateFromScanToml() throws IOException {
         ScanRun run = scan(gateConfigProject);
