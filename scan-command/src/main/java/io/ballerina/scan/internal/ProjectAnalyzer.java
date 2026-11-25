@@ -24,17 +24,21 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.projects.CompilerPluginCache;
+import io.ballerina.projects.DependencyGraph;
 import io.ballerina.projects.DiagnosticResult;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentConfig;
 import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
 import io.ballerina.projects.ModuleId;
+import io.ballerina.projects.Package;
 import io.ballerina.projects.PackageDependencyScope;
 import io.ballerina.projects.PackageManifest;
 import io.ballerina.projects.PackageResolution;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ResolvedPackageDependency;
+import io.ballerina.projects.SemanticVersion;
+import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.internal.model.CompilerPluginDescriptor;
 import io.ballerina.scan.Issue;
 import io.ballerina.scan.Rule;
@@ -190,10 +194,10 @@ public class ProjectAnalyzer {
         StringBuilder newImports = new StringBuilder();
         StringBuilder tomlDependencies = new StringBuilder();
         Set<ScanTomlFile.Analyzer> analyzers = scanTomlFile.getAnalyzers();
-        PackageManifest currentManifest = project.currentPackage().manifest();
+        // Importing this package, or a workspace package that depends on it, would be a cycle
+        List<Package> cyclicPackages = packagesDependingOnThis();
         for (ScanTomlFile.Analyzer analyzer : analyzers) {
-            // A workspace Scan.toml can name a package of the workspace, which must not import itself
-            if (!isPackageOf(analyzer, currentManifest)) {
+            if (cyclicPackages.stream().noneMatch(pkg -> provides(pkg, analyzer))) {
                 extractAnalyzerImportsAndDependencies(analyzer, newImports, tomlDependencies);
             }
         }
@@ -215,7 +219,7 @@ public class ProjectAnalyzer {
                 PackageDependencyScope.DEFAULT);
         Collection<ResolvedPackageDependency> directDependencies = packageResolution.dependencyGraph()
                 .getDirectDependencies(rootPkgNode);
-        findUnresolvedAnalyzers(analyzers, directDependencies, packageResolution);
+        findUnresolvedAnalyzers(analyzers, directDependencies, cyclicPackages, packageResolution);
         Map<String, List<Rule>> externalAnalyzers = new HashMap<>();
         directDependencies.stream()
                 .map(ResolvedPackageDependency::packageInstance).forEach(pkgDependency -> {
@@ -238,46 +242,104 @@ public class ProjectAnalyzer {
     }
 
     /**
-     * Records each analyzer of the Scan.toml file that did not resolve to a direct dependency, with the resolution
-     * diagnostic that names it, if any.
+     * Records each analyzer of the Scan.toml file that cannot be used, with the reason, or the resolution diagnostic
+     * that names it, if any.
      */
     private void findUnresolvedAnalyzers(Set<ScanTomlFile.Analyzer> analyzers,
                                          Collection<ResolvedPackageDependency> directDependencies,
-                                         PackageResolution packageResolution) {
+                                         List<Package> cyclicPackages, PackageResolution packageResolution) {
         unresolvedAnalyzers.clear();
-        List<PackageManifest> resolved = new ArrayList<>();
-        directDependencies.forEach(dependency -> resolved.add(dependency.packageInstance().manifest()));
-        resolved.add(project.currentPackage().manifest());
         for (ScanTomlFile.Analyzer analyzer : analyzers) {
-            if (resolved.stream().anyMatch(manifest -> isPackageOf(analyzer, manifest))) {
+            Optional<Package> cyclicPackage = cyclicPackages.stream().filter(pkg -> provides(pkg, analyzer))
+                    .findFirst();
+            if (cyclicPackage.isPresent()) {
+                // A Scan.toml shared by several packages, such as the workspace one, can name some of them
+                if (!isSharedScanToml()) {
+                    unresolvedAnalyzers.put(analyzer, cyclicPackage.get() == cyclicPackages.get(0)
+                            ? "it is the package being scanned" : "it depends on the package being scanned");
+                }
                 continue;
             }
-            // Such as a version missing from the local repository, which resolution reports only as a warning
+            Optional<Package> dependency = directDependencies.stream()
+                    .map(ResolvedPackageDependency::packageInstance)
+                    .filter(pkg -> provides(pkg, analyzer))
+                    .findFirst();
+            // A version that does not exist only gets a warning, and resolution keeps an older locked version
+            if (dependency.isPresent() && (analyzer.version() == null || !dependency.get().packageVersion().value()
+                    .lessThan(SemanticVersion.from(analyzer.version())))) {
+                continue;
+            }
             String reason = packageResolution.diagnosticResult().diagnostics().stream()
                     .map(Diagnostic::message)
                     .filter(message -> namesAnalyzer(message, analyzer))
                     .findFirst()
+                    .or(() -> dependency.map(pkg -> "version " + pkg.packageVersion() + " was resolved instead"))
                     .orElse("");
             unresolvedAnalyzers.put(analyzer, reason);
         }
     }
 
+    /**
+     * Returns this package, first, and the packages of its workspace that depend on it.
+     */
+    private List<Package> packagesDependingOnThis() {
+        List<Package> packages = new ArrayList<>();
+        packages.add(project.currentPackage());
+        project.workspaceProject().ifPresent(workspace -> {
+            DependencyGraph<BuildProject> graph = workspace.getResolution().dependencyGraph();
+            graph.getNodes().stream()
+                    .filter(member -> member.sourceRoot().equals(project.sourceRoot()))
+                    .findFirst()
+                    .ifPresent(member -> graph.getAllDependents(member)
+                            .forEach(dependent -> packages.add(dependent.currentPackage())));
+        });
+        return packages;
+    }
+
+    // A remote file, or one outside the package, such as the workspace Scan.toml or a shared configPath
+    private boolean isSharedScanToml() {
+        return scanTomlFile.getPath()
+                .map(path -> !path.toAbsolutePath().normalize().startsWith(project.sourceRoot().toAbsolutePath()
+                        .normalize()))
+                .orElse(true);
+    }
+
     // The name of an analyzer is that of its package, or of a module of it, such as "pkg.mod"
-    private static boolean isPackageOf(ScanTomlFile.Analyzer analyzer, PackageManifest manifest) {
-        String packageName = manifest.name().value();
-        return analyzer.org().equals(manifest.org().value())
-                && (analyzer.name().equals(packageName) || analyzer.name().startsWith(packageName + "."));
+    private static boolean provides(Package pkg, ScanTomlFile.Analyzer analyzer) {
+        if (!analyzer.org().equals(pkg.packageOrg().value())) {
+            return false;
+        }
+        for (Module module : pkg.modules()) {
+            if (module.moduleName().toString().equals(analyzer.name())) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    // Whether a resolution diagnostic names an analyzer by its whole org, name and version
+    /**
+     * Whether a resolution diagnostic names an analyzer by its whole org, name and version. For a module, such as
+     * "pkg.mod", the diagnostic may name only its package.
+     */
     static boolean namesAnalyzer(String message, ScanTomlFile.Analyzer analyzer) {
-        return containsToken(message, analyzer.org()) && containsToken(message, analyzer.name())
-                && (analyzer.version() == null || containsToken(message, analyzer.version()));
+        if (!containsToken(message, analyzer.org())
+                || (analyzer.version() != null && !containsToken(message, analyzer.version()))) {
+            return false;
+        }
+        String name = analyzer.name();
+        while (!containsToken(message, name)) {
+            int lastDot = name.lastIndexOf('.');
+            if (lastDot < 0) {
+                return false;
+            }
+            name = name.substring(0, lastDot);
+        }
+        return true;
     }
 
-    // Whether a value appears as a whole token, so that a short name such as "io" does not match other words
+    // Whether a value appears as a whole token, so that "io" does not match other words and "1.0.0" not "1.0.0-alpha"
     private static boolean containsToken(String message, String value) {
-        return Pattern.compile("(?<![\\w.])" + Pattern.quote(value) + "(?!\\w|\\.\\w)").matcher(message).find();
+        return Pattern.compile("(?<![\\w.])" + Pattern.quote(value) + "(?![\\w+-]|\\.\\w)").matcher(message).find();
     }
 
     /**

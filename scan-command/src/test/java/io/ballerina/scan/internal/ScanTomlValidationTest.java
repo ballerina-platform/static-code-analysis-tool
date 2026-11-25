@@ -20,6 +20,7 @@ package io.ballerina.scan.internal;
 
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.ProjectLoader;
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.utils.GateSeverity;
 import io.ballerina.scan.utils.ScanTomlFile;
@@ -353,6 +354,23 @@ public class ScanTomlValidationTest extends BaseTest {
                         """, "Scan.toml:1:1: error: analyzer 'ballerinax/example_module_static_code_analyzer:9.9.9 "
                         + "from the local repository' cannot be resolved: Dependency version (9.9.9) cannot be found "
                         + "in the local repository. org: `ballerinax` name: example_module_static_code_analyzer"},
+                // A package whose name starts with that of a resolved package is not one of its modules
+                {"""
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "example_module_static_code_analyzer"
+
+                        [[analyzer]]
+                        org = "exampleOrg"
+                        name = "example_module_static_code_analyzer.typo"
+                        """, "Scan.toml:5:1: error: analyzer 'exampleOrg/example_module_static_code_analyzer.typo' "
+                        + "cannot be resolved"},
+                {"""
+                        [[analyzer]]
+                        org = "ballerina"
+                        name = "bal_project_with_scan_toml_errors"
+                        """, "Scan.toml:1:1: error: analyzer 'ballerina/bal_project_with_scan_toml_errors' cannot be "
+                        + "resolved: it is the package being scanned"},
         };
     }
 
@@ -380,15 +398,26 @@ public class ScanTomlValidationTest extends BaseTest {
         ScanRun run = scan(sharedWorkspace);
         Assert.assertEquals(run.exitCode(), 1, run.output());
         Assert.assertEquals(run.errorReport(), """
-                bal scan: error: Scan.toml has 1 error
+                bal scan: error: 1 package failed
+                first-package: error: Scan.toml has 1 error
                 Scan.toml:1:1: error: analyzer 'nosuchorgxyz/nosuchpkg' cannot be resolved""");
         // The run stops at the first package that loads the analyzers, instead of failing each package
         Assert.assertFalse(run.output().contains("Running scans on second-package"), run.output());
 
-        run = scan(sharedWorkspace, "--list-rules");
+        // The failures found before it are still reported
+        Path secondPackageScanToml = sharedWorkspace.resolve("second-package").resolve("Scan.toml");
+        try {
+            Files.writeString(secondPackageScanToml, "[rule\n");
+            run = scan(sharedWorkspace, "--list-rules");
+        } finally {
+            Files.deleteIfExists(secondPackageScanToml);
+        }
         Assert.assertEquals(run.exitCode(), 1, run.output());
         Assert.assertEquals(run.errorReport(), """
-                bal scan: error: Scan.toml has 1 error
+                bal scan: error: 2 packages failed
+                second-package: error: Scan.toml has 1 error
+                Scan.toml:2:1: error: missing close bracket token
+                first-package: error: Scan.toml has 1 error
                 Scan.toml:1:1: error: analyzer 'nosuchorgxyz/nosuchpkg' cannot be resolved""");
     }
 
@@ -402,6 +431,114 @@ public class ScanTomlValidationTest extends BaseTest {
         ScanRun run = scan(sharedWorkspace);
         Assert.assertEquals(run.exitCode(), 0, run.output());
         Assert.assertFalse(run.output().contains("error:"), run.output());
+    }
+
+    @Test(description = "test a workspace Scan.toml can name a package that depends on the scanned one, which is "
+            + "not imported, since that would be a cycle")
+    void testWorkspaceAnalyzerDependingOnScannedPackage() throws IOException {
+        Path workspace = Files.createTempDirectory("workspace-with-dependent-analyzer");
+        try {
+            Files.writeString(workspace.resolve("Ballerina.toml"), """
+                    [workspace]
+                    packages = ["lib", "app"]
+                    """);
+            writePackage(workspace.resolve("lib"), "lib", "public function greet() returns string => \"hi\";\n",
+                    lockedPackage("lib", ""));
+            writePackage(workspace.resolve("app"), "app", """
+                    import ballerina/lib;
+
+                    public function main() {
+                        _ = lib:greet();
+                    }
+                    """, lockedPackage("app", """
+                    dependencies = [
+                    \t{org = "ballerina", name = "lib"}
+                    ]
+                    """) + lockedPackage("lib", ""));
+            Files.writeString(workspace.resolve("Scan.toml"), """
+                    [[analyzer]]
+                    org = "ballerina"
+                    name = "app"
+                    """);
+            ScanRun run = scan(workspace);
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertFalse(run.output().contains("error:"), run.output());
+        } finally {
+            ProjectUtils.deleteDirectory(workspace);
+        }
+    }
+
+    @Test(description = "test an analyzer version that does not exist fails although an older version is locked")
+    void testMissingAnalyzerVersionWithLockedVersion() throws IOException {
+        Path lockedProject = Files.createTempDirectory("project-with-locked-analyzer").resolve("locked_analyzer");
+        try {
+            writePackage(lockedProject, "locked_analyzer", """
+                    import exampleOrg/example_module_static_code_analyzer as _;
+
+                    public function main() {
+                    }
+                    """, lockedPackage("locked_analyzer", """
+                    dependencies = [
+                    \t{org = "exampleOrg", name = "example_module_static_code_analyzer"}
+                    ]
+                    """) + """
+
+                    [[package]]
+                    org = "exampleOrg"
+                    name = "example_module_static_code_analyzer"
+                    version = "0.1.0"
+                    modules = [
+                    \t{org = "exampleOrg", packageName = "example_module_static_code_analyzer", \
+                    moduleName = "example_module_static_code_analyzer"}
+                    ]
+                    """);
+            Files.writeString(lockedProject.resolve("Scan.toml"), """
+                    [[analyzer]]
+                    org = "exampleOrg"
+                    name = "example_module_static_code_analyzer"
+                    version = "9.9.9"
+                    repository = "local"
+                    """);
+            ScanRun run = scan(lockedProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertEquals(run.errorReport(), """
+                    bal scan: error: Scan.toml has 1 error
+                    Scan.toml:1:1: error: analyzer 'exampleOrg/example_module_static_code_analyzer:9.9.9 from the \
+                    local repository' cannot be resolved: Dependency version (9.9.9) cannot be found in the local \
+                    repository. org: `exampleOrg` name: example_module_static_code_analyzer""");
+        } finally {
+            ProjectUtils.deleteDirectory(lockedProject.getParent());
+        }
+    }
+
+    private static void writePackage(Path root, String name, String source, String lockedPackages)
+            throws IOException {
+        Files.createDirectories(root);
+        Files.writeString(root.resolve("Ballerina.toml"), """
+                [package]
+                org = "ballerina"
+                name = "<name>"
+                version = "0.1.0"
+                """.replace("<name>", name));
+        Files.writeString(root.resolve("Dependencies.toml"), """
+                [ballerina]
+                dependencies-toml-version = "2"
+                distribution-version = "2201.13.2"
+                """ + lockedPackages);
+        Files.writeString(root.resolve("main.bal"), source);
+    }
+
+    private static String lockedPackage(String name, String dependencies) {
+        return """
+
+                [[package]]
+                org = "ballerina"
+                name = "<name>"
+                version = "0.1.0"
+                <dependencies>modules = [
+                \t{org = "ballerina", packageName = "<name>", moduleName = "<name>"}
+                ]
+                """.replace("<name>", name).replace("<dependencies>", dependencies);
     }
 
     @Test(description = "test a platform named in --platforms whose [[platform]] has no path is reported as such")

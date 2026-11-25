@@ -203,8 +203,8 @@ public class ScanCmd implements BLauncherCmd {
     private Integer gateCount;
     // The defaults of the packages of a workspace, read once for all of them; null when the workspace has none
     private ScanTomlFile workspaceDefaults;
-    // An error of the workspace Scan.toml found while loading a package, which fails the run instead of the package
-    private ScanFailure workspaceFileFailure;
+    // Whether loading a package found an error of the workspace Scan.toml, which stops the run at that package
+    private boolean workspaceFileFailed;
     private boolean workspaceDefaultsRead;
     private final Set<String> printedWarnings = new HashSet<>();
     // The sources each package is scanned with, keyed by its root, for the workspace HTML report
@@ -543,8 +543,8 @@ public class ScanCmd implements BLauncherCmd {
                     failures.put(buildProject, result.suppressionFailure());
                 }
             } catch (RuntimeException ex) {
-                failOnWorkspaceFile();
                 failures.put(buildProject, ScanFailure.from(ex));
+                stopOnWorkspaceFileFailure(workspaceProject, failures);
             }
         }
         // A package that failed to load has no rules, so the analyzer rule IDs are complete only without failures
@@ -611,8 +611,8 @@ public class ScanCmd implements BLauncherCmd {
             try {
                 loadRules(packageScan);
             } catch (RuntimeException ex) {
-                failOnWorkspaceFile();
                 failures.put((BuildProject) packageScan.project(), ScanFailure.from(ex));
+                stopOnWorkspaceFileFailure(workspaceProject, failures);
             }
         }
         if (!allRules.isEmpty()) {
@@ -622,9 +622,14 @@ public class ScanCmd implements BLauncherCmd {
         failOnPackageFailures(workspaceProject, failures);
     }
 
-    private void failOnWorkspaceFile() {
-        if (workspaceFileFailure != null) {
-            throw workspaceFileFailure;
+    /**
+     * Stops at an error of the workspace Scan.toml, which the remaining packages would repeat, reporting it for the
+     * package it was found in along with the failures of the packages before it.
+     */
+    private void stopOnWorkspaceFileFailure(WorkspaceProject workspaceProject,
+                                            Map<BuildProject, ScanFailure> failures) {
+        if (workspaceFileFailed) {
+            failOnPackageFailures(workspaceProject, failures);
         }
     }
 
@@ -825,7 +830,7 @@ public class ScanCmd implements BLauncherCmd {
     /**
      * Fails with each [[analyzer]] of the Scan.toml file that could not be resolved, as a Scan.toml error at its
      * position, since leaving it out would give a clean-looking scan without its rules. An analyzer of the workspace
-     * Scan.toml fails the whole run, so that it is reported once instead of for every package.
+     * Scan.toml stops the run at the package it failed for, so that it is reported once instead of for every package.
      */
     private void failOnUnresolvedAnalyzers(Project project, ScanTomlFile scanTomlFile,
                                            Map<ScanTomlFile.Analyzer, String> unresolvedAnalyzers,
@@ -844,12 +849,9 @@ public class ScanCmd implements BLauncherCmd {
                     DiagnosticLog.error(DiagnosticCode.ANALYZER_NOT_RESOLVED, id, reason.isEmpty() ? "" : ": "
                             + reason)));
         });
-        ScanFailure failure = ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS,
-                displayPath, errors.size()), errors);
-        if (usesWorkspaceFile) {
-            workspaceFileFailure = failure;
-        }
-        throw failure;
+        workspaceFileFailed = usesWorkspaceFile;
+        throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.CONFIG_FILE_HAS_ERRORS, displayPath,
+                errors.size()), errors);
     }
 
     /**

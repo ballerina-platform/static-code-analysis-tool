@@ -104,7 +104,7 @@ bal scan: error: Scan.toml has 1 error
 Scan.toml:1:1: error: analyzer 'org2/name2:9.9.9 from the local repository' cannot be resolved: Dependency version (9.9.9) cannot be found in the local repository. org: `org2` name: name2
 ```
 
-A workspace `Scan.toml` can name a package of the workspace as an analyzer; that package does not import itself. An analyzer of the workspace `Scan.toml` that cannot be resolved stops the scan once, instead of failing every package.
+A `Scan.toml` shared by several packages, such as the workspace one, can name a package of the workspace as an analyzer. That package, and the packages that depend on it, are scanned without it, since importing it would be a cycle. A package's own `Scan.toml` cannot name the package itself or a package that depends on it. An analyzer of the workspace `Scan.toml` that cannot be resolved stops the scan at the first package it fails for, instead of failing every package.
 
 # Configuration for Static Code Analyzer Rules
 
