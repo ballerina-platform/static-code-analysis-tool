@@ -49,6 +49,7 @@ import java.util.Optional;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
+import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
 
 /**
  * Project analyzer tests.
@@ -175,6 +176,8 @@ public class ProjectAnalyzerTest extends BaseTest {
         // Every report also reaches the context's own reporter, including those in the generated import document
         // that the scan leaves out
         Assert.assertEquals(received.stream().filter(report -> report.startsWith("main.bal:")).count(), 3,
+                received.toString());
+        Assert.assertEquals(received.stream().filter(report -> report.startsWith(IMPORT_GENERATOR_FILE)).count(), 3,
                 received.toString());
     }
 

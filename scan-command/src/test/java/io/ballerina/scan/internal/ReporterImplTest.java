@@ -24,16 +24,20 @@ import io.ballerina.projects.Module;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.SingleFileProject;
 import io.ballerina.scan.Issue;
+import io.ballerina.scan.Reporter;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.Source;
 import io.ballerina.scan.utils.DiagnosticCode;
 import io.ballerina.scan.utils.DiagnosticLog;
+import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.diagnostics.Location;
 import io.ballerina.tools.text.LineRange;
 import io.ballerina.tools.text.TextRange;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLocation;
 
@@ -156,6 +160,101 @@ public class ReporterImplTest {
                 """), json);
         Assert.assertTrue(ScanUtils.convertIssuesToSarifString(List.of(issue), project)
                 .contains("\"ruleId\": \"exampleOrg/exampleName:7\""));
+    }
+
+    @Test(description = "test a rule implemented elsewhere without what the reports need fails where it is reported",
+            dataProvider = "incomplete-rules")
+    void testReporterWithIncompleteRule(String id, RuleKind kind, String description, String error) {
+        Rule rule = new Rule() {
+            @Override
+            public String id() {
+                return id;
+            }
+
+            @Override
+            public int numericId() {
+                return 7;
+            }
+
+            @Override
+            public String description() {
+                return description;
+            }
+
+            @Override
+            public RuleKind kind() {
+                return kind;
+            }
+        };
+        ReporterImpl reporter = new ReporterImpl(List.of());
+        Document document = mainDocument();
+
+        ScanToolException exception = Assert.expectThrows(ScanToolException.class,
+                () -> reporter.reportIssue(document, document.syntaxTree().rootNode().location(), rule));
+        Assert.assertEquals(exception.getMessage(), error);
+        Assert.assertTrue(reporter.getIssues().isEmpty());
+    }
+
+    @DataProvider(name = "incomplete-rules")
+    Object[][] incompleteRules() {
+        return new Object[][]{
+                {null, RuleKind.BUG, "rule", "rule '7' cannot be reported: its ID is null"},
+                {"exampleOrg/exampleName:7", null, "rule",
+                        "rule 'exampleOrg/exampleName:7' cannot be reported: its kind is null"},
+                {"exampleOrg/exampleName:7", RuleKind.BUG, null,
+                        "rule 'exampleOrg/exampleName:7' cannot be reported: its description is null"},
+        };
+    }
+
+    @Test(description = "test a report the wrapped reporter rejects is not recorded for the scan")
+    void testRecordingReporterWithRejectingDelegate() {
+        Rule rule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
+        Reporter rejecting = new Reporter() {
+            @Override
+            public void reportIssue(Document reportedDocument, Location location, int ruleId) {
+                throw new IllegalStateException("rejected " + ruleId);
+            }
+
+            @Override
+            public void reportIssue(Document reportedDocument, Location location, Rule reportedRule) {
+                throw new IllegalStateException("rejected " + reportedRule.id());
+            }
+        };
+        RecordingScannerContext context = new RecordingScannerContext(new ScannerContext() {
+            @Override
+            public Reporter getReporter() {
+                return rejecting;
+            }
+        }, List.of(rule));
+        Document document = mainDocument();
+        Location location = document.syntaxTree().rootNode().location();
+
+        Assert.expectThrows(IllegalStateException.class, () -> context.getReporter().reportIssue(document, location,
+                101));
+        Assert.expectThrows(IllegalStateException.class, () -> context.getReporter().reportIssue(document, location,
+                rule));
+        Assert.assertTrue(context.issues().isEmpty());
+    }
+
+    @Test(description = "test the scan tool's own context records each report once")
+    void testRecordingScannerContextOfScanTool() {
+        Rule rule = RuleFactory.createRule(101, "rule 101", RuleKind.BUG);
+        ScannerContextImpl ownContext = new ScannerContextImpl(List.of(rule), false);
+        RecordingScannerContext context = new RecordingScannerContext(ownContext, List.of(rule));
+        Document document = mainDocument();
+
+        context.getReporter().reportIssue(document, document.syntaxTree().rootNode().location(), 101);
+
+        Assert.assertEquals(context.issues().size(), 1);
+        Assert.assertTrue(ownContext.getReporter().getIssues().isEmpty());
+    }
+
+    private static Document mainDocument() {
+        Path validBalProject = Paths.get("src", "test", "resources", "test-resources",
+                "valid-single-file-project", "main.bal");
+        Project project = SingleFileProject.load(validBalProject);
+        Module defaultModule = project.currentPackage().getDefaultModule();
+        return defaultModule.document(defaultModule.documentIds().iterator().next());
     }
 
     @Test(description = "test creating a reporter and reporting an issue with non-existent numeric rule identifier")
