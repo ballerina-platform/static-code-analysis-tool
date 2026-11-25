@@ -130,9 +130,15 @@ public class ExcludeTestsTest extends BaseTest {
     @Test(description = "test --exclude-tests warns that a single file has no tests")
     void testExcludeTestsWithSingleFile() throws IOException {
         Path singleFile = testResourcesRoot.resolve("valid-single-file-project").resolve("main.bal");
-        String output = scan(testsProject, "--exclude-tests", singleFile.toAbsolutePath().toString());
-        Assert.assertTrue(output.contains("bal scan: warning: a single bal file has no tests to exclude, ignoring "
-                + "--exclude-tests"), output);
+        // A single file is saved in the current directory, so the scan runs in a temporary one
+        Path workDir = Files.createTempDirectory("single-file-scan");
+        try {
+            String output = scan(workDir, "--exclude-tests", singleFile.toAbsolutePath().toString());
+            Assert.assertTrue(output.contains("bal scan: warning: a single bal file has no tests to exclude, "
+                    + "ignoring --exclude-tests"), output);
+        } finally {
+            ProjectUtils.deleteDirectory(workDir);
+        }
     }
 
     private void assertTestsExcluded(String output) throws IOException {

@@ -1,7 +1,0 @@
-bal scan: warning: reports are not saved for a single bal file, ignoring --target-dir
-
-Running Scans
-
-[]
-
-0 issue(s)
