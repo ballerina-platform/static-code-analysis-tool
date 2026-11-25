@@ -4,6 +4,12 @@ All notable changes to the Ballerina scan tool are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each release states the Ballerina distribution it is built against. Releases for older distributions are maintained on the `support/*` branches, which keep their own changelog.
 
+## [Unreleased]
+
+### Changed
+
+- A rule ID in the `[rule]` table of a package's own `Scan.toml` that is not a rule of the package, such as `exclude = ["ballerina:999"]`, fails the scan with an error at its line and column, exit code `1`, instead of being ignored. An unknown core rule ID, such as `ballerina:999`, is an error in any `Scan.toml` and is reported before any package is scanned. A rule of the workspace `Scan.toml` fails the scan only when no package that reads it provides it; a rule that only some packages provide is still a warning for the others. A `Scan.toml` shared in another way, such as a remote one, a `configPath` outside the package, or the workspace file of a package scanned on its own, only warns about an analyzer rule the package lacks. An unknown rule in `--include-rules` or `--exclude-rules` is still reported first, with exit code `2`. `--list-rules` still lists the rules. ([#166](https://github.com/ballerina-platform/static-code-analysis-tool/issues/166))
+
 ## [0.14.0] - 2026-11-17
 
 Built against Ballerina 2201.13.2.

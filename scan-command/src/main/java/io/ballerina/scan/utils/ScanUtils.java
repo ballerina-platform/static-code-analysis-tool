@@ -1871,6 +1871,8 @@ public final class ScanUtils {
             errors.add(invalidConfigValue(rules, key, RULE_LIST_VALUES));
             return;
         }
+        rulesArray.elements().forEach(rule -> scanTomlFile.setRuleLocation(rule.toNativeValue().toString(),
+                rule.location().lineRange()));
         List<String> ruleIds = rulesArray.toNativeValue().stream().map(Object::toString).toList();
         ruleIds.forEach(rule -> {
             ScanTomlFile.RuleToFilter ruleToFilter = new ScanTomlFile.RuleToFilter(rule);

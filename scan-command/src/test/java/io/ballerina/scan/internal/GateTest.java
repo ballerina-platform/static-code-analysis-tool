@@ -61,6 +61,7 @@ public class GateTest extends BaseTest {
     private final Path invalidGateConfigProject = testResourcesRoot
             .resolve("bal-project-with-invalid-gate-configurations");
     private final Path gatedWorkspace = testResourcesRoot.resolve("workspace-with-gates");
+    private static final String ANALYZER_IMPORT = "import exampleOrg/example_module_static_code_analyzer as _;\n";
 
     @Test(description = "test findings do not fail the scan when no gate is set")
     void testNoGate() throws IOException {
@@ -150,6 +151,33 @@ public class GateTest extends BaseTest {
         Assert.assertEquals(run.exitCode(), 2, run.output());
         Assert.assertTrue(run.errorReport().startsWith(
                 "bal scan: error: unknown rules 'ballerina:98' and 'ballerina:99'\n"), run.output());
+    }
+
+    @Test(description = "test a [rule] ID of Scan.toml that the package lacks fails the scan at its location")
+    void testUnknownRuleInScanToml() throws IOException {
+        Path scanToml = gateConfigProject.resolve("Scan.toml");
+        String original = Files.readString(scanToml, StandardCharsets.UTF_8);
+        try {
+            Files.writeString(scanToml, original + """
+
+                    [rule]
+                    exclude = ["ballerina:999", "ballerina:1", "exampleOrg/example_module_static_code_analyzer:1"]
+                    """);
+            ScanRun run = scan(gateConfigProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertEquals(run.errorReport(), """
+                    bal scan: error: Scan.toml has 2 errors
+                    Scan.toml:5:12: error: unknown rule 'ballerina:999'; the package does not provide it
+                    Scan.toml:5:44: error: unknown rule 'exampleOrg/example_module_static_code_analyzer:1'; the \
+                    package does not provide it
+                      Run 'bal scan --list-rules' to see the available rules.""", run.output());
+            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+
+            run = scan(gateConfigProject, "--list-rules");
+            Assert.assertEquals(run.exitCode(), 0, "the rules are still listed: " + run.output());
+        } finally {
+            Files.writeString(scanToml, original);
+        }
     }
 
     @Test(description = "test the gate set in Scan.toml")
@@ -601,9 +629,16 @@ public class GateTest extends BaseTest {
     void testWorkspaceRuleDefault() throws IOException {
         Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        Path otherScanToml = gatedWorkspace.resolve("pkg-b").resolve("Scan.toml");
+        String otherOriginal = Files.readString(otherScanToml, StandardCharsets.UTF_8);
+        Path analyzerImport = gatedWorkspace.resolve("pkg-b").resolve("analyzer_import.bal");
         try {
             // pkg-a has no Scan.toml, so it uses the workspace exclusion of its HIGH issue
             Files.delete(packageScanToml);
+            // Both packages use the workspace file, and only pkg-b imports the analyzer, so its rules in the
+            // workspace file are valid and pkg-a is warned about
+            Files.delete(otherScanToml);
+            Files.writeString(analyzerImport, ANALYZER_IMPORT);
             writeWorkspaceScanToml("""
                     [rule]
                     exclude = ["ballerina:13"]
@@ -616,9 +651,10 @@ public class GateTest extends BaseTest {
                     exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
                     """);
             run = scan(gatedWorkspace);
+            Assert.assertEquals(run.exitCode(), 0, run.output());
             Assert.assertTrue(run.output().contains("bal scan: warning: 'exampleOrg/example_module_static_code_"
                     + "analyzer:1' in [rule] of Scan.toml is not a rule of pkg-a\n"), run.output());
-            Assert.assertFalse(run.output().contains("is not a rule of pkg-b"), "pkg-b uses its own file: "
+            Assert.assertFalse(run.output().contains("is not a rule of pkg-b"), "pkg-b has the rule: "
                     + run.output());
 
             // --exclude-rules adds to the exclude field, so pkg-a still leaves out its HIGH issue
@@ -631,7 +667,197 @@ public class GateTest extends BaseTest {
             Assert.assertFalse(run.output().contains("overrides [rule]"), run.output());
         } finally {
             Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
+            Files.deleteIfExists(analyzerImport);
             Files.writeString(packageScanToml, original);
+            Files.writeString(otherScanToml, otherOriginal);
+        }
+    }
+
+    @Test(description = "test a workspace [rule] ID that no package of the workspace provides fails the scan")
+    void testUnknownWorkspaceRule() throws IOException {
+        Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
+        String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        Path otherScanToml = gatedWorkspace.resolve("pkg-b").resolve("Scan.toml");
+        String otherOriginal = Files.readString(otherScanToml, StandardCharsets.UTF_8);
+        try {
+            Files.delete(packageScanToml);
+            writeWorkspaceScanToml("""
+                    [rule]
+                    exclude = ["ballerina:999", "exampleOrg/example_module_static_code_analyzer:1"]
+                    """);
+            // A core rule ID is the same for every package, so it is checked before any package is scanned
+            ScanRun run = scan(gatedWorkspace);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertEquals(run.errorReport(), """
+                    bal scan: error: Scan.toml has 1 error
+                    Scan.toml:2:12: error: unknown rule 'ballerina:999'; it is not a rule of the scan tool
+                      Run 'bal scan --list-rules' to see the available rules.""", run.output());
+            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+
+            writeWorkspaceScanToml("""
+                    [rule]
+                    exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
+                    """);
+            run = scan(gatedWorkspace);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertEquals(run.errorReport(), """
+                    bal scan: error: Scan.toml has 1 error
+                    Scan.toml:2:12: error: unknown rule 'exampleOrg/example_module_static_code_analyzer:1'; no \
+                    package that uses the file provides it
+                      Run 'bal scan --list-rules' to see the available rules.""", run.output());
+            Assert.assertFalse(run.output().contains("is not a rule of"), run.output());
+
+            // A package with its own Scan.toml does not read the workspace file, so its analyzer does not count
+            Files.writeString(otherScanToml, otherOriginal + """
+
+                    [[analyzer]]
+                    org = "exampleOrg"
+                    name = "example_module_static_code_analyzer"
+                    """);
+            run = scan(gatedWorkspace);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.errorReport().contains("error: unknown rule 'exampleOrg/example_module_static_code_"
+                    + "analyzer:1'; no package that uses the file provides it"), run.output());
+        } finally {
+            Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
+            Files.writeString(packageScanToml, original);
+            Files.writeString(otherScanToml, otherOriginal);
+        }
+    }
+
+    @Test(description = "test a [rule] ID of a workspace package's own Scan.toml must be a rule of that package")
+    void testUnknownRuleInWorkspacePackageScanToml() throws IOException {
+        Path packageScanToml = gatedWorkspace.resolve("pkg-b").resolve("Scan.toml");
+        String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        try {
+            Files.writeString(packageScanToml, original + """
+
+                    [rule]
+                    include = ["ballerina:999"]
+                    """);
+            ScanRun run = scan(gatedWorkspace);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.errorReport().contains("""
+                    pkg-b: error: pkg-b/Scan.toml has 1 error
+                    pkg-b/Scan.toml:5:12: error: unknown rule 'ballerina:999'; the package does not provide it
+                    """), run.output());
+        } finally {
+            Files.writeString(packageScanToml, original);
+        }
+    }
+
+    @Test(description = "test an unknown rule option is reported before an unknown rule of Scan.toml")
+    void testUnknownRuleOptionWinsOverScanToml() throws IOException {
+        Path scanToml = gateConfigProject.resolve("Scan.toml");
+        String original = Files.readString(scanToml, StandardCharsets.UTF_8);
+        try {
+            Files.writeString(scanToml, original + """
+
+                    [rule]
+                    exclude = ["ballerina:999"]
+                    """);
+            ScanRun run = scan(gateConfigProject, "--exclude-rules=ballerina:998");
+            Assert.assertEquals(run.exitCode(), 2, run.output());
+            Assert.assertTrue(run.errorReport().startsWith("bal scan: error: unknown rule 'ballerina:998'"),
+                    run.output());
+        } finally {
+            Files.writeString(scanToml, original);
+        }
+    }
+
+    @Test(description = "test a Scan.toml shared through configPath only warns about an analyzer rule the package "
+            + "lacks, while an unknown core rule fails before the scan")
+    void testUnknownRuleInSharedScanToml() throws IOException {
+        Path ballerinaToml = gateConfigProject.resolve("Ballerina.toml");
+        String original = Files.readString(ballerinaToml, StandardCharsets.UTF_8);
+        Path shared = Files.createTempFile("shared-scan", ".toml");
+        try {
+            Files.writeString(ballerinaToml, original + "\n[scan]\nconfigPath = \""
+                    + shared.toString().replace("\\", "/") + "\"\n");
+            Files.writeString(shared, """
+                    [rule]
+                    exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
+                    """);
+            ScanRun run = scan(gateConfigProject);
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertTrue(run.output().contains("'exampleOrg/example_module_static_code_analyzer:1' in [rule] "
+                    + "of "), run.output());
+            Assert.assertTrue(run.output().contains(" is not a rule of ballerina/"), run.output());
+
+            Files.writeString(shared, """
+                    [rule]
+                    exclude = ["ballerina:999"]
+                    """);
+            run = scan(gateConfigProject);
+            Assert.assertEquals(run.exitCode(), 1, run.output());
+            Assert.assertTrue(run.errorReport().contains("error: unknown rule 'ballerina:999'; it is not a rule of "
+                    + "the scan tool"), run.output());
+            Assert.assertFalse(run.output().contains("Running Scans"), run.output());
+        } finally {
+            Files.writeString(ballerinaToml, original);
+            Files.deleteIfExists(shared);
+        }
+    }
+
+    @Test(description = "test a workspace package scanned on its own with the workspace Scan.toml fails on an "
+            + "unknown core rule and only warns about an analyzer rule it lacks")
+    void testWorkspaceRuleForPackageScannedAlone() throws IOException {
+        Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
+        String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        try {
+            Files.delete(packageScanToml);
+            writeWorkspaceScanToml("""
+                    [rule]
+                    exclude = ["ballerina:999"]
+                    """);
+            // Loaded on its own, the package finds the workspace file from its root, as in the editor
+            Path packageRoot = gatedWorkspace.resolve("pkg-a");
+            String failure = scanAlone(packageRoot);
+            Assert.assertNotNull(failure, readOutput(true));
+            Assert.assertTrue(failure.contains("error: unknown rule 'ballerina:999'; it is not a rule of the scan "
+                    + "tool"), failure);
+
+            writeWorkspaceScanToml("""
+                    [rule]
+                    exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
+                    """);
+            failure = scanAlone(packageRoot);
+            String output = readOutput(true);
+            Assert.assertNull(failure, output);
+            Assert.assertTrue(output.contains("is not a rule of ballerina/pkg_a"), output);
+        } finally {
+            Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
+            Files.writeString(packageScanToml, original);
+        }
+    }
+
+    @Test(description = "test a configPath to the workspace Scan.toml is checked as the workspace file")
+    void testConfigPathToWorkspaceScanToml() throws IOException {
+        Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
+        String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        Path ballerinaToml = gatedWorkspace.resolve("pkg-a").resolve("Ballerina.toml");
+        String originalBallerinaToml = Files.readString(ballerinaToml, StandardCharsets.UTF_8);
+        Path otherScanToml = gatedWorkspace.resolve("pkg-b").resolve("Scan.toml");
+        String otherOriginal = Files.readString(otherScanToml, StandardCharsets.UTF_8);
+        Path analyzerImport = gatedWorkspace.resolve("pkg-b").resolve("analyzer_import.bal");
+        try {
+            Files.delete(packageScanToml);
+            Files.writeString(ballerinaToml, originalBallerinaToml + "\n[scan]\nconfigPath = \"../Scan.toml\"\n");
+            Files.delete(otherScanToml);
+            Files.writeString(analyzerImport, ANALYZER_IMPORT);
+            writeWorkspaceScanToml("""
+                    [rule]
+                    exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
+                    """);
+            ScanRun run = scan(gatedWorkspace);
+            Assert.assertEquals(run.exitCode(), 0, run.output());
+            Assert.assertTrue(run.output().contains("is not a rule of pkg-a"), run.output());
+        } finally {
+            Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
+            Files.deleteIfExists(analyzerImport);
+            Files.writeString(ballerinaToml, originalBallerinaToml);
+            Files.writeString(packageScanToml, original);
+            Files.writeString(otherScanToml, otherOriginal);
         }
     }
 
@@ -677,8 +903,15 @@ public class GateTest extends BaseTest {
     void testUnavailableWorkspaceRuleWithRuleOption() throws IOException {
         Path packageScanToml = gatedWorkspace.resolve("pkg-a").resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
+        Path otherScanToml = gatedWorkspace.resolve("pkg-b").resolve("Scan.toml");
+        String otherOriginal = Files.readString(otherScanToml, StandardCharsets.UTF_8);
+        Path analyzerImport = gatedWorkspace.resolve("pkg-b").resolve("analyzer_import.bal");
         try {
             Files.delete(packageScanToml);
+            // Both packages use the workspace file, and only pkg-b imports the analyzer, so its rules in the
+            // workspace file are valid and pkg-a is warned about
+            Files.delete(otherScanToml);
+            Files.writeString(analyzerImport, ANALYZER_IMPORT);
             writeWorkspaceScanToml("""
                     [rule]
                     exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
@@ -690,7 +923,9 @@ public class GateTest extends BaseTest {
                     + "analyzer:1' in [rule] of Scan.toml is not a rule of pkg-a\n"), run.output());
         } finally {
             Files.deleteIfExists(gatedWorkspace.resolve("Scan.toml"));
+            Files.deleteIfExists(analyzerImport);
             Files.writeString(packageScanToml, original);
+            Files.writeString(otherScanToml, otherOriginal);
         }
     }
 
@@ -838,6 +1073,20 @@ public class GateTest extends BaseTest {
         Assert.assertTrue(error.contains("View scan results at:"), error);
         Assert.assertTrue(error.trim().endsWith("issues at or above LOW, limit 1 (HIGH: 1, MEDIUM: 2, LOW: 3)"),
                 error);
+    }
+
+    // Scans a workspace package loaded without its workspace, and returns the failure, or null
+    private String scanAlone(Path packageRoot) {
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", packageRoot.toString());
+        try {
+            new ScanCmd(printStream, printStream).executeProject(BuildProject.load(packageRoot));
+            return null;
+        } catch (ScanFailure failure) {
+            return String.join("\n", failure.reportLines());
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
     }
 
     private ScanRun scan(Path project, String... args) throws IOException {
