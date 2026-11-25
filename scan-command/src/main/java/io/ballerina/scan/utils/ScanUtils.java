@@ -177,6 +177,7 @@ public final class ScanUtils {
      */
     public static final String GATE_COUNT_VALUES = "a whole number of 1 or more";
 
+    private static final String PLATFORM_NAME_VALUES = "a platform name, such as \"sonarqube\"";
     private static final String RULE_LIST_VALUES = "an array of rule IDs, such as [\"ballerina:1\"]";
     // The top-level tables of a Scan.toml file, each written as it is expected
     private static final Map<String, String> TOP_LEVEL_TABLES = tableForms(List.of(ANALYZER_TABLE, PLATFORM_TABLE),
@@ -1353,34 +1354,30 @@ public final class ScanUtils {
     }
 
     /**
-     * Loads a platform to the {@link ScanTomlFile} representation of the Scan.toml file. A platform without a name or
-     * a path is skipped.
+     * Loads a platform to the {@link ScanTomlFile} representation of the Scan.toml file, adding an error for a
+     * platform without a name. A platform without a path is recorded as such, since it fails only when it is selected.
      *
      * @param scanTomlFile the in-memory representation of the Scan.toml file
      * @param baseDir      the directory relative paths are resolved against
      */
     private static void loadPlatform(Toml platformTable, ScanTomlFile scanTomlFile, Path baseDir,
                                      List<ConfigError> errors) {
-        // A name or path of another type would otherwise read as missing
+        // Past these checks, the name is a non-blank string and the path is a string or missing
         int errorCount = errors.size();
-        checkStringEntry(platformTable, PLATFORM_NAME, "a platform name, such as \"sonarqube\"", errors);
+        checkStringEntry(platformTable, PLATFORM_NAME, PLATFORM_NAME_VALUES, errors);
         checkStringEntry(platformTable, PLATFORM_PATH, "the path or URL of the plugin JAR", errors);
+        checkPlatformName(platformTable, errors);
         if (errors.size() > errorCount) {
             return;
         }
         Map<String, Object> properties = platformTable.toMap();
-        Object platformName = properties.remove(PLATFORM_NAME);
-        Optional<String> name = (platformName instanceof String) ? Optional.of(platformName.toString())
-                : Optional.empty();
+        String name = (String) properties.remove(PLATFORM_NAME);
         Object platformPath = properties.remove(PLATFORM_PATH);
         Optional<String> path = (platformPath instanceof String) ? Optional.of(platformPath.toString())
                 : Optional.empty();
 
-        if (name.isEmpty() || name.get().isEmpty()) {
-            return;
-        }
         if (path.isEmpty()) {
-            scanTomlFile.addPlatformWithoutPath(name.get());
+            scanTomlFile.addPlatformWithoutPath(name);
             return;
         }
 
@@ -1400,8 +1397,23 @@ public final class ScanUtils {
             }
         }
 
-        ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name.get(), jarPath, properties);
+        ScanTomlFile.Platform platform = new ScanTomlFile.Platform(name, jarPath, properties);
         scanTomlFile.setPlatform(platform);
+    }
+
+    /**
+     * Adds an error for a platform whose name is missing or blank, since --platforms could never select it, and a
+     * misspelled key such as {@code nmae} would otherwise leave the platform out without notice.
+     */
+    private static void checkPlatformName(Toml platformTable, List<ConfigError> errors) {
+        TopLevelNode nameNode = platformTable.rootNode().entries().get(PLATFORM_NAME);
+        if (nameNode == null) {
+            errors.add(new ConfigError(platformTable.rootNode().location().lineRange(),
+                    DiagnosticLog.error(DiagnosticCode.PLATFORM_NAME_MISSING)));
+        } else if (nameNode instanceof TomlKeyValueNode keyValue && keyValue.value().kind() == TomlType.STRING
+                && keyValue.value().toNativeValue().toString().isBlank()) {
+            errors.add(invalidConfigValue(keyValue.value(), PLATFORM_NAME, PLATFORM_NAME_VALUES));
+        }
     }
 
     /**
