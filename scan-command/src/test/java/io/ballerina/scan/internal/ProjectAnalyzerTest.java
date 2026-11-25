@@ -26,25 +26,30 @@ import io.ballerina.projects.Project;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.scan.BaseTest;
 import io.ballerina.scan.Issue;
+import io.ballerina.scan.Reporter;
 import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
+import io.ballerina.scan.ScannerContext;
 import io.ballerina.scan.Source;
 import io.ballerina.scan.utils.ScanTomlFile;
 import io.ballerina.scan.utils.ScanToolException;
 import io.ballerina.scan.utils.ScanUtils;
 import io.ballerina.tools.diagnostics.Diagnostic;
+import io.ballerina.tools.diagnostics.Location;
 import io.ballerina.tools.text.LineRange;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static io.ballerina.scan.TestConstants.LINUX_LINE_SEPARATOR;
 import static io.ballerina.scan.TestConstants.WINDOWS_LINE_SEPARATOR;
+import static io.ballerina.scan.utils.Constants.IMPORT_GENERATOR_FILE;
 
 /**
  * Project analyzer tests.
@@ -55,16 +60,18 @@ public class ProjectAnalyzerTest extends BaseTest {
     private final Project project = BuildProject.load(testResources.resolve("test-resources")
             .resolve("bal-project-with-config-file"));
     private ProjectAnalyzer projectAnalyzer = null;
+    private ScanTomlFile scanTomlFile = null;
 
     @BeforeMethod
     void initializeMethod() {
         System.setProperty("user.dir", project.sourceRoot().toString());
-        Optional<ScanTomlFile> scanTomlFile = ScanUtils.loadScanTomlConfigurations(project, printStream);
+        Optional<ScanTomlFile> loaded = ScanUtils.loadScanTomlConfigurations(project, printStream);
         System.setProperty("user.dir", userDir);
-        if (scanTomlFile.isEmpty()) {
+        if (loaded.isEmpty()) {
             throw new IllegalStateException("Failed to load scan toml file!");
         }
-        projectAnalyzer = new ProjectAnalyzer(project, scanTomlFile.get());
+        scanTomlFile = loaded.get();
+        projectAnalyzer = new ProjectAnalyzer(project, scanTomlFile);
     }
 
     @Test(description = "Test analyzing project with core analyzer")
@@ -133,6 +140,45 @@ public class ProjectAnalyzerTest extends BaseTest {
                 version = '0.1.0'
                 repository = 'local'
                 """));
+    }
+
+    @Test(description = "Test external analyzers report through a context whose Reporter is not the scan tool's own")
+    void testExternalAnalyzersWithAnyReporter() {
+        List<String> received = new ArrayList<>();
+        Reporter reporter = new Reporter() {
+            @Override
+            public void reportIssue(Document reportedDocument, Location location, int ruleId) {
+                received.add(reportedDocument.name() + ":" + ruleId);
+            }
+
+            @Override
+            public void reportIssue(Document reportedDocument, Location location, Rule rule) {
+                received.add(reportedDocument.name() + ":" + rule.id());
+            }
+        };
+        // A project of its own, as the other tests add the analyzer imports to the shared one
+        Project ownProject = BuildProject.load(project.sourceRoot());
+        ProjectAnalyzer analyzer = new ProjectAnalyzer(ownProject, scanTomlFile) {
+            @Override
+            protected ScannerContext getScannerContext(List<Rule> rules) {
+                return new ScannerContext() {
+                    @Override
+                    public Reporter getReporter() {
+                        return reporter;
+                    }
+                };
+            }
+        };
+        List<Issue> issues = analyzer.runExternalAnalyzers(analyzer.getExternalAnalyzers());
+        Assert.assertEquals(issues.stream().map(issue -> issue.rule().id()).sorted().toList(), List.of(
+                "ballerina/example_module_static_code_analyzer:1", "ballerinax/example_module_static_code_analyzer:1",
+                "exampleOrg/example_module_static_code_analyzer:1"));
+        // Every report also reaches the context's own reporter, including those in the generated import document
+        // that the scan leaves out
+        Assert.assertEquals(received.stream().filter(report -> report.startsWith("main.bal:")).count(), 3,
+                received.toString());
+        Assert.assertEquals(received.stream().filter(report -> report.startsWith(IMPORT_GENERATOR_FILE)).count(), 3,
+                received.toString());
     }
 
     private void assertIssue(Issue issue, String fileName, int startLine, int startOffset, int endLine,

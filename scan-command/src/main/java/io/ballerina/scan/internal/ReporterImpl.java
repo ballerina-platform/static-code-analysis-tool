@@ -56,11 +56,7 @@ public class ReporterImpl implements Reporter {
 
     @Override
     public void reportIssue(Document reportedDocument, Location location, int ruleId) {
-        Rule rule = rules.get(ruleId);
-        if (rule == null) {
-            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.RULE_NOT_FOUND, ruleId));
-        }
-        issues.add(createIssue(reportedDocument, location, rule));
+        issues.add(createIssue(reportedDocument, location, ruleId));
     }
 
     @Override
@@ -68,7 +64,22 @@ public class ReporterImpl implements Reporter {
         issues.add(createIssue(reportedDocument, location, rule));
     }
 
-    private Issue createIssue(Document reportedDocument, Location location, Rule rule) {
+    /**
+     * Creates the issue for a report without recording it, failing on a numeric rule ID the analyzer does not have.
+     */
+    protected Issue createIssue(Document reportedDocument, Location location, int ruleId) {
+        Rule rule = rules.get(ruleId);
+        if (rule == null) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.RULE_NOT_FOUND, ruleId));
+        }
+        return createIssue(reportedDocument, location, rule);
+    }
+
+    /**
+     * Creates the issue for a report without recording it, failing on a rule that cannot be written to the reports.
+     */
+    protected Issue createIssue(Document reportedDocument, Location location, Rule reportedRule) {
+        Rule rule = RuleImpl.of(reportedRule);
         String fullyQualifiedRuleId = rule.id();
         String[] parts = fullyQualifiedRuleId.split(":");
 
