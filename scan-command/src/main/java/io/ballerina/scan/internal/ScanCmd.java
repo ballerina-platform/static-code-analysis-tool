@@ -62,6 +62,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -97,6 +98,9 @@ public class ScanCmd implements BLauncherCmd {
     private static final String LIST_RULES_HINT = "  Run 'bal scan --list-rules' to see the available rules.";
     // The JSON report has been named both json and ballerina, and --help documents json
     private static final String JSON_FORMAT = "json";
+    // The value an option gets when it is written without one; a command-line argument cannot hold a NUL character
+    private static final String MISSING_VALUE = "\0";
+    private static final String RULE_IDS = "a comma-separated list of rule IDs";
 
     private final PrintStream outputStream;
     private final PrintStream errorStream;
@@ -109,6 +113,11 @@ public class ScanCmd implements BLauncherCmd {
     // Collects every positional argument, so that extra ones exit as a usage error instead of a launcher error
     @CommandLine.Parameters
     private List<String> targets = new ArrayList<>();
+
+    // Collects unknown options, so that they exit as a usage error instead of a launcher error. An option that takes a
+    // value has an optional arity with MISSING_VALUE as its fallback for the same reason.
+    @CommandLine.Unmatched
+    private List<String> unmatchedArgs = new ArrayList<>();
 
     @CommandLine.Spec
     private CommandLine.Model.CommandSpec spec;
@@ -123,29 +132,33 @@ public class ScanCmd implements BLauncherCmd {
             hidden = true)
     private boolean platformTriggered;
 
-    @CommandLine.Option(names = "--target-dir", description = "Target directory path")
+    @CommandLine.Option(names = "--target-dir", arity = "0..1", fallbackValue = MISSING_VALUE,
+            description = "Target directory path")
     private String targetDir;
 
     @CommandLine.Option(names = "--scan-report", description = "Enable HTML scan report generation")
     private boolean scanReport;
 
     // Validated when the command runs, so that an invalid value exits as a usage error
-    @CommandLine.Option(names = "--format",
+    @CommandLine.Option(names = "--format", arity = "0..1", fallbackValue = MISSING_VALUE,
             description = "Specify the format of the report (json/sarif). Default is json")
     private String format = ReportFormat.BALLERINA.getFormat();
 
     @CommandLine.Option(names = "--list-rules", description = "List the rules available in the Ballerina scan tool")
     private boolean listRules;
 
-    @CommandLine.Option(names = "--include-rules", converter = StringToListConverter.class,
+    @CommandLine.Option(names = "--include-rules", arity = "0..1", fallbackValue = MISSING_VALUE,
+            converter = StringToListConverter.class,
             description = "Specify the comma separated list of rules to include specific analysis issues")
     private List<String> includeRules = new ArrayList<>();
 
-    @CommandLine.Option(names = "--exclude-rules", converter = StringToListConverter.class,
+    @CommandLine.Option(names = "--exclude-rules", arity = "0..1", fallbackValue = MISSING_VALUE,
+            converter = StringToListConverter.class,
             description = "Specify the comma separated list of rules to exclude specific analysis issues")
     private List<String> excludeRules = new ArrayList<>();
 
-    @CommandLine.Option(names = "--platforms", converter = StringToListConverter.class,
+    @CommandLine.Option(names = "--platforms", arity = "0..1", fallbackValue = MISSING_VALUE,
+            converter = StringToListConverter.class,
             description = "Specify the comma separated list of static code analysis platforms to report issues")
     private List<String> platforms = new ArrayList<>();
 
@@ -161,11 +174,11 @@ public class ScanCmd implements BLauncherCmd {
             description = "Fail the scan when a @scan:Suppress annotation names no rule")
     private boolean requireSuppressionRuleId;
 
-    @CommandLine.Option(names = FAIL_ON_SEVERITY_OPTION,
+    @CommandLine.Option(names = FAIL_ON_SEVERITY_OPTION, arity = "0..1", fallbackValue = MISSING_VALUE,
             description = "Fail the scan on issues at or above the severity (BLOCKER/HIGH/MEDIUM/LOW/INFO/NONE)")
     private String failOnSeverity;
 
-    @CommandLine.Option(names = FAIL_ON_COUNT_OPTION,
+    @CommandLine.Option(names = FAIL_ON_COUNT_OPTION, arity = "0..1", fallbackValue = MISSING_VALUE,
             description = "Fail the scan when the number of issues at or above --fail-on-severity reaches the count")
     private String failOnCount;
 
@@ -359,6 +372,8 @@ public class ScanCmd implements BLauncherCmd {
      * Loads the target and scans it as a package or a single file.
      */
     private void run() {
+        // An unknown option or a missing value is a usage error even with --help, as the launcher made it before
+        failOnInvalidArguments();
         if (helpFlag) {
             StringBuilder builder = helpMessage();
             outputStream.println(builder);
@@ -378,14 +393,6 @@ public class ScanCmd implements BLauncherCmd {
      * Validates the command-line arguments, so that invalid input exits as a usage error before anything is loaded.
      */
     private void resolveOptions() {
-        if (excludeTestsOption != null && !isBoolean(excludeTestsOption) && isExcludeTestsWrittenAlone()) {
-            // picocli takes an unknown option after --exclude-tests as its value, so it is reported here instead
-            if (excludeTestsOption.startsWith("-")) {
-                throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.UNKNOWN_OPTION, excludeTestsOption));
-            }
-            targets.add(excludeTestsValuePosition(), excludeTestsOption);
-            excludeTestsOption = "true";
-        }
         if (targets.size() > 1) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_NUMBER_OF_ARGUMENTS, targets.size(),
                     String.join(" ", targets)));
@@ -428,8 +435,11 @@ public class ScanCmd implements BLauncherCmd {
         }
         if (failOnCount != null) {
             gateCount = ScanUtils.parseGateCount(failOnCount).orElseThrow(() -> ScanFailure.usage(
-                    DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, failOnCount, FAIL_ON_COUNT_OPTION,
-                            ScanUtils.GATE_COUNT_VALUES)));
+                    isPositiveWholeNumber(failOnCount)
+                            ? DiagnosticLog.error(DiagnosticCode.NUMBER_TOO_LARGE, failOnCount, FAIL_ON_COUNT_OPTION,
+                            Integer.MAX_VALUE)
+                            : DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, failOnCount,
+                            FAIL_ON_COUNT_OPTION, ScanUtils.GATE_COUNT_VALUES)));
         }
     }
 
@@ -1093,6 +1103,107 @@ public class ScanCmd implements BLauncherCmd {
         return optionSpec != null && optionSpec.arity().max > 0;
     }
 
+    /**
+     * Fails on the arguments picocli could not give to an option: an unknown option, or an option without its value.
+     */
+    private void failOnInvalidArguments() {
+        if (excludeTestsOption != null && !isBoolean(excludeTestsOption) && isExcludeTestsWrittenAlone()) {
+            // picocli takes an unknown option after --exclude-tests as its value, so it is reported here instead
+            if (excludeTestsOption.length() > 1 && excludeTestsOption.startsWith("-")) {
+                unmatchedArgs.add(excludeTestsOption);
+            } else {
+                targets.add(excludeTestsValuePosition(), excludeTestsOption);
+            }
+            excludeTestsOption = "true";
+        }
+        failOnUnknownOptions();
+        failOnMissingValues();
+    }
+
+    /**
+     * Fails on the options the command does not have, in the order they were written. picocli gives an unknown option
+     * that starts with a single dash, such as {@code -x}, as a target, so a target that looks like an option is one
+     * unless it was written after {@code --}. The targets after {@code --} are the last ones, so they are matched from
+     * the end.
+     */
+    private void failOnUnknownOptions() {
+        List<String> args = originalArgs();
+        int endOfOptions = args.indexOf("--");
+        int pathCount = endOfOptions < 0 ? 0 : args.size() - endOfOptions - 1;
+        List<String> unknownOptions = new ArrayList<>(unmatchedArgs);
+        for (int i = 0; i < targets.size() - pathCount; i++) {
+            String target = targets.get(i);
+            if (target.length() > 1 && target.startsWith("-")) {
+                unknownOptions.add(target);
+            }
+        }
+        unknownOptions.addAll(unknownOptionsTakenAsValues(args, endOfOptions < 0 ? args.size() : endOfOptions));
+        if (!unknownOptions.isEmpty()) {
+            List<String> inOrder = unknownOptions.stream().distinct()
+                    .sorted(Comparator.comparingInt(option -> writtenAt(args, option)))
+                    .toList();
+            throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.UNKNOWN_OPTION,
+                    joinWith(quoted(inOrder), "and"), inOrder.size()));
+        }
+    }
+
+    /**
+     * Returns the unknown long options written right after an option that takes a value, which picocli gives to that
+     * option as its value, such as {@code --bogus} in {@code --target-dir --bogus}. A value that starts with a single
+     * dash, such as {@code -1}, stays a value, and one written with {@code =} is always a value.
+     */
+    private List<String> unknownOptionsTakenAsValues(List<String> args, int endOfOptions) {
+        List<String> unknownOptions = new ArrayList<>();
+        for (int i = 0; i < endOfOptions - 1; i++) {
+            CommandLine.Model.OptionSpec option = spec.findOption(args.get(i));
+            String next = args.get(i + 1);
+            if (option != null && option.arity().max() > 0 && !EXCLUDE_TESTS_OPTION.equals(args.get(i))
+                    && next.startsWith("--") && spec.findOption(next.split("=", 2)[0]) == null) {
+                unknownOptions.add(next);
+            }
+        }
+        return unknownOptions;
+    }
+
+    private static int writtenAt(List<String> args, String argument) {
+        int index = args.indexOf(argument);
+        return index < 0 ? Integer.MAX_VALUE : index;
+    }
+
+    /**
+     * Fails on the first option written without its value.
+     */
+    private void failOnMissingValues() {
+        Map<String, String> missing = new LinkedHashMap<>();
+        addIfMissing(missing, MISSING_VALUE.equals(targetDir), "--target-dir", "a directory path");
+        addIfMissing(missing, MISSING_VALUE.equals(format), "--format", "json or sarif");
+        addIfMissing(missing, includeRules.contains(MISSING_VALUE), "--include-rules", RULE_IDS);
+        addIfMissing(missing, excludeRules.contains(MISSING_VALUE), "--exclude-rules", RULE_IDS);
+        addIfMissing(missing, platforms.contains(MISSING_VALUE), "--platforms",
+                "a comma-separated list of platform names");
+        addIfMissing(missing, MISSING_VALUE.equals(failOnSeverity), FAIL_ON_SEVERITY_OPTION, GateSeverity.VALUES);
+        addIfMissing(missing, MISSING_VALUE.equals(failOnCount), FAIL_ON_COUNT_OPTION, ScanUtils.GATE_COUNT_VALUES);
+        List<String> args = originalArgs();
+        missing.entrySet().stream()
+                .min(Comparator.comparingInt(entry -> writtenAt(args, entry.getKey())))
+                .ifPresent(entry -> {
+                    throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.MISSING_OPTION_VALUE, entry.getKey(),
+                            entry.getValue()));
+                });
+    }
+
+    private static void addIfMissing(Map<String, String> missing, boolean isMissing, String option,
+                                     String expected) {
+        if (isMissing) {
+            missing.put(option, expected);
+        }
+    }
+
+    // A positive whole number that parseGateCount rejects does not fit in an int
+    private static boolean isPositiveWholeNumber(String value) {
+        return value.trim().matches("\\+?0*[1-9]\\d*");
+    }
+
     private List<String> originalArgs() {
         CommandLine.ParseResult parseResult = spec == null ? null : spec.commandLine().getParseResult();
         return parseResult == null ? List.of() : parseResult.originalArgs();
@@ -1113,6 +1224,9 @@ public class ScanCmd implements BLauncherCmd {
     private static class StringToListConverter implements CommandLine.ITypeConverter<List<String>> {
         @Override
         public List<String> convert(String value) {
+            if (MISSING_VALUE.equals(value)) {
+                return List.of(MISSING_VALUE);
+            }
             return Arrays.stream(value.split(",", -1)).map(String::trim).toList();
         }
     }
