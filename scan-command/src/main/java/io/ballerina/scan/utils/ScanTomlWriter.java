@@ -19,6 +19,7 @@
 package io.ballerina.scan.utils;
 
 import io.ballerina.toml.api.Toml;
+import io.ballerina.tools.diagnostics.DiagnosticSeverity;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -100,7 +101,12 @@ public final class ScanTomlWriter {
             String content = Files.readString(scanTomlPath, StandardCharsets.UTF_8).trim();
             if (!content.isEmpty()) {
                 Toml toml = Toml.read(scanTomlPath);
-                TomlKeys.normalize(toml);
+                boolean hasSyntaxErrors = toml.diagnostics().stream()
+                        .anyMatch(diagnostic -> diagnostic.diagnosticInfo().severity() == DiagnosticSeverity.ERROR);
+                // Rewriting would drop what the parser could not read and the later of two duplicate definitions
+                if (!TomlKeys.normalize(toml).isEmpty() || hasSyntaxErrors) {
+                    throw new IOException("the file has errors; run 'bal scan' to list them");
+                }
                 tomlMap = deepMutableCopy(toml.toMap());
             }
         }

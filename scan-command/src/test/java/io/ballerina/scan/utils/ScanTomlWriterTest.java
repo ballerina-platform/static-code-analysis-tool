@@ -23,6 +23,7 @@ import io.ballerina.scan.BaseTest;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -164,6 +165,7 @@ public class ScanTomlWriterTest extends BaseTest {
                 path = "plugin.jar"
                 "sonar.host.url" = "http://localhost:9000"
                 'plain' = "x"
+                opts = { "sonar.x" = "y" }
                 """, StandardCharsets.UTF_8);
 
         ScanTomlWriter.addGlobalExclusion(scanTomlPath, "ballerina:2");
@@ -177,7 +179,39 @@ public class ScanTomlWriterTest extends BaseTest {
         // The parser does not keep the order of the keys of a [[platform]] table
         Assert.assertEquals(Set.of(content.substring(0, content.indexOf("\n\n")).split("\n")), Set.of(
                 "[[platform]]", "name = \"sonarqube\"", "path = \"plugin.jar\"",
-                "\"sonar.host.url\" = \"http://localhost:9000\"", "plain = \"x\""));
+                "\"sonar.host.url\" = \"http://localhost:9000\"", "plain = \"x\"",
+                "opts = { \"sonar.x\" = \"y\" }"));
+    }
+
+    @Test(description = "test a Scan.toml with errors is not rewritten", dataProvider = "scan-tomls-with-errors")
+    void testFileWithErrorsNotRewritten(String original) throws IOException {
+        Files.writeString(scanTomlPath, original, StandardCharsets.UTF_8);
+
+        IOException error = Assert.expectThrows(IOException.class,
+                () -> ScanTomlWriter.addGlobalExclusion(scanTomlPath, "ballerina:2"));
+
+        Assert.assertEquals(error.getMessage(), "the file has errors; run 'bal scan' to list them");
+        Assert.assertEquals(Files.readString(scanTomlPath, StandardCharsets.UTF_8), original);
+    }
+
+    @DataProvider(name = "scan-tomls-with-errors")
+    Object[][] scanTomlsWithErrors() {
+        return new Object[][]{
+                {"""
+                        [gate]
+                        failOnCount = 1
+
+                        ["gate"]
+                        failOnSeverity = "HIGH"
+                        """},
+                {"""
+                        [rule]
+                        exclude = ["ballerina:1"
+
+                        [gate]
+                        failOnCount = 1
+                        """},
+        };
     }
 
     @Test(description = "test adding exclusion with whitespace handling")
