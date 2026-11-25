@@ -186,12 +186,20 @@ public class ScanCmdTest extends BaseTest {
     @Test(description = "test scan command with single file project with single file as argument")
     void testScanCommandSingleFileProject() throws IOException {
         Path validBalProject = testResources.resolve("test-resources").resolve("valid-single-file-project");
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {validBalProject.resolve("main.bal").toString()};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-        String expected = "Running Scans";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        // A single file is saved in the current directory, so the scan runs in a temporary one
+        Path workDir = Files.createTempDirectory("single-file-scan");
+        System.setProperty("user.dir", workDir.toString());
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream);
+            String[] args = {validBalProject.resolve("main.bal").toString()};
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+            String expected = "Running Scans";
+            Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+        } finally {
+            System.setProperty("user.dir", userDir);
+            ProjectUtils.deleteDirectory(workDir);
+        }
     }
 
     @Test(description = "test scan command with single file project with project directory as argument")
@@ -552,28 +560,107 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertEquals(scanCmd.exitCode(), 3);
     }
 
-    @Test(description = "test scan command with target directory flag on single file project")
-    void testScanCommandWithTargetDirFlagOnSingleFileProject() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
-        Path singleFileProject = testResources.resolve("test-resources")
-                .resolve("valid-single-file-project").resolve("main.bal");
-        String[] args = {singleFileProject.toString(), "--target-dir=results"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-        String expected = getExpectedOutput("single-file-report-generation.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+    @Test(description = "test a relative --target-dir is resolved against the current directory")
+    void testRelativeTargetDirFromCurrentDirectory() throws IOException {
+        Path workDir = Files.createTempDirectory("target-dir").toRealPath();
+        System.setProperty("user.dir", workDir.toString());
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+            new CommandLine(scanCmd).parseArgs(validBalProject.toAbsolutePath().toString(), "--target-dir=out");
+            scanCmd.execute();
+            String output = readOutput(true);
+            Assert.assertEquals(scanCmd.exitCode(), 0, output);
+            Assert.assertTrue(Files.isRegularFile(workDir.resolve("out").resolve("report")
+                    .resolve("scan_results.json")), output);
+            Assert.assertFalse(Files.exists(validBalProject.resolve("out")), "not saved in the package: " + output);
+        } finally {
+            System.setProperty("user.dir", userDir);
+            ProjectUtils.deleteDirectory(workDir);
+        }
     }
 
-    @Test(description = "test scan command with scan report flag on single file project")
-    void testScanCommandWithScanReportFlagOnSingleFileProject() throws IOException {
-        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
-        Path singleFileProject = testResources.resolve("test-resources")
-                .resolve("valid-single-file-project").resolve("main.bal");
-        String[] args = {singleFileProject.toString(), "--scan-report"};
-        new CommandLine(scanCmd).parseArgs(args);
+    @Test(description = "test a single file is saved in the report directory of the current directory or --target-dir")
+    void testSingleFileReports() throws IOException {
+        Path workDir = Files.createTempDirectory("single-file-reports").toRealPath();
+        Path singleFile = Files.createDirectories(workDir.resolve("src")).resolve("main.bal");
+        Files.writeString(singleFile, """
+                public function main() {
+                    int value = checkpanic int:fromString("1");
+                }
+                """);
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", workDir.toString());
+        try {
+            String output = scanSingleFile(singleFile, "--scan-report");
+            Path report = workDir.resolve("report");
+            Assert.assertTrue(Files.isRegularFile(report.resolve("scan_results.json")), output);
+            Assert.assertTrue(output.contains("View scan results at:\n\t" + report.resolve("scan_results.json")
+                    .toUri()), output);
+            Assert.assertTrue(output.contains("View scan report at:\n\t" + report.resolve("index.html").toUri()),
+                    output);
+            JsonArray results = JsonParser.parseString(Files.readString(report.resolve("scan_results.json")))
+                    .getAsJsonArray();
+            Assert.assertEquals(results.size(), 1, output);
+            JsonObject location = results.get(0).getAsJsonObject().getAsJsonObject("location");
+            Assert.assertEquals(location.get("filePath").getAsString(), "main.bal", output);
+            Assert.assertEquals(location.get("startLine").getAsInt(), 2, output);
+            JsonObject scanData = readScanReportData(report.resolve("index.html"));
+            Assert.assertEquals(scanData.get("projectName").getAsString(), "main.bal", output);
+            JsonObject scannedFile = scanData.getAsJsonArray("scannedFiles").get(0).getAsJsonObject();
+            Assert.assertEquals(scannedFile.get("relativePath").getAsString(), "main.bal", output);
+            Assert.assertEquals(scannedFile.getAsJsonArray("issues").size(), 1, output);
+
+            output = scanSingleFile(singleFile, "--target-dir=out", "--format=sarif");
+            Assert.assertTrue(Files.isRegularFile(workDir.resolve("out").resolve("report")
+                    .resolve("scan_results.sarif")), output);
+            Assert.assertFalse(Files.exists(singleFile.resolveSibling("out")), output);
+        } finally {
+            System.setProperty("user.dir", userDir);
+            ProjectUtils.deleteDirectory(workDir);
+        }
+    }
+
+    @Test(description = "test a single file scanned through the API is saved only to a given target directory, "
+            + "resolved against the folder of the file")
+    void testSingleFileReportsThroughApi() throws IOException {
+        Path workDir = Files.createTempDirectory("single-file-api-reports").toRealPath();
+        Path singleFile = Files.createDirectories(workDir.resolve("src")).resolve("main.bal");
+        Files.writeString(singleFile, """
+                public function main() {
+                    int value = checkpanic int:fromString("1");
+                }
+                """);
+        String userDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", workDir.toString());
+        try {
+            scanSingleFileThroughApi(singleFile, null);
+            Assert.assertFalse(Files.exists(workDir.resolve("report")), readOutput(true));
+
+            scanSingleFileThroughApi(singleFile, "out");
+            Assert.assertTrue(Files.isRegularFile(singleFile.resolveSibling("out").resolve("report")
+                    .resolve("scan_results.json")), readOutput(true));
+        } finally {
+            System.setProperty("user.dir", userDir);
+            ProjectUtils.deleteDirectory(workDir);
+        }
+    }
+
+    private void scanSingleFileThroughApi(Path singleFile, String targetDir) throws IOException {
+        ScanCmd scanCmd = new ScanCmd(singleFile, printStream, false, false, targetDir, false, null, false,
+                List.of(), List.of(), List.of());
         scanCmd.execute();
-        String expected = getExpectedOutput("single-file-scan-report-generation.txt");
-        Assert.assertEquals(readOutput(true).trim(), expected);
+        Assert.assertEquals(scanCmd.exitCode(), 0, readOutput(true));
+    }
+
+    private String scanSingleFile(Path singleFile, String... options) throws IOException {
+        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+        List<String> args = new ArrayList<>(List.of(singleFile.toString()));
+        args.addAll(List.of(options));
+        new CommandLine(scanCmd).parseArgs(args.toArray(String[]::new));
+        scanCmd.execute();
+        String output = readOutput(true);
+        Assert.assertEquals(scanCmd.exitCode(), 0, output);
+        return output;
     }
 
     @Test(description = "test method for sorting static code analysis rules in specified order",
@@ -952,101 +1039,99 @@ public class ScanCmdTest extends BaseTest {
         Assert.assertFalse(Files.exists(ballerinaProject.resolve("analysis-issues.json")), output);
     }
 
-    @Test(description = "test scan command with valid json format flag")
-    void testScanCommandWithValidJsonFormatFlag() throws IOException {
-        System.setProperty("user.dir", validBalProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--format=json"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-
-        System.setProperty("user.dir", userDir);
-        String expected = "Running Scans";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
-        Path jsonReport = validBalProject.resolve("target").resolve("report").resolve("scan_results.json");
-        Assert.assertTrue(Files.exists(jsonReport), "JSON report file should be created");
+    @Test(description = "test --report saves each selected report, and standard output stays JSON")
+    void testReportOption() throws IOException {
+        Path out = Files.createTempDirectory("reports").toRealPath();
+        try {
+            String output = scanValidProject(0, "--report=json,SARIF", "--report=html", "--target-dir=" + out);
+            Path report = out.resolve("report");
+            for (String file : List.of("scan_results.json", "scan_results.sarif", "index.html")) {
+                Assert.assertTrue(Files.isRegularFile(report.resolve(file)), file + ": " + output);
+            }
+            Assert.assertTrue(output.contains("View scan results at:\n\t" + report.resolve("scan_results.json").toUri()
+                    + "\n\t" + report.resolve("scan_results.sarif").toUri() + "\n"), output);
+            Assert.assertTrue(output.contains("View scan report at:\n\t" + report.resolve("index.html").toUri()),
+                    output);
+            Assert.assertFalse(output.contains("\"version\": \"2.1.0\""), "standard output is JSON: " + output);
+            Assert.assertFalse(output.contains("warning"), output);
+        } finally {
+            ProjectUtils.deleteDirectory(out);
+        }
     }
 
-    @Test(description = "test scan command with valid ballerina format flag")
-    void testScanCommandWithValidBallerinaFormatFlag() throws IOException {
-        System.setProperty("user.dir", validBalProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--format=ballerina"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
+    @Test(description = "test --report=html saves only the HTML report, and --report=sarif still prints JSON")
+    void testHtmlAndSarifReports() throws IOException {
+        Path out = Files.createTempDirectory("reports").toRealPath();
+        try {
+            String output = scanValidProject(0, "--report=html", "--target-dir=" + out);
+            Path report = out.resolve("report");
+            Assert.assertTrue(Files.isRegularFile(report.resolve("index.html")), output);
+            Assert.assertFalse(Files.exists(report.resolve("scan_results.json")), output);
+            Assert.assertFalse(Files.exists(report.resolve("scan_results.sarif")), output);
+            Assert.assertFalse(output.contains("View scan results at:"), output);
 
-        System.setProperty("user.dir", userDir);
-        String expected = "Running Scans";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
-        Path jsonReport = validBalProject.resolve("target").resolve("report").resolve("scan_results.json");
-        Assert.assertTrue(Files.exists(jsonReport), "JSON report file should be created");
+            output = scanValidProject(0, "--report=sarif", "--target-dir=" + out);
+            Assert.assertTrue(Files.isRegularFile(report.resolve("scan_results.sarif")), output);
+            Assert.assertFalse(output.contains("\"version\": \"2.1.0\""), "standard output is JSON: " + output);
+        } finally {
+            ProjectUtils.deleteDirectory(out);
+        }
     }
 
-    @Test(description = "test scan command with valid sarif format flag")
-    void testScanCommandWithValidSarifFormatFlag() throws IOException {
-        System.setProperty("user.dir", validBalProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--format=sarif"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
+    @Test(description = "test the deprecated --format and --scan-report still work, with a warning naming the "
+            + "replacement")
+    void testDeprecatedReportOptions() throws IOException {
+        Path out = Files.createTempDirectory("reports").toRealPath();
+        try {
+            String output = scanValidProject(0, "--format=SARIF", "--scan-report", "--target-dir=" + out);
+            Path report = out.resolve("report");
+            Assert.assertTrue(Files.isRegularFile(report.resolve("scan_results.sarif")), output);
+            Assert.assertTrue(Files.isRegularFile(report.resolve("index.html")), output);
+            Assert.assertFalse(Files.exists(report.resolve("scan_results.json")), output);
+            Assert.assertTrue(output.contains("\"version\": \"2.1.0\""), "--format=sarif still prints SARIF: "
+                    + output);
+            Assert.assertTrue(output.contains("bal scan: warning: --format=SARIF is deprecated and will be removed; "
+                    + "use --report=sarif instead\n"), output);
+            Assert.assertTrue(output.contains("bal scan: warning: --scan-report is deprecated and will be removed; "
+                    + "use --report=sarif,html instead\n"), output);
 
-        System.setProperty("user.dir", userDir);
-        String expected = "Running Scans";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
-        Path sarifReport = validBalProject.resolve("target").resolve("report").resolve("scan_results.sarif");
-        Assert.assertTrue(Files.exists(sarifReport), "SARIF report file should be created");
+            output = scanValidProject(0, "--format=ballerina", "--target-dir=" + out);
+            Assert.assertTrue(output.contains("bal scan: warning: --format=ballerina is deprecated and will be "
+                    + "removed; use --report=json instead\n"), output);
+        } finally {
+            ProjectUtils.deleteDirectory(out);
+        }
     }
 
-    @Test(description = "test scan command with invalid format flag")
-    void testScanCommandWithInvalidFormatFlag() throws IOException {
-        System.setProperty("user.dir", validBalProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream, printStream);
-        String[] args = {"--format=xml"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-        System.setProperty("user.dir", userDir);
-        Assert.assertEquals(readOutput(true).trim(), """
-                bal scan: error: invalid value 'xml' for --format; expected json or sarif
-                """ + UsageHintTestUtils.usageHint());
-        Assert.assertEquals(scanCmd.exitCode(), 2);
+    @Test(description = "test invalid report options are usage errors", dataProvider = "invalid-report-options")
+    void testInvalidReportOptions(String[] args, String message) throws IOException {
+        String output = scanValidProject(2, args);
+        Assert.assertEquals(output.trim(), "bal scan: error: " + message + "\n" + UsageHintTestUtils.usageHint());
     }
 
-    @Test(description = "test scan command with format flag case insensitive")
-    void testScanCommandWithFormatFlagCaseInsensitive() throws IOException {
-        System.setProperty("user.dir", validBalProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--format=BALLERINA"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-
-        System.setProperty("user.dir", userDir);
-        String expected = "Running Scans";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
-        System.setProperty("user.dir", validBalProject.toString());
-        scanCmd = new ScanCmd(printStream);
-        String[] sarifArgs = {"--format=SARIF"};
-        new CommandLine(scanCmd).parseArgs(sarifArgs);
-        scanCmd.execute();
-        System.setProperty("user.dir", userDir);
-        expected = "Running Scans";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
+    @DataProvider(name = "invalid-report-options")
+    Object[][] invalidReportOptions() {
+        return new Object[][]{
+                {new String[]{"--report=xml"}, "invalid value 'xml' for --report; expected json, sarif or html"},
+                {new String[]{"--report=json,"}, "invalid value '' for --report; expected json, sarif or html"},
+                {new String[]{"--format=xml"}, "invalid value 'xml' for --format; expected json or sarif"},
+                {new String[]{"--format=sarif", "--report=sarif"}, "--format is deprecated and cannot be combined "
+                        + "with --report; use --report alone"},
+        };
     }
 
-    @Test(description = "test scan command with format flag combined with target-dir")
-    void testScanCommandWithFormatFlagAndTargetDir() throws IOException {
+    private String scanValidProject(int exitCode, String... args) throws IOException {
         System.setProperty("user.dir", validBalProject.toString());
-        ScanCmd scanCmd = new ScanCmd(printStream);
-        String[] args = {"--format=sarif", "--target-dir=custom-results"};
-        new CommandLine(scanCmd).parseArgs(args);
-        scanCmd.execute();
-
-        System.setProperty("user.dir", userDir);
-        String expected = "Running Scans";
-        Assert.assertEquals(readOutput(true).trim().split("\n")[0], expected);
-        Path sarifReport = validBalProject.resolve("custom-results").resolve("report")
-                .resolve("scan_results.sarif");
-        Assert.assertTrue(Files.exists(sarifReport), "SARIF report file should be created in custom directory");
-        removeFile(validBalProject.resolve("custom-results"));
+        try {
+            ScanCmd scanCmd = new ScanCmd(printStream, printStream);
+            new CommandLine(scanCmd).parseArgs(args);
+            scanCmd.execute();
+            String output = readOutput(true);
+            Assert.assertEquals(scanCmd.exitCode(), exitCode, output);
+            return output;
+        } finally {
+            System.setProperty("user.dir", userDir);
+        }
     }
 
     @Test(description = "test scan command with a project containing compilation errors")

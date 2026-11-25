@@ -80,8 +80,8 @@ public enum DiagnosticCode {
     UNKNOWN_CONFIG_ENTRY("STATIC_ANALYSIS_ERROR_054", "unknown.config.entry"),
     INVALID_PLATFORM_LIST("STATIC_ANALYSIS_ERROR_055", "invalid.platform.list"),
     PLATFORM_PATH_MISSING("STATIC_ANALYSIS_ERROR_056", "platform.path.missing"),
-    REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_001", "report.not.supported"),
-    SCAN_REPORT_NOT_SUPPORTED("STATIC_ANALYSIS_WARNING_002", "scan.report.not.supported"),
+    REPORT_DIR_CONFLICT("STATIC_ANALYSIS_ERROR_065", "report.dir.conflict"),
+    DEPRECATED_OPTION_CONFLICT("STATIC_ANALYSIS_ERROR_066", "deprecated.option.conflict"),
     UNMATCHED_SUPPRESSION("STATIC_ANALYSIS_WARNING_003", "unmatched.suppression"),
     UNMATCHED_BLANKET_SUPPRESSION("STATIC_ANALYSIS_WARNING_004", "unmatched.blanket.suppression"),
     UNKNOWN_RULE_PROVIDER("STATIC_ANALYSIS_WARNING_006", "unknown.rule.provider"),
@@ -95,7 +95,8 @@ public enum DiagnosticCode {
     WORKSPACE_RULE_NOT_AVAILABLE("STATIC_ANALYSIS_WARNING_014", "workspace.rule.not.available"),
     PLATFORM_NOT_DECLARED("STATIC_ANALYSIS_WARNING_015", "platform.not.declared"),
     SCAN_FILE_OVERRIDDEN("STATIC_ANALYSIS_WARNING_016", "scan.file.overridden"),
-    PLATFORM_PATH_MISSING_SKIPPED("STATIC_ANALYSIS_WARNING_017", "platform.path.missing.skipped");
+    PLATFORM_PATH_MISSING_SKIPPED("STATIC_ANALYSIS_WARNING_017", "platform.path.missing.skipped"),
+    DEPRECATED_OPTION("STATIC_ANALYSIS_WARNING_018", "deprecated.option");
 
     private final String diagnosticId;
     private final String messageKey;

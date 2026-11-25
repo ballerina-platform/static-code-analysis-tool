@@ -17,18 +17,18 @@ DESCRIPTION
 
 OPTIONS
         --target-dir=<path>
-                Target directory path for saving analysis reports (only for Ballerina projects).
-                Default is the target directory of the package, or in a workspace, of each
-                package and of the workspace. A relative path is resolved against the package
-                root, and the results are saved in <path>/report. In a workspace, each package
-                saves its results in <path>/report under its own root, and the combined results
-                are saved in <path>/report under the workspace root.
+                Target directory path for saving analysis reports. The results are saved in
+                <path>/report. Default is the target directory of the package or workspace, or the
+                current directory for a single Ballerina file. A relative path is resolved against
+                the current directory. In a workspace, it is one directory for every package: the
+                combined results are saved in <path>/report and the results of each package in
+                <path>/<package path>/report.
 
-        --scan-report
-                Generate an HTML report containing the analysis results (only for Ballerina projects).
-
-        --format=<json|sarif>
-                Specify the format of the report. Default is json.
+        --report=<json|sarif|html>[,...]
+                Reports to save in <target-dir>/report: scan_results.json, scan_results.sarif or
+                index.html, the HTML report. Can be given more than once. Default is json.
+                The issues printed to standard output are always JSON. Replaces the
+                deprecated --format and --scan-report.
 
         --list-rules
                 List the rules available to the workspace, package or source file, along with
@@ -85,21 +85,22 @@ EXAMPLES
         console, and save results in JSON file format in the target directory.
                 $ bal scan
 
-        Run analysis against a standalone Ballerina file and print results to the console. The
-        file path of the Ballerina file can be relative or absolute.
+        Run analysis against a standalone Ballerina file, print results to the console and save
+        them in the report directory of the current directory. The file path of the Ballerina
+        file can be relative or absolute.
                 $ bal scan main.bal
 
         Run analysis and save analysis results in a specified directory.
                 $ bal scan --target-dir="results"
 
-        Run analysis and generate an HTML report in the target directory.
-                $ bal scan --scan-report
+        Run analysis and save the JSON results and the HTML report in the target directory.
+                $ bal scan --report=json,html
 
-        Run analysis and generate report in JSON format (default).
-                $ bal scan --format=json
+        Run analysis and save the results in SARIF format, for example for code scanning.
+                $ bal scan --report=sarif
 
-        Run analysis and generate report in SARIF format.
-                $ bal scan --format=sarif
+        Run analysis and save the results in SARIF format and the HTML report in one run.
+                $ bal scan --report=sarif,html
 
         View the rules available to the current package.
                 $ bal scan --list-rules

@@ -68,6 +68,7 @@ import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -76,12 +77,14 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -110,7 +113,9 @@ public class ScanCmd implements BLauncherCmd {
     private static final String FAIL_ON_SEVERITY_OPTION = "--fail-on-severity";
     private static final String FAIL_ON_COUNT_OPTION = "--fail-on-count";
     private static final String EXCLUDE_TESTS_OPTION = "--exclude-tests";
+    private static final String REPORT_OPTION = "--report";
     private static final String LIST_RULES_HINT = "  Run 'bal scan --list-rules' to see the available rules.";
+    private static final String EXTERNAL_PACKAGES_DIR = "_external";
 
     private final PrintStream outputStream;
     private final PrintStream errorStream;
@@ -139,14 +144,23 @@ public class ScanCmd implements BLauncherCmd {
 
     @CommandLine.Option(names = "--target-dir", description = "Target directory path")
     private String targetDir;
-
-    @CommandLine.Option(names = "--scan-report", description = "Enable HTML scan report generation")
-    private boolean scanReport;
+    // A --target-dir on the command line is resolved against the current directory. One given to the API constructor
+    // is resolved against the root of a package or workspace, and against the folder of a single file
+    private boolean targetDirFromCommandLine = true;
 
     // Validated when the command runs, so that an invalid value exits as a usage error
-    @CommandLine.Option(names = "--format",
+    @CommandLine.Option(names = REPORT_OPTION, converter = StringToListConverter.class,
+            description = "Specify the comma separated list of reports to save (json/sarif/html). Default is json")
+    private List<String> reportOptions = new ArrayList<>();
+
+    // Deprecated for --report=html, and hidden from the help
+    @CommandLine.Option(names = "--scan-report", hidden = true, description = "Enable HTML scan report generation")
+    private boolean scanReport;
+
+    // Deprecated for --report, and hidden from the help
+    @CommandLine.Option(names = "--format", hidden = true,
             description = "Specify the format of the report (json/sarif). Default is json")
-    private String format = ReportFormat.BALLERINA.getFormat();
+    private String format;
 
     @CommandLine.Option(names = "--list-rules", description = "List the rules available in the Ballerina scan tool")
     private boolean listRules;
@@ -198,7 +212,10 @@ public class ScanCmd implements BLauncherCmd {
     private final List<Issue> workspaceConsoleIssues = new ArrayList<>();
     private boolean printWorkspaceIssues;
     private boolean scanningWorkspace;
-    private ReportFormat reportFormat = ReportFormat.BALLERINA;
+    // The format of the issues printed to standard output: JSON, or SARIF only with the deprecated --format=sarif
+    private ReportFormat reportFormat = ReportFormat.JSON;
+    // The reports saved in the report directory, kept in the order of Report whatever the order --report gives
+    private final Set<Report> reports = new TreeSet<>();
     private GateSeverity gateSeverity;
     private Integer gateCount;
     // The defaults of the packages of a workspace, read once for all of them; null when the workspace has none
@@ -207,6 +224,8 @@ public class ScanCmd implements BLauncherCmd {
     private final Set<String> printedWarnings = new HashSet<>();
     // The sources each package is scanned with, keyed by its root, for the workspace HTML report
     private final Map<Path, AnalyzedSources> packageSources = new HashMap<>();
+    // The directory of each workspace package's results under --target-dir, keyed by its root
+    private final Map<Path, Path> packageReportDirs = new HashMap<>();
     // Each platform JAR is downloaded and loaded once for every package, and its loader is closed at the end
     private final Map<String, Path> platformJars = new HashMap<>();
     private final Map<Path, URLClassLoader> platformLoaders = new LinkedHashMap<>();
@@ -268,9 +287,12 @@ public class ScanCmd implements BLauncherCmd {
         this.helpFlag = helpFlag;
         this.platformTriggered = platformTriggered;
         this.targetDir = targetDir;
-        this.scanReport = scanReport;
-        this.reportFormat = format == null ? ReportFormat.BALLERINA : format;
-        this.format = this.reportFormat.getFormat();
+        this.targetDirFromCommandLine = false;
+        this.reportFormat = format == ReportFormat.SARIF ? ReportFormat.SARIF : ReportFormat.JSON;
+        this.reports.add(this.reportFormat == ReportFormat.SARIF ? Report.SARIF : Report.JSON);
+        if (scanReport) {
+            this.reports.add(Report.HTML);
+        }
         this.listRules = listRules;
         this.includeRules.addAll(includeRules.stream().map(Rule::id).toList());
         this.excludeRules.addAll(excludeRules.stream().map(Rule::id).toList());
@@ -455,6 +477,15 @@ public class ScanCmd implements BLauncherCmd {
         if (!platforms.isEmpty() && isStandaloneBalFile()) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.PLATFORMS_NOT_SUPPORTED));
         }
+        if (targetDir != null && targetDirFromCommandLine) {
+            try {
+                targetDir = Paths.get(System.getProperty(ProjectConstants.USER_DIR)).resolve(targetDir)
+                        .toAbsolutePath().normalize().toString();
+            } catch (InvalidPathException ex) {
+                throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, targetDir,
+                        "--target-dir", "a directory path"));
+            }
+        }
         if (excludeTestsOption != null) {
             if (!excludeTestsOption.equalsIgnoreCase("true") && !excludeTestsOption.equalsIgnoreCase("false")) {
                 throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, excludeTestsOption,
@@ -462,11 +493,7 @@ public class ScanCmd implements BLauncherCmd {
             }
             excludeTests = Boolean.parseBoolean(excludeTestsOption);
         }
-        try {
-            reportFormat = ReportFormat.fromString(format);
-        } catch (IllegalArgumentException ex) {
-            throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_FORMAT, format));
-        }
+        resolveReports();
         if (!includeRules.isEmpty() && !excludeRules.isEmpty()) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.ATTEMPT_TO_INCLUDE_AND_EXCLUDE));
         }
@@ -479,6 +506,42 @@ public class ScanCmd implements BLauncherCmd {
             gateCount = ScanUtils.parseGateCount(failOnCount).orElseThrow(() -> ScanFailure.usage(
                     DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, failOnCount, FAIL_ON_COUNT_OPTION,
                             ScanUtils.GATE_COUNT_VALUES)));
+        }
+    }
+
+    /**
+     * Selects the reports to save. The deprecated --format and --scan-report are mapped to --report, with a warning
+     * that names the replacement; --format=sarif still prints SARIF to standard output until it is removed.
+     */
+    private void resolveReports() {
+        if (format != null) {
+            if (!reportOptions.isEmpty()) {
+                throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.DEPRECATED_OPTION_CONFLICT, "--format",
+                        REPORT_OPTION));
+            }
+            ReportFormat legacyFormat;
+            try {
+                legacyFormat = ReportFormat.fromString(format);
+            } catch (IllegalArgumentException ex) {
+                throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_FORMAT, format));
+            }
+            boolean sarif = legacyFormat == ReportFormat.SARIF;
+            reportFormat = sarif ? ReportFormat.SARIF : ReportFormat.JSON;
+            reports.add(sarif ? Report.SARIF : Report.JSON);
+            warnOnce(DiagnosticLog.warning(DiagnosticCode.DEPRECATED_OPTION, "--format=" + format,
+                    REPORT_OPTION + "=" + (sarif ? "sarif" : "json")));
+        }
+        for (String value : reportOptions) {
+            reports.add(Report.parse(value).orElseThrow(() -> ScanFailure.usage(DiagnosticLog.error(
+                    DiagnosticCode.INVALID_OPTION_VALUE, value, REPORT_OPTION, Report.VALUES))));
+        }
+        if (reports.isEmpty()) {
+            reports.add(Report.JSON);
+        }
+        if (scanReport) {
+            reports.add(Report.HTML);
+            warnOnce(DiagnosticLog.warning(DiagnosticCode.DEPRECATED_OPTION, "--scan-report",
+                    REPORT_OPTION + "=" + String.join(",", reports.stream().map(Report::value).toList())));
         }
     }
 
@@ -526,6 +589,7 @@ public class ScanCmd implements BLauncherCmd {
         failOnUnknownRuleOptions(true);
         // The run fails anyway, so the other packages are not compiled and scanned
         failOnPackageFailures(workspaceProject, failures);
+        resolvePackageReportDirs(workspaceProject, packageScans);
 
         // Each package's analyzers are loaded just before it is scanned and released after it, and its result once it
         // is reported
@@ -639,16 +703,19 @@ public class ScanCmd implements BLauncherCmd {
      */
     private void writeWorkspaceReports(WorkspaceProject workspaceProject) {
         printResultsLocation(accumulateWorkspaceReports(workspaceProject));
-        if (scanReport) {
+        if (reports.contains(Report.HTML)) {
             printScanReportLocation(ScanUtils.generateScanReport(allIssues, workspaceProject, targetDir,
                     allSuppressions, this::analyzedSources));
         }
     }
 
-    private void printResultsLocation(Path resultsPath) {
+    private void printResultsLocation(List<Path> resultsPaths) {
+        if (resultsPaths.isEmpty()) {
+            return;
+        }
         section(Section.RESULTS_FILE);
         errorStream.println("View scan results at:");
-        errorStream.println("\t" + resultsPath.toUri());
+        resultsPaths.forEach(resultsPath -> errorStream.println("\t" + resultsPath.toUri()));
     }
 
     private void printScanReportLocation(Path scanReportPath) {
@@ -707,24 +774,30 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * Writes the issues of every package of a workspace to one results file, and returns its path.
+     * Writes the issues of every package of a workspace to one file of each selected results format, and returns their
+     * paths.
      */
-    private Path accumulateWorkspaceReports(WorkspaceProject workspaceProject) {
-        boolean isSarifFormat = ReportFormat.SARIF.equals(reportFormat);
-        String reportFileName = isSarifFormat ? Constants.RESULTS_SARIF_FILE : Constants.RESULTS_JSON_FILE;
-        Path finalReportPath;
-        try {
-            finalReportPath = ScanUtils.getTargetPath(workspaceProject, targetDir).getReportPath()
-                    .resolve(reportFileName);
-            String finalReportContent = isSarifFormat
-                    ? convertIssuesToSarifString(allIssues, workspaceProject, allSuppressions)
-                    : convertIssuesToJsonString(allIssues, workspaceProject, allSuppressions);
-            Files.writeString(finalReportPath, finalReportContent);
-        } catch (IOException e) {
-            throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.FAILED_TO_WRITE_REPORT, reportFileName,
-                    e.getMessage()));
+    private List<Path> accumulateWorkspaceReports(WorkspaceProject workspaceProject) {
+        List<Path> resultsPaths = new ArrayList<>();
+        for (Report report : reports) {
+            if (report == Report.HTML) {
+                continue;
+            }
+            boolean sarif = report == Report.SARIF;
+            String reportFileName = sarif ? Constants.RESULTS_SARIF_FILE : Constants.RESULTS_JSON_FILE;
+            try {
+                Path reportPath = ScanUtils.getTargetPath(workspaceProject, targetDir).getReportPath()
+                        .resolve(reportFileName);
+                Files.writeString(reportPath, sarif
+                        ? convertIssuesToSarifString(allIssues, workspaceProject, allSuppressions)
+                        : convertIssuesToJsonString(allIssues, workspaceProject, allSuppressions));
+                resultsPaths.add(reportPath);
+            } catch (IOException e) {
+                throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.FAILED_TO_WRITE_REPORT, reportFileName,
+                        e.getMessage()));
+            }
         }
-        return finalReportPath;
+        return resultsPaths;
     }
 
     /**
@@ -748,11 +821,11 @@ public class ScanCmd implements BLauncherCmd {
         if (result.suppressionFailure() != null) {
             throw result.suppressionFailure();
         }
-        Optional<Path> resultsPath = report(result);
+        Optional<List<Path>> resultsPaths = report(result);
         printSummary(result.activeIssues().size(), result.suppressions().size());
-        resultsPath.ifPresent(this::printResultsLocation);
-        if (resultsPath.isPresent() && scanReport) {
-            printScanReportLocation(ScanUtils.generateScanReport(result.issues(), project, targetDir,
+        resultsPaths.ifPresent(this::printResultsLocation);
+        if (resultsPaths.isPresent() && reports.contains(Report.HTML)) {
+            printScanReportLocation(ScanUtils.generateScanReport(result.issues(), project, packageTargetDir(project),
                     result.suppressions(), this::analyzedSources));
         }
         // The results are saved before the platforms run, and a failed platform wins over the gate
@@ -1209,9 +1282,9 @@ public class ScanCmd implements BLauncherCmd {
      * Prints the active issues of a package and saves its results, unless a platform triggered the scan. A workspace
      * prints the issues of all its packages together.
      *
-     * @return the results file of a package, or empty when none was saved
+     * @return the results files of a package or a single file, or empty when its results are not saved
      */
-    private Optional<Path> report(PackageResult result) {
+    private Optional<List<Path>> report(PackageResult result) {
         Project project = result.project();
         Map<Issue, SuppressedIssue> suppressions = result.suppressions();
         allIssues.addAll(result.issues());
@@ -1228,12 +1301,75 @@ public class ScanCmd implements BLauncherCmd {
         } else {
             printIssues(result.activeIssues(), project);
         }
-        if (!project.kind().equals(ProjectKind.BUILD_PROJECT)) {
+        if (project.kind() != ProjectKind.BUILD_PROJECT && project.kind() != ProjectKind.SINGLE_FILE_PROJECT) {
             return Optional.empty();
         }
-        return Optional.of(ReportFormat.SARIF.equals(reportFormat)
-                ? ScanUtils.saveSarifToDirectory(result.issues(), project, targetDir, suppressions)
-                : ScanUtils.saveToDirectory(result.issues(), project, targetDir, suppressions));
+        // Through the API, such as an analyzer's test runner, a single file is saved only to a given directory, so
+        // that a test suite does not write report/ into its working directory
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && targetDir == null && !targetDirFromCommandLine) {
+            return Optional.empty();
+        }
+        String reportDir = packageTargetDir(project);
+        List<Path> resultsPaths = new ArrayList<>();
+        if (reports.contains(Report.JSON)) {
+            resultsPaths.add(ScanUtils.saveToDirectory(result.issues(), project, reportDir, suppressions));
+        }
+        if (reports.contains(Report.SARIF)) {
+            resultsPaths.add(ScanUtils.saveSarifToDirectory(result.issues(), project, reportDir, suppressions));
+        }
+        return Optional.of(resultsPaths);
+    }
+
+    /**
+     * Returns the directory the results of a package or a single file are saved in, or null for the target directory
+     * of the package.
+     */
+    private String packageTargetDir(Project project) {
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT) {
+            if (targetDir == null) {
+                // A single file has only a temporary target directory, so it is saved where the scan runs, as bal
+                // build saves the executable of a single file
+                return Paths.get(System.getProperty(ProjectConstants.USER_DIR)).toAbsolutePath().normalize()
+                        .toString();
+            }
+            // The root of a single file project is the file, so a relative directory from the API is resolved against
+            // the folder of the file
+            return project.sourceRoot().toAbsolutePath().normalize().resolveSibling(targetDir).normalize().toString();
+        }
+        if (targetDir == null || !scanningWorkspace) {
+            return targetDir;
+        }
+        return packageReportDirs.get(packageKey(project)).toString();
+    }
+
+    /**
+     * Chooses the directory of each workspace package's results under --target-dir, which names one directory for the
+     * whole workspace, as it does for {@code bal build}. A package is saved under its path from the workspace root,
+     * and a package outside the root under {@code _external/<org>/<name>}, as a ../ path would leave the directory.
+     * Fails before any package is scanned when two packages would share a directory, so that neither is overwritten.
+     */
+    private void resolvePackageReportDirs(WorkspaceProject workspaceProject, Collection<PackageScan> packageScans) {
+        if (targetDir == null || platformTriggered) {
+            return;
+        }
+        Path workspaceRoot = workspaceProject.sourceRoot().toAbsolutePath().normalize();
+        Path reportRoot = workspaceRoot.resolve(targetDir).normalize();
+        // Keyed without case, as packages whose paths differ only in case share a folder on macOS and Windows
+        Map<String, Project> owners = new HashMap<>();
+        for (PackageScan packageScan : packageScans) {
+            Project project = packageScan.project();
+            Path packageRoot = project.sourceRoot().toAbsolutePath().normalize();
+            Path reportDir = reportRoot.resolve(packageRoot.startsWith(workspaceRoot)
+                    ? workspaceRoot.relativize(packageRoot)
+                    : Path.of(EXTERNAL_PACKAGES_DIR, project.currentPackage().packageOrg().value(),
+                    project.currentPackage().packageName().value())).normalize();
+            Project owner = owners.putIfAbsent(reportDir.toString().toLowerCase(Locale.ROOT), project);
+            if (owner != null) {
+                throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.REPORT_DIR_CONFLICT,
+                        packageLabel(workspaceProject, owner), packageLabel(workspaceProject, project), reportDir));
+            }
+            packageReportDirs.put(packageKey(project), reportDir);
+        }
     }
 
     /**
@@ -1296,14 +1432,6 @@ public class ScanCmd implements BLauncherCmd {
      * Warns about each option that has no effect on a single Ballerina file.
      */
     private void printUnsupportedSingleFileFlagWarnings() {
-        if (targetDir != null) {
-            warn(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
-        }
-
-        if (scanReport) {
-            warn(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
-        }
-
         if (Boolean.TRUE.equals(excludeTests)) {
             warn(DiagnosticLog.warning(DiagnosticCode.EXCLUDE_TESTS_NOT_SUPPORTED));
         }
@@ -1539,6 +1667,30 @@ public class ScanCmd implements BLauncherCmd {
 
     private static boolean isBoolean(String value) {
         return "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value);
+    }
+
+    /**
+     * A report saved in the report directory. The reports are saved and listed in the order of the constants.
+     */
+    private enum Report {
+        JSON("json"),
+        SARIF("sarif"),
+        HTML("html");
+
+        static final String VALUES = "json, sarif or html";
+        private final String value;
+
+        Report(String value) {
+            this.value = value;
+        }
+
+        String value() {
+            return value;
+        }
+
+        static Optional<Report> parse(String value) {
+            return Arrays.stream(values()).filter(report -> report.value.equalsIgnoreCase(value)).findFirst();
+        }
     }
 
     private static class StringToListConverter implements CommandLine.ITypeConverter<List<String>> {
