@@ -22,8 +22,12 @@ import io.ballerina.scan.Rule;
 import io.ballerina.scan.RuleKind;
 import io.ballerina.scan.Severity;
 import io.ballerina.scan.Standards;
+import io.ballerina.scan.utils.DiagnosticCode;
+import io.ballerina.scan.utils.DiagnosticLog;
+import io.ballerina.scan.utils.ScanToolException;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Represents the implementation of the {@link Rule} interface.
@@ -134,6 +138,44 @@ public class RuleImpl implements Rule {
 
     static Builder builder() {
         return new Builder();
+    }
+
+    /**
+     * Returns a rule as the scan tool's own implementation, copying one that an analyzer implemented itself through
+     * the {@link Rule} getters, so that every report writes it the same way. A copied rule must have what the reports
+     * need, so that a broken rule fails where the analyzer reports it instead of while the reports are written.
+     *
+     * @param rule the rule
+     * @return the rule, or a copy of it
+     */
+    static RuleImpl of(Rule rule) {
+        if (rule instanceof RuleImpl ruleImpl) {
+            return ruleImpl;
+        }
+        int missing = missingField(rule);
+        if (missing >= 0) {
+            throw new ScanToolException(DiagnosticLog.error(DiagnosticCode.INCOMPLETE_RULE,
+                    rule.id() == null ? String.valueOf(rule.numericId()) : rule.id(), missing));
+        }
+        return builder().id(rule.id()).numericId(rule.numericId()).name(rule.name())
+                .description(rule.description()).details(rule.details()).helpUri(rule.helpUri())
+                .ruleKind(rule.kind()).severity(rule.severity()).tags(rule.tags()).standards(rule.standards())
+                .build();
+    }
+
+    // The choice index of the INCOMPLETE_RULE message, or -1 when the rule is complete
+    private static int missingField(Rule rule) {
+        if (rule.id() == null) {
+            return 0;
+        }
+        if (rule.kind() == null) {
+            return 1;
+        }
+        if (rule.description() == null) {
+            return 2;
+        }
+        List<String> tags = rule.tags();
+        return tags != null && tags.stream().anyMatch(Objects::isNull) ? 3 : -1;
     }
 
     /**
