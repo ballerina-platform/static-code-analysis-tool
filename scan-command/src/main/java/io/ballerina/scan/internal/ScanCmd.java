@@ -84,6 +84,7 @@ import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -206,8 +207,6 @@ public class ScanCmd implements BLauncherCmd {
     private ScanTomlFile workspaceDefaults;
     // The rules of each workspace package that uses the workspace Scan.toml, in scan order
     private final Map<Project, List<Rule>> workspaceFileUsers = new LinkedHashMap<>();
-    // The workspace Scan.toml a package scanned on its own uses, as the other packages' rules are not known
-    private ScanTomlFile enclosingWorkspaceFile;
     private boolean workspaceDefaultsRead;
     private final Set<String> printedWarnings = new HashSet<>();
     // The sources each package is scanned with, keyed by its root, for the workspace HTML report
@@ -535,12 +534,22 @@ public class ScanCmd implements BLauncherCmd {
         // Each package's analyzers are loaded just before it is scanned and released after it, and its result once it
         // is reported
         Deque<PackageResult> results = new ArrayDeque<>();
+        boolean allRulesLoaded = true;
         while (!packageScans.isEmpty()) {
             PackageScan packageScan = packageScans.poll();
             BuildProject buildProject = (BuildProject) packageScan.project();
+            PackageRules rules;
             try {
                 printRunningScans(buildProject);
-                PackageResult result = scanPackage(packageScan, loadRules(packageScan));
+                rules = loadRules(packageScan);
+            } catch (RuntimeException ex) {
+                failures.put(buildProject, ScanFailure.from(ex));
+                allRulesLoaded = false;
+                continue;
+            }
+            try {
+                failOnUnknownTomlRules(packageScan, rules);
+                PackageResult result = scanPackage(packageScan, rules);
                 results.add(result);
                 if (result.suppressionFailure() != null) {
                     failures.put(buildProject, result.suppressionFailure());
@@ -549,14 +558,11 @@ public class ScanCmd implements BLauncherCmd {
                 failures.put(buildProject, ScanFailure.from(ex));
             }
         }
-        // A package that failed to load has no rules, so the analyzer rule IDs are complete only without failures
-        if (failures.isEmpty()) {
-            failOnUnknownWorkspaceRules(workspaceProject);
-        }
-        workspaceFileUsers.forEach((project, rules) -> warnUnavailableWorkspaceRules(project, workspaceDefaults,
-                rules));
-        if (failures.isEmpty()) {
+        // A package that failed to load has no rules, so the analyzer rule IDs are complete only when every package
+        // loaded; a command-line usage error then wins over the packages' errors
+        if (allRulesLoaded) {
             failOnUnknownRuleOptions(false);
+            failOnUnknownWorkspaceRules(workspaceProject);
         }
         // Nothing is reported until every package is scanned without an error
         failOnPackageFailures(workspaceProject, failures);
@@ -639,6 +645,9 @@ public class ScanCmd implements BLauncherCmd {
             if (workspaceDefaults != null) {
                 errorStream.println(LOADING_CONFIGURATIONS_LOG + "the workspace from "
                         + workspaceDefaults.getDisplayPath(workspaceProject.sourceRoot()).orElse(Constants.SCAN_FILE));
+                if (!listRules) {
+                    failOnUnknownCoreRules(workspaceDefaults, workspaceProject.sourceRoot());
+                }
             }
         }
         return workspaceDefaults;
@@ -746,6 +755,7 @@ public class ScanCmd implements BLauncherCmd {
         PackageScan packageScan = preparePackage(project);
         PackageRules rules = loadRules(packageScan);
         failOnUnknownRuleOptions(false);
+        failOnUnknownTomlRules(packageScan, rules);
         if (listRules) {
             section(Section.RULES);
             ScanUtils.printRulesToConsole(allRules, outputStream);
@@ -783,6 +793,10 @@ public class ScanCmd implements BLauncherCmd {
     private PackageScan preparePackage(Project project) {
         section(Section.LOADING);
         ScanTomlFile scanTomlFile = chooseScanToml(project);
+        // A package's own file is checked in full once its analyzers are loaded, still before it is analyzed
+        if (!listRules && !usesWorkspaceFile(scanTomlFile) && !isOwnScanToml(project, scanTomlFile)) {
+            failOnUnknownCoreRules(scanTomlFile, displayRoot(project));
+        }
         PackageConfig config = resolveConfig(project, scanTomlFile);
         packageSources.put(packageKey(project), config.analyzedSources());
 
@@ -813,17 +827,60 @@ public class ScanCmd implements BLauncherCmd {
         Map<String, List<Rule>> externalAnalyzers = projectAnalyzer.getExternalAnalyzers();
         addRules(coreRules);
         externalAnalyzers.values().forEach(this::addRules);
-
-        boolean usesWorkspaceFile = scanningWorkspace && workspaceDefaults != null && scanTomlFile == workspaceDefaults;
-        List<Rule> packageRules = ProjectAnalyzer.rules(coreRules, externalAnalyzers);
-        if (!listRules && usesWorkspaceFile) {
-            workspaceFileUsers.put(project, packageRules);
-        } else if (!listRules && scanTomlFile != enclosingWorkspaceFile) {
-            Path root = scanningWorkspace ? project.workspaceProject().orElseThrow().sourceRoot()
-                    : project.sourceRoot();
-            failOnUnknownTomlRules(scanTomlFile, root, ruleIds(packageRules), false);
+        if (!listRules && usesWorkspaceFile(scanTomlFile)) {
+            workspaceFileUsers.put(project, ProjectAnalyzer.rules(coreRules, externalAnalyzers));
         }
         return new PackageRules(projectAnalyzer, coreRules, externalAnalyzers);
+    }
+
+    // A package of a workspace scan that reads the workspace Scan.toml, also through a configPath to it
+    private boolean usesWorkspaceFile(ScanTomlFile scanTomlFile) {
+        return scanningWorkspace && workspaceDefaults != null && scanTomlFile.getPath().isPresent()
+                && scanTomlFile.getPath().equals(workspaceDefaults.getPath());
+    }
+
+    /**
+     * Checks the rule IDs of the [rule] table of the Scan.toml file a package uses against the rules of the package.
+     * Its own Scan.toml must name only rules it has. A file shared with other packages, such as a remote one or a
+     * configPath outside the package, may name an analyzer that only some of them use, so a rule the package lacks is
+     * a warning. The workspace file of a workspace scan is checked once all the packages are loaded, by
+     * {@link #failOnUnknownWorkspaceRules}.
+     */
+    private void failOnUnknownTomlRules(PackageScan packageScan, PackageRules rules) {
+        ScanTomlFile scanTomlFile = packageScan.scanTomlFile();
+        if (listRules || usesWorkspaceFile(scanTomlFile)) {
+            return;
+        }
+        Project project = packageScan.project();
+        Set<String> packageRuleIds = ruleIds(ProjectAnalyzer.rules(rules.coreRules(), rules.externalAnalyzers()));
+        if (isOwnScanToml(project, scanTomlFile)) {
+            failOnUnknownTomlRules(scanTomlFile, displayRoot(project), ruleId -> !packageRuleIds.contains(ruleId), 0);
+        } else {
+            warnUnavailableRules(project, scanTomlFile, packageRuleIds);
+        }
+    }
+
+    // A Scan.toml in the folder of the package, or of a single file, rather than one it shares with other packages
+    private static boolean isOwnScanToml(Project project, ScanTomlFile scanTomlFile) {
+        Path root = project.sourceRoot().toAbsolutePath().normalize();
+        Path packageRoot = project.kind() == ProjectKind.SINGLE_FILE_PROJECT ? root.getParent() : root;
+        return packageRoot != null && scanTomlFile.getPath()
+                .map(path -> path.toAbsolutePath().normalize().startsWith(packageRoot))
+                .orElse(false);
+    }
+
+    private Path displayRoot(Project project) {
+        return scanningWorkspace ? project.workspaceProject().orElseThrow().sourceRoot() : project.sourceRoot();
+    }
+
+    /**
+     * Fails on a rule ID of the [rule] table of a shared Scan.toml file that is not a core rule, as every package has
+     * the same core rules. Done before any package is compiled, so that a typo does not wait for the scan.
+     */
+    private static void failOnUnknownCoreRules(ScanTomlFile scanTomlFile, Path root) {
+        Set<String> coreRuleIds = ruleIds(CoreRule.rules());
+        failOnUnknownTomlRules(scanTomlFile, root,
+                ruleId -> ruleId.startsWith(BALLERINA_RULE_PREFIX) && !coreRuleIds.contains(ruleId), 2);
     }
 
     /**
@@ -863,10 +920,7 @@ public class ScanCmd implements BLauncherCmd {
             ScanTomlFile packageFile = ScanUtils.readScanTomlConfigurations(project, errorStream, listRules);
             // A workspace package scanned on its own uses the workspace file too, as it does in the editor
             if (packageFile.getPath().isEmpty()) {
-                Optional<ScanTomlFile> workspaceFile = ScanUtils.readEnclosingWorkspaceScanToml(project, errorStream,
-                        listRules);
-                enclosingWorkspaceFile = workspaceFile.orElse(null);
-                return workspaceFile.orElse(packageFile);
+                return ScanUtils.readEnclosingWorkspaceScanToml(project, errorStream, listRules).orElse(packageFile);
             }
             return packageFile;
         }
@@ -970,32 +1024,39 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * Fails the scan when a rule ID of the workspace [rule] table is not a rule of any package of the workspace. One
-     * that only some packages provide is valid, and each package that lacks it is warned about instead.
+     * Fails the scan when a rule ID of the workspace [rule] table is not a rule of any package that reads the file. One
+     * that only some of them provide is valid, and each package that lacks it is warned about instead.
      */
     private void failOnUnknownWorkspaceRules(WorkspaceProject workspaceProject) {
-        if (!workspaceFileUsers.isEmpty()) {
-            failOnUnknownTomlRules(workspaceDefaults, workspaceProject.sourceRoot(), allRuleIds, true);
+        if (workspaceFileUsers.isEmpty()) {
+            return;
         }
+        Set<String> userRuleIds = new HashSet<>();
+        workspaceFileUsers.values().forEach(rules -> userRuleIds.addAll(ruleIds(rules)));
+        failOnUnknownTomlRules(workspaceDefaults, workspaceProject.sourceRoot(),
+                ruleId -> !userRuleIds.contains(ruleId), 1);
+        workspaceFileUsers.forEach((project, rules) -> warnUnavailableRules(project, workspaceDefaults,
+                ruleIds(rules)));
     }
 
     /**
-     * Fails the scan with an error at each rule ID of the [rule] table of a Scan.toml file that is not one of the given
-     * rules, as an unknown rule on the command line is.
+     * Fails the scan with an error at each rule ID of the [rule] table of a Scan.toml file that is unknown, as an
+     * unknown rule on the command line is. The scope says what does not provide it: 0 the package, 1 the packages of
+     * the workspace, 2 the scan tool.
      */
-    private static void failOnUnknownTomlRules(ScanTomlFile scanTomlFile, Path root, Set<String> knownRuleIds,
-                                               boolean workspaceFile) {
+    private static void failOnUnknownTomlRules(ScanTomlFile scanTomlFile, Path root, Predicate<String> isUnknown,
+                                               int scope) {
         String displayPath = scanTomlFile.getDisplayPath(root).orElse(Constants.SCAN_FILE);
         List<String> errors = new ArrayList<>(Stream.concat(scanTomlFile.getRulesToInclude().stream(),
                         scanTomlFile.getRulesToExclude().stream())
                 .map(ScanTomlFile.RuleToFilter::id)
-                .filter(ruleId -> !knownRuleIds.contains(ruleId))
+                .filter(isUnknown)
                 .distinct()
                 .map(ruleId -> Map.entry(ruleId, scanTomlFile.getRuleLocation(ruleId).orElseThrow()))
                 .sorted(Comparator.comparing((Map.Entry<String, LineRange> rule) -> rule.getValue().startLine().line())
                         .thenComparing(rule -> rule.getValue().startLine().offset()))
                 .map(rule -> DiagnosticLog.fileError(displayPath, rule.getValue(),
-                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_RULE, rule.getKey(), workspaceFile ? 1 : 0)))
+                        DiagnosticLog.error(DiagnosticCode.UNKNOWN_CONFIG_RULE, rule.getKey(), scope)))
                 .toList());
         if (errors.isEmpty()) {
             return;
@@ -1013,14 +1074,12 @@ public class ScanCmd implements BLauncherCmd {
     }
 
     /**
-     * Warns about the rules of the workspace [rule] table that a package does not provide, since they may come from an
-     * analyzer that only some packages use.
+     * Warns about the rules of the [rule] table of a shared Scan.toml file that a package does not provide, since they
+     * may come from an analyzer that only some of the packages use.
      */
-    private void warnUnavailableWorkspaceRules(Project project, ScanTomlFile workspaceFile, List<Rule> packageRules) {
-        Set<String> packageRuleIds = new HashSet<>();
-        packageRules.forEach(rule -> packageRuleIds.add(rule.id()));
-        List<String> unavailableRules = quoted(Stream.concat(workspaceFile.getRulesToInclude().stream(),
-                        workspaceFile.getRulesToExclude().stream())
+    private void warnUnavailableRules(Project project, ScanTomlFile scanTomlFile, Set<String> packageRuleIds) {
+        List<String> unavailableRules = quoted(Stream.concat(scanTomlFile.getRulesToInclude().stream(),
+                        scanTomlFile.getRulesToExclude().stream())
                 .map(ScanTomlFile.RuleToFilter::id)
                 .filter(ruleId -> !packageRuleIds.contains(ruleId))
                 .distinct()
@@ -1028,10 +1087,11 @@ public class ScanCmd implements BLauncherCmd {
         if (unavailableRules.isEmpty()) {
             return;
         }
-        WorkspaceProject workspaceProject = project.workspaceProject().orElseThrow();
+        String packageName = scanningWorkspace ? packageLabel(project.workspaceProject().orElseThrow(), project)
+                : project.currentPackage().packageOrg().value() + "/" + project.currentPackage().packageName().value();
         warn(DiagnosticLog.warning(DiagnosticCode.WORKSPACE_RULE_NOT_AVAILABLE, joinWith(unavailableRules, "and"),
-                workspaceFile.getDisplayPath(workspaceProject.sourceRoot()).orElse(Constants.SCAN_FILE),
-                unavailableRules.size(), packageLabel(workspaceProject, project)));
+                scanTomlFile.getDisplayPath(displayRoot(project)).orElse(Constants.SCAN_FILE),
+                unavailableRules.size(), packageName));
     }
 
     /**

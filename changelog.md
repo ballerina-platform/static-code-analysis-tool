@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- A rule ID in the `[rule]` table of `Scan.toml` that is not a rule of the package, such as `exclude = ["ballerina:999"]`, fails the scan with an error at its line and column, exit code `1`, instead of being ignored. A rule of the workspace `Scan.toml` fails the scan only when no package of the workspace provides it; a rule that only some packages provide is still a warning for the others. `--list-rules` still lists the rules. A package scanned on its own with the `Scan.toml` of its workspace is not checked, as the rules of the other packages are not known. ([#166](https://github.com/ballerina-platform/static-code-analysis-tool/issues/166))
+- A rule ID in the `[rule]` table of a package's own `Scan.toml` that is not a rule of the package, such as `exclude = ["ballerina:999"]`, fails the scan with an error at its line and column, exit code `1`, instead of being ignored. An unknown core rule ID, such as `ballerina:999`, is an error in any `Scan.toml` and is reported before any package is scanned. A rule of the workspace `Scan.toml` fails the scan only when no package that reads it provides it; a rule that only some packages provide is still a warning for the others. A `Scan.toml` shared in another way, such as a remote one, a `configPath` outside the package, or the workspace file of a package scanned on its own, only warns about an analyzer rule the package lacks. An unknown rule in `--include-rules` or `--exclude-rules` is still reported first, with exit code `2`. `--list-rules` still lists the rules. ([#166](https://github.com/ballerina-platform/static-code-analysis-tool/issues/166))
 
 ## [0.14.0] - 2026-11-17
 

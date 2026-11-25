@@ -169,26 +169,27 @@ public class ConsoleLayoutTest extends BaseTest {
         Path otherScanToml = workspace.resolve("pkg-b").resolve("Scan.toml");
         String original = Files.readString(packageScanToml, StandardCharsets.UTF_8);
         String otherOriginal = Files.readString(otherScanToml, StandardCharsets.UTF_8);
+        Path analyzerImport = workspace.resolve("pkg-b").resolve("analyzer_import.bal");
         try {
-            // pkg-a uses the workspace file, which names a rule of pkg-b's analyzer; pkg-b's own file leaves it out
+            // Both packages use the workspace file, which names a rule of the analyzer only pkg-b imports, and the
+            // command line overrides its gate
             Files.delete(packageScanToml);
-            Files.writeString(otherScanToml, otherOriginal + """
-
-                    [[analyzer]]
-                    org = "exampleOrg"
-                    name = "example_module_static_code_analyzer"
-                    """);
+            Files.delete(otherScanToml);
+            Files.writeString(analyzerImport, "import exampleOrg/example_module_static_code_analyzer as _;\n");
             Files.writeString(workspaceScanToml, """
                     [rule]
                     exclude = ["exampleOrg/example_module_static_code_analyzer:1"]
+
+                    [gate]
+                    failOnSeverity = "HIGH"
                     """);
-            String output = scan(workspace);
+            String output = scan(workspace, "--fail-on-severity=NONE");
             Assert.assertEquals(withoutWarnings(skeleton(output)), """
                     Resolving workspace dependencies
 
                     Loading scan tool configurations for the workspace from Scan.toml
                     Using the workspace scan tool configurations for pkg-a
-                    Loading scan tool configurations for pkg-b from pkg-b/Scan.toml
+                    Using the workspace scan tool configurations for pkg-b
 
                     <WARNING>
 
@@ -209,6 +210,7 @@ public class ConsoleLayoutTest extends BaseTest {
                     """, output);
         } finally {
             Files.deleteIfExists(workspaceScanToml);
+            Files.deleteIfExists(analyzerImport);
             Files.writeString(packageScanToml, original);
             Files.writeString(otherScanToml, otherOriginal);
         }
