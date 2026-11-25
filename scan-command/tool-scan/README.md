@@ -22,8 +22,8 @@ All options are optional. Rule filters and platforms can also be configured in a
 
 | Option | Description |
 |--------|-------------|
-| `--target-dir=<path>` | Target directory path for saving analysis reports (only for Ballerina projects). Default is the `target` directory of the package, or in a workspace, of each package and of the workspace. A relative path is resolved against the package root, and the results are saved in `<path>/report`. In a workspace, each package saves its results in `<path>/report` under its own root, and the combined results are saved in `<path>/report` under the workspace root. |
-| `--scan-report` | Generate an HTML report containing the analysis results (only for Ballerina projects). Disabled by default. |
+| `--target-dir=<path>` | Target directory path for saving analysis reports. Default is the `target` directory of the package or workspace, or the current directory for a single Ballerina file. A relative path is resolved against the current directory. In a workspace, it is one directory for every package. See [Report locations](#report-locations). |
+| `--scan-report` | Generate an HTML report containing the analysis results. Disabled by default. |
 | `--format=<json\|sarif>` | Specify the format of the report. Default is `json`. |
 | `--list-rules` | List the rules available to the workspace, package or source file, along with their kind and severity. Lists only the core rules and the rules contributed by the dependencies (library tools and static code analyzer plugins), and for a package or workspace, by the analyzers declared in `Scan.toml`. |
 | `--include-rules=<rule1, ...>` | Run analysis for a specific set of rules. By default, all available rules are included. A rule that is not available to the project is an error. |
@@ -43,11 +43,13 @@ All options are optional. Rule filters and platforms can also be configured in a
 # console, and save results in JSON file format in the target directory.
 bal scan
 
-# Run analysis against a standalone Ballerina file and print results to the console. The
-# file path of the Ballerina file can be relative or absolute.
+# Run analysis against a standalone Ballerina file, print results to the console and save
+# them in the report directory of the current directory. The file path of the Ballerina file
+# can be relative or absolute.
 bal scan main.bal
 
-# Run analysis and save analysis results in a specified directory.
+# Run analysis and save analysis results in a specified directory, relative to the current
+# directory.
 bal scan --target-dir="results"
 
 # Run analysis and generate an HTML report in the target directory.
@@ -173,7 +175,22 @@ To generate a detailed HTML report of the analysis results, use the `--scan-repo
 bal scan --scan-report
 ```
 
-This produces an HTML report and the scan results in JSON format inside the `target/report` directory, or in the `report` directory under the path given with `--target-dir`. The report is only generated for Ballerina projects, not for standalone Ballerina files. It is generated even when the results are also reported to a platform.
+This produces an HTML report and the scan results in JSON format inside the `target/report` directory, or in the `report` directory under the path given with `--target-dir`. It is generated even when the results are also reported to a platform.
+
+### Report locations
+
+A package scan saves its results, `scan_results.json` or `scan_results.sarif`, and the HTML report in the `report` folder of the target directory: `target/report` in the package, or `<dir>/report` with `--target-dir=<dir>`. A relative `--target-dir` is resolved against the current directory, so `bal scan ../orders --target-dir=out` saves to `out/report` in the current directory.
+
+A single Ballerina file has no `target` directory, so its results and HTML report are saved in the `report` folder of the current directory, as `bal build` saves the executable of a single file in the current directory, or in `<dir>/report` with `--target-dir=<dir>`. For example, `bal scan src/main.bal --scan-report` saves `report/scan_results.json` and `report/index.html` in the current directory.
+
+A workspace scan saves the results of each package in the `target/report` folder of that package, and the combined results of every package and the HTML report in the `target/report` folder of the workspace. With `--target-dir=<dir>`, the workspace uses one directory for all its packages, as `bal build --target-dir` does: the combined results and the HTML report are saved in `<dir>/report`, and the results of each package in `<dir>/<package path>/report`, where the package path is its path from the workspace root, such as `apps/orders`, or `_external/<org>/<name>` for a package outside the workspace root, such as `../shared`. If two packages would save their results to the same directory, for example a package in the `_external/myorg/utils` folder of the workspace and the package `myorg/utils` outside it, the scan fails before any package is scanned. For example, `bal scan --target-dir=/tmp/scan` in a workspace with the packages `orders` and `apps/billing` saves:
+
+```
+/tmp/scan/report/scan_results.json                 combined results
+/tmp/scan/report/index.html                        HTML report, with --scan-report
+/tmp/scan/orders/report/scan_results.json
+/tmp/scan/apps/billing/report/scan_results.json
+```
 
 The HTML report includes a summary of the total number of files scanned and the number of code smells, bugs, and vulnerabilities found in each file. You can filter, search, and export the list of files.
 

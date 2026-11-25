@@ -68,6 +68,7 @@ import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -76,6 +77,7 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -111,6 +113,7 @@ public class ScanCmd implements BLauncherCmd {
     private static final String FAIL_ON_COUNT_OPTION = "--fail-on-count";
     private static final String EXCLUDE_TESTS_OPTION = "--exclude-tests";
     private static final String LIST_RULES_HINT = "  Run 'bal scan --list-rules' to see the available rules.";
+    private static final String EXTERNAL_PACKAGES_DIR = "_external";
 
     private final PrintStream outputStream;
     private final PrintStream errorStream;
@@ -139,6 +142,9 @@ public class ScanCmd implements BLauncherCmd {
 
     @CommandLine.Option(names = "--target-dir", description = "Target directory path")
     private String targetDir;
+    // A --target-dir on the command line is resolved against the current directory. One given to the API constructor
+    // is resolved against the root of a package or workspace, and against the folder of a single file
+    private boolean targetDirFromCommandLine = true;
 
     @CommandLine.Option(names = "--scan-report", description = "Enable HTML scan report generation")
     private boolean scanReport;
@@ -207,6 +213,8 @@ public class ScanCmd implements BLauncherCmd {
     private final Set<String> printedWarnings = new HashSet<>();
     // The sources each package is scanned with, keyed by its root, for the workspace HTML report
     private final Map<Path, AnalyzedSources> packageSources = new HashMap<>();
+    // The directory of each workspace package's results under --target-dir, keyed by its root
+    private final Map<Path, Path> packageReportDirs = new HashMap<>();
     // Each platform JAR is downloaded and loaded once for every package, and its loader is closed at the end
     private final Map<String, Path> platformJars = new HashMap<>();
     private final Map<Path, URLClassLoader> platformLoaders = new LinkedHashMap<>();
@@ -268,6 +276,7 @@ public class ScanCmd implements BLauncherCmd {
         this.helpFlag = helpFlag;
         this.platformTriggered = platformTriggered;
         this.targetDir = targetDir;
+        this.targetDirFromCommandLine = false;
         this.scanReport = scanReport;
         this.reportFormat = format == null ? ReportFormat.BALLERINA : format;
         this.format = this.reportFormat.getFormat();
@@ -455,6 +464,15 @@ public class ScanCmd implements BLauncherCmd {
         if (!platforms.isEmpty() && isStandaloneBalFile()) {
             throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.PLATFORMS_NOT_SUPPORTED));
         }
+        if (targetDir != null && targetDirFromCommandLine) {
+            try {
+                targetDir = Paths.get(System.getProperty(ProjectConstants.USER_DIR)).resolve(targetDir)
+                        .toAbsolutePath().normalize().toString();
+            } catch (InvalidPathException ex) {
+                throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, targetDir,
+                        "--target-dir", "a directory path"));
+            }
+        }
         if (excludeTestsOption != null) {
             if (!excludeTestsOption.equalsIgnoreCase("true") && !excludeTestsOption.equalsIgnoreCase("false")) {
                 throw ScanFailure.usage(DiagnosticLog.error(DiagnosticCode.INVALID_OPTION_VALUE, excludeTestsOption,
@@ -526,6 +544,7 @@ public class ScanCmd implements BLauncherCmd {
         failOnUnknownRuleOptions(true);
         // The run fails anyway, so the other packages are not compiled and scanned
         failOnPackageFailures(workspaceProject, failures);
+        resolvePackageReportDirs(workspaceProject, packageScans);
 
         // Each package's analyzers are loaded just before it is scanned and released after it, and its result once it
         // is reported
@@ -752,7 +771,7 @@ public class ScanCmd implements BLauncherCmd {
         printSummary(result.activeIssues().size(), result.suppressions().size());
         resultsPath.ifPresent(this::printResultsLocation);
         if (resultsPath.isPresent() && scanReport) {
-            printScanReportLocation(ScanUtils.generateScanReport(result.issues(), project, targetDir,
+            printScanReportLocation(ScanUtils.generateScanReport(result.issues(), project, packageTargetDir(project),
                     result.suppressions(), this::analyzedSources));
         }
         // The results are saved before the platforms run, and a failed platform wins over the gate
@@ -1228,12 +1247,70 @@ public class ScanCmd implements BLauncherCmd {
         } else {
             printIssues(result.activeIssues(), project);
         }
-        if (!project.kind().equals(ProjectKind.BUILD_PROJECT)) {
+        if (project.kind() != ProjectKind.BUILD_PROJECT && project.kind() != ProjectKind.SINGLE_FILE_PROJECT) {
             return Optional.empty();
         }
+        // Through the API, such as an analyzer's test runner, a single file is saved only to a given directory, so
+        // that a test suite does not write report/ into its working directory
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT && targetDir == null && !targetDirFromCommandLine) {
+            return Optional.empty();
+        }
+        String reportDir = packageTargetDir(project);
         return Optional.of(ReportFormat.SARIF.equals(reportFormat)
-                ? ScanUtils.saveSarifToDirectory(result.issues(), project, targetDir, suppressions)
-                : ScanUtils.saveToDirectory(result.issues(), project, targetDir, suppressions));
+                ? ScanUtils.saveSarifToDirectory(result.issues(), project, reportDir, suppressions)
+                : ScanUtils.saveToDirectory(result.issues(), project, reportDir, suppressions));
+    }
+
+    /**
+     * Returns the directory the results of a package or a single file are saved in, or null for the target directory
+     * of the package.
+     */
+    private String packageTargetDir(Project project) {
+        if (project.kind() == ProjectKind.SINGLE_FILE_PROJECT) {
+            if (targetDir == null) {
+                // A single file has only a temporary target directory, so it is saved where the scan runs, as bal
+                // build saves the executable of a single file
+                return Paths.get(System.getProperty(ProjectConstants.USER_DIR)).toAbsolutePath().normalize()
+                        .toString();
+            }
+            // The root of a single file project is the file, so a relative directory from the API is resolved against
+            // the folder of the file
+            return project.sourceRoot().toAbsolutePath().normalize().resolveSibling(targetDir).normalize().toString();
+        }
+        if (targetDir == null || !scanningWorkspace) {
+            return targetDir;
+        }
+        return packageReportDirs.get(packageKey(project)).toString();
+    }
+
+    /**
+     * Chooses the directory of each workspace package's results under --target-dir, which names one directory for the
+     * whole workspace, as it does for {@code bal build}. A package is saved under its path from the workspace root,
+     * and a package outside the root under {@code _external/<org>/<name>}, as a ../ path would leave the directory.
+     * Fails before any package is scanned when two packages would share a directory, so that neither is overwritten.
+     */
+    private void resolvePackageReportDirs(WorkspaceProject workspaceProject, Collection<PackageScan> packageScans) {
+        if (targetDir == null || platformTriggered) {
+            return;
+        }
+        Path workspaceRoot = workspaceProject.sourceRoot().toAbsolutePath().normalize();
+        Path reportRoot = workspaceRoot.resolve(targetDir).normalize();
+        // Keyed without case, as packages whose paths differ only in case share a folder on macOS and Windows
+        Map<String, Project> owners = new HashMap<>();
+        for (PackageScan packageScan : packageScans) {
+            Project project = packageScan.project();
+            Path packageRoot = project.sourceRoot().toAbsolutePath().normalize();
+            Path reportDir = reportRoot.resolve(packageRoot.startsWith(workspaceRoot)
+                    ? workspaceRoot.relativize(packageRoot)
+                    : Path.of(EXTERNAL_PACKAGES_DIR, project.currentPackage().packageOrg().value(),
+                    project.currentPackage().packageName().value())).normalize();
+            Project owner = owners.putIfAbsent(reportDir.toString().toLowerCase(Locale.ROOT), project);
+            if (owner != null) {
+                throw ScanFailure.runtime(DiagnosticLog.error(DiagnosticCode.REPORT_DIR_CONFLICT,
+                        packageLabel(workspaceProject, owner), packageLabel(workspaceProject, project), reportDir));
+            }
+            packageReportDirs.put(packageKey(project), reportDir);
+        }
     }
 
     /**
@@ -1296,14 +1373,6 @@ public class ScanCmd implements BLauncherCmd {
      * Warns about each option that has no effect on a single Ballerina file.
      */
     private void printUnsupportedSingleFileFlagWarnings() {
-        if (targetDir != null) {
-            warn(DiagnosticLog.warning(DiagnosticCode.REPORT_NOT_SUPPORTED));
-        }
-
-        if (scanReport) {
-            warn(DiagnosticLog.warning(DiagnosticCode.SCAN_REPORT_NOT_SUPPORTED));
-        }
-
         if (Boolean.TRUE.equals(excludeTests)) {
             warn(DiagnosticLog.warning(DiagnosticCode.EXCLUDE_TESTS_NOT_SUPPORTED));
         }

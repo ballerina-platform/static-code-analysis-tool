@@ -385,18 +385,25 @@ public class ConsoleLayoutTest extends BaseTest {
     @Test(description = "test the layout of a single file scan, whose warnings come before the scan")
     void testSingleFileLayout() throws IOException {
         Path singleFile = testResourcesRoot.resolve("valid-single-file-project").resolve("main.bal");
-        String output = scan(testResourcesRoot, singleFile.toAbsolutePath().toString(), "--target-dir=out",
-                "--scan-report");
-        Assert.assertEquals(skeleton(output), """
-                bal scan: warning: reports are not saved for a single bal file, ignoring --target-dir
-                bal scan: warning: the HTML report is not generated for a single bal file, ignoring --scan-report
+        // A single file is saved in the current directory, so the scan runs in a temporary one
+        Path workDir = Files.createTempDirectory("single-file-scan");
+        try {
+            String output = scan(workDir, singleFile.toAbsolutePath().toString(), "--exclude-tests");
+            Assert.assertEquals(skeleton(output), """
+                    bal scan: warning: a single bal file has no tests to exclude, ignoring --exclude-tests
 
-                Running Scans
+                    Running Scans
 
-                <ISSUES>
+                    <ISSUES>
 
-                <SUMMARY>
-                """, output);
+                    <SUMMARY>
+
+                    View scan results at:
+                    \t<URI>
+                    """, output);
+        } finally {
+            ProjectUtils.deleteDirectory(workDir);
+        }
     }
 
     @Test(description = "test --platforms on a single file is rejected as not supported")
